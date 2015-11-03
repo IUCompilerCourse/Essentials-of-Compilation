@@ -1,19 +1,14 @@
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% LaTeX book template                           %%
-%% Author:  Amber Jain (http://amberj.devio.us/) %%
-%% License: ISC license                          %%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 \documentclass[11pt]{book}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Source: http://en.wikibooks.org/wiki/LaTeX/Hyperlinks %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \usepackage{hyperref}
 \usepackage{graphicx}
 \usepackage[english]{babel}
+\usepackage{listings}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{amssymb}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 'dedication' environment: To add a dedication paragraph at the start of book %
@@ -48,13 +43,26 @@
 \makeatother
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\itm}[1]{\mathit{#1}}
+\newcommand{\Atom}{\itm{atom}}
+\newcommand{\Stmt}{\itm{stmt}}
+\newcommand{\Exp}{\itm{exp}}
+\newcommand{\Ins}{\itm{inst}}
+\newcommand{\Arg}{\itm{arg}}
+\newcommand{\Int}{\itm{int}}
+\newcommand{\Var}{\itm{var}}
+\newcommand{\Op}{\itm{op}}
+\newcommand{\key}[1]{\mathtt{#1}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % First page of book which contains 'stuff' like: %
 %  - Book title, subtitle                         %
 %  - Book author name                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Book's title and subtitle
-\title{\Huge \textbf{Essentials of Compilation} \\ \huge From Racket to x86 Assembly}
+\title{\Huge \textbf{Essentials of Compilation} \\ \huge From Scheme to x86 Assembly}
 % Author
 \author{\textsc{Jeremy G. Siek}
    \thanks{\url{http://homes.soic.indiana.edu/jsiek/}}
@@ -70,7 +78,7 @@
 % Add a dedication paragraph to dedicate your book to someone %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{dedication}
-Dedicated to Calvin and Hobbes.
+Dedicated to PL group at Indiana University.
 \end{dedication}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -111,25 +119,77 @@ Dedicated to Calvin and Hobbes.
 %%%%%%%%%%%%%%%%
 % NEW CHAPTER! %
 %%%%%%%%%%%%%%%%
-\chapter{Integers, Expressions, and Variables}
+\chapter{Integers and Variables}
 
 %\begin{chapquote}{Author's name, \textit{Source of this quote}}
 %``This is a quote and I don't know who said this.''
 %\end{chapquote}
 
-\newcommand{\exp}{\mathit{exp}}
 
-The $S_0$ language
+
+The $S_0$ language includes integers, operations on integers,
+(arithmetic and input), and local variable definitions. This language
+is rich enough to exhibit several compilation techniques but simple
+enough so that we can reasonably hope to implement the compilation to
+x86-64 assembly in two weeks of hard work.  The instructor solution
+for the $S_0$ compiler consists of 6 recursive functions and a few
+small helper functions that together span 256 lines of code.
+
+The syntax of the $S_0$ language is defined by the following grammar.
 \[
-\begin{array}{}
-  \exp &::=& 
+\begin{array}{lcl}
+  \Op  &::=& \key{+} \mid \key{-} \mid \key{*} \mid \key{read} \\
+  \Exp &::=& \Int \mid \Var \mid (\Op \; \Exp^{+}) \mid (\key{let}\, ([\Var \; \Exp])\, \Exp)
 \end{array}
 \]
+As usual, evaluating a Scheme expression produces a value.  For $S_0$,
+integers are the only kind of values. To make it straightforward to
+map these integers onto x86 assembly, we restrict the integers to just
+those representable with 64-bits, the range $-2^{63}$ to $2^{63}$.
 
-
+The following are a some example expressions in $S_0$ and their value.
+\begin{align*}
+(+ \; 2 \; 3)  &\Longrightarrow 5 \\
+(+ \; 2 \; (- (- 3)))  &\Longrightarrow 5 \\
+(\key{let}\,([x \; 3])\, (+ \; 2 \; x)) & \Longrightarrow 5 \\
+(\key{let}\,([x \; 3])\, (+ \; (\key{let}\,([x\;2])\, x) \; x)) & \Longrightarrow 5 
+\end{align*}
+Given user input of 2, the following expression evaluates to $5$.
+\[
+(+ \; (\key{read}) \; 3)  \Longrightarrow 5
+\]
+Given user input of 2 then 3, the following expression may evaluate to
+either $1$ or $-1$ depending on the whims of the Scheme
+implementation.
+\[
+(+ \; (\key{read}) \; (-\; (\key{read}))) 
+\Longrightarrow
+1 \text{ or } -1
+\]
 
 \section{x86-64 Assembly}
 
+\[
+\begin{array}{lcl}
+\Arg &::=&  \Int \mid \itm{register} \mid \Int(\itm{register})\\ 
+\Ins &::=& \key{addq} \; \Arg \; \Arg \mid 
+      \key{subq} \; \Arg \; \Arg \mid 
+      \key{imulq} \; \Arg \; \Arg \mid 
+      \key{negq} \; \Arg \mid \\
+  && \key{movq} \; \Arg \; \Arg \mid 
+      \key{callq} \; \mathit{label}
+\end{array}
+\]
+
+\section{An intermediate C-like language}
+
+\[
+\begin{array}{lcl}
+\Atom &::=& \Int \mid \Var \\
+\Exp &::=& \Atom \mid (\Op \; \Atom^{*})\\
+\Stmt &::=& (\key{assign} \; \Var \; \Exp) \mid (\key{return}\; \Exp)
+\end{array}
+\]
 
 
 \end{document}
