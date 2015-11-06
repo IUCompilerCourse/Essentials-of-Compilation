@@ -9,6 +9,9 @@
 \usepackage{amsmath}
 \usepackage{amsthm}
 \usepackage{amssymb}
+\usepackage{natbib}
+\usepackage{stmaryrd}
+\usepackage{xypic}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 'dedication' environment: To add a dedication paragraph at the start of book %
@@ -48,12 +51,14 @@
 \newcommand{\Atom}{\itm{atom}}
 \newcommand{\Stmt}{\itm{stmt}}
 \newcommand{\Exp}{\itm{exp}}
-\newcommand{\Ins}{\itm{inst}}
+\newcommand{\Ins}{\itm{instr}}
+\newcommand{\Prog}{\itm{prog}}
 \newcommand{\Arg}{\itm{arg}}
 \newcommand{\Int}{\itm{int}}
 \newcommand{\Var}{\itm{var}}
 \newcommand{\Op}{\itm{op}}
 \newcommand{\key}[1]{\mathtt{#1}}
+\newcommand{\Meaning}[1]{\llbracket#1\rrbracket}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % First page of book which contains 'stuff' like: %
@@ -78,7 +83,7 @@
 % Add a dedication paragraph to dedicate your book to someone %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{dedication}
-Dedicated to PL group at Indiana University.
+This book is dedicated to the programming languages group at Indiana University.
 \end{dedication}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -93,8 +98,11 @@ Dedicated to PL group at Indiana University.
 %%%%%%%%%%%
 % Preface %
 %%%%%%%%%%%
-%\chapter*{Preface}
+\chapter*{Preface}
 
+\cite{Sarkar:2004fk}
+\cite{Keep:2012aa}
+\cite{Ghuloum:2006bh}
 
 %\section*{Structure of book}
 % You might want to add short description about each chapter in this book.
@@ -111,7 +119,17 @@ Dedicated to PL group at Indiana University.
 % Give credit where credit is due. %
 % Say thanks!                      %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%\section*{Acknowledgements}
+\section*{Acknowledgements}
+
+Need to give thanks to 
+\begin{itemize}
+\item Kent Dybvig
+\item Daniel P. Freidman
+\item Oscar Waddell
+\item Abdulaziz Ghuloum
+\item Dipanwita Sarkar
+\end{itemize}
+
 %\mbox{}\\
 %\noindent Amber Jain \\
 %\noindent \url{http://amberj.devio.us/}
@@ -130,54 +148,93 @@ Dedicated to PL group at Indiana University.
 The $S_0$ language includes integers, operations on integers,
 (arithmetic and input), and local variable definitions. This language
 is rich enough to exhibit several compilation techniques but simple
-enough so that we can reasonably hope to implement the compilation to
-x86-64 assembly in two weeks of hard work.  The instructor solution
-for the $S_0$ compiler consists of 6 recursive functions and a few
-small helper functions that together span 256 lines of code.
+enough so that we can implement a compiler for it in two weeks of hard
+work.  To give the reader a feeling for the scale of this first
+compiler, the instructor solution for the $S_0$ compiler consists of 6
+recursive functions and a few small helper functions that together
+span 256 lines of code.
 
 The syntax of the $S_0$ language is defined by the following grammar.
 \[
 \begin{array}{lcl}
   \Op  &::=& \key{+} \mid \key{-} \mid \key{*} \mid \key{read} \\
-  \Exp &::=& \Int \mid \Var \mid (\Op \; \Exp^{+}) \mid (\key{let}\, ([\Var \; \Exp])\, \Exp)
+  \Exp &::=& \Int \mid (\Op \; \Exp^{+}) \mid \Var \mid (\key{let}\, ([\Var \; \Exp])\, \Exp)
 \end{array}
 \]
-As usual, evaluating a Scheme expression produces a value.  For $S_0$,
+The result of evaluating an expression is a value.  For $S_0$,
 integers are the only kind of values. To make it straightforward to
 map these integers onto x86 assembly, we restrict the integers to just
 those representable with 64-bits, the range $-2^{63}$ to $2^{63}$.
 
 The following are a some example expressions in $S_0$ and their value.
-\begin{align*}
-(+ \; 2 \; 3)  &\Longrightarrow 5 \\
+\begin{align}
+(+ \; 2 \; 3)  &\Longrightarrow 5 \label{p0} \\
 (+ \; 2 \; (- (- 3)))  &\Longrightarrow 5 \\
 (\key{let}\,([x \; 3])\, (+ \; 2 \; x)) & \Longrightarrow 5 \\
-(\key{let}\,([x \; 3])\, (+ \; (\key{let}\,([x\;2])\, x) \; x)) & \Longrightarrow 5 
-\end{align*}
-Given user input of 2, the following expression evaluates to $5$.
-\[
-(+ \; (\key{read}) \; 3)  \Longrightarrow 5
-\]
-Given user input of 2 then 3, the following expression may evaluate to
-either $1$ or $-1$ depending on the whims of the Scheme
-implementation.
-\[
+(\key{let}\,([x \; 3])\, (+ \; (\key{let}\,([x\;2])\, x) \; x)) & \Longrightarrow 5  \\
+(+ \; (\key{read}) \; 3)  &\Longrightarrow 5 
+  & (\text{given input } 2) \\
 (+ \; (\key{read}) \; (-\; (\key{read}))) 
-\Longrightarrow
-1 \text{ or } -1
+& \Longrightarrow 1 \text{ or } -1
+& (\text{given input } 3 \; 2) \label{p1}
+\end{align}
+
+As we can see, the observable behavior of an $S_0$ program is a
+relation between the sequence of inputs and the result value.  The
+behavior of the first program \eqref{p0} is to relate any sequence of
+input values to the result $5$. 
+\[
+  \Meaning{(+ \; 2 \; 3)} = \{ (s,5) \mid s \in \mathbb{Z}^{*} \} 
 \]
+To explain this notation, we write $\Meaning{\exp}$ for the observable
+behavior of an expression.  Why do we not instead say that \eqref{p0}
+relates the empty sequence $\epsilon$ of inputs to $5$? (As in
+$\{(\epsilon,5)\}$.) It is because this program results in $5$
+regardless of what input it receives; it ignores the input.
+
+The observable behavior of program \eqref{p1} is somewhat subtle
+because Scheme does not specify an evaluation order for arguments of
+an operator such as $+$. Thus, the observable behavior for \eqref{p1}
+includes two different possible results.  In general, if $n_1$ and
+$n_2$ are the first two integers in the input sequence, then
+\eqref{p1} can result in either $n_1 + -n_2$ or $n_2 + -n_1$.
+\begin{align*}
+\Meaning{(+ \; (\key{read}) \; (-\; (\key{read})))} &= B_1 \cup B_2 \\
+ \text{where } & B_1 = \{ (n_1\cdot n_2\cdot s, n_1 + -n_2) \mid s \in \mathbb{Z}^{*} \}\\
+ \text{and }  & B_2 = \{ (n_1\cdot n_2\cdot s, n_2 + -n_1) \mid s \in \mathbb{Z}^{*} \}
+\end{align*}
+
+
+The goal for this chapter is to implement a compiler that translates
+any program $p \in S_0$ into a x86-64 assembly program $p'$ such that
+the assembly program exhibits the same behavior on Intel hardward as
+the $S_0$ program running in a Scheme implementation.
+\[
+\xymatrix{
+p \in S_0  \ar[rr]^{\text{compile}} \ar[drr]_{\text{run in Scheme}\quad}   &&  p' \in \text{x86-64} \ar[d]^{\quad\text{run on Intel HW}}\\
+& & n \in \mathbb{Z}   
+}
+\]
+In the next section we introduce enough of the x86-64 assembly
+language to compile $S_0$.
 
 \section{x86-64 Assembly}
 
 \[
 \begin{array}{lcl}
+\itm{register} &::=& \key{rax} \mid \key{rbx} \mid \key{rcx}
+              \mid \key{rdx} \mid \key{rsi} \mid \key{rdi} \mid \\
+              && \key{r8} \mid \key{r9} \mid \key{r10}
+              \mid \key{r11} \mid \key{r12} \mid \key{r13}
+              \mid \key{r14} \mid \key{r15} \\
 \Arg &::=&  \Int \mid \itm{register} \mid \Int(\itm{register})\\ 
 \Ins &::=& \key{addq} \; \Arg \; \Arg \mid 
       \key{subq} \; \Arg \; \Arg \mid 
       \key{imulq} \; \Arg \; \Arg \mid 
       \key{negq} \; \Arg \mid \\
   && \key{movq} \; \Arg \; \Arg \mid 
-      \key{callq} \; \mathit{label}
+      \key{callq} \; \mathit{label} \\
+\Prog &::= & \Ins^{*}
 \end{array}
 \]
 
@@ -191,5 +248,8 @@ implementation.
 \end{array}
 \]
 
+
+\bibliographystyle{plainnat}
+\bibliography{all}
 
 \end{document}
