@@ -13,6 +13,10 @@
 \usepackage{stmaryrd}
 \usepackage{xypic}
 
+\lstset{%
+basicstyle=\ttfamily%
+}
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 'dedication' environment: To add a dedication paragraph at the start of book %
 % Source: http://www.tug.org/pipermail/texhax/2010-June/015184.html            %
@@ -154,58 +158,51 @@ compiler, the instructor solution for the $S_0$ compiler consists of 6
 recursive functions and a few small helper functions that together
 span 256 lines of code.
 
-The syntax of the $S_0$ language is defined by the following grammar.
+\begin{figure}[tbp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
   \Op  &::=& \key{+} \mid \key{-} \mid \key{*} \mid \key{read} \\
   \Exp &::=& \Int \mid (\Op \; \Exp^{+}) \mid \Var \mid (\key{let}\, ([\Var \; \Exp])\, \Exp)
 \end{array}
 \]
-The result of evaluating an expression is a value.  For $S_0$,
-integers are the only kind of values. To make it straightforward to
-map these integers onto x86 assembly, we restrict the integers to just
-those representable with 64-bits, the range $-2^{63}$ to $2^{63}$.
+\end{minipage}
+}
+\caption{The syntax of the $S_0$ language.}
+\label{fig:s0-syntax}
+\end{figure}
+
+The syntax of the $S_0$ language is defined by the grammar in
+Figure~\ref{fig:s0-syntax}. The result of evaluating an expression is
+a value.  For $S_0$, integers are the only kind of values. To make it
+straightforward to map these integers onto x86-64
+assembly~\citep{Matz:2013aa}, we restrict the integers to just those
+representable with 64-bits, the range $-2^{63}$ to $2^{63}$.
 
 The following are a some example expressions in $S_0$ and their value.
 \begin{align}
-(+ \; 2 \; 3)  &\Longrightarrow 5 \label{p0} \\
-(+ \; 2 \; (- (- 3)))  &\Longrightarrow 5 \\
-(\key{let}\,([x \; 3])\, (+ \; 2 \; x)) & \Longrightarrow 5 \\
-(\key{let}\,([x \; 3])\, (+ \; (\key{let}\,([x\;2])\, x) \; x)) & \Longrightarrow 5  \\
-(+ \; (\key{read}) \; 3)  &\Longrightarrow 5 
-  & (\text{given input } 2) \\
+(+ \; 10 \; 32)  &\Longrightarrow 42 \label{p0} \\
+(+ \; 10 \; (- \;(-\; 32)))  &\Longrightarrow 42 \\
+(\key{let}\,([x \; 32])\, (+ \; 10 \; x)) & \Longrightarrow 42 \\
+(\key{let}\,([x \; 32])\, (+ \; (\key{let}\,([x\;10])\, x) \; x)) & \Longrightarrow 42  \label{p-shadow}\\
+(+ \; (\key{read}) \; 32)  &\Longrightarrow 42
+  & (\text{given input } 10) \\
 (+ \; (\key{read}) \; (-\; (\key{read}))) 
 & \Longrightarrow 1 \text{ or } -1
-& (\text{given input } 3 \; 2) \label{p1}
+& (\text{given input } 3 \; 2)  \label{p2}
 \end{align}
+The \texttt{let} construct stores a value in a variable which can then
+be used within the body of the \texttt{let}. When there are multiple
+\texttt{let}'s for the same variable, the closest enclosing
+\texttt{let} is used, as in program \eqref{p-shadow}.
 
-As we can see, the observable behavior of an $S_0$ program is a
-relation between the sequence of inputs and the result value.  The
-behavior of the first program \eqref{p0} is to relate any sequence of
-input values to the result $5$. 
-\[
-  \Meaning{(+ \; 2 \; 3)} = \{ (s,5) \mid s \in \mathbb{Z}^{*} \} 
-\]
-To explain this notation, we write $\Meaning{\exp}$ for the observable
-behavior of an expression.  Why do we not instead say that \eqref{p0}
-relates the empty sequence $\epsilon$ of inputs to $5$? (As in
-$\{(\epsilon,5)\}$.) It is because this program results in $5$
-regardless of what input it receives; it ignores the input.
-
-The observable behavior of program \eqref{p1} is somewhat subtle
-because Scheme does not specify an evaluation order for arguments of
-an operator such as $+$. Thus, the observable behavior for \eqref{p1}
-includes two different possible results.  In general, if $n_1$ and
-$n_2$ are the first two integers in the input sequence, then
-\eqref{p1} can result in either $n_1 + -n_2$ or $n_2 + -n_1$.
-\begin{align*}
-\Meaning{(+ \; (\key{read}) \; (-\; (\key{read})))} &= B_1 \cup B_2 \\
- \text{where } & B_1 = \{ (n_1\cdot n_2\cdot s, n_1 + -n_2) \mid s \in \mathbb{Z}^{*} \}\\
- \text{and }  & B_2 = \{ (n_1\cdot n_2\cdot s, n_2 + -n_1) \mid s \in \mathbb{Z}^{*} \}
-\end{align*}
-We include the \texttt{read} operation in $S_0$ to demonstrate that
-order of evaluation sometimes makes a difference and also to prevent
-the use of an interpreter to trivially implement the compiler for $S_0$.
+The behavior of program \eqref{p2} is somewhat subtle because Scheme
+does not specify an evaluation order for arguments of an operator such
+as $+$. If $n_1$ and $n_2$ are the first two integers in the input
+sequence, then program \eqref{p2} can result in either $n_1 + -n_2$ or
+$n_2 + -n_1$.  We include the \texttt{read} operation in $S_0$ to
+demonstrate that order of evaluation can make a difference.
 
 The goal for this chapter is to implement a compiler that translates
 any program $p \in S_0$ into a x86-64 assembly program $p'$ such that
@@ -213,18 +210,33 @@ the assembly program exhibits the same behavior on Intel hardward as
 the $S_0$ program running in a Scheme implementation.
 \[
 \xymatrix{
-p \in S_0  \ar[rr]^{\text{compile}} \ar[drr]_{\text{run in Scheme}\quad}   &&  p' \in \text{x86-64} \ar[d]^{\quad\text{run on Intel HW}}\\
+p \in S_0  \ar[rr]^{\text{compile}} \ar[drr]_{\text{run in Scheme}\quad}   &&  p' \in \text{x86-64} \ar[d]^{\quad\text{run on an x86 machine}}\\
 & & n \in \mathbb{Z}   
 }
 \]
-
 In the next section we introduce enough of the x86-64 assembly
 language to compile $S_0$.
 
-
-
 \section{x86-64 Assembly}
 
+An x86-64 program is a sequence of instructions. The instructions
+manipulate a fixed number of variables called \emph{registers} and can
+load and store values into \emph{memory}. Memory is a mapping of
+64-bit addresses to 64-bit values. The syntax $n(r)$ is used to read
+the address $a$ stored in register $r$ and then offset it by $n$,
+producing the address $a + n$. The arithmetic instructions, such as
+$\key{addq}\,s\,d$, read from the source $s$ and destination argument
+$d$, apply the arithmetic operation, then stores the result in the
+destination $d$. In this case, computing $d \gets d + s$.  The move
+instruction, $\key{movq}\,s\,d$ reads from $s$ and stores the result
+in $d$. The $\key{callq}\,\mathit{label}$ instruction executes the
+function specified by the label, which we shall use to implement
+\texttt{read}. Figure~\ref{fig:x86-a} defines the syntax for this
+subset of the x86-64 assembly language.
+
+\begin{figure}[tbp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
 \itm{register} &::=& \key{rax} \mid \key{rbx} \mid \key{rcx}
@@ -232,7 +244,7 @@ language to compile $S_0$.
               && \key{r8} \mid \key{r9} \mid \key{r10}
               \mid \key{r11} \mid \key{r12} \mid \key{r13}
               \mid \key{r14} \mid \key{r15} \\
-\Arg &::=&  \Int \mid \itm{register} \mid \Int(\itm{register})\\ 
+\Arg &::=&  \Int \mid \key{\%}\itm{register} \mid \Int(\key{\%}\itm{register}) \\ 
 \Ins &::=& \key{addq} \; \Arg \; \Arg \mid 
       \key{subq} \; \Arg \; \Arg \mid 
       \key{imulq} \; \Arg \; \Arg \mid 
@@ -242,6 +254,23 @@ language to compile $S_0$.
 \Prog &::= & \Ins^{*}
 \end{array}
 \]
+\end{minipage}
+}
+\caption{A subset of the x86-64 assembly language.}
+\label{fig:x86-a}
+\end{figure}
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+	.globl _main
+_main:
+	movq	$10, %rax
+	addq	$32, %rax
+	retq
+\end{lstlisting}
+\caption{A simple x86-64 program equivalent to $(+ \; 10 \; 32)$.}
+\label{fig:p0-x86}
+\end{figure}
 
 \section{An intermediate C-like language}
 
