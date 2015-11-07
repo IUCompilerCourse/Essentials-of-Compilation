@@ -1,4 +1,4 @@
-\documentclass[11pt]{book}
+\documentclass[10pt]{book}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
@@ -49,9 +49,9 @@ basicstyle=\ttfamily%
   {\par\normalfont\hfill--\ \chapquote@author\hspace*{\@tempdima}\par\bigskip}
 \makeatother
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\newcommand{\itm}[1]{\mathit{#1}}
+\newcommand{\itm}[1]{\ensuremath{\mathit{#1}}}
 \newcommand{\Atom}{\itm{atom}}
 \newcommand{\Stmt}{\itm{stmt}}
 \newcommand{\Exp}{\itm{exp}}
@@ -61,47 +61,37 @@ basicstyle=\ttfamily%
 \newcommand{\Int}{\itm{int}}
 \newcommand{\Var}{\itm{var}}
 \newcommand{\Op}{\itm{op}}
-\newcommand{\key}[1]{\mathtt{#1}}
-\newcommand{\Meaning}[1]{\llbracket#1\rrbracket}
+\newcommand{\key}[1]{\texttt{#1}}
+\newcommand{\READ}{(\key{read})}
+\newcommand{\UNIOP}[2]{(\key{#1}\,#2)}
+\newcommand{\BINOP}[3]{(\key{#1}\,#2\,#3)}
+\newcommand{\LET}[3]{(\key{let}\,([#1\;#2])\,#3)}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% First page of book which contains 'stuff' like: %
-%  - Book title, subtitle                         %
-%  - Book author name                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Book's title and subtitle
-\title{\Huge \textbf{Essentials of Compilation} \\ \huge From Scheme to x86 Assembly}
-% Author
+\title{\Huge \textbf{Essentials of Compilation} \\ 
+  \huge From Scheme to x86 Assembly}
+
 \author{\textsc{Jeremy G. Siek}
    \thanks{\url{http://homes.soic.indiana.edu/jsiek/}}
    }
-
 
 \begin{document}
 
 \frontmatter
 \maketitle
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Add a dedication paragraph to dedicate your book to someone %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{dedication}
 This book is dedicated to the programming languages group at Indiana University.
 \end{dedication}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Auto-generated table of contents, list of figures and list of tables %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \tableofcontents
 %\listoffigures
 %\listoftables
 
 \mainmatter
 
-%%%%%%%%%%%
-% Preface %
-%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter*{Preface}
 
 \cite{Sarkar:2004fk}
@@ -119,10 +109,6 @@ This book is dedicated to the programming languages group at Indiana University.
 %  \item Miscellaneous material (e.g. suggested readings etc).
 %\end{itemize}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Give credit where credit is due. %
-% Say thanks!                      %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section*{Acknowledgements}
 
 Need to give thanks to 
@@ -138,71 +124,103 @@ Need to give thanks to
 %\noindent Amber Jain \\
 %\noindent \url{http://amberj.devio.us/}
 
-%%%%%%%%%%%%%%%%
-% NEW CHAPTER! %
-%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Integers and Variables}
 
 %\begin{chapquote}{Author's name, \textit{Source of this quote}}
 %``This is a quote and I don't know who said this.''
 %\end{chapquote}
 
-
-
 The $S_0$ language includes integers, operations on integers,
-(arithmetic and input), and local variable definitions. This language
-is rich enough to exhibit several compilation techniques but simple
-enough so that we can implement a compiler for it in two weeks of hard
-work.  To give the reader a feeling for the scale of this first
-compiler, the instructor solution for the $S_0$ compiler consists of 6
-recursive functions and a few small helper functions that together
-span 256 lines of code.
+(arithmetic and input), and variable definitions.  The syntax of the
+$S_0$ language is defined by the grammar in
+Figure~\ref{fig:s0-syntax}. This language is rich enough to exhibit
+several compilation techniques but simple enough so that we can
+implement a compiler for it in two weeks of hard work.  To give the
+reader a feeling for the scale of this first compiler, the instructor
+solution for the $S_0$ compiler consists of 6 recursive functions and
+a few small helper functions that together span 256 lines of code.
 
-\begin{figure}[tbp]
+\begin{figure}[htbp]
+\centering
 \fbox{
-\begin{minipage}{0.96\textwidth}
+\begin{minipage}{0.85\textwidth}
 \[
 \begin{array}{lcl}
   \Op  &::=& \key{+} \mid \key{-} \mid \key{*} \mid \key{read} \\
-  \Exp &::=& \Int \mid (\Op \; \Exp^{+}) \mid \Var \mid (\key{let}\, ([\Var \; \Exp])\, \Exp)
+  \Exp &::=& \Int \mid (\Op \; \Exp^{+}) \mid \Var \mid \LET{\Var}{\Exp}{\Exp}
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The syntax of the $S_0$ language.}
+\caption{The syntax of the $S_0$ language. The abbreviation \Op{} is
+  short for operator, \Exp{} is short for expression, \Int{} for integer,
+  and \Var{} for variable.}
 \label{fig:s0-syntax}
 \end{figure}
 
-The syntax of the $S_0$ language is defined by the grammar in
-Figure~\ref{fig:s0-syntax}. The result of evaluating an expression is
-a value.  For $S_0$, integers are the only kind of values. To make it
-straightforward to map these integers onto x86-64
-assembly~\citep{Matz:2013aa}, we restrict the integers to just those
-representable with 64-bits, the range $-2^{63}$ to $2^{63}$.
+The result of evaluating an expression is a value.  For $S_0$, values
+are integers. To make it straightforward to map these integers onto
+x86-64 assembly~\citep{Matz:2013aa}, we restrict the integers to just
+those representable with 64-bits, the range $-2^{63}$ to $2^{63}$.
 
-The following are a some example expressions in $S_0$ and their value.
-\begin{align}
-(+ \; 10 \; 32)  &\Longrightarrow 42 \label{p0} \\
-(+ \; 10 \; (- \;(-\; 32)))  &\Longrightarrow 42 \\
-(\key{let}\,([x \; 32])\, (+ \; 10 \; x)) & \Longrightarrow 42 \\
-(\key{let}\,([x \; 32])\, (+ \; (\key{let}\,([x\;10])\, x) \; x)) & \Longrightarrow 42  \label{p-shadow}\\
-(+ \; (\key{read}) \; 32)  &\Longrightarrow 42
-  & (\text{given input } 10) \\
-(+ \; (\key{read}) \; (-\; (\key{read}))) 
-& \Longrightarrow 1 \text{ or } -1
-& (\text{given input } 3 \; 2)  \label{p2}
-\end{align}
-The \texttt{let} construct stores a value in a variable which can then
-be used within the body of the \texttt{let}. When there are multiple
-\texttt{let}'s for the same variable, the closest enclosing
-\texttt{let} is used, as in program \eqref{p-shadow}.
+We will walk through some examples of $S_0$ programs, commenting on
+aspects of the language that will be relevant to compiling it.  We
+start with one of the simplest $S_0$ programs; it adds two integers.
+\[
+\BINOP{+}{10}{32}
+\]
+The result is $42$, as you might expected. 
+%
+The next example demonstrates that expressions may be nested within
+eachother, in this case nesting several additions and negations.
+\[
+\BINOP{+}{10}{ \UNIOP{-}{ \BINOP{+}{12}{20} } }
+\]
+What is the result of the above program?
 
-The behavior of program \eqref{p2} is somewhat subtle because Scheme
-does not specify an evaluation order for arguments of an operator such
-as $+$. If $n_1$ and $n_2$ are the first two integers in the input
-sequence, then program \eqref{p2} can result in either $n_1 + -n_2$ or
-$n_2 + -n_1$.  We include the \texttt{read} operation in $S_0$ to
-demonstrate that order of evaluation can make a difference.
+The \key{let} construct stores a value in a variable which can then be
+used within the body of the \key{let}. So the following program stores
+$32$ in $x$ and then computes $\BINOP{+}{10}{x}$, producing $42$.
+\[
+\LET{x}{ \BINOP{+}{12}{20} }{ \BINOP{+}{10}{x} } 
+\]
+When there are multiple \key{let}'s for the same variable, the closest
+enclosing \key{let} is used. Consider the following program with two
+\key{let}'s that define variables named $x$.
+\[
+\LET{x}{32}{ \BINOP{+}{ \LET{x}{10}{x} }{ x } }
+\]
+For the purposes of showing which variable uses correspond to which
+definitions, the following shows the $x$'s annotated with subscripts
+to distinguish them.
+\[
+\LET{x_1}{32}{ \BINOP{+}{ \LET{x_2}{10}{x_2} }{ x_1 } }
+\]
+
+The \key{read} operation prompts the user of the program for an
+integer. Given an input of $10$, the following program produces $42$.
+\[
+\BINOP{+}{(\key{read})}{32}
+\]
+We include the \key{read} operation in $S_0$ to demonstrate that order
+of evaluation can make a different. Given the input $52$ then $10$,
+the following produces $42$ (and not $-42$).
+\[
+\LET{x}{\READ}{ \LET{y}{\READ}{ \BINOP{-}{x}{y} } }
+\]
+The initializing expression of a \key{let} is always evaluated before
+the body of the \key{let}, so in the above, the \key{read} for $x$ is
+performed before the \key{read} for $y$.
+%
+The behavior of the following program is somewhat subtle because
+Scheme does not specify an evaluation order for arguments of an
+operator such as $-$.
+\[
+\BINOP{-}{\READ}{\READ}
+\]
+Given the input $42$ then $10$, the above program can result in either
+$42$ or $-42$, depending on the whims of the Scheme implementation.
 
 The goal for this chapter is to implement a compiler that translates
 any program $p \in S_0$ into a x86-64 assembly program $p'$ such that
@@ -231,7 +249,7 @@ destination $d$. In this case, computing $d \gets d + s$.  The move
 instruction, $\key{movq}\,s\,d$ reads from $s$ and stores the result
 in $d$. The $\key{callq}\,\mathit{label}$ instruction executes the
 function specified by the label, which we shall use to implement
-\texttt{read}. Figure~\ref{fig:x86-a} defines the syntax for this
+\key{read}. Figure~\ref{fig:x86-a} defines the syntax for this
 subset of the x86-64 assembly language.
 
 \begin{figure}[tbp]
