@@ -1,4 +1,4 @@
-\documentclass[10pt]{book}
+\documentclass[12pt]{book}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
@@ -52,7 +52,6 @@ basicstyle=\ttfamily%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \newcommand{\itm}[1]{\ensuremath{\mathit{#1}}}
-\newcommand{\Atom}{\itm{atom}}
 \newcommand{\Stmt}{\itm{stmt}}
 \newcommand{\Exp}{\itm{exp}}
 \newcommand{\Ins}{\itm{instr}}
@@ -70,7 +69,7 @@ basicstyle=\ttfamily%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \title{\Huge \textbf{Essentials of Compilation} \\ 
-  \huge From Scheme to x86 Assembly}
+  \huge An Incremental Approach}
 
 \author{\textsc{Jeremy G. Siek}
    \thanks{\url{http://homes.soic.indiana.edu/jsiek/}}
@@ -209,9 +208,9 @@ the following produces $42$ (and not $-42$).
 \[
 \LET{x}{\READ}{ \LET{y}{\READ}{ \BINOP{-}{x}{y} } }
 \]
-The initializing expression of a \key{let} is always evaluated before
-the body of the \key{let}, so in the above, the \key{read} for $x$ is
-performed before the \key{read} for $y$.
+The initializing expression is always evaluated before the body of the
+\key{let}, so in the above, the \key{read} for $x$ is performed before
+the \key{read} for $y$.
 %
 The behavior of the following program is somewhat subtle because
 Scheme does not specify an evaluation order for arguments of an
@@ -238,38 +237,40 @@ language to compile $S_0$.
 \section{x86-64 Assembly}
 
 An x86-64 program is a sequence of instructions. The instructions
-manipulate a fixed number of variables called \emph{registers} and can
-load and store values into \emph{memory}. Memory is a mapping of
-64-bit addresses to 64-bit values. The syntax $n(r)$ is used to read
-the address $a$ stored in register $r$ and then offset it by $n$,
-producing the address $a + n$. The arithmetic instructions, such as
-$\key{addq}\,s\,d$, read from the source $s$ and destination argument
-$d$, apply the arithmetic operation, then stores the result in the
-destination $d$. In this case, computing $d \gets d + s$.  The move
-instruction, $\key{movq}\,s\,d$ reads from $s$ and stores the result
-in $d$. The $\key{callq}\,\mathit{label}$ instruction executes the
-function specified by the label, which we shall use to implement
-\key{read}. Figure~\ref{fig:x86-a} defines the syntax for this
-subset of the x86-64 assembly language.
+manipulate 16 variables called \emph{registers} and can also load and
+store values into \emph{memory}. Memory is a mapping of 64-bit
+addresses to 64-bit values. The syntax $n(r)$ is used to read the
+address $a$ stored in register $r$ and then offset it by $n$ bytes (8
+bits), producing the address $a + n$. The arithmetic instructions,
+such as $\key{addq}\,s\,d$, read from the source $s$ and destination
+argument $d$, apply the arithmetic operation, then stores the result
+in the destination $d$. In this case, computing $d \gets d + s$.  The
+move instruction, $\key{movq}\,s\,d$ reads from $s$ and stores the
+result in $d$. The $\key{callq}\,\mathit{label}$ instruction executes
+the procedure specified by the label, which we shall use to implement
+\key{read}. Figure~\ref{fig:x86-a} defines the syntax for this subset
+of the x86-64 assembly language.
 
 \begin{figure}[tbp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-\itm{register} &::=& \key{rax} \mid \key{rbx} \mid \key{rcx}
+\itm{register} &::=& \key{rsp} \mid \key{rbp} \mid \key{rax} \mid \key{rbx} \mid \key{rcx}
               \mid \key{rdx} \mid \key{rsi} \mid \key{rdi} \mid \\
               && \key{r8} \mid \key{r9} \mid \key{r10}
               \mid \key{r11} \mid \key{r12} \mid \key{r13}
               \mid \key{r14} \mid \key{r15} \\
-\Arg &::=&  \Int \mid \key{\%}\itm{register} \mid \Int(\key{\%}\itm{register}) \\ 
+\Arg &::=&  \key{\$}\Int \mid \key{\%}\itm{register} \mid \Int(\key{\%}\itm{register}) \\ 
 \Ins &::=& \key{addq} \; \Arg \; \Arg \mid 
       \key{subq} \; \Arg \; \Arg \mid 
       \key{imulq} \; \Arg \; \Arg \mid 
       \key{negq} \; \Arg \mid \\
   && \key{movq} \; \Arg \; \Arg \mid 
-      \key{callq} \; \mathit{label} \\
-\Prog &::= & \Ins^{*}
+      \key{callq} \; \mathit{label} \mid
+      \key{pushq}\;\Arg \mid \key{popq};\Arg \mid \key{retq} \\
+\Prog &::= & \key{.globl \_main}\\
+      &    & \key{\_main:} \; \Ins^{+} 
 \end{array}
 \]
 \end{minipage}
@@ -278,7 +279,21 @@ subset of the x86-64 assembly language.
 \label{fig:x86-a}
 \end{figure}
 
-\begin{figure}[tbp]
+Figure~\ref{fig:p0-x86} depicts an x86-64 program that is equivalent
+to $\BINOP{+}{10}{32}$. The \key{globl} directive says that the
+\key{\_main} procedure is externally visible, which is necessary so
+that the operating system can call it. The label \key{\_main:}
+indicates the beginning of the \key{\_main} procedure.  The
+instruction $\key{movq}\,\$10, \%\key{rax}$ puts $10$ into the
+register \key{rax}. The following instruction $\key{addq}\,\key{\$}32,
+\key{\%rax}$ adds $32$ to the $10$ in \key{rax} and puts the result,
+$42$, back into \key{rax}. The instruction \key{retq} finishes the
+\key{\_main} function by returning the integer in the \key{rax}
+register to the operating system.
+
+\begin{figure}[htbp]
+\centering
+\begin{minipage}{0.6\textwidth}
 \begin{lstlisting}
 	.globl _main
 _main:
@@ -286,16 +301,132 @@ _main:
 	addq	$32, %rax
 	retq
 \end{lstlisting}
-\caption{A simple x86-64 program equivalent to $(+ \; 10 \; 32)$.}
+\end{minipage}
+\caption{A simple x86-64 program equivalent to $\BINOP{+}{10}{32}$.}
 \label{fig:p0-x86}
 \end{figure}
+
+The next example exhibits the use of memory.  Figure~\ref{fig:p1-x86}
+lists an x86-64 program that is equivalent to $\BINOP{+}{52}{
+  \UNIOP{-}{10} }$. To understand how this x86-64 program uses memory,
+we need to explain a region of memory called called the
+\emph{procedure call stack} (\emph{stack} for short). The stack
+consists of a separate \emph{frame} for each procedure call. The
+memory layout for an individual frame is shown in
+Figure~\ref{fig:frame}.  The register \key{rsp} is called the
+\emph{stack pointer} and points to the item at the top of the
+stack. The stack grows downward in memory, so we increase the size of
+the stack by subtracting from the stack pointer. The frame size is
+required to be a multiple of 16 bytes. The register \key{rbp} is the
+\emph{base pointer} which serves two purposes: 1) it saves the
+location of the stack pointer for the procedure that called the
+current one and 2) it is used to access variables associated with the
+current procedure. We number the variables from $1$ to $n$. Variable
+$1$ is stored at address $-8\key{(\%rbp)}$, variable $2$ at
+$-16\key{(\%rbp)}$, etc.
+
+\begin{figure}
+\centering
+\begin{minipage}{0.6\textwidth}
+\begin{lstlisting}
+	.globl _main
+_main:
+	pushq	%rbp
+	movq	%rsp, %rbp
+	subq	$16, %rsp
+
+	movq	$10, -8(%rbp)
+	negq	-8(%rbp)
+	movq	$52, %rax
+	addq	-8(%rbp), %rax
+
+	addq	$16, %rsp
+	popq	%rbp
+	retq
+\end{lstlisting}
+\end{minipage}
+\caption{An x86-64 program equivalent to $\BINOP{+}{52}{\UNIOP{-}{10} }$.}
+\label{fig:p1-x86}
+\end{figure}
+
+
+\begin{figure}
+\centering
+\begin{tabular}{|r|l|} \hline
+Position & Contents \\ \hline
+8(\key{\%rbp}) & return address \\
+0(\key{\%rbp}) & old \key{rbp} \\
+-8(\key{\%rbp}) & variable $1$ \\
+-16(\key{\%rbp}) & variable $2$ \\
+ \ldots  & \ldots \\
+0(\key{\%rsp}) & variable $n$\\ \hline
+\end{tabular}
+
+\caption{Memory layout of a frame.}
+\label{fig:frame}
+\end{figure}
+
+Getting back to the program in Figure~\ref{fig:p1-x86}, the first
+three instructions are the typical prelude for a procedure.  The
+instruction \key{pushq \%rbp} saves the base pointer for the procedure
+that called the current one onto the stack and subtracts $8$ from the
+stack pointer. The second instruction \key{movq \%rsp, \%rbp} changes
+the base pointer to the top of the stack. The instruction \key{subq
+  \$16, \%rsp} moves the stack pointer down to make enough room for
+storing variables.  This program just needs one variable ($8$ bytes)
+but because the frame size is required to be a multiple of 16 bytes,
+it rounds to 16 bytes.
+
+The next four instructions carry out the work of computing
+$\BINOP{+}{52}{\UNIOP{-}{10} }$. The first instruction \key{movq \$10,
+  -8(\%rbp)} stores $10$ in variable $1$. The instruction \key{negq
+  -8(\%rbp)} changes variable $1$ to $-10$. The \key{movq \$52, \%rax}
+places $52$ in the register \key{rax} and \key{addq -8(\%rbp), \%rax}
+adds the contents of variable $1$ to \key{rax}, at which point
+\key{rax} contains $42$.
+
+The last three instructions are the typical conclusion of a procedure.
+The \key{addq \$16, \%rsp} instruction moves the stack pointer back to
+point at the old base pointer. The amount added here needs to match
+the amount that was subtracted in the prelude of the procedure.  Then
+\key{popq \%rbp} returns the old base pointer to \key{rbp} and adds
+$8$ to the stack pointer.  The \key{retq} instruction jumps back to
+the procedure that called this one and subtracts 8 from the stack
+pointer.
+
+\section{Planning the route from $S_0$ to x86-64}
+
+To compile one language to another it helps to focus on the
+differences between the two languages. It is these differences that
+the compiler will need to bridge. What are the differences between
+$S_0$ and x86-64 assembly? Here we list some of the most important the
+differences.
+
+\begin{enumerate}
+\item Variables in $S_0$ can overshadow other variables with the same
+  name. The registers and memory locations of x86-64 all have unique
+  names.
+
+\item An argument to an $S_0$ operator can be any expression, whereas
+  x86-64 instructions restrict their arguments to integers, registers,
+  and memory locations.
+
+\item x86-64 arithmetic instructions typically take two arguments and
+  update the second argument in place. In contrast, $S_0$ arithmetic
+  operations only read their arguments and produce a new value.
+
+\item An $S_0$ program can have any number of variables whereas x86-64
+  has only 16 registers.
+\end{enumerate}
+
+
 
 \section{An intermediate C-like language}
 
 \[
 \begin{array}{lcl}
-\Atom &::=& \Int \mid \Var \\
-\Exp &::=& \Atom \mid (\Op \; \Atom^{*})\\
+\Arg &::=& \Int \mid \Var \\
+\Exp &::=& \Arg \mid (\Op \; \Arg^{*})\\
 \Stmt &::=& (\key{assign} \; \Var \; \Exp) \mid (\key{return}\; \Exp)
 \end{array}
 \]
