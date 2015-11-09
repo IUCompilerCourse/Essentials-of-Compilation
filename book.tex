@@ -66,6 +66,9 @@ basicstyle=\ttfamily%
 \newcommand{\BINOP}[3]{(\key{#1}\,#2\,#3)}
 \newcommand{\LET}[3]{(\key{let}\,([#1\;#2])\,#3)}
 
+\newcommand{\ASSIGN}[2]{(\key{assign}\,#1\;#2)}
+\newcommand{\RETURN}[1]{(\key{return}\,#1)}
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \title{\Huge \textbf{Essentials of Compilation} \\ 
@@ -449,7 +452,7 @@ include at least one \key{return} statement.
 \begin{array}{lcl}
 \Arg &::=& \Int \mid \Var \\
 \Exp &::=& \Arg \mid (\Op \; \Arg^{*})\\
-\Stmt &::=& (\key{assign} \; \Var \; \Exp) \mid (\key{return}\; \Exp) \\
+\Stmt &::=& \ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg} \\
 \Prog & ::= & \Stmt^{+}
 \end{array}
 \]
@@ -512,6 +515,23 @@ when it gets to a variable reference, so we add another paramter to
 \textsf{uniquify} for the association list.
 
 \section{Flatten}
+
+The purpose of the \textsf{flatten} pass is to get rid of nested
+expressions, such as the $\UNIOP{-}{10}$ in the following program,
+without changing the behavior of the program.
+\[
+\BINOP{+}{52}{ \UNIOP{-}{10} }
+\]
+This can be accomplished by introducing a new variable, assigning the
+nested expression to the new variable, and then using the new variable
+in place of the nested expressions. For example, the above program is
+translated to the following one.
+\[
+\begin{array}{l}
+\ASSIGN{ \itm{x} }{ \UNIOP{-}{10} } \\
+\RETURN{ \BINOP{+}{52}{ \itm{x} } }
+\end{array}
+\]
 
 
 \section{Select Instructions}
