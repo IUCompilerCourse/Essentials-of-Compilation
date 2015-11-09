@@ -541,31 +541,52 @@ introduced while flattening the expression.
 Take special care for programs such as the following that initialize
 variables with integers or other variables.
 \[
-\LET{a}{42}{ \LET{b}{x}{ y }}
+\LET{a}{42}{ \LET{b}{a}{ b }}
 \]
 This program should be translated to 
 \[
-\begin{array}{l}
-\ASSIGN{a}{42}
-\ASSIGN{b}{x}
+\ASSIGN{a}{42} \;
+\ASSIGN{b}{a} \;
 \RETURN{b}
-\end{array}
 \]
 and not the following, which could result from a naive implementation
-of \textsf{flatten}
+of \textsf{flatten}.
 \[
-\begin{array}{l}
-\ASSIGN{x.1}{42}\\
-\ASSIGN{a}{x.1}\\
-\ASSIGN{x.2}{a}\\
-\ASSIGN{y}{x.2}\\
-\RETURN{y}
-\end{array}
+\ASSIGN{x.1}{42}\;
+\ASSIGN{a}{x.1}\;
+\ASSIGN{x.2}{a}\;
+\ASSIGN{b}{x.2}\;
+\RETURN{b}
 \]
-
 
 \section{Select Instructions}
 
+In the \textsf{select\_instructions} pass we begin the work of
+translating from $C_0$ to x86. The first step is dealing with the
+differing format of arithmetic operations. For example, in $C_0$ an
+addition operation could take the following form:
+\[
+\ASSIGN{x}{ \BINOP{+}{10}{32} }
+\]
+To translate to x86, we need to express this using the \key{addq}
+instruction that does an inplace update. So we first move $10$ to $x$
+then perform the \key{addq}.
+\[
+  (\key{movq}\; 10 \; x) \;
+  (\key{addq}\; 32 \; x)
+\]
+
+There are some special cases that should be handled differently.  If
+one of the arguments is the same as the left-hand side of the
+assignment, then there is no need for the extra move instruction.
+For example, the following
+\[
+\ASSIGN{x}{ \BINOP{+}{10}{x} }
+\]
+should translate to 
+\[
+ (\key{addq}\; 10\; x)
+\]
 
 \section{Assign Homes}
 
