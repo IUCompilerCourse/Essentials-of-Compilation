@@ -54,7 +54,7 @@ basicstyle=\ttfamily%
 \newcommand{\itm}[1]{\ensuremath{\mathit{#1}}}
 \newcommand{\Stmt}{\itm{stmt}}
 \newcommand{\Exp}{\itm{exp}}
-\newcommand{\Ins}{\itm{instr}}
+\newcommand{\Instr}{\itm{instr}}
 \newcommand{\Prog}{\itm{prog}}
 \newcommand{\Arg}{\itm{arg}}
 \newcommand{\Int}{\itm{int}}
@@ -108,12 +108,12 @@ This book is dedicated to the programming languages group at Indiana University.
 %  \item Miscellaneous material (e.g. suggested readings etc).
 %\end{itemize}
 
-\section*{Acknowledgements}
+\section*{Acknowledgments}
 
 Need to give thanks to 
 \begin{itemize}
 \item Kent Dybvig
-\item Daniel P. Freidman
+\item Daniel P. Friedman
 \item Oscar Waddell
 \item Abdulaziz Ghuloum
 \item Dipanwita Sarkar
@@ -125,6 +125,7 @@ Need to give thanks to
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Integers and Variables}
+\label{ch:int-exp}
 
 %\begin{chapquote}{Author's name, \textit{Source of this quote}}
 %``This is a quote and I don't know who said this.''
@@ -172,7 +173,7 @@ start with one of the simplest $S_0$ programs; it adds two integers.
 The result is $42$, as you might expected. 
 %
 The next example demonstrates that expressions may be nested within
-eachother, in this case nesting several additions and negations.
+each other, in this case nesting several additions and negations.
 \[
 \BINOP{+}{10}{ \UNIOP{-}{ \BINOP{+}{12}{20} } }
 \]
@@ -223,7 +224,7 @@ $42$ or $-42$, depending on the whims of the Scheme implementation.
 
 The goal for this chapter is to implement a compiler that translates
 any program $p \in S_0$ into a x86-64 assembly program $p'$ such that
-the assembly program exhibits the same behavior on Intel hardward as
+the assembly program exhibits the same behavior on an x86 computer as
 the $S_0$ program running in a Scheme implementation.
 \[
 \xymatrix{
@@ -262,7 +263,7 @@ of the x86-64 assembly language.
               \mid \key{r11} \mid \key{r12} \mid \key{r13}
               \mid \key{r14} \mid \key{r15} \\
 \Arg &::=&  \key{\$}\Int \mid \key{\%}\itm{register} \mid \Int(\key{\%}\itm{register}) \\ 
-\Ins &::=& \key{addq} \; \Arg \; \Arg \mid 
+\Instr &::=& \key{addq} \; \Arg \; \Arg \mid 
       \key{subq} \; \Arg \; \Arg \mid 
       \key{imulq} \; \Arg \; \Arg \mid 
       \key{negq} \; \Arg \mid \\
@@ -270,7 +271,7 @@ of the x86-64 assembly language.
       \key{callq} \; \mathit{label} \mid
       \key{pushq}\;\Arg \mid \key{popq};\Arg \mid \key{retq} \\
 \Prog &::= & \key{.globl \_main}\\
-      &    & \key{\_main:} \; \Ins^{+} 
+      &    & \key{\_main:} \; \Instr^{*}
 \end{array}
 \]
 \end{minipage}
@@ -419,20 +420,117 @@ differences.
   has only 16 registers.
 \end{enumerate}
 
+We ease the challenge of compiling from $S_0$ to x86 by breaking down
+the problem into several steps, dealing with the above differences one
+at a time. Further, we identify an intermediate language named $C_0$,
+roughly half-way between $S_0$ and x86, to provide a rest stop along
+the way. The name $C_0$ comes from this language being vaguely similar
+to the $C$ language. first two differences discussed above, regarding
+variables and nested expressions, are handled by the passes
+\textsf{uniquify} and \textsf{flatten} that bring us to $C_0$.
+\[\large
+\xymatrix@=55pt{
+  S_0 \ar[r]^-{\textsf{uniquify}} & S_0 \ar[r]^-{\textsf{flatten}} & C_0 
+}
+\]
 
+The syntax for $C_0$ is defined in Figure~\ref{fig:c0-syntax}.  The
+$C_0$ language supports the same operators as $S_0$ but the arguments
+of operators are now restricted to just variables and integers. The
+\key{let} construct of $S_0$ is replaced by an assignment statement
+and there is a \key{return} construct to specify the return value of
+the program. A program consists of a sequence of statements that
+include at least one \key{return} statement.
 
-\section{An intermediate C-like language}
-
+\begin{figure}[htbp]
 \[
 \begin{array}{lcl}
 \Arg &::=& \Int \mid \Var \\
 \Exp &::=& \Arg \mid (\Op \; \Arg^{*})\\
-\Stmt &::=& (\key{assign} \; \Var \; \Exp) \mid (\key{return}\; \Exp)
+\Stmt &::=& (\key{assign} \; \Var \; \Exp) \mid (\key{return}\; \Exp) \\
+\Prog & ::= & \Stmt^{+}
 \end{array}
 \]
+\caption{The $C_0$ intermediate language.}
+\label{fig:c0-syntax}
+\end{figure}
+
+
+To get from $C_0$ to x86-64 assembly requires three more steps, which
+we discuss below.
+\[\large
+\xymatrix@=55pt{
+  C_0 \ar[r]^-{\textsf{select\_instr.}}
+  & \text{x86}^{*} \ar[r]^-{\textsf{assign\_homes}} & \text{x86}^{*}
+    \ar[r]^-{\textsf{spill\_code}}
+  & \text{x86}
+}
+\]
+We handle the third difference listed above, concerning the format of
+arithmetic instructions, in the \textsf{select\_instructions} pass.
+The result of this pass produces programs consisting of x86-64
+instructions that use variables.
+%
+As there are only 16 registers, we cannot always map variables to
+registers. Fortunately, the stack can grow arbitrarily, so we can
+always map variables to locations on the stack. This is handled in the
+\textsf{assign\_homes} pass. The topic of
+Chapter~\ref{ch:register-allocation} is implementing a smarter
+approach in which we make a best-effort to map variables to registers,
+resorting to the stack only when necessary.
+%
+The final pass in our journey to x86 handles an indiosycracy of x86
+assembly. Many x86 instructions have two arguments but only one of the
+arguments may be a memory reference. Because we are mapping variables
+to stack locations, many of our generated instructions will violate
+this restriction. The purpose of the \textsf{spill\_code} pass is to
+patch up this problem by replacing each bad instructions with a short
+sequence of instructions that use the \key{rax} register.
+
+\section{Uniquify}
+
+The purpose of this pass is to make sure that each \key{let} uses a
+unique variable name. For example, the \textsf{uniquify} pass could
+translate
+\[
+\LET{x}{32}{ \BINOP{+}{ \LET{x}{10}{x} }{ x } }
+\]
+to
+\[
+\LET{x.1}{32}{ \BINOP{+}{ \LET{x.2}{10}{x.2} }{ x.1 } }
+\]
+
+We recommend implementing \textsf{uniquify} as a recursive function
+that mostly just copies the input program. However, when encountering
+a \key{let}, it should generate a unique name for the variable (the
+Racket function \key{gensym} is handy for this) and associate the old
+name with the new unique name in an association list. The
+\textsf{uniquify} function will need to access this association list
+when it gets to a variable reference, so we add another paramter to
+\textsf{uniquify} for the association list.
+
+\section{Flatten}
+
+
+\section{Select Instructions}
+
+
+\section{Assign Homes}
+
+
+\section{Spill Code}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Register Allocation}
+\label{ch:register-allocation}
+
 
 
 \bibliographystyle{plainnat}
 \bibliography{all}
 
 \end{document}
+
+%%  LocalWords:  Dybvig Waddell Abdulaziz Ghuloum Dipanwita
+%%  LocalWords:  Sarkar lcl Matz aa representable
