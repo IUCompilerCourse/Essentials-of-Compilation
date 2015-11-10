@@ -69,6 +69,11 @@ basicstyle=\ttfamily%
 \newcommand{\ASSIGN}[2]{(\key{assign}\,#1\;#2)}
 \newcommand{\RETURN}[1]{(\key{return}\,#1)}
 
+\newcommand{\INT}[1]{(\key{int}\;#1)}
+\newcommand{\REG}[1]{(\key{reg}\;#1)}
+\newcommand{\VAR}[1]{(\key{var}\;#1)}
+\newcommand{\STACKLOC}[1]{(\key{stack}\;#1)}
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \title{\Huge \textbf{Essentials of Compilation} \\ 
@@ -240,7 +245,7 @@ p \in S_0  \ar[rr]^{\text{compile}} \ar[drr]_{\text{run in Scheme}\quad}   &&  p
 In the next section we introduce enough of the x86-64 assembly
 language to compile $S_0$.
 
-\section{x86-64 Assembly}
+\section{The x86-64 Assembly Language}
 
 An x86-64 program is a sequence of instructions. The instructions
 manipulate 16 variables called \emph{registers} and can also load and
@@ -268,15 +273,15 @@ of the x86-64 assembly language.
               \mid \key{r11} \mid \key{r12} \mid \key{r13}
               \mid \key{r14} \mid \key{r15} \\
 \Arg &::=&  \key{\$}\Int \mid \key{\%}\itm{register} \mid \Int(\key{\%}\itm{register}) \\ 
-\Instr &::=& \key{addq} \; \Arg \; \Arg \mid 
-      \key{subq} \; \Arg \; \Arg \mid 
-      \key{imulq} \; \Arg \; \Arg \mid 
+\Instr &::=& \key{addq} \; \Arg, \Arg \mid 
+      \key{subq} \; \Arg, \Arg \mid 
+      \key{imulq} \; \Arg,\Arg \mid 
       \key{negq} \; \Arg \mid \\
-  && \key{movq} \; \Arg \; \Arg \mid 
+  && \key{movq} \; \Arg, \Arg \mid 
       \key{callq} \; \mathit{label} \mid
-      \key{pushq}\;\Arg \mid \key{popq};\Arg \mid \key{retq} \\
+      \key{pushq}\;\Arg \mid \key{popq}\;\Arg \mid \key{retq} \\
 \Prog &::= & \key{.globl \_main}\\
-      &    & \key{\_main:} \; \Instr^{*}
+      &    & \key{\_main:} \; \Instr^{+}
 \end{array}
 \]
 \end{minipage}
@@ -391,16 +396,48 @@ places $52$ in the register \key{rax} and \key{addq -8(\%rbp), \%rax}
 adds the contents of variable $1$ to \key{rax}, at which point
 \key{rax} contains $42$.
 
-The last three instructions are the typical conclusion of a procedure.
-The \key{addq \$16, \%rsp} instruction moves the stack pointer back to
-point at the old base pointer. The amount added here needs to match
-the amount that was subtracted in the prelude of the procedure.  Then
-\key{popq \%rbp} returns the old base pointer to \key{rbp} and adds
-$8$ to the stack pointer.  The \key{retq} instruction jumps back to
-the procedure that called this one and subtracts 8 from the stack
-pointer.
+The last three instructions are the typical \emph{conclusion} of a
+procedure.  The \key{addq \$16, \%rsp} instruction moves the stack
+pointer back to point at the old base pointer. The amount added here
+needs to match the amount that was subtracted in the prelude of the
+procedure.  Then \key{popq \%rbp} returns the old base pointer to
+\key{rbp} and adds $8$ to the stack pointer.  The \key{retq}
+instruction jumps back to the procedure that called this one and
+subtracts 8 from the stack pointer.
+
+The compiler will need a convenient representation for manipulating
+x86 programs, so we define an abstract syntax for x86 in
+Figure~\ref{fig:x86-ast-a}. The \itm{info} field of the \key{program}
+AST node is for storing auxilliary information that needs to be
+communicated from one pass to the next. The function \key{print-x86}
+provided in the supplemental code converts an x86 abstract syntax tree
+into the text representation for x86 (Figure~\ref{fig:x86-a}).
+
+\begin{figure}[tbp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{lcl}
+\Arg &::=&  \INT{\Int} \mid \REG{\itm{register}}
+    \mid \STACKLOC{\Int} \\ 
+\Instr &::=& (\key{add} \; \Arg\; \Arg) \mid 
+      (\key{sub} \; \Arg\; \Arg) \mid 
+      (\key{imul} \; \Arg\;\Arg) \mid 
+      (\key{neg} \; \Arg) \mid \\
+  && (\key{mov} \; \Arg\; \Arg) \mid 
+      (\key{call} \; \mathit{label}) \mid
+      (\key{push}\;\Arg) \mid (\key{pop}\;\Arg) \mid (\key{ret}) \\
+\Prog &::= & (\key{program} \;\itm{info} \; \Instr^{+})
+\end{array}
+\]
+\end{minipage}
+}
+\caption{Abstract syntax for x86-64 assembly.}
+\label{fig:x86-ast-a}
+\end{figure}
 
 \section{Planning the route from $S_0$ to x86-64}
+\label{sec:plan-s0-x86}
 
 To compile one language to another it helps to focus on the
 differences between the two languages. It is these differences that
@@ -409,32 +446,62 @@ $S_0$ and x86-64 assembly? Here we list some of the most important the
 differences.
 
 \begin{enumerate}
-\item Variables in $S_0$ can overshadow other variables with the same
-  name. The registers and memory locations of x86-64 all have unique
-  names.
+\item x86-64 arithmetic instructions typically take two arguments and
+  update the second argument in place. In contrast, $S_0$ arithmetic
+  operations only read their arguments and produce a new value.
 
 \item An argument to an $S_0$ operator can be any expression, whereas
   x86-64 instructions restrict their arguments to integers, registers,
   and memory locations.
 
-\item x86-64 arithmetic instructions typically take two arguments and
-  update the second argument in place. In contrast, $S_0$ arithmetic
-  operations only read their arguments and produce a new value.
-
 \item An $S_0$ program can have any number of variables whereas x86-64
   has only 16 registers.
+
+\item Variables in $S_0$ can overshadow other variables with the same
+  name. The registers and memory locations of x86-64 all have unique
+  names.
 \end{enumerate}
 
 We ease the challenge of compiling from $S_0$ to x86 by breaking down
 the problem into several steps, dealing with the above differences one
-at a time. Further, we identify an intermediate language named $C_0$,
-roughly half-way between $S_0$ and x86, to provide a rest stop along
-the way. The name $C_0$ comes from this language being vaguely similar
-to the $C$ language. first two differences discussed above, regarding
-variables and nested expressions, are handled by the passes
-\textsf{uniquify} and \textsf{flatten} that bring us to $C_0$.
+at a time. The main question then becomes: in what order to we tackle
+these differences? This is often one of the most challenging questions
+that a compiler writer must answer because some orderings may be much
+more difficult to implement than others. It is difficult to know ahead
+of time which orders will be better so often some trial-and-error is
+involved. However, we can try to plan ahead and choose the orderings
+based on what we find out.
+
+For example, to handle difference \#2 (nested expressions), we shall
+introduce new variables and pull apart the nested expressions into a
+sequence of assignment statements.  To deal with difference \#3 we
+will be replacing variables with registers and/or stack
+locations. Thus, it makes sense to deal with \#2 before \#3 so that
+\#3 can replace both the original variables and the new ones. Next,
+consider where \#1 should fit in. Because it has to do with the format
+of x86 instructions, it makes more sense after we have flattened the
+nested expressions (\#2). Finally, when should we deal with \#4
+(variable overshadowing)?  We shall be solving this problem by
+renaming variables to make sure they have unique names. Recall that
+our plan for \#2 involves moving nested expressions, which could be
+problematic if it changes the shadowing of variables. However, if we
+deal with \#4 first, then it will not be an issue.  Thus, we arrive at
+the following ordering.
+\[
+\xymatrix{
+4 \ar[r] & 2 \ar[r] & 1 \ar[r] & 3
+}
+\]
+
+We further simplify the translation from $S_0$ to x86 by identifying
+an intermediate language named $C_0$, roughly half-way between $S_0$
+and x86, to provide a rest stop along the way. The name $C_0$ comes
+from this language being vaguely similar to the $C$ language. The
+differences \#4 and \#1, regarding variables and nested expressions,
+are handled by the passes \textsf{uniquify} and \textsf{flatten} that
+bring us to $C_0$.
 \[\large
-\xymatrix@=55pt{
+\xymatrix@=60pt{
   S_0 \ar[r]^-{\textsf{uniquify}} & S_0 \ar[r]^-{\textsf{flatten}} & C_0 
 }
 \]
@@ -453,7 +520,7 @@ include at least one \key{return} statement.
 \Arg &::=& \Int \mid \Var \\
 \Exp &::=& \Arg \mid (\Op \; \Arg^{*})\\
 \Stmt &::=& \ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg} \\
-\Prog & ::= & \Stmt^{+}
+\Prog & ::= & (\key{program}\;\itm{info}\;\Stmt^{+})
 \end{array}
 \]
 \caption{The $C_0$ intermediate language.}
@@ -464,32 +531,32 @@ include at least one \key{return} statement.
 To get from $C_0$ to x86-64 assembly requires three more steps, which
 we discuss below.
 \[\large
-\xymatrix@=55pt{
+\xymatrix@=60pt{
   C_0 \ar[r]^-{\textsf{select\_instr.}}
   & \text{x86}^{*} \ar[r]^-{\textsf{assign\_homes}} & \text{x86}^{*}
-    \ar[r]^-{\textsf{spill\_code}}
+    \ar[r]^-{\textsf{patch\_instr.}}
   & \text{x86}
 }
 \]
-We handle the third difference listed above, concerning the format of
-arithmetic instructions, in the \textsf{select\_instructions} pass.
-The result of this pass produces programs consisting of x86-64
-instructions that use variables.
+We handle difference \#1, concerning the format of arithmetic
+instructions, in the \textsf{select\_instructions} pass.  The result
+of this pass produces programs consisting of x86-64 instructions that
+use variables.
 %
 As there are only 16 registers, we cannot always map variables to
-registers. Fortunately, the stack can grow arbitrarily, so we can
-always map variables to locations on the stack. This is handled in the
+registers (difference \#3). Fortunately, the stack can grow quite, so
+we can map variables to locations on the stack. This is handled in the
 \textsf{assign\_homes} pass. The topic of
 Chapter~\ref{ch:register-allocation} is implementing a smarter
 approach in which we make a best-effort to map variables to registers,
 resorting to the stack only when necessary.
-%
+
 The final pass in our journey to x86 handles an indiosycracy of x86
 assembly. Many x86 instructions have two arguments but only one of the
 arguments may be a memory reference. Because we are mapping variables
 to stack locations, many of our generated instructions will violate
-this restriction. The purpose of the \textsf{spill\_code} pass is to
-patch up this problem by replacing each bad instructions with a short
+this restriction. The purpose of the \textsf{patch\_instructions} pass
+is to fix this problem by replacing every bad instruction with a short
 sequence of instructions that use the \key{rax} register.
 
 \section{Uniquify}
@@ -562,36 +629,104 @@ of \textsf{flatten}.
 \section{Select Instructions}
 
 In the \textsf{select\_instructions} pass we begin the work of
-translating from $C_0$ to x86. The first step is dealing with the
-differing format of arithmetic operations. For example, in $C_0$ an
-addition operation could take the following form:
+translating from $C_0$ to x86. The target language of this pass is a
+pseudo-x86 language that still uses variables, so we add an AST node
+of the form $\VAR{\itm{var}}$.  The \textsf{select\_instructions} pass
+deals with the differing format of arithmetic operations. For example,
+in $C_0$ an addition operation could take the following form:
 \[
 \ASSIGN{x}{ \BINOP{+}{10}{32} }
 \]
-To translate to x86, we need to express this using the \key{addq}
-instruction that does an inplace update. So we first move $10$ to $x$
-then perform the \key{addq}.
+To translate to x86, we need to express this addition using the
+\key{add} instruction that does an inplace update. So we first move
+$10$ to $x$ then perform the \key{add}.
 \[
-  (\key{movq}\; 10 \; x) \;
-  (\key{addq}\; 32 \; x)
+(\key{mov}\,\INT{10}\, \VAR{x})\; (\key{add} \;\INT{32}\; \VAR{x})
 \]
 
-There are some special cases that should be handled differently.  If
-one of the arguments is the same as the left-hand side of the
-assignment, then there is no need for the extra move instruction.
-For example, the following
+There are some cases that require special care to avoid generating
+needlessly complicated code. If one of the arguments is the same as
+the left-hand side of the assignment, then there is no need for the
+extra move instruction.  For example, the following
 \[
 \ASSIGN{x}{ \BINOP{+}{10}{x} }
+\quad\text{should translate to}\quad
+(\key{add} \; \INT{10}\; \VAR{x})
 \]
-should translate to 
-\[
- (\key{addq}\; 10\; x)
-\]
+
+Regarding the \RETURN{e} statement of $C_0$, we recommend treating it
+as an assignment to the \key{rax} register and let the procedure
+conclusion handle the transfer of control back to the calling
+procedure.
 
 \section{Assign Homes}
 
+As discussed in Section~\ref{sec:plan-s0-x86}, the
+\textsf{assign\_homes} pass places all of the variables on the stack.
+Consider again the example $S_0$ program $\BINOP{+}{52}{ \UNIOP{-}{10} }$,
+which after \textsf{select\_instructions} looks like the following.
+\[
+\begin{array}{l}
+(\key{mov}\;\INT{10}\; \VAR{x})\\
+(\key{neg}\; \VAR{x})\\
+(\key{mov}\; \INT{52}\; \REG{\itm{rax}})\\
+(\key{add}\; \VAR{x} \REG{\itm{rax}})
+\end{array}
+\]
+The one and only variable $x$ is assigned to stack location
+\key{-8(\%rbp)}, so the \textsf{assign\_homes} pass translates the
+above to
+\[
+\begin{array}{l}
+(\key{mov}\;\INT{10}\; \STACKLOC{{-}8})\\
+(\key{neg}\; \STACKLOC{{-}8})\\
+(\key{mov}\; \INT{52}\; \REG{\itm{rax}})\\
+(\key{add}\; \STACKLOC{{-}8}\; \REG{\itm{rax}})
+\end{array}
+\]
 
-\section{Spill Code}
+In the process of assigning stack locations to variables, it is
+convenient to compute and store the size of the frame which will be
+needed later to generate the procedure conclusion.
+
+\section{Patch Instructions}
+
+The purpose of this pass is to make sure that each instruction adheres
+to the restrictions regarding which arguments can be memory
+references. For most instructions, the rule is that at most one
+argument may be a memory reference.
+
+Consider again the following example.
+\[
+\LET{a}{42}{ \LET{b}{a}{ b }}
+\]
+After \textsf{assign\_homes} pass, the above has been translated to
+\[
+\begin{array}{l}
+(\key{mov} \;\INT{42}\; \STACKLOC{{-}8})\\
+(\key{mov}\;\STACKLOC{{-}8}\; \STACKLOC{{-}16})\\
+(\key{mov}\;\STACKLOC{{-}16}\; \REG{\itm{rax}})
+\end{array}
+\]
+The second \key{mov} instruction is problematic because both arguments
+are stack locations. We suggest fixing this problem by moving from the
+source to \key{rax} and then from \key{rax} to the destination, as
+follows.
+\[
+\begin{array}{l}
+(\key{mov} \;\INT{42}\; \STACKLOC{{-}8})\\
+(\key{mov}\;\STACKLOC{{-}8}\; \REG{\itm{rax}})\\
+(\key{mov}\;\REG{\itm{rax}}\; \STACKLOC{{-}16})\\
+(\key{mov}\;\STACKLOC{{-}16}\; \REG{\itm{rax}})
+\end{array}
+\]
+
+The \key{imul} instruction is a special case because the destination
+argument must be a register.
+
+
+\section{Testing with the Interpreters}
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
