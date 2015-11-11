@@ -15,7 +15,8 @@
 
 \lstset{%
 language=Lisp,
-basicstyle=\ttfamily\small
+basicstyle=\ttfamily\small,
+escapechar=@
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -751,26 +752,21 @@ result.
 \chapter{Register Allocation}
 \label{ch:register-allocation}
 
+In Chapter~\ref{ch:int-exp} we simplified the generation of x86
+assembly by placing all variables on the stack. We can improve the
+performance of the generated code considerably if we instead try to
+place as many variables as possible into registers.  The CPU can
+access a register in a single cycle, whereas accessing the stack can
+take from several cycles (to go to cache) to hundreds of cycles (to go
+to main memory).  Figure~\ref{fig:reg-eg} shows a program with four
+variables that serves as a running example. We show the source program
+and also the output of instruction selection. At that point the
+program is almost x86 assembly but not quite; it still contains
+variables instead of stack locations or registers.
 
-% three new passes between instruction selection and spill code
-% uncover-live
-% build-interference
-% allocate registers (uses assign-homes)
-
-\[
-\xymatrix{
-  C_0 \ar@/^/[r]^-{\textsf{select\_instr.}}
-    & \text{x86}^{*} \ar[d]^-{\textsf{uncover\_live}} \\
-    & \text{x86}^{*} \ar[d]^-{\textsf{build\_interference}} \\
-    & \text{x86}^{*} \ar[d]_-{\textsf{allocate\_register}} \\
-    & \text{x86}^{*} \ar@/^/[r]^-{\textsf{patch\_instr.}} 
-    & \text{x86} 
-}
-\]
-
-% example
-% some vars with disjoint live ranges: x y
-% some vars with overlapping live ranges: z
+\begin{figure}
+\begin{minipage}{0.45\textwidth}
+Source program:
 \begin{lstlisting}
 (let ([x 30])
   (let ([z (+ x 4)])
@@ -778,8 +774,9 @@ result.
       (let ([w (+ z 10)])
         (- w y)))))
 \end{lstlisting}
-
-after select instructions
+\end{minipage}
+\begin{minipage}{0.45\textwidth}
+After instruction selection:
 \begin{lstlisting}
 (program (x z y w)
   (mov (int 30) (var x))
@@ -791,50 +788,148 @@ after select instructions
   (mov (var w) (reg rax))
   (sub (var y) (reg rax)))
 \end{lstlisting}
+\end{minipage}
+\caption{Program to serve as running example for this chapter.}
+\label{fig:reg-eg}
+\end{figure}
+
+
+The goal of register allocation is to fit as many variables into
+registers as possible. It is often the case that we have more
+variables than registers, so we can't naively map each variable to a
+register. Fortunately, it is also common for different variables to be
+needed during different periods of time, and in such cases the
+variables can be mapped to the same register.  Consider variables $x$
+and $y$ in Figure~\ref{fig:reg-eg}.  After the variable $x$ is moved
+to $z$ it is no longer needed.  Variable $y$, on the other hand, is
+used only after this point, so $x$ and $y$ could share the same
+register. The topic of the next section is how we compute where a
+variable is needed.
 
 
 \section{Liveness Analysis}
 
-\begin{lstlisting}
-(program (x z y w)
-; { }
-  (mov (int 30) (var x))
-; { x }
-  (mov (var x) (var z))
-; { z }
-  (add (int 4) (var z))
-; { z }
-  (mov (int 2) (var y))
-; { y, z }
-  (mov (var z) (var w))
-; { w, y }
-  (add (int 10) (var w))
-; { w, y }
-  (mov (var w) (reg rax))
-; { y, rax }
-  (sub (var y) (reg rax)))
+A variable is \emph{live} if the variable is used at some later point
+in the program and there is not an intervening assignment to the
+variable.
+%
+To understand the latter condition, consider the following code
+fragment in which there are two writes to $y$. Are $x$ and
+$y$ both live at the same time? 
+\begin{lstlisting}[numbers=left,numberstyle=\tiny]
+(mov (int 5) (var x))    ; @$x \gets 5$@
+(mov (int 30) (var y))   ; @$y \gets 30$@
+(mov (var x) (var z))    ; @$z \gets x$@
+(mov (int 10) (var y))   ; @$y \gets 10$@
+(add (var y) (var z))    ; @$z \gets z + y$@
 \end{lstlisting}
+The answer is no because the value $30$ written to $y$ on line 2 is
+never used. The variable $y$ is read on line 5 and there is an
+intervening write to $y$ on line 4, so the read on line 5 receives the
+value written on line 4, not line 2.
 
+The live variables can be computed by traversing the instruction
+sequence back to front (i.e., backwards in execution order).  Let
+$I_1,\ldots, I_n$ be the instruction sequence. We write
+$L_{\mathsf{after}}(k)$ for the set of live variables after
+instruction $I_k$ and $L_{\mathsf{before}}(k)$ for the set of live
+variables before instruction $I_k$. The live variables after an
+instruction are always the same as the live variables before the next
+instruction.
+\begin{equation*}
+  L_{\mathsf{after}}(k) = L_{\mathsf{before}}(k+1)
+\end{equation*}
+To start things off, there are no live variables after the last
+instruction, so 
+\begin{equation*}
+  L_{\mathsf{after}}(n) = \emptyset 
+\end{equation*}
+We then apply the following rule repeatedly, traversing the
+instruction sequence back to front.
+\begin{equation*}
+  L_{\mathtt{before}}(k) = (L_{\mathtt{after}}(k) - W(k)) \cup R(k),
+\end{equation*}
+where $W(k)$ are the variables written to by instruction $I_k$ and
+$R(k)$ are the variables read by instruction $I_k$.
+Figure~\ref{fig:live-eg} shows the results of live variables analysis
+for the running example. Next to each instruction we write its
+$L_{\mathtt{after}}$ set.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+(program (x z y w)           ; @$\{ \}$@
+  (mov (int 30) (var x))     ; @$\{ x \}$@
+  (mov (var x) (var z))      ; @$\{ z \}$@
+  (add (int 4) (var z))      ; @$\{ z \}$@
+  (mov (int 2) (var y))      ; @$\{ y, z \}$@
+  (mov (var z) (var w))      ; @$\{ w, y \}$@
+  (add (int 10) (var w))     ; @$\{ w, y \}$@
+  (mov (var w) (reg rax))    ; @$\{ y, \itm{rax} \}$@
+  (sub (var y) (reg rax)))   ; @$\{ \}$@
+\end{lstlisting}
+\caption{Running example program annotated with live variables.}
+\label{fig:live-eg}
+\end{figure}
 
 
 \section{Build Interference Graph}
 
-%% (hash
-%%    'z1498
-%%    (set 'rax 'x1497 'y1499)
-%%    'x1497
-%%    (set 'z1498)
-%%    'rax
-%%    (set 'z1498 'y1499)
-%%    'y1499
-%%    (set 'rax 'z1498)))
+Based on the liveness analysis, we know the program regions where each
+variable is needed.  However, during register allocation, we need to
+answer questions of the specific form: are variables $u$ and $v$ ever
+live at the same time?  (And therefore cannot be assigned to the same
+register.)  To make this question easier to answer, we create an
+explicit data structure, an \emph{interference graph}.  An
+interference graph is an undirected graph that has an edge between two
+variables if they are live at the same time, that is, if they
+interfere with each other.
 
+The most obvious way to compute the interference graph is to look at
+the set of live variables between each statement in the program, and
+add an edge to the graph for every pair of variables in the same set.
+This approach is less than ideal for two reasons. First, it can be
+rather expensive because it takes $O(n^2)$ time to look at every pair
+in a set of $n$ live variables. Second, there is a special case in
+which two variables that are live at the same time do not actually
+interfere with each other: when they both contain the same value
+because we have assigned one to the other.
+
+A better way to compute the edges of the intereference graph is given
+by the following rules.
+
+\begin{itemize}
+\item If instruction $I_k$ is a move: (\key{mov} $s$\, $d$), then add
+  the edge $(d,v)$ for every $v \in L_{\mathsf{after}}(k)$ unless $v =
+  d$ or $v = s$.
+
+\item If instruction $I_k$ is not a move but some other arithmetic
+  instruction such as (\key{add} $s$\, $d$), then add the edge $(d,v)$
+  for every $v \in L_{\mathsf{after}}(k)$ unless $v = d$.
+  
+\item If instruction $I_k$ is of the form (\key{call}
+  $\mathit{label}$), then add an edge $(r,v)$ for every caller-save
+  register $r$ and every variable $v \in L_{\mathsf{after}}(k)$.
+\end{itemize}
+
+Working from the top to bottom of Figure~\ref{fig:live-eg}, $y$
+interferes with $z$, $w$ interfers with $y$, 
+[?? w should not conflict with z! ??]
+The resulting interference graph is shown in
+Figure~\ref{fig:interfere}.
+
+\begin{figure}[tbp]
+\large
 \[
-\xymatrix{
+\xymatrix@=40pt{
   w \ar@{-}[d] \ar@{-}[dr] &  x \ar@{-}[d] \\
   y \ar@{-}[r] & z
 }
 \]
+\caption{Interference graph for the example program.}
+\label{fig:interfere}
+\end{figure}
+
+
 
 
 \section{Graph Coloring via Sudoku}
@@ -866,6 +961,24 @@ patch instructions fixes the move from
 	movq	-16(%rbp), %rax
 	movq	%rax, -8(%rbp)
 \end{lstlisting}
+
+% three new passes between instruction selection and spill code
+% uncover-live
+% build-interference
+% allocate registers (uses assign-homes)
+
+\[
+\xymatrix{
+  C_0 \ar@/^/[r]^-{\textsf{select\_instr.}}
+    & \text{x86}^{*} \ar[d]^-{\textsf{uncover\_live}} \\
+    & \text{x86}^{*} \ar[d]^-{\textsf{build\_interference}} \\
+    & \text{x86}^{*} \ar[d]_-{\textsf{allocate\_register}} \\
+    & \text{x86}^{*} \ar@/^/[r]^-{\textsf{patch\_instr.}} 
+    & \text{x86} 
+}
+\]
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Booleans, Conditions, and Type Checking}
