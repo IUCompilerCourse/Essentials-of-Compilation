@@ -14,7 +14,8 @@
 \usepackage{xypic}
 
 \lstset{%
-basicstyle=\ttfamily%
+language=Lisp,
+basicstyle=\ttfamily\small
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -89,7 +90,8 @@ basicstyle=\ttfamily%
 \maketitle
 
 \begin{dedication}
-This book is dedicated to the programming languages group at Indiana University.
+This book is dedicated to the programming language wonks at Indiana
+University.
 \end{dedication}
 
 \tableofcontents
@@ -101,9 +103,8 @@ This book is dedicated to the programming languages group at Indiana University.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter*{Preface}
 
-\cite{Sarkar:2004fk}
-\cite{Keep:2012aa}
-\cite{Ghuloum:2006bh}
+Talk about nano-pass \citep{Sarkar:2004fk,Keep:2012aa} and incremental
+compilers \citep{Ghuloum:2006bh}.
 
 %\section*{Structure of book}
 % You might want to add short description about each chapter in this book.
@@ -122,9 +123,11 @@ Need to give thanks to
 \begin{itemize}
 \item Kent Dybvig
 \item Daniel P. Friedman
-\item Oscar Waddell
 \item Abdulaziz Ghuloum
+\item Oscar Waddell
 \item Dipanwita Sarkar
+\item Ronald Garcia
+\item Bor-Yuh Evan Chang
 \end{itemize}
 
 %\mbox{}\\
@@ -501,8 +504,10 @@ differences \#4 and \#1, regarding variables and nested expressions,
 are handled by the passes \textsf{uniquify} and \textsf{flatten} that
 bring us to $C_0$.
 \[\large
-\xymatrix@=60pt{
-  S_0 \ar[r]^-{\textsf{uniquify}} & S_0 \ar[r]^-{\textsf{flatten}} & C_0 
+\xymatrix@=50pt{
+  S_0 \ar@/^/[r]^-{\textsf{uniquify}} & 
+  S_0 \ar@/^/[r]^-{\textsf{flatten}} &
+  C_0 
 }
 \]
 
@@ -531,10 +536,10 @@ include at least one \key{return} statement.
 To get from $C_0$ to x86-64 assembly requires three more steps, which
 we discuss below.
 \[\large
-\xymatrix@=60pt{
-  C_0 \ar[r]^-{\textsf{select\_instr.}}
-  & \text{x86}^{*} \ar[r]^-{\textsf{assign\_homes}} & \text{x86}^{*}
-    \ar[r]^-{\textsf{patch\_instr.}}
+\xymatrix@=50pt{
+  C_0 \ar@/^/[r]^-{\textsf{select\_instr.}}
+  & \text{x86}^{*} \ar@/^/[r]^-{\textsf{assign\_homes}} 
+  & \text{x86}^{*} \ar@/^/[r]^-{\textsf{patch\_instr.}}
   & \text{x86}
 }
 \]
@@ -724,15 +729,143 @@ follows.
 The \key{imul} instruction is a special case because the destination
 argument must be a register.
 
-
 \section{Testing with Interpreters}
 
+The typical way to test a compiler is to run the generated assembly
+code on a diverse set of programs and check whether they behave as
+expected. However, when a compiler is structured as our is, with many
+passes, when there is an error in the generated assembly code it can
+be hard to determine which pass contains the source of the error.  A
+good way to isolate the error is to not only test the generated
+assembly code but to also test the output of every pass. This requires
+having interpreters for all the intermediate languages.  Indeed, the
+file \key{interp.rkt} in the supplemental code provides interpreters
+for all the intermediate languages described in this book, starting
+with interpreters for $S_0$, $C_0$, and x86 (in abstract syntax).
 
+The file \key{run-tests.rkt} automates the process of running the
+interpreters on the output programs of each pass and checking their
+result.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Register Allocation}
 \label{ch:register-allocation}
 
+
+% three new passes between instruction selection and spill code
+% uncover-live
+% build-interference
+% allocate registers (uses assign-homes)
+
+\[
+\xymatrix{
+  C_0 \ar@/^/[r]^-{\textsf{select\_instr.}}
+    & \text{x86}^{*} \ar[d]^-{\textsf{uncover\_live}} \\
+    & \text{x86}^{*} \ar[d]^-{\textsf{build\_interference}} \\
+    & \text{x86}^{*} \ar[d]_-{\textsf{allocate\_register}} \\
+    & \text{x86}^{*} \ar@/^/[r]^-{\textsf{patch\_instr.}} 
+    & \text{x86} 
+}
+\]
+
+% example
+% some vars with disjoint live ranges: x y
+% some vars with overlapping live ranges: z
+\begin{lstlisting}
+(let ([x 30])
+  (let ([z (+ x 4)])
+    (let ([y 2])
+      (let ([w (+ z 10)])
+        (- w y)))))
+\end{lstlisting}
+
+after select instructions
+\begin{lstlisting}
+(program (x z y w)
+  (mov (int 30) (var x))
+  (mov (var x) (var z))
+  (add (int 4) (var z))
+  (mov (int 2) (var y))
+  (mov (var z) (var w))
+  (add (int 10) (var w))
+  (mov (var w) (reg rax))
+  (sub (var y) (reg rax)))
+\end{lstlisting}
+
+
+\section{Liveness Analysis}
+
+\begin{lstlisting}
+(program (x z y w)
+; { }
+  (mov (int 30) (var x))
+; { x }
+  (mov (var x) (var z))
+; { z }
+  (add (int 4) (var z))
+; { z }
+  (mov (int 2) (var y))
+; { y, z }
+  (mov (var z) (var w))
+; { w, y }
+  (add (int 10) (var w))
+; { w, y }
+  (mov (var w) (reg rax))
+; { y, rax }
+  (sub (var y) (reg rax)))
+\end{lstlisting}
+
+
+
+\section{Build Interference Graph}
+
+%% (hash
+%%    'z1498
+%%    (set 'rax 'x1497 'y1499)
+%%    'x1497
+%%    (set 'z1498)
+%%    'rax
+%%    (set 'z1498 'y1499)
+%%    'y1499
+%%    (set 'rax 'z1498)))
+
+\[
+\xymatrix{
+  w \ar@{-}[d] \ar@{-}[dr] &  x \ar@{-}[d] \\
+  y \ar@{-}[r] & z
+}
+\]
+
+
+\section{Graph Coloring via Sudoku}
+
+Suppose only \key{rbx} is available for use by the register allocator.
+
+\[
+\xymatrix{
+  w:\key{-8(\%rbp)}  \ar@{-}[d] \ar@{-}[dr] &  x:\itm{rbx} \ar@{-}[d] \\
+  y:\itm{rbx} \ar@{-}[r] & z:\key{-16(\%rbp)}
+}
+\]
+
+\begin{lstlisting}
+	movq	$30, %rbx
+	movq	%rbx, -16(%rbp)
+	addq	$4, -16(%rbp)
+	movq	$2, %rbx
+	movq	-16(%rbp), -8(%rbp)
+	addq	$10, -8(%rbp)
+	movq	-8(%rbp), %rax
+	subq	%rbx, %rax
+\end{lstlisting}
+
+patch instructions fixes the move from 
+\key{-16(\%rbp)} to  \key{-8(\%rbp)}.
+
+\begin{lstlisting}
+	movq	-16(%rbp), %rax
+	movq	%rax, -8(%rbp)
+\end{lstlisting}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Booleans, Conditions, and Type Checking}
@@ -754,13 +887,13 @@ argument must be a register.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Mutable Data}
+\label{ch:mutable-data}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{The Dynamic Type}
 \label{ch:type-dynamic}
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{Mutable Lists}
-\label{ch:mutable-lists}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Parametric Polymorphism}
