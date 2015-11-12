@@ -768,10 +768,10 @@ variables instead of stack locations or registers.
 \begin{minipage}{0.45\textwidth}
 Source program:
 \begin{lstlisting}
-(let ([x 30])
-  (let ([z (+ x 4)])
+(let ([x 25])
+  (let ([z (+ 9 x)])
     (let ([y 2])
-      (let ([w (+ z 10)])
+      (let ([w (+ 10 z)])
         (- w y)))))
 \end{lstlisting}
 \end{minipage}
@@ -779,12 +779,12 @@ Source program:
 After instruction selection:
 \begin{lstlisting}
 (program (x z y w)
-  (mov (int 30) (var x))
-  (mov (var x) (var z))
-  (add (int 4) (var z))
+  (mov (int 25) (var x))
+  (mov (int 9) (var z))
+  (add (var x) (var z))
   (mov (int 2) (var y))
-  (mov (var z) (var w))
-  (add (int 10) (var w))
+  (mov (int 10) (var w))
+  (add (var z) (var w))
   (mov (var w) (reg rax))
   (sub (var y) (reg rax)))
 \end{lstlisting}
@@ -792,7 +792,6 @@ After instruction selection:
 \caption{Program to serve as running example for this chapter.}
 \label{fig:reg-eg}
 \end{figure}
-
 
 The goal of register allocation is to fit as many variables into
 registers as possible. It is often the case that we have more
@@ -857,17 +856,17 @@ $L_{\mathtt{after}}$ set.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(program (x z y w)           ; @$\{ \}$@
-  (mov (int 30) (var x))     ; @$\{ x \}$@
-  (mov (var x) (var z))      ; @$\{ z \}$@
-  (add (int 4) (var z))      ; @$\{ z \}$@
-  (mov (int 2) (var y))      ; @$\{ y, z \}$@
-  (mov (var z) (var w))      ; @$\{ w, y \}$@
-  (add (int 10) (var w))     ; @$\{ w, y \}$@
-  (mov (var w) (reg rax))    ; @$\{ y, \itm{rax} \}$@
-  (sub (var y) (reg rax)))   ; @$\{ \}$@
+(program (x z y w)
+  (mov (int 25) (var x))      @$\{x\}$@
+  (mov (int 9) (var z))       @$\{x,z\}$@
+  (add (var x) (var z))       @$\{z\}$@
+  (mov (int 2) (var y))       @$\{y,z\}$@
+  (mov (int 10) (var w))      @$\{w,y,z\}$@
+  (add (var z) (var w))       @$\{w,y\}$@
+  (mov (var w) (reg rax))     @$\{y\}$@
+  (sub (var y) (reg rax)))    @$\{\}$@
 \end{lstlisting}
-\caption{Running example program annotated with live variables.}
+\caption{Running example program annotated with live-after sets.}
 \label{fig:live-eg}
 \end{figure}
 
@@ -911,17 +910,16 @@ by the following rules.
   register $r$ and every variable $v \in L_{\mathsf{after}}(k)$.
 \end{itemize}
 
-Working from the top to bottom of Figure~\ref{fig:live-eg}, $y$
-interferes with $z$, $w$ interfers with $y$, 
-[?? w should not conflict with z! ??]
-The resulting interference graph is shown in
+Working from the top to bottom of Figure~\ref{fig:live-eg}, $z$
+interferes with $x$, $y$ interferes with $z$, and $w$ interferes with
+$y$ and $z$.  The resulting interference graph is shown in
 Figure~\ref{fig:interfere}.
 
 \begin{figure}[tbp]
 \large
 \[
 \xymatrix@=40pt{
-  w \ar@{-}[d] \ar@{-}[dr] &  x \ar@{-}[d] \\
+  w \ar@{-}[d]\ar@{-}[dr] &  x \ar@{-}[d]\\
   y \ar@{-}[r] & z
 }
 \]
@@ -930,36 +928,139 @@ Figure~\ref{fig:interfere}.
 \end{figure}
 
 
-
-
 \section{Graph Coloring via Sudoku}
+
+We now come to the main event, mapping variables to registers (or to
+stack locations in the event that we run out of registers).  We need
+to make sure not to map two variables to the same register if the two
+variables interfere with each other.  In terms of the interference
+graph, this means we cannot map adjacent nodes to the same register.
+If we think of registers as colors, the register allocation problem
+becomes the widely-studied graph coloring
+problem~\citep{Balakrishnan:1996ve,Rosen:2002bh}.  
+
+The reader may be more familar with the graph coloring problem then he
+or she realizes; the popular game of Sudoku is an instance of the
+graph coloring problem. The following describes how to build a graph
+out of a Sudoku board.
+\begin{itemize}
+\item There is one node in the graph for each Sudoku square.
+\item There is an edge between two nodes if the corresponding squares
+  are in the same row or column, or if the squares are in the same
+  $3\times 3$ region.
+\item Choose nine colors to correspond to the numbers $1$ to $9$.
+\item Based on the initial assignment of numbers to squares in the
+  Sudoku board, assign the corresponding colors to the corresponding
+  nodes in the graph.
+\end{itemize}
+If you can color the remaining nodes in the graph with the nine
+colors, then you've also solved the corresponding game of Sudoku.
+
+Given that Sudoku is graph coloring, one can use Sudoku strategies to
+come up with an algorithm for allocating registers. For example, one
+of the basic techniques for Sudoku is Pencil Marks. The idea is that
+you use a process of elimination to determine what numbers still make
+sense for a square, and write down those numbers in the square
+(writing very small). At first, each number might be a
+possibility, but as the board fills up, more and more of the
+possibilities are crossed off (or erased). For example, if the number
+$1$ is assigned to a square, then by process of elimination, you can
+cross off the $1$ pencil mark from all the squares in the same row,
+column, and region. Many Sudoku computer games provide automatic
+support for Pencil Marks. This heuristic also reduces the degree of
+branching in the search tree.
+
+The Pencil Marks technique corresponds to the notion of color
+\emph{saturation} due to \cite{Brelaz:1979eu}.  The
+saturation of a node, in Sudoku terms, is the number of possibilities
+that have been crossed off using the process of elimination mentioned
+above. In graph terminology, we have the following definition:
+\begin{equation*}
+  \mathrm{saturation}(u) = |\{ c \;|\; \exists v. v \in \mathrm{Adj}(u) 
+     \text{ and } \mathrm{color}(v) = c \}|
+\end{equation*}
+where $\mathrm{Adj}(u)$ is the set of nodes adjacent to $u$ and
+the notation $|S|$ stands for the size of the set $S$.
+
+Using the Pencil Marks technique leads to a simple strategy for
+filling in numbers: if there is a square with only one possible number
+left, then write down that number! But what if there aren't any
+squares with only one possibility left? One brute-force approach is to
+just make a guess. If that guess ultimately leads to a solution,
+great.  If not, backtrack to the guess and make a different guess.  Of
+course, this is horribly time consuming. One standard way to reduce
+the amount of backtracking is to use the most-constrained-first
+heuristic. That is, when making a guess, always choose a square with
+the fewest possibilities left (the node with the highest saturation).
+The idea is that choosing highly constrained squares earlier rather
+than later is better because later there may not be any possibilities
+left.
+
+In some sense, register allocation is easier than Sudoku because we
+can always cheat and add more numbers by spilling variables to the
+stack. Also, we'd like to minimize the time needed to color the graph,
+and backtracking is expensive. Thus, it makes sense to keep the
+most-constrained-first heuristic but drop the backtracking in favor of
+greedy search (guess and just keep going).
+Figure~\ref{fig:satur-algo} gives the pseudo-code for this simple
+greedy algorithm for register allocation based on saturation and the
+most-constrained-first heuristic, which is roughly equivalent to the
+DSATUR algorithm of \cite{Brelaz:1979eu} (also known as
+saturation degree ordering
+(SDO)~\citep{Gebremedhin:1999fk,Omari:2006uq}).  Just as in Sudoku,
+the algorithm represents colors with integers, with the first $k$
+colors corresponding to the $k$ registers in a given machine and the
+rest of the integers corresponding to stack locations.
+
+\begin{figure}[btp]
+  \centering
+\begin{lstlisting}[basicstyle=\rmfamily,deletekeywords={for,from,with,is,not,in,find},morekeywords={while},columns=fullflexible]
+Algorithm: DSATUR
+Input: the inference graph @$G$@
+Output: an assignment @$\mathrm{color}(v)$@ for each node @$v \in G$@
+
+@$W \gets \mathit{vertices}(G)$@
+while @$W \neq \emptyset$@ do
+    pick a node @$u$@ from @$W$@ with the highest saturation,
+        breaking ties randomly
+    find the lowest color @$c$@ that is not in @$\{ \mathrm{color}(v) \;|\; v \in \mathrm{Adj}(v)\}$@
+    @$\mathrm{color}(u) = c$@
+    @$W \gets W - \{u\}$@
+\end{lstlisting}
+  \caption{Saturation-based greedy graph coloring algorithm.}
+  \label{fig:satur-algo}
+\end{figure}
+
+
+UNDER CONSTRUCTION
+
 
 Suppose only \key{rbx} is available for use by the register allocator.
 
 \[
-\xymatrix{
-  w:\key{-8(\%rbp)}  \ar@{-}[d] \ar@{-}[dr] &  x:\itm{rbx} \ar@{-}[d] \\
-  y:\itm{rbx} \ar@{-}[r] & z:\key{-16(\%rbp)}
+\xymatrix@=40pt{
+  w:\key{-16(\%rbp)} \ar@{-}[d] \ar@{-}[dr] &  x:\key{\%rbx} \ar@{-}[d] \\
+  y:\key{\%rbx} \ar@{-}[r] & z:\key{-8(\%rbp)}
 }
 \]
 
 \begin{lstlisting}
-	movq	$30, %rbx
-	movq	%rbx, -16(%rbp)
-	addq	$4, -16(%rbp)
+	movq	$25, %rbx
+	movq	$9, -8(%rbp)
+	addq	%rbx, -8(%rbp)
 	movq	$2, %rbx
-	movq	-16(%rbp), -8(%rbp)
-	addq	$10, -8(%rbp)
-	movq	-8(%rbp), %rax
+	movq	$10, -16(%rbp)
+	addq	-8(%rbp), -16(%rbp)
+	movq	-16(%rbp), %rax
 	subq	%rbx, %rax
 \end{lstlisting}
 
-patch instructions fixes the move from 
-\key{-16(\%rbp)} to  \key{-8(\%rbp)}.
+patch instructions fixes the addition of
+\key{-8(\%rbp)} to  \key{-16(\%rbp)}.
 
 \begin{lstlisting}
-	movq	-16(%rbp), %rax
-	movq	%rax, -8(%rbp)
+	movq	-8(%rbp), %rax
+	addq	%rax, -16(%rbp)
 \end{lstlisting}
 
 % three new passes between instruction selection and spill code
