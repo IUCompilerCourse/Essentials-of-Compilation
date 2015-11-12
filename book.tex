@@ -768,28 +768,31 @@ variables instead of stack locations or registers.
 \begin{minipage}{0.45\textwidth}
 Source program:
 \begin{lstlisting}
-(let ([x 25])
-  (let ([z (+ 9 x)])
-    (let ([y 2])
-      (let ([w (+ 10 z)])
-        (- w y)))))
+  (let ([v 1])
+  (let ([w 46])
+  (let ([x (+ v 7)])
+  (let ([y (+ 4 x)])
+  (let ([z (+ x w)])
+       (- z y))))))
 \end{lstlisting}
 \end{minipage}
 \begin{minipage}{0.45\textwidth}
 After instruction selection:
 \begin{lstlisting}
-(program (x z y w)
-  (mov (int 25) (var x))
-  (mov (int 9) (var z))
-  (add (var x) (var z))
-  (mov (int 2) (var y))
-  (mov (int 10) (var w))
-  (add (var z) (var w))
-  (mov (var w) (reg rax))
-  (sub (var y) (reg rax)))
+  (program (v w x y z)
+    (mov (int 1) (var v))
+    (mov (int 46) (var w))
+    (mov (var v) (var x))
+    (add (int 7) (var x))
+    (mov (var x) (var y))
+    (add (int 4) (var y))
+    (mov (var x) (var z))
+    (add (var w) (var z))
+    (mov (var z) (reg rax))
+    (sub (var y) (reg rax)))
 \end{lstlisting}
 \end{minipage}
-\caption{Program to serve as running example for this chapter.}
+\caption{Running example for this chapter.}
 \label{fig:reg-eg}
 \end{figure}
 
@@ -813,18 +816,18 @@ in the program and there is not an intervening assignment to the
 variable.
 %
 To understand the latter condition, consider the following code
-fragment in which there are two writes to $y$. Are $x$ and
-$y$ both live at the same time? 
+fragment in which there are two writes to $b$. Are $a$ and
+$b$ both live at the same time? 
 \begin{lstlisting}[numbers=left,numberstyle=\tiny]
-(mov (int 5) (var x))    ; @$x \gets 5$@
-(mov (int 30) (var y))   ; @$y \gets 30$@
-(mov (var x) (var z))    ; @$z \gets x$@
-(mov (int 10) (var y))   ; @$y \gets 10$@
-(add (var y) (var z))    ; @$z \gets z + y$@
+(mov (int 5) (var a))    ; @$a \gets 5$@
+(mov (int 30) (var b))   ; @$b \gets 30$@
+(mov (var a) (var c))    ; @$c \gets x$@
+(mov (int 10) (var b))   ; @$b \gets 10$@
+(add (var b) (var c))    ; @$c \gets c + b$@
 \end{lstlisting}
-The answer is no because the value $30$ written to $y$ on line 2 is
-never used. The variable $y$ is read on line 5 and there is an
-intervening write to $y$ on line 4, so the read on line 5 receives the
+The answer is no because the value $30$ written to $b$ on line 2 is
+never used. The variable $b$ is read on line 5 and there is an
+intervening write to $b$ on line 4, so the read on line 5 receives the
 value written on line 4, not line 2.
 
 The live variables can be computed by traversing the instruction
@@ -856,22 +859,24 @@ $L_{\mathtt{after}}$ set.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(program (x z y w)
-  (mov (int 25) (var x))      @$\{x\}$@
-  (mov (int 9) (var z))       @$\{x,z\}$@
-  (add (var x) (var z))       @$\{z\}$@
-  (mov (int 2) (var y))       @$\{y,z\}$@
-  (mov (int 10) (var w))      @$\{w,y,z\}$@
-  (add (var z) (var w))       @$\{w,y\}$@
-  (mov (var w) (reg rax))     @$\{y\}$@
-  (sub (var y) (reg rax)))    @$\{\}$@
+  (program (v w x y z)
+    (mov (int 1) (var v))      @$\{ v \}$@
+    (mov (int 46) (var w))     @$\{ v, w \}$@
+    (mov (var v) (var x))      @$\{ w, x \}$@
+    (add (int 7) (var x))      @$\{ w, x \}$@
+    (mov (var x) (var y))      @$\{ w, x, y\}$@
+    (add (int 4) (var y))      @$\{ w, x, y \}$@
+    (mov (var x) (var z))      @$\{ w, y, z \}$@
+    (add (var w) (var z))      @$\{ y, z \}$@
+    (mov (var z) (reg rax))    @$\{ y \}$@
+    (sub (var y) (reg rax)))   @$\{\}$@
 \end{lstlisting}
 \caption{Running example program annotated with live-after sets.}
 \label{fig:live-eg}
 \end{figure}
 
 
-\section{Build Interference Graph}
+\section{Building the Interference Graph}
 
 Based on the liveness analysis, we know the program regions where each
 variable is needed.  However, during register allocation, we need to
@@ -919,11 +924,11 @@ Figure~\ref{fig:interfere}.
 \large
 \[
 \xymatrix@=40pt{
-  w \ar@{-}[d]\ar@{-}[dr] &  x \ar@{-}[d]\\
-  y \ar@{-}[r] & z
+  v \ar@{-}[r] & w \ar@{-}[r]\ar@{-}[d]\ar@{-}[dr] &  x \ar@{-}[dl]\\
+               & y \ar@{-}[r] & z
 }
 \]
-\caption{Interference graph for the example program.}
+\caption{Interference graph for the running example.}
 \label{fig:interfere}
 \end{figure}
 
@@ -984,17 +989,16 @@ the notation $|S|$ stands for the size of the set $S$.
 
 Using the Pencil Marks technique leads to a simple strategy for
 filling in numbers: if there is a square with only one possible number
-left, then write down that number! But what if there aren't any
-squares with only one possibility left? One brute-force approach is to
-just make a guess. If that guess ultimately leads to a solution,
-great.  If not, backtrack to the guess and make a different guess.  Of
-course, this is horribly time consuming. One standard way to reduce
-the amount of backtracking is to use the most-constrained-first
-heuristic. That is, when making a guess, always choose a square with
-the fewest possibilities left (the node with the highest saturation).
-The idea is that choosing highly constrained squares earlier rather
-than later is better because later there may not be any possibilities
-left.
+left, then write down that number! But what if there are no squares
+with only one possibility left? One brute-force approach is to just
+make a guess. If that guess ultimately leads to a solution, great.  If
+not, backtrack to the guess and make a different guess.  Of course,
+this is horribly time consuming. One standard way to reduce the amount
+of backtracking is to use the most-constrained-first heuristic. That
+is, when making a guess, always choose a square with the fewest
+possibilities left (the node with the highest saturation).  The idea
+is that choosing highly constrained squares earlier rather than later
+is better because later there may not be any possibilities left.
 
 In some sense, register allocation is easier than Sudoku because we
 can always cheat and add more numbers by spilling variables to the
@@ -1032,42 +1036,109 @@ while @$W \neq \emptyset$@ do
 \end{figure}
 
 
-UNDER CONSTRUCTION
-
-
-Suppose only \key{rbx} is available for use by the register allocator.
-
+With this algorithm in hand, let us return to the running example and
+consider how to color the interference graph in
+Figure~\ref{fig:interfere}. Initially, all of the nodes are not yet
+colored and they are unsaturated, so we annotate each of them with a
+dash for their color and an empty set for the saturation.
 \[
-\xymatrix@=40pt{
-  w:\key{-16(\%rbp)} \ar@{-}[d] \ar@{-}[dr] &  x:\key{\%rbx} \ar@{-}[d] \\
-  y:\key{\%rbx} \ar@{-}[r] & z:\key{-8(\%rbp)}
+\xymatrix{
+  v:-,\{\} \ar@{-}[r] & w:-,\{\} \ar@{-}[r]\ar@{-}[d]\ar@{-}[dr] &  x:-,\{\} \ar@{-}[dl]\\
+               & y:-,\{\} \ar@{-}[r] & z:-,\{\}
+}
+\]
+We select a maximally saturated node and color it $0$. In this case we
+have a 5-way tie, so we arbitrarily pick $y$. The color $0$ is no
+longer available for $w$, $x$, and $z$ because they interfere with
+$y$.
+\[
+\xymatrix{
+  v:-,\{\} \ar@{-}[r] & w:-,\{0\} \ar@{-}[r]\ar@{-}[d]\ar@{-}[dr] &  x:-,\{0\} \ar@{-}[dl]\\
+               & y:0,\{\} \ar@{-}[r] & z:-,\{0\}
+}
+\]
+Now we repeat the process, selecting another maximally saturated node.
+This time there is a three-way tie between $w$, $x$, and $z$. We color
+$w$ with $1$.
+\[
+\xymatrix{
+  v:-,\{1\} \ar@{-}[r] & w:1,\{0\} \ar@{-}[r]\ar@{-}[d]\ar@{-}[dr] &  x:-,\{0,1\} \ar@{-}[dl]\\
+               & y:0,\{1\} \ar@{-}[r] & z:-,\{0,1\}
+}
+\]
+The most saturated nodes are now $x$ and $z$. We color $x$ with the
+next avialable color which is $2$.
+\[
+\xymatrix{
+  v:-,\{1\} \ar@{-}[r] & w:1,\{0,2\} \ar@{-}[r]\ar@{-}[d]\ar@{-}[dr] &  x:2,\{0,1\} \ar@{-}[dl]\\
+               & y:0,\{1,2\} \ar@{-}[r] & z:-,\{0,1\}
+}
+\]
+We have only two nodes left to color, $v$ and $z$, but $z$ is
+more highly saturaded, so we color $z$ with $2$.
+\[
+\xymatrix{
+  v:-,\{1\} \ar@{-}[r] & w:1,\{0,2\} \ar@{-}[r]\ar@{-}[d]\ar@{-}[dr] &  x:2,\{0,1\} \ar@{-}[dl]\\
+               & y:0,\{1,2\} \ar@{-}[r] & z:2,\{0,1\}
+}
+\]
+The last iteration of the coloring algorithm assigns color $0$ to $v$.
+\[
+\xymatrix{
+  v:0,\{1\} \ar@{-}[r] & w:1,\{0,2\} \ar@{-}[r]\ar@{-}[d]\ar@{-}[dr] &  x:2,\{0,1\} \ar@{-}[dl]\\
+               & y:0,\{1,2\} \ar@{-}[r] & z:2,\{0,1\}
 }
 \]
 
+With the coloring complete, we can finalize assignment of variables to
+registers and stack locations. Recall that if we have $k$ registers,
+we map the first $k$ colors to registers and the rest to stack
+lcoations. Suppose for the moment that we just have one extra register
+to use for register allocation, just \key{rbx}. Then the following is
+the mapping of colors to registers and stack allocations.
+\[
+  \{ 0 \mapsto \key{\%rbx}, \; 1 \mapsto \key{-8(\%rbp)}, \; 2 \mapsto \key{-16(\%rbp)}, \ldots \}
+\]
+Putting this together with the above coloring of the variables, we
+arrive at the following assignment.
+\[
+  \{ v \mapsto \key{\%rbx}, \;
+  w \mapsto \key{-8(\%rbp)},  \;
+  x \mapsto \key{-16(\%rbp)}, \;
+  y \mapsto \key{\%rbx},  \;
+  z\mapsto \key{-16(\%rbp)} \}
+\]
+Applying this assignment to our running example
+(Figure~\ref{fig:reg-eg}) yields the following program.
+% why frame size of 32? -JGS
 \begin{lstlisting}
-	movq	$25, %rbx
-	movq	$9, -8(%rbp)
-	addq	%rbx, -8(%rbp)
-	movq	$2, %rbx
-	movq	$10, -16(%rbp)
-	addq	-8(%rbp), -16(%rbp)
-	movq	-16(%rbp), %rax
-	subq	%rbx, %rax
+(program 32
+  (mov (int 1) (reg rbx))
+  (mov (int 46) (stack-loc -8))
+  (mov (reg rbx) (stack-loc -16))
+  (add (int 7) (stack-loc -16))
+  (mov (stack-loc 16) (reg rbx))
+  (add (int 4) (reg rbx))
+  (mov (stack-loc -16) (stack-loc -16))
+  (add (stack-loc -8) (stack-loc -16))
+  (mov (stack-loc -16) (reg rax))
+  (sub (reg rbx) (reg rax)))
 \end{lstlisting}
-
-patch instructions fixes the addition of
-\key{-8(\%rbp)} to  \key{-16(\%rbp)}.
-
+This program is almost an x86 program. The remaining step is to apply
+the patch instructions pass. In this example, the trivial move of
+\key{-16(\%rbp)} to itself is deleted and the addition of
+\key{-8(\%rbp)} to \key{-16(\%rbp)} is fixed by going through
+\key{\%rax}. The following shows the portion of the program that
+changed.
 \begin{lstlisting}
-	movq	-8(%rbp), %rax
-	addq	%rax, -16(%rbp)
+  (add (int 4) (reg rbx))
+  (mov (stack-loc -8) (reg rax)
+  (add (reg rax) (stack-loc -16))
 \end{lstlisting}
+An overview of all of the passes involved in register allocation is
+shown in Figure~\ref{fig:reg-alloc-passes}.
 
-% three new passes between instruction selection and spill code
-% uncover-live
-% build-interference
-% allocate registers (uses assign-homes)
-
+\begin{figure}[tbp]
 \[
 \xymatrix{
   C_0 \ar@/^/[r]^-{\textsf{select\_instr.}}
@@ -1078,11 +1149,13 @@ patch instructions fixes the addition of
     & \text{x86} 
 }
 \]
-
+\caption{Diagram of the passes for register allocation.}
+\label{fig:reg-alloc-passes}
+\end{figure}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{Booleans, Conditions, and Type Checking}
+\chapter{Booleans, Type Checking, and Control Flow}
 \label{ch:bool-types}
 
 
