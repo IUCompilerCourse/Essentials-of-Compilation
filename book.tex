@@ -12,6 +12,7 @@
 \usepackage{natbib}
 \usepackage{stmaryrd}
 \usepackage{xypic}
+\usepackage{semantic}
 
 \lstset{%
 language=Lisp,
@@ -76,13 +77,16 @@ escapechar=@
 \newcommand{\VAR}[1]{(\key{var}\;#1)}
 \newcommand{\STACKLOC}[1]{(\key{stack}\;#1)}
 
+\newcommand{\IF}[3]{(\key{if}\,#1\;#2\;#3)}
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \title{\Huge \textbf{Essentials of Compilation} \\ 
   \huge An Incremental Approach}
 
-\author{\textsc{Jeremy G. Siek}
-   \thanks{\url{http://homes.soic.indiana.edu/jsiek/}}
+\author{\textsc{Jeremy G. Siek} \\
+%\thanks{\url{http://homes.soic.indiana.edu/jsiek/}} \\
+  Indiana University
    }
 
 \begin{document}
@@ -134,6 +138,11 @@ Need to give thanks to
 %\mbox{}\\
 %\noindent Amber Jain \\
 %\noindent \url{http://amberj.devio.us/}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Abstract Syntax Trees and Recursion}
+\label{ch:trees-recur}
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Integers and Variables}
@@ -440,7 +449,7 @@ into the text representation for x86 (Figure~\ref{fig:x86-a}).
 \label{fig:x86-ast-a}
 \end{figure}
 
-\section{Planning the route from $S_0$ to x86-64}
+\section{From $S_0$ to x86-64 through $C_0$}
 \label{sec:plan-s0-x86}
 
 To compile one language to another it helps to focus on the
@@ -1157,6 +1166,162 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Booleans, Type Checking, and Control Flow}
 \label{ch:bool-types}
+
+\section{The $S_1$ Language}
+
+\begin{figure}[htbp]
+\centering
+\fbox{
+\begin{minipage}{0.85\textwidth}
+\[
+\begin{array}{lcl}
+  \Op  &::=& \ldots \mid \key{and} \mid \key{or} \mid \key{not} \mid \key{eq?} \\
+  \Exp &::=& \ldots \mid \key{\#t} \mid \key{\#f} \mid
+      \IF{\Exp}{\Exp}{\Exp}
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The $S_1$ language, an extension of $S_0$
+  (Figure~\ref{fig:s0-syntax}).}
+\label{fig:s1-syntax}
+\end{figure}
+
+\section{Type Checking $S_1$ Programs}
+
+% T ::= Integer | Boolean
+
+It is common practice to specify a type system by writing rules for
+each kind of AST node. For example, the rule for \key{if} is:
+\begin{quote}
+  For any expressions $e_1, e_2, e_3$ and any type $T$, if $e_1$ has
+  type \key{bool}, $e_2$ has type $T$, and $e_3$ has type $T$, then
+  $\IF{e_1}{e_2}{e_3}$ has type $T$.
+\end{quote}
+It is also common practice to write rules using a horizontal line,
+with the conditions written above the line and the conclusion written
+below the line.
+\begin{equation*}
+  \inference{e_1 \text{ has type } \key{bool} & 
+        e_2 \text{ has type } T & e_3 \text{ has type } T}
+  {\IF{e_1}{e_2}{e_3} \text{ has type } T}
+\end{equation*}
+Because the phrase ``has type'' is repeated so often in these type
+checking rules, it is abbreviated to just a colon. So the above rule
+is abbreviated to the following.
+\begin{equation*}
+  \inference{e_1 : \key{bool} & e_2 : T & e_3 : T}
+            {\IF{e_1}{e_2}{e_3} : T}
+\end{equation*}
+
+The $\LET{x}{e_1}{e_2}$ construct poses an interesting challenge. The
+variable $x$ is assigned the value of $e_1$ and then $x$ can be used
+inside $e_2$. When we get to an occurrence of $x$ inside $e_2$, how do
+we know what type the variable should be?  The answer is that we need
+a way to map from variable names to types.  Such a mapping is called a
+\emph{type environment} (aka. \emph{symbol table}). The capital Greek
+letter gamma, written $\Gamma$, is used for referring to type
+environments environments. The notation $\Gamma, x : T$ stands for
+making a copy of the environment $\Gamma$ and then associating $T$
+with the variable $x$ in the new environment.  We write $\Gamma(x)$ to
+lookup the associated type for $x$.  The type checking rules for
+\key{let} and variables are as follows.
+\begin{equation*}
+  \inference{e_1 : T_1 \text{ in } \Gamma &
+             e_2 : T_2 \text{ in } \Gamma,x:T_1}
+            {\LET{x}{e_1}{e_2} : T_2 \text{ in } \Gamma} 
+  \qquad
+  \inference{\Gamma(x) = T}
+            {x : T \text{ in } \Gamma}
+\end{equation*}
+Type checking has roots in logic, and logicians have a tradition of
+writing the environment on the left-hand side and separating it from
+the expression with a turn-stile ($\vdash$).  The turn-stile does not
+have any intrinsic meaning per se.  It is punctuation that separates
+the environment $\Gamma$ from the expression $e$.  So the above typing
+rules are written as follows.
+\begin{equation*}
+  \inference{\Gamma \vdash e_1 : T_1 &
+             \Gamma,x:T_1 \vdash e_2 : T_2}
+            {\Gamma \vdash \LET{x}{e_1}{e_2} : T_2} 
+   \qquad
+  \inference{\Gamma(x) = T}
+            {\Gamma \vdash x : T}
+\end{equation*}
+Overall, the statement $\Gamma \vdash e : T$ is an example of what is
+called a \emph{judgment}.  In particular, this judgment says, ``In
+environment $\Gamma$, expression $e$ has type $T$.''
+Figure~\ref{fig:S1-type-system} shows the type checking rules for
+$S_1$.
+
+\begin{figure}
+\begin{gather*}
+  \inference{\Gamma(x) = T}
+            {\Gamma \vdash x : T}
+   \qquad
+  \inference{\Gamma \vdash e_1 : T_1 &
+             \Gamma,x:T_1 \vdash e_2 : T_2}
+            {\Gamma \vdash \LET{x}{e_1}{e_2} : T_2} 
+  \\[2ex]
+  \inference{}{\Gamma \vdash n : \key{Integer}}
+  \quad
+  \inference{\Gamma \vdash e_i : T_i \ ^{\forall i \in 1\ldots n} & \Delta(\Op,T_1,\ldots,T_n) = T}
+            {\Gamma \vdash (\Op \; e_1 \ldots e_n) : T}
+  \\[2ex]
+  \inference{}{\Gamma \vdash \key{\#t} : \key{Boolean}}
+  \quad
+  \inference{}{\Gamma \vdash \key{\#f} : \key{Boolean}}
+  \quad
+  \inference{\Gamma \vdash e_1 : \key{bool} \\
+             \Gamma \vdash e_2 : T &
+             \Gamma \vdash e_3 : T}
+  {\Gamma \vdash \IF{e_1}{e_2}{e_3} : T}
+\end{gather*}
+\caption{Type System for $S_1$.}
+\label{fig:S1-type-system}
+\end{figure}
+
+
+\begin{figure}
+
+\begin{align*}
+\Delta(\key{+},\key{Integer},\key{Integer}) &= \key{Integer} \\
+\Delta(\key{-},\key{Integer},\key{Integer}) &= \key{Integer} \\
+\Delta(\key{-},\key{Integer}) &= \key{Integer} \\
+\Delta(\key{*},\key{Integer},\key{Integer}) &= \key{Integer} \\
+\Delta(\key{read}) &= \key{Integer} \\
+\Delta(\key{and},\key{Boolean},\key{Boolean}) &= \key{Boolean} \\
+\Delta(\key{or},\key{Boolean},\key{Boolean}) &= \key{Boolean} \\
+\Delta(\key{not},\key{Boolean}) &= \key{Boolean} \\
+\Delta(\key{eq?},\key{Integer},\key{Integer}) &= \key{Boolean} \\
+\Delta(\key{eq?},\key{Boolean},\key{Boolean}) &= \key{Boolean} 
+\end{align*}
+
+\caption{Types for the primitives operators.}
+\end{figure}
+
+
+\section{The $C_1$ Language}
+
+\begin{figure}[htbp]
+\[
+\begin{array}{lcl}
+\Arg &::=& \ldots \mid \key{\#t} \mid \key{\#f} \\
+\Stmt &::=& \ldots \mid \IF{\Exp}{\Stmt^{*}}{\Stmt^{*}} 
+\end{array}
+\]
+\caption{The $C_1$ intermediate language, an extension of $C_0$
+  (Figure~\ref{fig:c0-syntax}).}
+\label{fig:c1-syntax}
+\end{figure}
+
+\section{Flatten Expressions}
+
+\section{Select Instructions}
+
+\section{Register Allocation}
+
+\section{Patch Instructions}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
