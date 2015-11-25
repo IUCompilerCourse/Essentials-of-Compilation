@@ -146,6 +146,84 @@ Need to give thanks to
 \chapter{Abstract Syntax Trees, Matching, and Recursion}
 \label{ch:trees-recur}
 
+\section{Abstract Syntax Trees}
+% \begin{enumerate}
+% \item language representation
+% \item reading grammars
+% \end{enumerate}
+Abstract syntax trees (AST) are used to represent and model the syntax of a
+language. In compiler implementation, we use them to represent intermediary 
+languages (IL). Representing ILs with ASTs allow us to categorize expressions
+our language along with the restricting the context in which they can 
+appear. A simple example is the representation of the untyped 
+\mbox{\(\lambda\)-calculus} with simple arithmetic operators. For our 
+purposes, we use Racket syntax.
+
+\begin{verbatim}
+op  ::= + | - | *
+exp ::= n | (op exp*) | x | (lambda (x) exp) | (exp exp)
+\end{verbatim}
+With this specification, we can more easily perform \textit{syntax 
+transformations} on any expression within the given language (i.e., 
+\(\lambda\)-calculus). In the above AST, the syntax {\tt exp*} signifies
+\textit{zero or more} {\tt exp}. Later on in this chapter,  we show how 
+to transform an arbitrary \(\lambda\)-term into the equivalent 
+\textit{de-Bruijinized} \(\lambda\)-term.
+
+\section{Using Match}
+% \begin{enumerate}
+% \item Syntax transformation
+% \item Some Racket examples (factorial?)
+% \end{enumerate}
+
+Racket provides a built-in pattern-matcher, {\tt match}, that we can use to
+perform syntax transformations. As a preliminary example, we include a
+familiar definition of factorial, without using match.
+\begin{verbatim}
+(define (! n)
+  (if (zero? n) 1
+      (* n (! (sub1 n)))))
+\end{verbatim}
+In this form of factorial, we are simply conditioning on the inputted
+natural number, {\tt n}. If we rewrite factorial to use {\tt match}, we can
+match on the actual value of {\tt n}.
+\begin{verbatim}
+(define (! n)
+  (match n
+    (0 1)
+    (n (* n (! (sub1 n))))))
+\end{verbatim}
+Of course, we can also use {\tt match} to pattern match on more complex
+expressions.
+
+If we were told to write a function that takes a \(\lambda\)-term as input,
+we can match on the values of \textit{syntax-expressions} ({\tt sexp}). We
+can then represent the language of Figure ?? with the following function
+that uses {\tt match}.
+\begin{verbatim}
+(lambda (exp)
+  (match exp
+    ((? number?) ...)
+    ((? symbol?) ...)
+    (`(,op exp* ...)
+     #:when (memv op '(+ - *))
+     ...)
+    (`(lambda (,x) ,b) ...)
+    (`(,e1 ,e2) ...)))
+\end{verbatim}
+It's easy to get lost in Racket's {\tt match} syntax. To understand this,
+we can represent the possible ways of writing \textit{left-hand side} (LHS)
+match expressions.
+\begin{verbatim}
+exp ::= val | (unquote val) | (exp exp*)
+lhs ::= val | (quote val*) | (quasi-quote exp) | (? Racket-pred) 
+\end{verbatim}
+
+\section{Recursion}
+% \begin{enumerate}
+% \item \textit{What is a base case?}
+% \item Using on a language (lambda calculus -> 
+% \end{enumerate}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Integers and Variables}
