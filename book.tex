@@ -146,98 +146,195 @@ Need to give thanks to
 \chapter{Abstract Syntax Trees, Matching, and Recursion}
 \label{ch:trees-recur}
 
-\section{Abstract Syntax Trees}
+In this chapter, we introduce key concepts about abstract syntax trees, pattern
+matching, and (structural) recursion. Understanding these three concepts are
+helpful in compiler implementation.
+ 
+\section{Abstract Syntax Trees and Grammars}
+In programming language theory (PLT), abstract syntax trees (AST) are used to 
+structurally model the syntax of a program. As an example, we first provide the
+Backus-Naur Form (BNF), or grammar, of a simple arithmetic language, {\tt Arith}.
+\begin{figure}[htbp]
+\centering
+\fbox{
+\begin{minipage}{0.85\textwidth}
+\[
+\begin{array}{lcl}
+  \Op    &::=& \key{+} \mid \key{-} \\
+  Arith &::=& Integer \mid (Arith \; \Op \; Arith) \mid (\Op \; Arith) 
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The syntax of the {\tt Arith} language.}
+\label{fig:arith-syntax}
+\end{figure}
+From this grammar, we have defined {\tt Arith} by constraining its syntax.
+Effectively, we have defined {\tt Arith} by first defining what a legal 
+expression (or program) within the language is. To clarify further, we can 
+think of {\tt Arith} as a \textit{set} of expressions, where, under syntax
+constraints, \mbox{{\tt 1 + 1}} and {\tt -1} are inhabitants and {\tt 3.2 + 3}
+and {\tt 2 ++ 2} are not (see ~Figure\ref{fig:ast}).
 
-\marginpar{\scriptsize Introduce s-expressions, quote, and quasi-quote, and comma in
-  this section. Make sure to include examples of ASTs. The description
-  here of grammars is incomplete. It doesn't really say what grammars are or what they do, it
-  just shows an example. I would recommend reading my blog post: a crash course on
-  notation in PL theory, especially the sections on Definition by Rules
-  and Language Syntax and Grammars. -JGS}
-\marginpar{\scriptsize The lambda calculus is more complex of an example that what we really
-  need at this point. I think we can make due with just integers and arithmetic. -JGS}
-% \begin{enumerate}
-% \item language representation
-% \item reading grammars
-% \end{enumerate}
-Abstract syntax trees (AST) are used to represent and model the syntax of a
-language. In compiler implementation, we use them to represent intermediary 
-languages (IL). Representing ILs with ASTs allow us to categorize expressions
-our language along with the restricting the context in which they can 
-appear. A simple example is the representation of the untyped 
-\mbox{\(\lambda\)-calculus} with simple arithmetic operators. For our 
-purposes, we use Racket syntax.
+The relationship between a grammar and an AST is then similar to that of a set
+and an inhabitant. From this, every syntaxically valid expression, under the 
+constraints of a grammar, can be represented by an abstract syntax tree. This
+is because {\tt Arith} is essentially a specification of a Tree-like 
+data-structure. In this case, tree nodes are the arithmetic operators {\tt +} and
+{\tt -}, and the leaves are  integer constants. From this, we can represent any
+expression of {\tt Arith} using a \textit{syntax expression} (s-exp).
 
+\begin{figure}[htbp]
+\centering
+\fbox{
+\begin{minipage}{0.85\textwidth}
+\[
+\begin{array}{lcl}
+  exp  &::=& sexp \mid (sexp*) \mid (unquote \; sexp)  \\
+  sexp &::=& Val \mid Var \mid (quote \; exp) \mid (quasiquote \; exp)
+\end{array}
+\]
+\end{minipage}
+}
+\caption{\textit{s-exp} syntax: $Val$ and $Var$ are shorthand for Value and Variable.}
+\label{fig:sexp-syntax}
+\end{figure}
+
+For our purposes, we will treat s-exps equivalent to \textit{possibly
+deeply-nested lists}. For the sake of brevity, the symbols $single$ $quote$ ('),
+$backquote$ (`), and $comma$ (,) are reader sugar for {\tt quote}, 
+{\tt quasiquote}, and {\tt unquote}. We provide several examples of s-exps and
+functions that return s-exps below. We use the {\tt >} symbol to represent 
+interaction with a Racket REPL.
 \begin{verbatim}
-op  ::= + | - | *
-exp ::= n | (op exp*) | x | (lambda (x) exp) | (exp exp)
+(define 1plus1 `(1 + 1))
+(define (1plusX x) `(1 + ,x))
+(define (XplusY x y) `(,x + ,y))
+
+> 1plus1
+'(1 + 1)
+> (1plusX 1)
+'(1 + 1)
+> (XplusY 1 1)
+'(1 + 1)
+> `,1plus1
+'(1 + 1)
 \end{verbatim}
-\marginpar{\scriptsize Regarding de-Bruijnizing as an example... that strikes me
-  as something that may be foreign to many readers. The examples in this
-  first chapter should try to be simple and hopefully connect with things
-  that the reader is already familiar with. -JGS}
-With this specification, we can more easily perform \textit{syntax 
-transformations} on any expression within the given language (i.e., 
-\(\lambda\)-calculus). In the above AST, the syntax {\tt exp*} signifies
-\textit{zero or more} {\tt exp}. Later on in this chapter,  we show how 
-to transform an arbitrary \(\lambda\)-term into the equivalent 
-\textit{de-Bruijinized} \(\lambda\)-term.
+In any expression wrapped with {\tt quasiquote} ({\tt `}), sub-expressions
+wrapped with an {\tt unquote} expression are evaluated before the entire 
+expression is returned wrapped in a {\tt quote} expression.
 
+% \marginpar{\scriptsize Introduce s-expressions, quote, and quasi-quote, and comma in
+%   this section. Make sure to include examples of ASTs. The description
+%   here of grammars is incomplete. It doesn't really say what grammars are or what they do, it
+%   just shows an example. I would recommend reading my blog post: a crash course on
+%   notation in PL theory, especially the sections on Definition by Rules
+%   and Language Syntax and Grammars. -JGS}
+% \marginpar{\scriptsize The lambda calculus is more complex of an example that what we really
+%   need at this point. I think we can make due with just integers and arithmetic. -JGS}
+% \marginpar{\scriptsize Regarding de-Bruijnizing as an example... that strikes me
+%   as something that may be foreign to many readers. The examples in this
+%   first chapter should try to be simple and hopefully connect with things
+%   that the reader is already familiar with. -JGS}
 
-\section{Using Match}
+\section{Pattern Matching}
 % \begin{enumerate}
 % \item Syntax transformation
 % \item Some Racket examples (factorial?)
 % \end{enumerate}
 
-Racket provides a built-in pattern-matcher, {\tt match}, that we can use to
-perform syntax transformations. As a preliminary example, we include a
-familiar definition of factorial, without using match.
+For our purposes, our compiler will take a Scheme-like expression and
+transform it to X86\_64 Assembly. Along the way, we transform each input
+expression into a handful of  \textit{intermediary languages} (IL). 
+A key tool for transforming one language into another is \textit{pattern matching}. 
+
+Racket provides a built-in pattern-matcher, {\tt match}, that we can use
+to perform operations on s-exps. As a preliminary example, we include a 
+familiar definition of factorial, first without using match.
 \begin{verbatim}
 (define (! n)
   (if (zero? n) 1
       (* n (! (sub1 n)))))
 \end{verbatim}
-In this form of factorial, we are simply conditioning on the inputted
-natural number, {\tt n}. If we rewrite factorial to use {\tt match}, we can
-match on the actual value of {\tt n}.
+In this form of factorial, we are simply conditioning (viz. {\tt zero?})
+on the inputted natural number, {\tt n}. If we rewrite factorial using 
+{\tt match}, we can match on the actual value of {\tt n}.
 \begin{verbatim}
 (define (! n)
   (match n
     (0 1)
     (n (* n (! (sub1 n))))))
 \end{verbatim}
-Of course, we can also use {\tt match} to pattern match on more complex
-expressions.
+In this definition of factorial, the first {\tt match} line (viz. {\tt (0 1)})
+can be read as "if {\tt n} is 0, then return 1." The second line matches on an
+arbitrary variable, {\tt n}, and does not place any constraints on it. We could
+have also written this line as {\tt (else (* n (! (sub1 n))))}, where {\tt n}
+is scoped by {\tt match}. Of course, we can also use {\tt match} to pattern
+match on more complex expressions.
 
-If we were told to write a function that takes a \(\lambda\)-term as input,
-we can match on the values of \textit{syntax-expressions} ({\tt sexp}). We
-can then represent the language of Figure ?? with the following function
-that uses {\tt match}.
+Similar to Racket's {\tt cond} expression, {\tt match} expressions are
+comprised of \textit{left-hand side} (LHS) and \textit{right-hand side} (RHS)
+sub-expressions. LHS sub-expressions can be thought of as an expression
+of the grammar in Figure~\ref{fig:sexp-syntax}. To provide an example, we
+include a function that takes an arbitrary expression, {\tt exp} and
+determines whether or not {\tt exp} \(\in\) {\tt Arith}.
 \begin{verbatim}
-(lambda (exp)
+(define (arith-foo exp)
   (match exp
-    ((? number?) ...)
-    ((? symbol?) ...)
-    (`(,op exp* ...)
-     #:when (memv op '(+ - *))
-     ...)
-    (`(lambda (,x) ,b) ...)
-    (`(,e1 ,e2) ...)))
+    ((? integer?) #t)
+    (`(,e1 ,op ,e2) #:when (memv op '(+ -)) 
+     (and (arith-foo e1) (arith-foo e2)))
+    (`(,op ,e) #:when (memv op '(+ -)) (arith-foo e))
+    (else (error "not an Arith expression: " arith-exp))))
 \end{verbatim}
-It's easy to get lost in Racket's {\tt match} syntax. To understand this,
-we can represent the possible ways of writing \textit{left-hand side} (LHS)
-match expressions.
-\begin{verbatim}
-exp ::= val | (unquote val) | (exp exp*)
-lhs ::= val | (quote val*) | (quasi-quote exp) | (? Racket-pred) 
-\end{verbatim}
+Here, {\tt \#:when} puts constraints on the value of matched expressions.
+In this case, we make sure that every sub-expression in \textit{op} position
+is either {\tt +} or {\tt -}. Otherwise, we return an error, signaling a
+non-{\tt Arith} expression. As we mentioned earlier, every expression 
+wrapped in an {\tt unquote} is evaluated first. When used in a LHS {\tt match}
+sub-expression, these expressions evaluate to the actual value of the matched
+expression (i.e., {\tt arith-exp}). Thus, {\tt `(,e1 ,op ,e2)} and 
+{\tt `(e1 op e2)} are not equivalent.
 
 \section{Recursion}
 % \begin{enumerate}
 % \item \textit{What is a base case?}
 % \item Using on a language (lambda calculus -> 
 % \end{enumerate}
+Before getting into more complex {\tt match} examples, we first introduce
+the concept of \textit{structural recursion}, which is the general name for
+recurring over Tree-like or \textit{possibly deeply-nested list} structures.
+The key to performing structural recursion, which from now on we refer to 
+simply as recursion, is to have some form of specification for the structure
+we are recurring on. Luckily, we are already familiar with one: a BNF or grammar.
+
+For example, let's take the grammar for $S_0$, which we include below. 
+Writing a recursive program that takes an arbitrary expression of $S_0$
+should handle each expression in the grammar. An example program that
+we can write is an $interpreter$. To keep our interpreter simple, we 
+ignore the {\tt read} operator.
+\begin{figure}[htbp]
+\centering
+\fbox{
+\begin{minipage}{0.85\textwidth}
+\[
+\begin{array}{lcl}
+  \Op  &::=& \key{+} \mid \key{-} \mid \key{*} \mid \key{read} \\
+  \Exp &::=& \Int \mid (\Op \; \Exp^{*}) \mid \Var \mid \LET{\Var}{\Exp}{\Exp}
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The syntax of the $S_0$ language. The abbreviation \Op{} is
+  short for operator, \Exp{} is short for expression, \Int{} for integer,
+  and \Var{} for variable.}
+\label{fig:s0-syntax}
+\end{figure}
+\begin{verbatim}
+
+\end{verbatim}
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Integers and Variables}
