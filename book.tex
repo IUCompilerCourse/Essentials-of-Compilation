@@ -14,6 +14,9 @@
 \usepackage{xypic}
 \usepackage{semantic}
 
+% Computer Modern is already the default. -Jeremy
+%\renewcommand{\ttdefault}{cmtt}
+
 \lstset{%
 language=Lisp,
 basicstyle=\ttfamily\small,
@@ -147,90 +150,200 @@ Need to give thanks to
 \label{ch:trees-recur}
 
 In this chapter, we review the basic tools that are needed for
-implementing a compiler. We use abstract syntax trees (ASTs) to
-represent programs (Section~\ref{sec:ast}) and pattern matching to
-inspect an AST node (Section~\ref{sec:pattern-matching}).  We use
-recursion to construct and deconstruct entire ASTs
-(Section~\ref{sec:recursion}).
+implementing a compiler. We use abstract syntax trees (ASTs) in the
+form of S-expressions to represent programs (Section~\ref{sec:ast})
+and pattern matching to inspect an AST node
+(Section~\ref{sec:pattern-matching}).  We use recursion to construct
+and deconstruct entire ASTs (Section~\ref{sec:recursion}).
 
-\section{Abstract Syntax Trees and Grammars}
+\section{Trees, Grammars, and S-Expressions}
 \label{sec:ast}
 
-In programming language theory (PLT), abstract syntax trees (AST) are
-used to structurally model the syntax of a program. As an example, we
-first provide the Backus-Naur Form (BNF), or grammar, of a simple
-arithmetic language, {\tt Arith}.
-
-\begin{figure}[htbp]
-\centering
-\fbox{
-\begin{minipage}{0.85\textwidth}
-\[
-\begin{array}{lcl}
-  \Op    &::=& \key{+} \mid \key{-} \mid \key{*} \\
-  \itm{Arith} &::=& \itm{Integer} \mid (\Op \; \itm{Arith} \; \itm{Arith}) \mid (\Op \; \itm{Arith}) 
-\end{array}
-\]
+The primary data structure that is commonly used for representing
+programs is the \emph{abstract syntax tree} (AST). When considering
+some part of a program, a compiler needs to ask what kind of part it
+is and what sub-parts it has. For example, the program on the left is
+represented by the AST on the right.
+\begin{center}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(+ 50 (- 8))
+\end{lstlisting}
 \end{minipage}
-}
-\caption{The syntax of the {\tt Arith} language.}
-\label{fig:arith-syntax}
-\end{figure}
-
-From this grammar, we have defined {\tt Arith} by constraining its syntax.
-Effectively, we have defined {\tt Arith} by first defining what a legal 
-expression (or program) within the language is. To clarify further, we can 
-think of {\tt Arith} as a \textit{set} of expressions, where, under syntax
-constraints, \mbox{{\tt (+ 1 1)}} and {\tt -1} are inhabitants and {\tt (+ 3.2 3)}
-and {\tt (++ 2 2)} are not (see ~Figure\ref{fig:ast}).
-
-The relationship between a grammar and an AST is then similar to that of a set
-and an inhabitant. From this, every syntaxically valid expression, under the 
-constraints of a grammar, can be represented by an abstract syntax tree. This
-is because {\tt Arith} is essentially a specification of a Tree-like 
-data-structure. In this case, tree nodes are the arithmetic operators {\tt +} and
-{\tt -}, and the leaves are  integer constants. From this, we can represent any
-expression of {\tt Arith} using a \textit{syntax expression} (s-exp).
-
-\begin{figure}[htbp]
-\centering
-\fbox{
-\begin{minipage}{0.85\textwidth}
-\[
-\begin{array}{lcl}
-  exp  &::=& sexp \mid (sexp*) \mid (unquote \; sexp)  \\
-  sexp &::=& Val \mid Var \mid (quote \; exp) \mid (quasiquote \; exp)
-\end{array}
-\]
+\begin{minipage}{0.4\textwidth}
+\begin{equation}
+\xymatrix@=15pt{
+    & *+[F]{+} \ar[dl]\ar[dr]& \\
+*+[F]{\tt 50}  &   & *+[F]{-} \ar[d] \\
+    &   & *+[F]{\tt 8} 
+} \label{eq:arith-prog}
+\end{equation}
 \end{minipage}
+\end{center}
+When deciding how to compile this program, we need to know that the
+top-most part is an addition and that it has two sub-parts, the
+integer \texttt{50} and the negation of \texttt{8}. The abstract
+syntax tree data structure directly supports these queries and hence
+is a good choice. In this book, we will often write down the textual
+representation of a program even when we really have in mind the AST,
+simply because the textual representation is easier to typeset.  We
+recommend that, in your mind, you should alway interpret programs as
+abstract syntax trees.
+
+A programming language can be thought of as a \emph{set} of programs.
+The set is typically infinite (one can always create larger and larger
+programs), so one cannot simply describe a language by listing all of
+the programs in the language. Instead we write down a set of rules, a
+\emph{grammar}, for building programs. We shall write our rules in a
+variant of Backus-Naur Form (BNF)~\citep{Backus:1960aa,Knuth:1964aa}.
+As an example, we describe a small language, named $\itm{arith}$, of
+integers and arithmetic operations. The first rule says that any
+integer is in the language:
+\begin{equation}
+\itm{arith} ::= \Int  \label{eq:arith-int}
+\end{equation}
+Each rule has a left-hand-side and a right-hand-side. The way to read
+a rule is that if you have all the program parts on the
+right-hand-side, then you can create and AST node and categorize it
+according to the left-hand-side. (We do not define $\Int$ because the
+reader already knows what an integer is.)
+
+The second rule says that, given an $\itm{arith}$, you can build
+another arith by negating it.
+\begin{equation}
+  \itm{arith} ::= (\key{-} \; \itm{arith})  \label{eq:arith-neg}
+\end{equation}
+By rule \eqref{eq:arith-int}, \texttt{8} is an $\itm{arith}$, then by
+rule \eqref{eq:arith-neg}, the following AST is an $\itm{arith}$.
+\begin{center}
+\begin{minipage}{0.25\textwidth}
+\begin{lstlisting}
+(- 8)
+\end{lstlisting}
+\end{minipage}
+\begin{minipage}{0.25\textwidth}
+\begin{equation}
+\xymatrix@=15pt{
+ *+[F]{-} \ar[d] \\
+ *+[F]{\tt 8} 
 }
-\caption{\textit{s-exp} syntax: $Val$ and $Var$ are shorthand for Value and Variable.}
-\label{fig:sexp-syntax}
-\end{figure}
+\label{eq:arith-neg8}
+\end{equation}
+\end{minipage}
+\end{center}
 
-For our purposes, we will treat s-exps equivalent to \textit{possibly
-deeply-nested lists}. For the sake of brevity, the symbols $single$ $quote$ ('),
-$backquote$ (`), and $comma$ (,) are reader sugar for {\tt quote}, 
-{\tt quasiquote}, and {\tt unquote}. We provide several examples of s-exps and
-functions that return s-exps below. We use the {\tt >} symbol to represent 
-interaction with a Racket REPL.
-\begin{verbatim}
-(define 1plus1 `(1 + 1))
-(define (1plusX x) `(1 + ,x))
-(define (XplusY x y) `(,x + ,y))
+The third and last rule for the $\itm{arith}$ language is for addition:
+\begin{equation}
+  \itm{arith} ::= (\key{+} \; \itm{arith} \; \itm{arith}) \label{eq:arith-add}
+\end{equation}
+Now we can see that the AST \eqref{eq:arith-prog} is in $\itm{arith}$.
+We know that \lstinline{50} is in $\itm{arith}$ by rule
+\eqref{eq:arith-int} and we have shown that \texttt{(- 8)} is in
+$\itm{arith}$, so we can apply rule \eqref{eq:arith-add} to show that
+\texttt{(+ 50 (- 8))} is in the $\itm{arith}$ language.
 
-> 1plus1
-'(1 + 1)
-> (1plusX 1)
-'(1 + 1)
-> (XplusY 1 1)
-'(1 + 1)
-> `,1plus1
-'(1 + 1)
-\end{verbatim}
-In any expression wrapped with {\tt quasiquote} ({\tt `}), sub-expressions
-wrapped with an {\tt unquote} expression are evaluated before the entire 
-expression is returned wrapped in a {\tt quote} expression.
+If you have an AST for which the above three rules do not apply, then
+the AST is not in $\itm{arith}$. For example, the AST \texttt{(- 50
+  (+ 8))} is not in $\itm{arith}$ because there are no rules for $+$
+with only one argument, nor for $-$ with two arguments.  Whenever we
+define a language through a grammar, we implicitly mean for the
+language to be the smallest set of programs that are justified by the
+rules. That is, the language only includes those programs that the
+rules allow.
+
+It is common to have many rules with the same left-hand side, so the
+following vertical bar notation is used to gather several rules on one
+line.  We refer to each clause between a vertical bar as an
+``alternative''.
+\[
+\itm{arith} ::= \Int \mid (\key{-} \; \itm{arith}) \mid
+   (\key{+} \; \itm{arith} \; \itm{arith})
+\]
+
+Racket, as a descendant of Lisp~\citep{McCarthy:1960dz}, has
+particularly convenient support for creating and manipulating abstract
+syntax trees with its \emph{symbolic expression} feature, or
+S-expression for short. We can create an S-expression simply by
+writing a backquote followed by the textual representation of the
+AST. For example, an S-expression to represent the AST
+\eqref{eq:arith-prog} is created by the following Racket expression:
+\begin{center}
+\texttt{`(+ 50 (- 8))}
+\end{center}
+
+To build larger S-expressions one often needs to splice together
+several smaller S-expressions. Racket provides the comma operator to
+splice an S-expression into a larger one. For example, instead of
+creating the S-expression for AST \eqref{eq:arith-prog} all at once,
+we could have first created an S-expression for AST
+\eqref{eq:arith-neg8} and then spliced that into the addition
+S-expression.
+\begin{lstlisting}
+(define ast1.4 `(- 8))
+(define ast1.1 `(+ 50 ,neg8))
+\end{lstlisting}
+In general, the Racket expression that follows the comma (splice)
+can be any expression that computes an S-expression.
+
+
+
+
+%% From this grammar, we have defined {\tt arith} by constraining its
+%% syntax.  Effectively, we have defined {\tt arith} by first defining
+%% what a legal expression (or program) within the language is. To
+%% clarify further, we can think of {\tt arith} as a \textit{set} of
+%% expressions, where, under syntax constraints, \mbox{{\tt (+ 1 1)}} and
+%% {\tt -1} are inhabitants and {\tt (+ 3.2 3)} and {\tt (++ 2 2)} are
+%% not (see ~Figure\ref{fig:ast}).
+
+%% The relationship between a grammar and an AST is then similar to that
+%% of a set and an inhabitant. From this, every syntaxically valid
+%% expression, under the constraints of a grammar, can be represented by
+%% an abstract syntax tree. This is because {\tt arith} is essentially a
+%% specification of a Tree-like data-structure. In this case, tree nodes
+%% are the arithmetic operators {\tt +} and {\tt -}, and the leaves are
+%% integer constants. From this, we can represent any expression of {\tt
+%%   arith} using a \textit{syntax expression} (s-exp).
+
+%% \begin{figure}[htbp]
+%% \centering
+%% \fbox{
+%% \begin{minipage}{0.85\textwidth}
+%% \[
+%% \begin{array}{lcl}
+%%   exp  &::=& sexp \mid (sexp*) \mid (unquote \; sexp)  \\
+%%   sexp &::=& Val \mid Var \mid (quote \; exp) \mid (quasiquote \; exp)
+%% \end{array}
+%% \]
+%% \end{minipage}
+%% }
+%% \caption{\textit{s-exp} syntax: $Val$ and $Var$ are shorthand for Value and Variable.}
+%% \label{fig:sexp-syntax}
+%% \end{figure}
+
+%% For our purposes, we will treat s-exps equivalent to \textit{possibly
+%%   deeply-nested lists}. For the sake of brevity, the symbols $single$
+%% $quote$ ('), $backquote$ (`), and $comma$ (,) are reader sugar for
+%% {\tt quote}, {\tt quasiquote}, and {\tt unquote}. We provide several
+%% examples of s-exps and functions that return s-exps below. We use the
+%% {\tt >} symbol to represent interaction with a Racket REPL.
+%% \begin{verbatim}
+%% (define 1plus1 `(1 + 1))
+%% (define (1plusX x) `(1 + ,x))
+%% (define (XplusY x y) `(,x + ,y))
+
+%% > 1plus1
+%% '(1 + 1)
+%% > (1plusX 1)
+%% '(1 + 1)
+%% > (XplusY 1 1)
+%% '(1 + 1)
+%% > `,1plus1
+%% '(1 + 1)
+%% \end{verbatim}
+%% In any expression wrapped with {\tt quasiquote} ({\tt `}), sub-expressions
+%% wrapped with an {\tt unquote} expression are evaluated before the entire 
+%% expression is returned wrapped in a {\tt quote} expression.
 
 % \marginpar{\scriptsize Introduce s-expressions, quote, and quasi-quote, and comma in
 %   this section. Make sure to include examples of ASTs. The description
@@ -254,13 +367,14 @@ expression is returned wrapped in a {\tt quote} expression.
 % \end{enumerate}
 
 For our purposes, our compiler will take a Scheme-like expression and
-transform it to X86\_64 Assembly. Along the way, we transform each input
-expression into a handful of  \textit{intermediary languages} (IL). 
-A key tool for transforming one language into another is \textit{pattern matching}. 
+transform it to X86\_64 Assembly. Along the way, we transform each
+input expression into a handful of \textit{intermediary languages}
+(IL).  A key tool for transforming one language into another is
+\textit{pattern matching}.
 
-Racket provides a built-in pattern-matcher, {\tt match}, that we can use
-to perform operations on s-exps. As a preliminary example, we include a 
-familiar definition of factorial, first without using match.
+Racket provides a built-in pattern-matcher, {\tt match}, that we can
+use to perform operations on s-exps. As a preliminary example, we
+include a familiar definition of factorial, first without using match.
 \begin{verbatim}
 (define (! n)
   (if (zero? n) 1
@@ -287,7 +401,7 @@ comprised of \textit{left-hand side} (LHS) and \textit{right-hand side} (RHS)
 sub-expressions. LHS sub-expressions can be thought of as an expression
 of the grammar in Figure~\ref{fig:sexp-syntax}. To provide an example, we
 include a function that takes an arbitrary expression, {\tt exp} and
-determines whether or not {\tt exp} \(\in\) {\tt Arith}.
+determines whether or not {\tt exp} \(\in\) {\tt arith}.
 \begin{verbatim}
 (define (arith-foo exp)
   (match exp
@@ -295,12 +409,12 @@ determines whether or not {\tt exp} \(\in\) {\tt Arith}.
     (`(,e1 ,op ,e2) #:when (memv op '(+ -)) 
      (and (arith-foo e1) (arith-foo e2)))
     (`(,op ,e) #:when (memv op '(+ -)) (arith-foo e))
-    (else (error "not an Arith expression: " arith-exp))))
+    (else (error "not an arith expression: " arith-exp))))
 \end{verbatim}
 Here, {\tt \#:when} puts constraints on the value of matched expressions.
 In this case, we make sure that every sub-expression in \textit{op} position
 is either {\tt +} or {\tt -}. Otherwise, we return an error, signaling a
-non-{\tt Arith} expression. As we mentioned earlier, every expression 
+non-{\tt arith} expression. As we mentioned earlier, every expression 
 wrapped in an {\tt unquote} is evaluated first. When used in a LHS {\tt match}
 sub-expression, these expressions evaluate to the actual value of the matched
 expression (i.e., {\tt arith-exp}). Thus, {\tt `(,e1 ,op ,e2)} and 
@@ -340,7 +454,7 @@ ignore the {\tt read} operator.
 \caption{The syntax of the $S_0$ language. The abbreviation \Op{} is
   short for operator, \Exp{} is short for expression, \Int{} for integer,
   and \Var{} for variable.}
-\label{fig:s0-syntax}
+%\label{fig:s0-syntax}
 \end{figure}
 \begin{verbatim}
 
@@ -368,7 +482,7 @@ reader a feeling for the scale of this first compiler, the instructor
 solution for the $S_0$ compiler consists of 6 recursive functions and
 a few small helper functions that together span 256 lines of code.
 
-\begin{figure}[htbp]
+\begin{figure}[btp]
 \centering
 \fbox{
 \begin{minipage}{0.85\textwidth}
@@ -633,6 +747,7 @@ into the text representation for x86 (Figure~\ref{fig:x86-a}).
 \begin{figure}[tbp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
+\vspace{-10pt}
 \[
 \begin{array}{lcl}
 \Arg &::=&  \INT{\Int} \mid \REG{\itm{register}}
@@ -681,7 +796,7 @@ differences.
 
 We ease the challenge of compiling from $S_0$ to x86 by breaking down
 the problem into several steps, dealing with the above differences one
-at a time. The main question then becomes: in what order to we tackle
+at a time. The main question then becomes: in what order do we tackle
 these differences? This is often one of the most challenging questions
 that a compiler writer must answer because some orderings may be much
 more difficult to implement than others. It is difficult to know ahead
@@ -698,12 +813,12 @@ locations. Thus, it makes sense to deal with \#2 before \#3 so that
 consider where \#1 should fit in. Because it has to do with the format
 of x86 instructions, it makes more sense after we have flattened the
 nested expressions (\#2). Finally, when should we deal with \#4
-(variable overshadowing)?  We shall be solving this problem by
-renaming variables to make sure they have unique names. Recall that
-our plan for \#2 involves moving nested expressions, which could be
-problematic if it changes the shadowing of variables. However, if we
-deal with \#4 first, then it will not be an issue.  Thus, we arrive at
-the following ordering.
+(variable overshadowing)?  We shall solve this problem by renaming
+variables to make sure they have unique names. Recall that our plan
+for \#2 involves moving nested expressions, which could be problematic
+if it changes the shadowing of variables. However, if we deal with \#4
+first, then it will not be an issue.  Thus, we arrive at the following
+ordering.
 \[
 \xymatrix{
 4 \ar[r] & 2 \ar[r] & 1 \ar[r] & 3
@@ -733,7 +848,9 @@ and there is a \key{return} construct to specify the return value of
 the program. A program consists of a sequence of statements that
 include at least one \key{return} statement.
 
-\begin{figure}[htbp]
+\begin{figure}[tbp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
 \Arg &::=& \Int \mid \Var \\
@@ -742,6 +859,8 @@ include at least one \key{return} statement.
 \Prog & ::= & (\key{program}\;\itm{info}\;\Stmt^{+})
 \end{array}
 \]
+\end{minipage}
+}
 \caption{The $C_0$ intermediate language.}
 \label{fig:c0-syntax}
 \end{figure}
