@@ -168,15 +168,15 @@ represented by the AST on the right.
 \begin{center}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(+ 50 (- 8))
+(+ (read) (- 8))
 \end{lstlisting}
 \end{minipage}
 \begin{minipage}{0.4\textwidth}
 \begin{equation}
 \xymatrix@=15pt{
-    & *+[Fo]{+} \ar[dl]\ar[dr]& \\
-*+[Fo]{\tt 50}  &   & *+[Fo]{-} \ar[d] \\
-    &   & *+[Fo]{\tt 8} 
+    & *++[Fo]{+} \ar[dl]\ar[dr]& \\
+*+[Fo]{\tt read}  &   & *++[Fo]{-} \ar[d] \\
+    &   & *++[Fo]{\tt 8} 
 } \label{eq:arith-prog}
 \end{equation}
 \end{minipage}
@@ -185,12 +185,13 @@ We shall use the standard terminology for trees: each square above is
 called a \emph{node}. The arrows connect a node to its \emph{children}
 (which are also nodes). The top-most node is the \emph{root}.  Every
 node except for the root has a \emph{parent} (the node it is the child
-of).
+of). If a node has no children, it is a \emph{leaf} node.  Otherwise
+it is an \emph{internal} node.
 
 When deciding how to compile the above program, we need to know that
-the root node an addition and that it has two children: the integer
-\texttt{50} and the negation of \texttt{8}. The abstract syntax tree
-data structure directly supports these queries and hence is a good
+the root node an addition and that it has two children: \texttt{read}
+and the negation of \texttt{8}. The abstract syntax tree data
+structure directly supports these queries and hence is a good
 choice. In this book, we will often write down the textual
 representation of a program even when we really have in mind the AST,
 simply because the textual representation is easier to typeset.  We
@@ -218,7 +219,13 @@ right-hand-side, then you can create and AST node and categorize it
 according to the left-hand-side. (We do not define $\Int$ because the
 reader already knows what an integer is.)
 
-The second rule says that, given an $\itm{arith}$, you can build
+The second rule for the $\itm{arith}$ language is the \texttt{read}
+function to receive an input integer from the user of the program.
+\begin{equation}
+  \itm{arith} ::= (\key{read}) \label{eq:arith-read}
+\end{equation}
+
+The third rule says that, given an $\itm{arith}$, you can build
 another arith by negating it.
 \begin{equation}
   \itm{arith} ::= (\key{-} \; \itm{arith})  \label{eq:arith-neg}
@@ -242,18 +249,18 @@ rule \eqref{eq:arith-neg}, the following AST is an $\itm{arith}$.
 \end{minipage}
 \end{center}
 
-The third and last rule for the $\itm{arith}$ language is for addition:
+The last rule for the $\itm{arith}$ language is for addition:
 \begin{equation}
   \itm{arith} ::= (\key{+} \; \itm{arith} \; \itm{arith}) \label{eq:arith-add}
 \end{equation}
 Now we can see that the AST \eqref{eq:arith-prog} is in $\itm{arith}$.
-We know that \lstinline{50} is in $\itm{arith}$ by rule
-\eqref{eq:arith-int} and we have shown that \texttt{(- 8)} is in
+We know that \lstinline{(read)} is in $\itm{arith}$ by rule
+\eqref{eq:arith-read} and we have shown that \texttt{(- 8)} is in
 $\itm{arith}$, so we can apply rule \eqref{eq:arith-add} to show that
-\texttt{(+ 50 (- 8))} is in the $\itm{arith}$ language.
+\texttt{(+ (read) (- 8))} is in the $\itm{arith}$ language.
 
-If you have an AST for which the above three rules do not apply, then
-the AST is not in $\itm{arith}$. For example, the AST \texttt{(- 50
+If you have an AST for which the above four rules do not apply, then
+the AST is not in $\itm{arith}$. For example, the AST \texttt{(- (read)
   (+ 8))} is not in $\itm{arith}$ because there are no rules for $+$
 with only one argument, nor for $-$ with two arguments.  Whenever we
 define a language through a grammar, we implicitly mean for the
@@ -266,8 +273,8 @@ following vertical bar notation is used to gather several rules on one
 line.  We refer to each clause between a vertical bar as an
 ``alternative''.
 \[
-\itm{arith} ::= \Int \mid (\key{-} \; \itm{arith}) \mid
-   (\key{+} \; \itm{arith} \; \itm{arith})
+\itm{arith} ::= \Int \mid (\key{read}) \mid (\key{-} \; \itm{arith}) \mid
+   (\key{+} \; \itm{arith} \; \itm{arith}) 
 \]
 
 \section{S-Expressions}
@@ -281,7 +288,7 @@ writing a backquote followed by the textual representation of the
 AST. For example, an S-expression to represent the AST
 \eqref{eq:arith-prog} is created by the following Racket expression:
 \begin{center}
-\texttt{`(+ 50 (- 8))}
+\texttt{`(+ (read) (- 8))}
 \end{center}
 
 To build larger S-expressions one often needs to splice together
@@ -293,7 +300,7 @@ we could have first created an S-expression for AST
 S-expression.
 \begin{lstlisting}
    (define ast1.4 `(- 8))
-   (define ast1.1 `(+ 50 ,ast1.4))
+   (define ast1.1 `(+ (read) ,ast1.4))
 \end{lstlisting}
 In general, the Racket expression that follows the comma (splice)
 can be any expression that computes an S-expression.
@@ -322,7 +329,7 @@ right.
 
 
    '+
-   50
+   '(read)
    '(- 8)
 \end{lstlisting}
 \end{minipage}
@@ -335,26 +342,27 @@ that may contain pattern-variables (preceded by a comma).  The body
 may contain any Racket code.
 
 A \texttt{match} form may contain several clauses, as in the following
-function \texttt{arith-kind} that recognizes which kind of AST node is
-represented by a given S-expression. The \texttt{match} proceeds
-through the clauses in order, checking whether the pattern can match
-the input S-expression. The body of the first clause that matches is
-executed. The output of \texttt{arith-kind} for several S-expressions
-is shown on the right. In the below \texttt{match}, we see another
-form of pattern: the \texttt{(?  integer?)}  tests the predicate
-\texttt{integer?} on the input S-expression.
+function \texttt{leaf?} that recognizes when an $\itm{arith}$ node is
+a leaf. The \texttt{match} proceeds through the clauses in order,
+checking whether the pattern can match the input S-expression. The
+body of the first clause that matches is executed. The output of
+\texttt{leaf?} for several S-expressions is shown on the right. In the
+below \texttt{match}, we see another form of pattern: the \texttt{(?
+  fixnum?)} applies the predicate \texttt{fixnum?} to the input
+S-expression to see if it is a machine-representable integer.
 \begin{center}
 \begin{minipage}{0.5\textwidth}
 \begin{lstlisting}
-(define (arith-kind arith)
+(define (leaf? arith)
   (match arith
-    [(? integer?) `int]
-    [`(- ,c1) `neg]
-    [`(+ ,c1 ,c2) `add]))
+    [(? fixnum?) #t]
+    [`(read) #t]
+    [`(- ,c1) #f]
+    [`(+ ,c1 ,c2) #f]))
 
-(arith-kind `50)
-(arith-kind `(- 8))
-(arith-kind `(+ 50 (- 8)))
+(leaf? `(read))
+(leaf? `(- 8))
+(leaf? `(+ (read) (- 8)))
 \end{lstlisting}
 \end{minipage}
 \vrule
@@ -366,9 +374,9 @@ form of pattern: the \texttt{(?  integer?)}  tests the predicate
 
 
 
-   'int
-   'neg
-   'add
+   #t
+   #f
+   #f
 \end{lstlisting}
 \end{minipage}
 \end{center}
@@ -489,20 +497,28 @@ entire program is with a recursive function.  As a first example of
 such a function, we define \texttt{arith?} below, which takes an
 arbitrary S-expression, {\tt sexp}, and determines whether or not {\tt
   sexp} is in {\tt arith}. Note that each match clause corresponds to
-one of the grammar rules.
+one grammar rule for $\itm{arith}$ and the body of each clause makes a
+recursive call for each child node. This pattern of recursive function
+is so common that it has a name, \emph{structural recursion}.  In
+general, when a recursive function is defined using a set of match
+clauses that correspond to a grammar, and each clause body makes a
+recursive call on each child node, then we say the function is defined
+by structural recursion.
+
 \begin{center}
 \begin{minipage}{0.7\textwidth}
 \begin{lstlisting}
 (define (arith? sexp)
   (match sexp
-    [(? integer?) #t]
+    [(? fixnum?) #t]
+    [`(read) #t]
     [`(- ,e) (arith? e)]
     [`(+ ,e1 ,e2)
      (and (arith? e1) (arith? e2))]
     [else #f]))
 
-(arith? `(+ 50 (- 8)))
-(arith? `(- 50 (+ 8)))
+(arith? `(+ (read) (- 8)))
+(arith? `(- (read) (+ 8)))
 \end{lstlisting}
 \end{minipage}
 \vrule
@@ -523,55 +539,115 @@ one of the grammar rules.
 \end{center}
 
 
-UNDER CONSTRUCTION
 
-Here, {\tt \#:when} puts constraints on the value of matched expressions.
-In this case, we make sure that every sub-expression in \textit{op} position
-is either {\tt +} or {\tt -}. Otherwise, we return an error, signaling a
-non-{\tt arith} expression. As we mentioned earlier, every expression 
-wrapped in an {\tt unquote} is evaluated first. When used in a LHS {\tt match}
-sub-expression, these expressions evaluate to the actual value of the matched
-expression (i.e., {\tt arith-exp}). Thus, {\tt `(,e1 ,op ,e2)} and 
-{\tt `(e1 op e2)} are not equivalent.
+
+%% Here, {\tt \#:when} puts constraints on the value of matched expressions.
+%% In this case, we make sure that every sub-expression in \textit{op} position
+%% is either {\tt +} or {\tt -}. Otherwise, we return an error, signaling a
+%% non-{\tt arith} expression. As we mentioned earlier, every expression 
+%% wrapped in an {\tt unquote} is evaluated first. When used in a LHS {\tt match}
+%% sub-expression, these expressions evaluate to the actual value of the matched
+%% expression (i.e., {\tt arith-exp}). Thus, {\tt `(,e1 ,op ,e2)} and 
+%% {\tt `(e1 op e2)} are not equivalent.
 
 
 % \begin{enumerate}
 % \item \textit{What is a base case?}
 % \item Using on a language (lambda calculus -> 
 % \end{enumerate}
-Before getting into more complex {\tt match} examples, we first introduce
-the concept of \textit{structural recursion}, which is the general name for
-recurring over Tree-like or \textit{possibly deeply-nested list} structures.
-The key to performing structural recursion, which from now on we refer to 
-simply as recursion, is to have some form of specification for the structure
-we are recurring on. Luckily, we are already familiar with one: a BNF or grammar.
+%% Before getting into more complex {\tt match} examples, we first
+%% introduce the concept of \textit{structural recursion}, which is the
+%% general name for recurring over Tree-like or \textit{possibly
+%%   deeply-nested list} structures.  The key to performing structural
+%% recursion, which from now on we refer to simply as recursion, is to
+%% have some form of specification for the structure we are recurring
+%% on. Luckily, we are already familiar with one: a BNF or grammar.
 
-For example, let's take the grammar for $S_0$, which we include below. 
-Writing a recursive program that takes an arbitrary expression of $S_0$
-should handle each expression in the grammar. An example program that
-we can write is an $interpreter$. To keep our interpreter simple, we 
-ignore the {\tt read} operator.
-\begin{figure}[htbp]
-\centering
-\fbox{
-\begin{minipage}{0.85\textwidth}
-\[
-\begin{array}{lcl}
-  \Op  &::=& \key{+} \mid \key{-} \mid \key{*} \mid \key{read} \\
-  \Exp &::=& \Int \mid (\Op \; \Exp^{*}) \mid \Var \mid \LET{\Var}{\Exp}{\Exp}
-\end{array}
-\]
-\end{minipage}
-}
-\caption{The syntax of the $S_0$ language. The abbreviation \Op{} is
-  short for operator, \Exp{} is short for expression, \Int{} for integer,
-  and \Var{} for variable.}
-%\label{fig:s0-syntax}
+%% For example, let's take the grammar for $S_0$, which we include below. 
+%% Writing a recursive program that takes an arbitrary expression of $S_0$
+%% should handle each expression in the grammar. An example program that
+%% we can write is an $interpreter$. To keep our interpreter simple, we 
+%% ignore the {\tt read} operator.
+%% \begin{figure}[htbp]
+%% \centering
+%% \fbox{
+%% \begin{minipage}{0.85\textwidth}
+%% \[
+%% \begin{array}{lcl}
+%%   \Op  &::=& \key{+} \mid \key{-} \mid \key{*} \mid \key{read} \\
+%%   \Exp &::=& \Int \mid (\Op \; \Exp^{*}) \mid \Var \mid \LET{\Var}{\Exp}{\Exp}
+%% \end{array}
+%% \]
+%% \end{minipage}
+%% }
+%% \caption{The syntax of the $S_0$ language. The abbreviation \Op{} is
+%%   short for operator, \Exp{} is short for expression, \Int{} for integer,
+%%   and \Var{} for variable.}
+%% %\label{fig:s0-syntax}
+%% \end{figure}
+%% \begin{verbatim}
+
+%% \end{verbatim}
+
+\section{Interpreter}
+\label{sec:interp-arith}
+
+The meaning, or semantics, of a program is typically defined in the
+specification of the language. For example, the Scheme language is
+defined in the report by \cite{SPERBER:2009aa}. The Racket language is
+defined in its reference manual~\citep{plt-tr}. In this book we use an
+interpreter to define the meaning of each language that we consider,
+following Reynold's advice in this
+regard~\citep{reynolds72:_def_interp}. Here we will warm up by writing
+an interpreter for the $\itm{arith}$ language, which will also serve
+as a second example of structural recursion. The \texttt{interp-arith}
+function is defined in Figure~\ref{fig:interp-arith}. The body of the
+function is a match on the input expression \texttt{e} and there is
+one clause per grammar rule for $\itm{arith}$. The clauses for
+internal AST nodes make recursive calls to \texttt{interp-arith} on
+each child node.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+   (define (interp-arith e)
+     (match e
+       [(? fixnum?) e]
+       [`(read)
+        (define r (read))
+        (cond [(fixnum? r) r]
+              [else (error 'interp-arith "expected an integer" r)])]
+       [`(- ,e)
+        (fx- 0 (interp-arith e))]
+       [`(+ ,e1 ,e2)
+        (fx+ (interp-arith e1) (interp-arith e2))]
+       ))
+\end{lstlisting}
+\caption{Interpreter for the $\itm{arith}$ language.}
+\label{fig:interp-arith}
 \end{figure}
-\begin{verbatim}
 
-\end{verbatim}
+We make the simplifying design decision that the $\itm{arith}$
+language (and all of the languages in this book) only handle
+machine-representable integers, that is, the \texttt{fixnum} datatype
+in Racket. Thus, we implement the arithmetic operations using the
+appropriate fixnum operators.
 
+If we interpret the AST \eqref{eq:arith-prog} and give it the input
+\texttt{50}
+\begin{lstlisting}
+   (interp-arith ast1.1)
+\end{lstlisting}
+we get the answer to life, the universe, and everything
+\begin{lstlisting}
+   42
+\end{lstlisting}
+
+
+\section{Partial Evaluation}
+\label{sec:partial-evaluation}
+
+
+UNDER CONSTRUCTION
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
