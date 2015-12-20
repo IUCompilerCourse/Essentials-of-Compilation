@@ -20,7 +20,8 @@
 \lstset{%
 language=Lisp,
 basicstyle=\ttfamily\small,
-escapechar=@
+escapechar=@,
+columns=fullflexible
 }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -146,7 +147,7 @@ Need to give thanks to
 %\noindent \url{http://amberj.devio.us/}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{Abstract Syntax Trees, Matching, and Recursion}
+\chapter{Preliminaries}
 \label{ch:trees-recur}
 
 In this chapter, we review the basic tools that are needed for
@@ -156,7 +157,7 @@ and pattern matching to inspect an AST node
 (Section~\ref{sec:pattern-matching}).  We use recursion to construct
 and deconstruct entire ASTs (Section~\ref{sec:recursion}).
 
-\section{Trees, Grammars, and S-Expressions}
+\section{Abstract Syntax Trees}
 \label{sec:ast}
 
 The primary data structure that is commonly used for representing
@@ -173,22 +174,31 @@ represented by the AST on the right.
 \begin{minipage}{0.4\textwidth}
 \begin{equation}
 \xymatrix@=15pt{
-    & *+[F]{+} \ar[dl]\ar[dr]& \\
-*+[F]{\tt 50}  &   & *+[F]{-} \ar[d] \\
-    &   & *+[F]{\tt 8} 
+    & *+[Fo]{+} \ar[dl]\ar[dr]& \\
+*+[Fo]{\tt 50}  &   & *+[Fo]{-} \ar[d] \\
+    &   & *+[Fo]{\tt 8} 
 } \label{eq:arith-prog}
 \end{equation}
 \end{minipage}
 \end{center}
-When deciding how to compile this program, we need to know that the
-top-most part is an addition and that it has two sub-parts, the
-integer \texttt{50} and the negation of \texttt{8}. The abstract
-syntax tree data structure directly supports these queries and hence
-is a good choice. In this book, we will often write down the textual
+We shall use the standard terminology for trees: each square above is
+called a \emph{node}. The arrows connect a node to its \emph{children}
+(which are also nodes). The top-most node is the \emph{root}.  Every
+node except for the root has a \emph{parent} (the node it is the child
+of).
+
+When deciding how to compile the above program, we need to know that
+the root node an addition and that it has two children: the integer
+\texttt{50} and the negation of \texttt{8}. The abstract syntax tree
+data structure directly supports these queries and hence is a good
+choice. In this book, we will often write down the textual
 representation of a program even when we really have in mind the AST,
 simply because the textual representation is easier to typeset.  We
 recommend that, in your mind, you should alway interpret programs as
 abstract syntax trees.
+
+\section{Grammars}
+\label{sec:grammar}
 
 A programming language can be thought of as a \emph{set} of programs.
 The set is typically infinite (one can always create larger and larger
@@ -224,8 +234,8 @@ rule \eqref{eq:arith-neg}, the following AST is an $\itm{arith}$.
 \begin{minipage}{0.25\textwidth}
 \begin{equation}
 \xymatrix@=15pt{
- *+[F]{-} \ar[d] \\
- *+[F]{\tt 8} 
+ *+[Fo]{-} \ar[d] \\
+ *+[Fo]{\tt 8} 
 }
 \label{eq:arith-neg8}
 \end{equation}
@@ -260,6 +270,9 @@ line.  We refer to each clause between a vertical bar as an
    (\key{+} \; \itm{arith} \; \itm{arith})
 \]
 
+\section{S-Expressions}
+\label{sec:s-expr}
+
 Racket, as a descendant of Lisp~\citep{McCarthy:1960dz}, has
 particularly convenient support for creating and manipulating abstract
 syntax trees with its \emph{symbolic expression} feature, or
@@ -279,13 +292,86 @@ we could have first created an S-expression for AST
 \eqref{eq:arith-neg8} and then spliced that into the addition
 S-expression.
 \begin{lstlisting}
-(define ast1.4 `(- 8))
-(define ast1.1 `(+ 50 ,neg8))
+   (define ast1.4 `(- 8))
+   (define ast1.1 `(+ 50 ,ast1.4))
 \end{lstlisting}
 In general, the Racket expression that follows the comma (splice)
 can be any expression that computes an S-expression.
 
+\section{Pattern Matching}
+\label{sec:pattern-matching}
 
+As mentioned above, one of the operations that a compiler needs to
+perform on an AST is to access the children of a node.  Racket
+provides the \texttt{match} form to access the parts of an
+S-expression. Consider the following example and the output on the
+right.
+\begin{center}
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}
+(match ast1.1
+  [`(,op ,child1 ,child2)
+    (print op) (newline)
+    (print child1) (newline)
+    (print child2)])
+\end{lstlisting}
+\end{minipage}
+\vrule
+\begin{minipage}{0.25\textwidth}
+\begin{lstlisting}
+
+
+   '+
+   50
+   '(- 8)
+\end{lstlisting}
+\end{minipage}
+\end{center}
+The \texttt{match} form takes AST \eqref{eq:arith-prog} and binds its
+parts to the three variables \texttt{op}, \texttt{child1}, and
+\texttt{child2}. In general, a match clause consists of a
+\emph{pattern} and a \emph{body}. The pattern is a quoted S-expression
+that may contain pattern-variables (preceded by a comma).  The body
+may contain any Racket code.
+
+A \texttt{match} form may contain several clauses, as in the following
+function \texttt{arith-kind} that recognizes which kind of AST node is
+represented by a given S-expression. The \texttt{match} proceeds
+through the clauses in order, checking whether the pattern can match
+the input S-expression. The body of the first clause that matches is
+executed. The output of \texttt{arith-kind} for several S-expressions
+is shown on the right. In the below \texttt{match}, we see another
+form of pattern: the \texttt{(?  integer?)}  tests the predicate
+\texttt{integer?} on the input S-expression.
+\begin{center}
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}
+(define (arith-kind arith)
+  (match arith
+    [(? integer?) `int]
+    [`(- ,c1) `neg]
+    [`(+ ,c1 ,c2) `add]))
+
+(arith-kind `50)
+(arith-kind `(- 8))
+(arith-kind `(+ 50 (- 8)))
+\end{lstlisting}
+\end{minipage}
+\vrule
+\begin{minipage}{0.25\textwidth}
+\begin{lstlisting}
+
+
+
+
+
+
+   'int
+   'neg
+   'add
+\end{lstlisting}
+\end{minipage}
+\end{center}
 
 
 %% From this grammar, we have defined {\tt arith} by constraining its
@@ -358,59 +444,87 @@ can be any expression that computes an S-expression.
 %   first chapter should try to be simple and hopefully connect with things
 %   that the reader is already familiar with. -JGS}
 
-\section{Pattern Matching}
-\label{sec:pattern-matching}
 
 % \begin{enumerate}
 % \item Syntax transformation
 % \item Some Racket examples (factorial?)
 % \end{enumerate}
 
-For our purposes, our compiler will take a Scheme-like expression and
-transform it to X86\_64 Assembly. Along the way, we transform each
-input expression into a handful of \textit{intermediary languages}
-(IL).  A key tool for transforming one language into another is
-\textit{pattern matching}.
+%% For our purposes, our compiler will take a Scheme-like expression and
+%% transform it to X86\_64 Assembly. Along the way, we transform each
+%% input expression into a handful of \textit{intermediary languages}
+%% (IL).  A key tool for transforming one language into another is
+%% \textit{pattern matching}.
 
-Racket provides a built-in pattern-matcher, {\tt match}, that we can
-use to perform operations on s-exps. As a preliminary example, we
-include a familiar definition of factorial, first without using match.
-\begin{verbatim}
-(define (! n)
-  (if (zero? n) 1
-      (* n (! (sub1 n)))))
-\end{verbatim}
-In this form of factorial, we are simply conditioning (viz. {\tt zero?})
-on the inputted natural number, {\tt n}. If we rewrite factorial using 
-{\tt match}, we can match on the actual value of {\tt n}.
-\begin{verbatim}
-(define (! n)
-  (match n
-    (0 1)
-    (n (* n (! (sub1 n))))))
-\end{verbatim}
-In this definition of factorial, the first {\tt match} line (viz. {\tt (0 1)})
-can be read as "if {\tt n} is 0, then return 1." The second line matches on an
-arbitrary variable, {\tt n}, and does not place any constraints on it. We could
-have also written this line as {\tt (else (* n (! (sub1 n))))}, where {\tt n}
-is scoped by {\tt match}. Of course, we can also use {\tt match} to pattern
-match on more complex expressions.
+%% Racket provides a built-in pattern-matcher, {\tt match}, that we can
+%% use to perform operations on s-exps. As a preliminary example, we
+%% include a familiar definition of factorial, first without using match.
+%% \begin{verbatim}
+%% (define (! n)
+%%   (if (zero? n) 1
+%%       (* n (! (sub1 n)))))
+%% \end{verbatim}
+%% In this form of factorial, we are simply conditioning (viz. {\tt zero?})
+%% on the inputted natural number, {\tt n}. If we rewrite factorial using 
+%% {\tt match}, we can match on the actual value of {\tt n}.
+%% \begin{verbatim}
+%% (define (! n)
+%%   (match n
+%%     (0 1)
+%%     (n (* n (! (sub1 n))))))
+%% \end{verbatim}
+%% In this definition of factorial, the first {\tt match} line (viz. {\tt (0 1)})
+%% can be read as "if {\tt n} is 0, then return 1." The second line matches on an
+%% arbitrary variable, {\tt n}, and does not place any constraints on it. We could
+%% have also written this line as {\tt (else (* n (! (sub1 n))))}, where {\tt n}
+%% is scoped by {\tt match}. Of course, we can also use {\tt match} to pattern
+%% match on more complex expressions.
 
-Similar to Racket's {\tt cond} expression, {\tt match} expressions are
-comprised of \textit{left-hand side} (LHS) and \textit{right-hand side} (RHS)
-sub-expressions. LHS sub-expressions can be thought of as an expression
-of the grammar in Figure~\ref{fig:sexp-syntax}. To provide an example, we
-include a function that takes an arbitrary expression, {\tt exp} and
-determines whether or not {\tt exp} \(\in\) {\tt arith}.
-\begin{verbatim}
-(define (arith-foo exp)
-  (match exp
-    ((? integer?) #t)
-    (`(,e1 ,op ,e2) #:when (memv op '(+ -)) 
-     (and (arith-foo e1) (arith-foo e2)))
-    (`(,op ,e) #:when (memv op '(+ -)) (arith-foo e))
-    (else (error "not an arith expression: " arith-exp))))
-\end{verbatim}
+\section{Recursion}
+\label{sec:recursion}
+
+Programs are inherently recursive in that an $\itm{arith}$ AST is made
+up of smaller $\itm{arith}$ ASTs. Thus, the natural way to process in
+entire program is with a recursive function.  As a first example of
+such a function, we define \texttt{arith?} below, which takes an
+arbitrary S-expression, {\tt sexp}, and determines whether or not {\tt
+  sexp} is in {\tt arith}. Note that each match clause corresponds to
+one of the grammar rules.
+\begin{center}
+\begin{minipage}{0.7\textwidth}
+\begin{lstlisting}
+(define (arith? sexp)
+  (match sexp
+    [(? integer?) #t]
+    [`(- ,e) (arith? e)]
+    [`(+ ,e1 ,e2)
+     (and (arith? e1) (arith? e2))]
+    [else #f]))
+
+(arith? `(+ 50 (- 8)))
+(arith? `(- 50 (+ 8)))
+\end{lstlisting}
+\end{minipage}
+\vrule
+\begin{minipage}{0.25\textwidth}
+\begin{lstlisting}
+
+
+
+
+
+
+
+
+   #t
+   #f
+\end{lstlisting}
+\end{minipage}
+\end{center}
+
+
+UNDER CONSTRUCTION
+
 Here, {\tt \#:when} puts constraints on the value of matched expressions.
 In this case, we make sure that every sub-expression in \textit{op} position
 is either {\tt +} or {\tt -}. Otherwise, we return an error, signaling a
@@ -420,8 +534,6 @@ sub-expression, these expressions evaluate to the actual value of the matched
 expression (i.e., {\tt arith-exp}). Thus, {\tt `(,e1 ,op ,e2)} and 
 {\tt `(e1 op e2)} are not equivalent.
 
-\section{Recursion}
-\label{sec:recursion}
 
 % \begin{enumerate}
 % \item \textit{What is a base case?}
