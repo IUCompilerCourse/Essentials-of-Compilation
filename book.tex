@@ -217,7 +217,8 @@ Each rule has a left-hand-side and a right-hand-side. The way to read
 a rule is that if you have all the program parts on the
 right-hand-side, then you can create and AST node and categorize it
 according to the left-hand-side. (We do not define $\Int$ because the
-reader already knows what an integer is.)
+reader already knows what an integer is.) A name such as $\itm{arith}$
+that is defined by the rules, is a \emph{non-terminal}.
 
 The second rule for the $\itm{arith}$ language is the \texttt{read}
 function to receive an input integer from the user of the program.
@@ -230,6 +231,9 @@ another arith by negating it.
 \begin{equation}
   \itm{arith} ::= (\key{-} \; \itm{arith})  \label{eq:arith-neg}
 \end{equation}
+Symbols such as \key{-} that play an auxilliary role in the abstract
+syntax are called \emph{terminal} symbols.
+
 By rule \eqref{eq:arith-int}, \texttt{8} is an $\itm{arith}$, then by
 rule \eqref{eq:arith-neg}, the following AST is an $\itm{arith}$.
 \begin{center}
@@ -285,7 +289,8 @@ particularly convenient support for creating and manipulating abstract
 syntax trees with its \emph{symbolic expression} feature, or
 S-expression for short. We can create an S-expression simply by
 writing a backquote followed by the textual representation of the
-AST. For example, an S-expression to represent the AST
+AST. (Technically speaking, this is called a \emph{quasiquote} in
+Racket.)  For example, an S-expression to represent the AST
 \eqref{eq:arith-prog} is created by the following Racket expression:
 \begin{center}
 \texttt{`(+ (read) (- 8))}
@@ -642,12 +647,122 @@ we get the answer to life, the universe, and everything
    42
 \end{lstlisting}
 
+The job of a compiler is to translate programs in one language into
+programs in another language (typically but not always a language with
+a lower level of abstraction) in such a way that each output program
+behaves the same way as the input program. This idea is depicted in
+the following diagram. Suppose we have two languages, $\mathcal{L}_1$
+and $\mathcal{L}_2$, and an interpreter for each language.  Suppose
+that the compiler translates program $P_1$ in language $\mathcal{L}_1$
+into program $P_2$ in language $\mathcal{L}_2$.  Then interpreting
+$P_1$ and $P_2$ on the respective interpreters for the two languages,
+and given the same inputs $i$, should yield the same output. That is,
+we always have $o_1 = o_2$.
+\[
+\xymatrix@=50pt{
+  P_1 \ar[r]^{compile}\ar[d]^{\mathcal{L}_1-interp(i)} & P_2 \ar[d]^{\mathcal{L}_2-interp(i)} \\
+  o_1 \ar@{=}[r] & o_2
+}
+\]
+In the next section we will see our first example of a compiler, which
+is also be another example of structural recursion.
+
 
 \section{Partial Evaluation}
 \label{sec:partial-evaluation}
 
+In this section we consider a compiler that translates $\itm{arith}$
+programs into $\itm{arith}$ programs that are more efficient, that is,
+this compiler is an optimizer. Our optimizer will accomplish this by
+trying to eagerly compute the parts of the program that do not depend
+on any inputs. For example, given the following program
+\begin{lstlisting}
+(+ (read) (- (+ 5 3)))
+\end{lstlisting}
+our compiler will translate it into the program
+\begin{lstlisting}
+(+ (read) -8)
+\end{lstlisting}
 
-UNDER CONSTRUCTION
+Figure~\ref{fig:pe-arith} gives the code for a simple partial
+evaluator for the $\itm{arith}$ language. The output of the partial
+evaluator is an $\itm{arith}$ program, which we build up using a
+combination of quasiquotes and commas. (Though no quasiquote is
+necessary for integers.) In Figure~\ref{fig:pe-arith}, the normal
+structural recursion is captured in the main \texttt{pe-arith}
+function whereas the code for partially evaluating negation and
+addition is factored out the into two separate helper functions:
+\texttt{pe-neg} and \texttt{pe-add}. Note that the inputs two these
+helper functions is the output of partially evaluating the children
+nodes.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+   (define (pe-neg r)
+     (match r
+       [(? fixnum?) (fx- 0 r)]
+       [else `(- ,r)]
+       ))
+   (define (pe-add r1 r2)
+     (match (list r1 r2)
+       [`(,n1 ,n2)
+        #:when (and (fixnum? n1) (fixnum? n2))
+        (fx+ r1 r2)]
+       [else
+        `(+ ,r1 ,r2)]
+       ))
+   (define (pe-arith e)
+     (match e
+       [(? fixnum?) e]
+       [`(read)
+        `(read)]
+       [`(- ,e1)
+        (pe-neg (pe-arith e1))]
+       [`(+ ,e1 ,e2)
+        (pe-add (pe-arith e1) (pe-arith e2))]
+       ))   
+\end{lstlisting}
+\caption{A partial evaluator for the $\itm{arith}$ language.}
+\label{fig:pe-arith}
+\end{figure}
+
+Our code for \texttt{pe-neg} and \texttt{pe-add} implements the simple
+idea of checking whether the inputs are integers and if they are, to
+go ahead perform the arithmetic.  Otherwise, we use quasiquote to
+create an AST node for the appropriate operation (either negation or
+addition) and use comma to splice in the child nodes.
+
+[to do: talk about testing]
+
+\section{Exercise}
+
+We challenge the reader to improve on the simple partial evaluator in
+Figure~\ref{fig:pe-arith} by replacing the \texttt{pe-neg} and
+\texttt{pe-add} helper functions with functions that know more about
+arithmetic. For example, your partial evaluator should know enough
+about arithmetic to translate
+\begin{lstlisting}
+(+ 1 (+ (read) 1))
+\end{lstlisting}
+into
+\begin{lstlisting}
+(+ 2 (read))
+\end{lstlisting}
+To accomplish this, we recomend that your partial evaluator be
+designed in such a way that its output takes the form of the $r$
+non-terminal in the following grammar.
+\[
+\begin{array}{lcl}
+e &::=& (\key{read}) \mid (- \;(\key{read})) \mid (\key{+} \;e\; e)\\
+r &::=& \Int \mid (\key{+}\; \Int\; e) \mid e
+\end{array}
+\]
+
+
+
+
+
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
