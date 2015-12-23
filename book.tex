@@ -24,6 +24,14 @@ escapechar=@,
 columns=fullflexible
 }
 
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{constraint}[theorem]{Constraint}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{exercise}[theorem]{Exercise}
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 'dedication' environment: To add a dedication paragraph at the start of book %
 % Source: http://www.tug.org/pipermail/texhax/2010-June/015184.html            %
@@ -658,12 +666,12 @@ into program $P_2$ in language $\mathcal{L}_2$.  Then interpreting
 $P_1$ and $P_2$ on the respective interpreters for the two languages,
 and given the same inputs $i$, should yield the same output. That is,
 we always have $o_1 = o_2$.
-\[
+\begin{equation} \label{eq:compile-correct}
 \xymatrix@=50pt{
   P_1 \ar[r]^{compile}\ar[d]^{\mathcal{L}_1-interp(i)} & P_2 \ar[d]^{\mathcal{L}_2-interp(i)} \\
   o_1 \ar@{=}[r] & o_2
 }
-\]
+\end{equation}
 In the next section we will see our first example of a compiler, which
 is also be another example of structural recursion.
 
@@ -700,26 +708,18 @@ functions is the output of partially evaluating the children nodes.
    (define (pe-neg r)
      (match r
        [(? fixnum?) (fx- 0 r)]
-       [else `(- ,r)]
-       ))
+       [else `(- ,r)]))
    (define (pe-add r1 r2)
      (match (list r1 r2)
-       [`(,n1 ,n2)
-        #:when (and (fixnum? n1) (fixnum? n2))
+       [`(,n1 ,n2) #:when (and (fixnum? n1) (fixnum? n2))
         (fx+ r1 r2)]
-       [else
-        `(+ ,r1 ,r2)]
-       ))
+       [else `(+ ,r1 ,r2)]))
    (define (pe-arith e)
      (match e
        [(? fixnum?) e]
-       [`(read)
-        `(read)]
-       [`(- ,e1)
-        (pe-neg (pe-arith e1))]
-       [`(+ ,e1 ,e2)
-        (pe-add (pe-arith e1) (pe-arith e2))]
-       ))   
+       [`(read) `(read)]
+       [`(- ,e1) (pe-neg (pe-arith e1))]
+       [`(+ ,e1 ,e2) (pe-add (pe-arith e1) (pe-arith e2))]))   
 \end{lstlisting}
 \caption{A partial evaluator for the $\itm{arith}$ language.}
 \label{fig:pe-arith}
@@ -731,33 +731,44 @@ go ahead perform the arithmetic.  Otherwise, we use quasiquote to
 create an AST node for the appropriate operation (either negation or
 addition) and use comma to splice in the child nodes.
 
-[to do: talk about testing]
+To gain some confidence that the partial evaluator is correct, we can
+test whether it produces programs that get the same result as the
+input program. That is, we can test whether it satisfies Diagram
+\eqref{eq:compile-correct}. The following code runs the partial
+evaluator on several examples and tests the output program.  The
+\texttt{assert} function is defined in Appendix~\ref{sec:utilities}.
+\begin{lstlisting}
+(define (test-pe pe p)
+  (assert "testing pe-arith"
+     (equal? (interp-arith p) (interp-arith (pe-arith p)))))
 
-\section{Exercise}
+(test-pe `(+ (read) (- (+ 5 3))))
+(test-pe `(+ 1 (+ (read) 1)))
+(test-pe `(- (+ (read) (- 5))))
+\end{lstlisting}
 
+\begin{exercise}
 We challenge the reader to improve on the simple partial evaluator in
 Figure~\ref{fig:pe-arith} by replacing the \texttt{pe-neg} and
 \texttt{pe-add} helper functions with functions that know more about
-arithmetic. For example, your partial evaluator should know enough
-about arithmetic to translate
+arithmetic. For example, your partial evaluator should translate
 \begin{lstlisting}
-(+ 1 (+ (read) 1))
+   (+ 1 (+ (read) 1))
 \end{lstlisting}
 into
 \begin{lstlisting}
-(+ 2 (read))
+   (+ 2 (read))
 \end{lstlisting}
-To accomplish this, we recomend that your partial evaluator be
-designed in such a way that its output takes the form of the $r$
-non-terminal in the following grammar.
+To accomplish this, we recomend that your partial evaluator produce
+output that takes the form of the $\itm{residual}$ non-terminal in the
+following grammar.
 \[
 \begin{array}{lcl}
-e &::=& (\key{read}) \mid (- \;(\key{read})) \mid (\key{+} \;e\; e)\\
-r &::=& \Int \mid (\key{+}\; \Int\; e) \mid e
+e &::=& (\key{read}) \mid (\key{-} \;(\key{read})) \mid (\key{+} \;e\; e)\\
+\itm{residual} &::=& \Int \mid (\key{+}\; \Int\; e) \mid e
 \end{array}
 \]
-
-
+\end{exercise}
 
 
 
@@ -1985,6 +1996,22 @@ $S_1$.
 \chapter{High-level Optimization}
 \label{ch:high-level-optimization}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Appendix}
+
+\section{Utility Functions}
+\label{sec:utilities}
+
+\begin{lstlisting}
+(define assert
+  (lambda (msg b)
+    (if (not b)
+	(begin
+	  (display "ERROR: ")
+	  (display msg)
+	  (newline))
+	(void))))
+\end{lstlisting}
 
 \bibliographystyle{plainnat}
 \bibliography{all}
