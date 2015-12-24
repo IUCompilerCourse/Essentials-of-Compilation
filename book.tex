@@ -13,6 +13,7 @@
 \usepackage{stmaryrd}
 \usepackage{xypic}
 \usepackage{semantic}
+\usepackage{wrapfig}
 
 % Computer Modern is already the default. -Jeremy
 %\renewcommand{\ttdefault}{cmtt}
@@ -125,6 +126,8 @@ University.
 
 Talk about nano-pass \citep{Sarkar:2004fk,Keep:2012aa} and incremental
 compilers \citep{Ghuloum:2006bh}.
+
+Talk about pre-requisites.
 
 %\section*{Structure of book}
 % You might want to add short description about each chapter in this book.
@@ -664,12 +667,11 @@ and $\mathcal{L}_2$, and an interpreter for each language.  Suppose
 that the compiler translates program $P_1$ in language $\mathcal{L}_1$
 into program $P_2$ in language $\mathcal{L}_2$.  Then interpreting
 $P_1$ and $P_2$ on the respective interpreters for the two languages,
-and given the same inputs $i$, should yield the same output. That is,
-we always have $o_1 = o_2$.
+and given the same inputs $i$, should yield the same output $o$.
 \begin{equation} \label{eq:compile-correct}
 \xymatrix@=50pt{
-  P_1 \ar[r]^{compile}\ar[d]^{\mathcal{L}_1-interp(i)} & P_2 \ar[d]^{\mathcal{L}_2-interp(i)} \\
-  o_1 \ar@{=}[r] & o_2
+  P_1 \ar[r]^{compile}\ar[dr]_{\mathcal{L}_1-interp(i)} & P_2 \ar[d]^{\mathcal{L}_2-interp(i)} \\
+   & o
 }
 \end{equation}
 In the next section we will see our first example of a compiler, which
@@ -771,21 +773,31 @@ e &::=& (\key{read}) \mid (\key{-} \;(\key{read})) \mid (\key{+} \;e\; e)\\
 \end{exercise}
 
 
-
-
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Integers and Variables}
 \label{ch:int-exp}
 
-%\begin{chapquote}{Author's name, \textit{Source of this quote}}
-%``This is a quote and I don't know who said this.''
-%\end{chapquote}
+This chapter concerns the challenge of compiling a subset of Racket,
+which we name $S_0$, to x86-64 assembly code. The chapter begins with
+a description of the $S_0$ language (Section~\ref{sec:s0}) and then a
+description of x86-64 (Section~\ref{sec:x86-64}). The x86-64 assembly
+language is quite large, so we only discuss what is needed for
+compiling $S_0$. We will introduce more of x86-64 in later
+chapters. Once we have introduced $S_0$ and x86-64, we reflect on
+their differences and come up with a plan for a handful of steps that
+will take us from $S_0$ to x86-64 (Section~\ref{sec:plan-s0-x86}).
+The rest of the sections in this Chapter give detailed hints regarding
+what each step should do and how to organize your code
+(Sections~\ref{sec:uniquify-s0}, \ref{sec:flatten-s0},
+\ref{sec:select-s0} \ref{sec:assign-s0}, and \ref{sec:patch-s0}).  We
+hope to give enough hints that the well-prepared reader can implement
+a compiler from $S_0$ to x86-64 while at the same time leaving room
+for some fun and creativity.
 
 \section{The $S_0$ Language}
+\label{sec:s0}
 
-The $S_0$ language includes integers, operations on integers,
+The $S_0$ language includes integers, operations on integers
 (arithmetic and input), and variable definitions.  The syntax of the
 $S_0$ language is defined by the grammar in
 Figure~\ref{fig:s0-syntax}. This language is rich enough to exhibit
@@ -816,11 +828,12 @@ a few small helper functions that together span 256 lines of code.
 The result of evaluating an expression is a value.  For $S_0$, values
 are integers. To make it straightforward to map these integers onto
 x86-64 assembly~\citep{Matz:2013aa}, we restrict the integers to just
-those representable with 64-bits, the range $-2^{63}$ to $2^{63}$.
+those representable with 64-bits, the range $-2^{63}$ to $2^{63}$
+(``fixnums'' in Racket parlance).
 
-We will walk through some examples of $S_0$ programs, commenting on
-aspects of the language that will be relevant to compiling it.  We
-start with one of the simplest $S_0$ programs; it adds two integers.
+We start with some examples of $S_0$ programs, commenting on aspects
+of the language that will be relevant to compiling it.  We start with
+one of the simplest $S_0$ programs; it adds two integers.
 \[
 \BINOP{+}{10}{32}
 \]
@@ -833,27 +846,31 @@ each other, in this case nesting several additions and negations.
 \]
 What is the result of the above program?
 
-The \key{let} construct stores a value in a variable which can then be
-used within the body of the \key{let}. So the following program stores
-$32$ in $x$ and then computes $\BINOP{+}{10}{x}$, producing $42$.
+The \key{let} construct defines a variable for used within it's body
+and initializes the variable with the value of an expression.  So the
+following program initializes $x$ to $32$ and then evaluates the body
+$\BINOP{+}{10}{x}$, producing $42$.
 \[
 \LET{x}{ \BINOP{+}{12}{20} }{ \BINOP{+}{10}{x} } 
 \]
 When there are multiple \key{let}'s for the same variable, the closest
-enclosing \key{let} is used. Consider the following program with two
-\key{let}'s that define variables named $x$.
+enclosing \key{let} is used. That is, variable definitions overshadow
+prior definitions. Consider the following program with two \key{let}'s
+that define variables named $x$. Can you figure out the result?
 \[
 \LET{x}{32}{ \BINOP{+}{ \LET{x}{10}{x} }{ x } }
 \]
 For the purposes of showing which variable uses correspond to which
 definitions, the following shows the $x$'s annotated with subscripts
-to distinguish them.
+to distinguish them. Double check that your answer for the above is
+the same as your answer for this annotated version of the program.
 \[
 \LET{x_1}{32}{ \BINOP{+}{ \LET{x_2}{10}{x_2} }{ x_1 } }
 \]
 
-The \key{read} operation prompts the user of the program for an
-integer. Given an input of $10$, the following program produces $42$.
+Moving on, the \key{read} operation prompts the user of the program
+for an integer. Given an input of $10$, the following program produces
+$42$.
 \[
 \BINOP{+}{(\key{read})}{32}
 \]
@@ -868,21 +885,21 @@ The initializing expression is always evaluated before the body of the
 the \key{read} for $y$.
 %
 The behavior of the following program is somewhat subtle because
-Scheme does not specify an evaluation order for arguments of an
+Racket does not specify an evaluation order for arguments of an
 operator such as $-$.
 \[
 \BINOP{-}{\READ}{\READ}
 \]
 Given the input $42$ then $10$, the above program can result in either
-$42$ or $-42$, depending on the whims of the Scheme implementation.
+$42$ or $-42$, depending on the whims of the Racket implementation.
 
 The goal for this chapter is to implement a compiler that translates
-any program $p \in S_0$ into a x86-64 assembly program $p'$ such that
-the assembly program exhibits the same behavior on an x86 computer as
-the $S_0$ program running in a Scheme implementation.
+any program $P_1 \in S_0$ into a x86-64 assembly program $P_2$ such
+that the assembly program exhibits the same behavior on an x86
+computer as the $S_0$ program running in a Racket implementation.
 \[
 \xymatrix{
-p \in S_0  \ar[rr]^{\text{compile}} \ar[drr]_{\text{run in Scheme}\quad}   &&  p' \in \text{x86-64} \ar[d]^{\quad\text{run on an x86 machine}}\\
+P_1 \in S_0  \ar[rr]^{\text{compile}} \ar[drr]_{\text{run in Racket}\quad}   &&  P_2 \in \text{x86-64} \ar[d]^{\quad\text{run on an x86 machine}}\\
 & & n \in \mathbb{Z}   
 }
 \]
@@ -890,21 +907,39 @@ In the next section we introduce enough of the x86-64 assembly
 language to compile $S_0$.
 
 \section{The x86-64 Assembly Language}
+\label{sec:x86-64}
 
-An x86-64 program is a sequence of instructions. The instructions
-manipulate 16 variables called \emph{registers} and can also load and
-store values into \emph{memory}. Memory is a mapping of 64-bit
-addresses to 64-bit values. The syntax $n(r)$ is used to read the
-address $a$ stored in register $r$ and then offset it by $n$ bytes (8
-bits), producing the address $a + n$. The arithmetic instructions,
-such as $\key{addq}\,s\,d$, read from the source $s$ and destination
-argument $d$, apply the arithmetic operation, then stores the result
-in the destination $d$. In this case, computing $d \gets d + s$.  The
-move instruction, $\key{movq}\,s\,d$ reads from $s$ and stores the
-result in $d$. The $\key{callq}\,\mathit{label}$ instruction executes
-the procedure specified by the label, which we shall use to implement
-\key{read}. Figure~\ref{fig:x86-a} defines the syntax for this subset
-of the x86-64 assembly language.
+An x86-64 program is a sequence of instructions. The instructions may
+refer to integer constants (called \emph{immediate values}), variables
+called \emph{registers}, and instructions may load and store values
+into \emph{memory}.  Memory is a mapping of 64-bit addresses to 64-bit
+values. Figure~\ref{fig:x86-a} defines the syntax for the subset of
+the x86-64 assembly language needed for this chapter.
+
+An immediate value is written using the notation \key{\$}$n$ where $n$
+is an integer. 
+%
+A register is written with a \key{\%} followed by the register name,
+such as \key{\%rax}.
+%
+An access to memory is specified using the syntax $n(\key{\%}r)$,
+which reads register $r$, obtaining address $a$, and then offsets the
+address by $n$ bytes (8 bits), producing the address $a + n$. The
+address is then used to either load or store to memory depending on
+whether it occurs as a source or destination argument of an
+instruction.
+
+An arithmetic instruction, such as $\key{addq}\,s\,d$, reads from the
+source argument $s$ and destination argument $d$, applies the
+arithmetic operation, then write the result in the destination $d$. In
+this case, computing $d \gets d + s$.
+%
+The move instruction, $\key{movq}\,s\,d$ reads from $s$ and stores the
+result in $d$. 
+%
+The $\key{callq}\,\mathit{label}$ instruction executes the procedure
+specified by the label, which we shall use to implement
+\key{read}. 
 
 \begin{figure}[tbp]
 \fbox{
@@ -934,21 +969,7 @@ of the x86-64 assembly language.
 \label{fig:x86-a}
 \end{figure}
 
-Figure~\ref{fig:p0-x86} depicts an x86-64 program that is equivalent
-to $\BINOP{+}{10}{32}$. The \key{globl} directive says that the
-\key{\_main} procedure is externally visible, which is necessary so
-that the operating system can call it. The label \key{\_main:}
-indicates the beginning of the \key{\_main} procedure.  The
-instruction $\key{movq}\,\$10, \%\key{rax}$ puts $10$ into the
-register \key{rax}. The following instruction $\key{addq}\,\key{\$}32,
-\key{\%rax}$ adds $32$ to the $10$ in \key{rax} and puts the result,
-$42$, back into \key{rax}. The instruction \key{retq} finishes the
-\key{\_main} function by returning the integer in the \key{rax}
-register to the operating system.
-
-\begin{figure}[htbp]
-\centering
-\begin{minipage}{0.6\textwidth}
+\begin{wrapfigure}{r}{2.25in}
 \begin{lstlisting}
 	.globl _main
 _main:
@@ -956,33 +977,25 @@ _main:
 	addq	$32, %rax
 	retq
 \end{lstlisting}
-\end{minipage}
-\caption{A simple x86-64 program equivalent to $\BINOP{+}{10}{32}$.}
+\caption{An x86-64 program equivalent to $\BINOP{+}{10}{32}$.}
 \label{fig:p0-x86}
-\end{figure}
+\end{wrapfigure}
 
-The next example exhibits the use of memory.  Figure~\ref{fig:p1-x86}
-lists an x86-64 program that is equivalent to $\BINOP{+}{52}{
-  \UNIOP{-}{10} }$. To understand how this x86-64 program uses memory,
-we need to explain a region of memory called called the
-\emph{procedure call stack} (\emph{stack} for short). The stack
-consists of a separate \emph{frame} for each procedure call. The
-memory layout for an individual frame is shown in
-Figure~\ref{fig:frame}.  The register \key{rsp} is called the
-\emph{stack pointer} and points to the item at the top of the
-stack. The stack grows downward in memory, so we increase the size of
-the stack by subtracting from the stack pointer. The frame size is
-required to be a multiple of 16 bytes. The register \key{rbp} is the
-\emph{base pointer} which serves two purposes: 1) it saves the
-location of the stack pointer for the procedure that called the
-current one and 2) it is used to access variables associated with the
-current procedure. We number the variables from $1$ to $n$. Variable
-$1$ is stored at address $-8\key{(\%rbp)}$, variable $2$ at
-$-16\key{(\%rbp)}$, etc.
+Figure~\ref{fig:p0-x86} depicts an x86-64 program that is equivalent to
+$\BINOP{+}{10}{32}$. The \key{globl} directive says that the
+\key{\_main} procedure is externally visible, which is necessary so
+that the operating system can call it. The label \key{\_main:}
+indicates the beginning of the \key{\_main} procedure which is where
+the operating system starting executing this program.  The instruction
+\lstinline{movq $10, %rax} puts $10$ into register \key{rax}. The
+  following instruction \lstinline{addq $32, %rax} adds $32$ to the
+    $10$ in \key{rax} and puts the result, $42$, back into
+    \key{rax}. The instruction \key{retq} finishes the \key{\_main}
+    function by returning the integer in the \key{rax} register to the
+    operating system.
 
-\begin{figure}
-\centering
-\begin{minipage}{0.6\textwidth}
+
+\begin{wrapfigure}{r}{2.25in}
 \begin{lstlisting}
 	.globl _main
 _main:
@@ -999,13 +1012,29 @@ _main:
 	popq	%rbp
 	retq
 \end{lstlisting}
-\end{minipage}
 \caption{An x86-64 program equivalent to $\BINOP{+}{52}{\UNIOP{-}{10} }$.}
 \label{fig:p1-x86}
-\end{figure}
+\end{wrapfigure}
 
+The next example exhibits the use of memory.  Figure~\ref{fig:p1-x86}
+lists an x86-64 program that is equivalent to $\BINOP{+}{52}{
+  \UNIOP{-}{10} }$. To understand how this x86-64 program works, we
+need to explain a region of memory called called the \emph{procedure
+  call stack} (or \emph{stack} for short). The stack consists of a
+separate \emph{frame} for each procedure call. The memory layout for
+an individual frame is shown in Figure~\ref{fig:frame}.  The register
+\key{rsp} is called the \emph{stack pointer} and points to the item at
+the top of the stack. The stack grows downward in memory, so we
+increase the size of the stack by subtracting from the stack
+pointer. The frame size is required to be a multiple of 16 bytes. The
+register \key{rbp} is the \emph{base pointer} which serves two
+purposes: 1) it saves the location of the stack pointer for the
+procedure that called the current one and 2) it is used to access
+variables associated with the current procedure. We number the
+variables from $1$ to $n$. Variable $1$ is stored at address
+$-8\key{(\%rbp)}$, variable $2$ at $-16\key{(\%rbp)}$, etc.
 
-\begin{figure}
+\begin{figure}[tbp]
 \centering
 \begin{tabular}{|r|l|} \hline
 Position & Contents \\ \hline
@@ -1041,21 +1070,24 @@ adds the contents of variable $1$ to \key{rax}, at which point
 \key{rax} contains $42$.
 
 The last three instructions are the typical \emph{conclusion} of a
-procedure.  The \key{addq \$16, \%rsp} instruction moves the stack
-pointer back to point at the old base pointer. The amount added here
-needs to match the amount that was subtracted in the prelude of the
-procedure.  Then \key{popq \%rbp} returns the old base pointer to
-\key{rbp} and adds $8$ to the stack pointer.  The \key{retq}
-instruction jumps back to the procedure that called this one and
-subtracts 8 from the stack pointer.
+procedure. These instructions are necessary to get the state of the
+machine back to where it was before the current procedure was called.
+The \key{addq \$16, \%rsp} instruction moves the stack pointer back to
+point at the old base pointer. The amount added here needs to match
+the amount that was subtracted in the prelude of the procedure.  Then
+\key{popq \%rbp} returns the old base pointer to \key{rbp} and adds
+$8$ to the stack pointer.  The \key{retq} instruction jumps back to
+the procedure that called this one and subtracts 8 from the stack
+pointer.
 
 The compiler will need a convenient representation for manipulating
 x86 programs, so we define an abstract syntax for x86 in
 Figure~\ref{fig:x86-ast-a}. The \itm{info} field of the \key{program}
 AST node is for storing auxilliary information that needs to be
-communicated from one pass to the next. The function \key{print-x86}
-provided in the supplemental code converts an x86 abstract syntax tree
-into the text representation for x86 (Figure~\ref{fig:x86-a}).
+communicated from one step of the compiler to the next. The function
+\key{print-x86} provided in the supplemental code converts an x86
+abstract syntax tree into the text representation for x86
+(Figure~\ref{fig:x86-a}).
 
 \begin{figure}[tbp]
 \fbox{
@@ -1115,7 +1147,7 @@ that a compiler writer must answer because some orderings may be much
 more difficult to implement than others. It is difficult to know ahead
 of time which orders will be better so often some trial-and-error is
 involved. However, we can try to plan ahead and choose the orderings
-based on what we find out.
+based on this planning.
 
 For example, to handle difference \#2 (nested expressions), we shall
 introduce new variables and pull apart the nested expressions into a
@@ -1140,11 +1172,11 @@ ordering.
 
 We further simplify the translation from $S_0$ to x86 by identifying
 an intermediate language named $C_0$, roughly half-way between $S_0$
-and x86, to provide a rest stop along the way. The name $C_0$ comes
-from this language being vaguely similar to the $C$ language. The
-differences \#4 and \#1, regarding variables and nested expressions,
-are handled by the passes \textsf{uniquify} and \textsf{flatten} that
-bring us to $C_0$.
+and x86, to provide a rest stop along the way. We name the language
+$C_0$ because it is vaguely similar to the $C$
+language~\citep{Kernighan:1988nx}. The differences \#4 and \#1,
+regarding variables and nested expressions, are handled by the passes
+\textsf{uniquify} and \textsf{flatten} that bring us to $C_0$.
 \[\large
 \xymatrix@=50pt{
   S_0 \ar@/^/[r]^-{\textsf{uniquify}} & 
@@ -1211,6 +1243,7 @@ is to fix this problem by replacing every bad instruction with a short
 sequence of instructions that use the \key{rax} register.
 
 \section{Uniquify Variables}
+\label{sec:uniquify-s0}
 
 The purpose of this pass is to make sure that each \key{let} uses a
 unique variable name. For example, the \textsf{uniquify} pass could
@@ -1233,6 +1266,7 @@ when it gets to a variable reference, so we add another paramter to
 \textsf{uniquify} for the association list.
 
 \section{Flatten Expressions}
+\label{sec:flatten-s0}
 
 The purpose of the \textsf{flatten} pass is to get rid of nested
 expressions, such as the $\UNIOP{-}{10}$ in the following program,
@@ -1278,6 +1312,7 @@ of \textsf{flatten}.
 \]
 
 \section{Select Instructions}
+\label{sec:select-s0}
 
 In the \textsf{select\_instructions} pass we begin the work of
 translating from $C_0$ to x86. The target language of this pass is a
@@ -1311,6 +1346,7 @@ conclusion handle the transfer of control back to the calling
 procedure.
 
 \section{Assign Homes}
+\label{sec:assign-s0}
 
 As discussed in Section~\ref{sec:plan-s0-x86}, the
 \textsf{assign\_homes} pass places all of the variables on the stack.
@@ -1341,6 +1377,7 @@ convenient to compute and store the size of the frame which will be
 needed later to generate the procedure conclusion.
 
 \section{Patch Instructions}
+\label{sec:patch-s0}
 
 The purpose of this pass is to make sure that each instruction adheres
 to the restrictions regarding which arguments can be memory
