@@ -1175,15 +1175,20 @@ an intermediate language named $C_0$, roughly half-way between $S_0$
 and x86, to provide a rest stop along the way. We name the language
 $C_0$ because it is vaguely similar to the $C$
 language~\citep{Kernighan:1988nx}. The differences \#4 and \#1,
-regarding variables and nested expressions, are handled by the passes
-\textsf{uniquify} and \textsf{flatten} that bring us to $C_0$.
+regarding variables and nested expressions, will be handled by two
+steps, \key{uniquify} and \key{flatten}, which bring us to
+$C_0$.
 \[\large
 \xymatrix@=50pt{
-  S_0 \ar@/^/[r]^-{\textsf{uniquify}} & 
-  S_0 \ar@/^/[r]^-{\textsf{flatten}} &
+  S_0 \ar@/^/[r]^-{\key{uniquify}} & 
+  S_0 \ar@/^/[r]^-{\key{flatten}} &
   C_0 
 }
 \]
+Each of these steps in the compiler is implemented by a function,
+typically a structurally recursive function that translates an input
+AST into an output AST. We refer to such a function as a \emph{pass}
+because it makes a pass over the AST.
 
 The syntax for $C_0$ is defined in Figure~\ref{fig:c0-syntax}.  The
 $C_0$ language supports the same operators as $S_0$ but the arguments
@@ -1215,21 +1220,21 @@ To get from $C_0$ to x86-64 assembly requires three more steps, which
 we discuss below.
 \[\large
 \xymatrix@=50pt{
-  C_0 \ar@/^/[r]^-{\textsf{select\_instr.}}
-  & \text{x86}^{*} \ar@/^/[r]^-{\textsf{assign\_homes}} 
-  & \text{x86}^{*} \ar@/^/[r]^-{\textsf{patch\_instr.}}
+  C_0 \ar@/^/[r]^-{\key{select\_instr.}}
+  & \text{x86}^{*} \ar@/^/[r]^-{\key{assign\_homes}} 
+  & \text{x86}^{*} \ar@/^/[r]^-{\key{patch\_instr.}}
   & \text{x86}
 }
 \]
 We handle difference \#1, concerning the format of arithmetic
-instructions, in the \textsf{select\_instructions} pass.  The result
+instructions, in the \key{select\_instructions} pass.  The result
 of this pass produces programs consisting of x86-64 instructions that
 use variables.
 %
 As there are only 16 registers, we cannot always map variables to
-registers (difference \#3). Fortunately, the stack can grow quite, so
-we can map variables to locations on the stack. This is handled in the
-\textsf{assign\_homes} pass. The topic of
+registers (difference \#3). Fortunately, the stack can grow quite
+large, so we can map variables to locations on the stack. This is
+handled in the \key{assign\_homes} pass. The topic of
 Chapter~\ref{ch:register-allocation} is implementing a smarter
 approach in which we make a best-effort to map variables to registers,
 resorting to the stack only when necessary.
@@ -1238,15 +1243,15 @@ The final pass in our journey to x86 handles an indiosycracy of x86
 assembly. Many x86 instructions have two arguments but only one of the
 arguments may be a memory reference. Because we are mapping variables
 to stack locations, many of our generated instructions will violate
-this restriction. The purpose of the \textsf{patch\_instructions} pass
-is to fix this problem by replacing every bad instruction with a short
-sequence of instructions that use the \key{rax} register.
+this restriction. The purpose of the \key{patch\_instructions} pass
+is to fix this problem by replacing every violating instruction with a
+short sequence of instructions that use the \key{rax} register.
 
 \section{Uniquify Variables}
 \label{sec:uniquify-s0}
 
 The purpose of this pass is to make sure that each \key{let} uses a
-unique variable name. For example, the \textsf{uniquify} pass could
+unique variable name. For example, the \key{uniquify} pass could
 translate
 \[
 \LET{x}{32}{ \BINOP{+}{ \LET{x}{10}{x} }{ x } }
@@ -1256,21 +1261,71 @@ to
 \LET{x.1}{32}{ \BINOP{+}{ \LET{x.2}{10}{x.2} }{ x.1 } }
 \]
 
-We recommend implementing \textsf{uniquify} as a recursive function
-that mostly just copies the input program. However, when encountering
-a \key{let}, it should generate a unique name for the variable (the
+We recommend implementing \key{uniquify} as a recursive function that
+mostly just copies the input program. However, when encountering a
+\key{let}, it should generate a unique name for the variable (the
 Racket function \key{gensym} is handy for this) and associate the old
 name with the new unique name in an association list. The
-\textsf{uniquify} function will need to access this association list
-when it gets to a variable reference, so we add another paramter to
-\textsf{uniquify} for the association list.
+\key{uniquify} function will need to access this association list when
+it gets to a variable reference, so we add another paramter to
+\key{uniquify} for the association list. It is quite common for a
+compiler pass to need a map to store extra information about
+variables. Such maps are often called \emph{symbol tables}.
+
+The skeleton of the \key{uniquify} function is shown in
+Figure~\ref{fig:uniquify-s0}.  The function is curried so that it is
+convenient to partially apply it to an association list and then apply
+it to different expressions, as in the last clause for primitive
+operations in Figure~\ref{fig:uniquify-s0}.
+
+\begin{exercise}
+Complete the \key{uniquify} pass by filling in the blanks, that is,
+implement the clauses for variables and for the \key{let} construct.
+\end{exercise}
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+   (define uniquify
+     (lambda (alist)
+       (lambda (e)
+         (match e
+           [(? symbol?) ___]
+           [(? integer?) e]
+           [`(let ([,x ,e]) ,body) ___]
+           [`(program ,info ,e)
+            `(program ,info ,((uniquify alist) e))]
+           [`(,op ,es ...)
+            `(,op ,@(map (uniquify alist) es))]
+           ))))
+\end{lstlisting}
+\caption{Skeleton for the \key{uniquify} pass.}
+\label{fig:uniquify-s0}
+\end{figure}
+
+\begin{exercise}
+Test your \key{uniquify} pass by creating three example $S_0$ programs
+and checking whether the output programs produce the same result as
+the input programs. The $S_0$ programs should be designed to test the
+most interesting parts of the \key{uniquify} pass, that is, the
+programs should include \key{let} constructs, variables, and variables
+that overshadow eachother.  
+
+[to do: explain the test-compiler function and interpret-S0.]
+
+%% You can use the interpreter \key{interpret-S0} defined in the
+%% \key{interp.rkt} file. The entire sequence of tests should be a short
+%% Racket program so you can re-run all the tests by running the Racket
+%% program. We refer to this as the \emph{regression test} program.
+\end{exercise}
+
 
 \section{Flatten Expressions}
 \label{sec:flatten-s0}
 
-The purpose of the \textsf{flatten} pass is to get rid of nested
-expressions, such as the $\UNIOP{-}{10}$ in the following program,
-without changing the behavior of the program.
+The \key{flatten} pass will transform $S_0$ programs into $C_0$
+programs. In particular, the purpose of the \key{flatten} pass is to
+get rid of nested expressions, such as the $\UNIOP{-}{10}$ in the
+following program.
 \[
 \BINOP{+}{52}{ \UNIOP{-}{10} }
 \]
@@ -1281,14 +1336,19 @@ translated to the following one.
 \[
 \begin{array}{l}
 \ASSIGN{ \itm{x} }{ \UNIOP{-}{10} } \\
-\RETURN{ \BINOP{+}{52}{ \itm{x} } }
+\ASSIGN{ \itm{y} }{ \BINOP{+}{52}{ \itm{x} } } \\
+\RETURN{ y }
 \end{array}
 \]
 
-We recommend implementing \textsf{flatten} as a recursive function
-that returns two things, 1) the newly flattened expression, and 2) a
-list of assignment statements, one for each of the new variables
-introduced while flattening the expression.
+We recommend implementing \key{flatten} as a structurally recursive
+function that returns two things, 1) the newly flattened expression,
+and 2) a list of assignment statements, one for each of the new
+variables introduced while flattening the expression. You can return
+multiple things from a function using the \key{values} form and you
+can receive multiple things from a function call using the
+\key{define-values} form. If you are not familiar with these
+constructs, the Racket documentation will be of help.
 
 Take special care for programs such as the following that initialize
 variables with integers or other variables.
@@ -1302,7 +1362,7 @@ This program should be translated to
 \RETURN{b}
 \]
 and not the following, which could result from a naive implementation
-of \textsf{flatten}.
+of \key{flatten}.
 \[
 \ASSIGN{x.1}{42}\;
 \ASSIGN{a}{x.1}\;
@@ -1311,13 +1371,22 @@ of \textsf{flatten}.
 \RETURN{b}
 \]
 
+\begin{exercise}
+Implement the \key{flatten} pass and test it on all of the example
+programs that you created to test the \key{uniquify} pass and create
+three new example programs that are designed to exercise all of the
+interesting code in the \key{flatten} pass. 
+[to do: add to the test-compiler stuff]
+\end{exercise}
+
+
 \section{Select Instructions}
 \label{sec:select-s0}
 
-In the \textsf{select\_instructions} pass we begin the work of
+In the \key{select\_instructions} pass we begin the work of
 translating from $C_0$ to x86. The target language of this pass is a
 pseudo-x86 language that still uses variables, so we add an AST node
-of the form $\VAR{\itm{var}}$.  The \textsf{select\_instructions} pass
+of the form $\VAR{\itm{var}}$.  The \key{select\_instructions} pass
 deals with the differing format of arithmetic operations. For example,
 in $C_0$ an addition operation could take the following form:
 \[
@@ -1349,9 +1418,9 @@ procedure.
 \label{sec:assign-s0}
 
 As discussed in Section~\ref{sec:plan-s0-x86}, the
-\textsf{assign\_homes} pass places all of the variables on the stack.
+\key{assign\_homes} pass places all of the variables on the stack.
 Consider again the example $S_0$ program $\BINOP{+}{52}{ \UNIOP{-}{10} }$,
-which after \textsf{select\_instructions} looks like the following.
+which after \key{select\_instructions} looks like the following.
 \[
 \begin{array}{l}
 (\key{mov}\;\INT{10}\; \VAR{x})\\
@@ -1361,7 +1430,7 @@ which after \textsf{select\_instructions} looks like the following.
 \end{array}
 \]
 The one and only variable $x$ is assigned to stack location
-\key{-8(\%rbp)}, so the \textsf{assign\_homes} pass translates the
+\key{-8(\%rbp)}, so the \key{assign\_homes} pass translates the
 above to
 \[
 \begin{array}{l}
@@ -1388,7 +1457,7 @@ Consider again the following example.
 \[
 \LET{a}{42}{ \LET{b}{a}{ b }}
 \]
-After \textsf{assign\_homes} pass, the above has been translated to
+After \key{assign\_homes} pass, the above has been translated to
 \[
 \begin{array}{l}
 (\key{mov} \;\INT{42}\; \STACKLOC{{-}8})\\
@@ -1823,11 +1892,11 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \begin{figure}[tbp]
 \[
 \xymatrix{
-  C_0 \ar@/^/[r]^-{\textsf{select\_instr.}}
-    & \text{x86}^{*} \ar[d]^-{\textsf{uncover\_live}} \\
-    & \text{x86}^{*} \ar[d]^-{\textsf{build\_interference}} \\
-    & \text{x86}^{*} \ar[d]_-{\textsf{allocate\_register}} \\
-    & \text{x86}^{*} \ar@/^/[r]^-{\textsf{patch\_instr.}} 
+  C_0 \ar@/^/[r]^-{\key{select\_instr.}}
+    & \text{x86}^{*} \ar[d]^-{\key{uncover\_live}} \\
+    & \text{x86}^{*} \ar[d]^-{\key{build\_interference}} \\
+    & \text{x86}^{*} \ar[d]_-{\key{allocate\_register}} \\
+    & \text{x86}^{*} \ar@/^/[r]^-{\key{patch\_instr.}} 
     & \text{x86} 
 }
 \]
