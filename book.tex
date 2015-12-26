@@ -899,7 +899,8 @@ that the assembly program exhibits the same behavior on an x86
 computer as the $S_0$ program running in a Racket implementation.
 \[
 \xymatrix{
-P_1 \in S_0  \ar[rr]^{\text{compile}} \ar[drr]_{\text{run in Racket}\quad}   &&  P_2 \in \text{x86-64} \ar[d]^{\quad\text{run on an x86 machine}}\\
+P_1 \in S_0  \ar[rr]^{\text{compile}} \ar[drr]_{\text{run in Racket}\quad} 
+  &&  P_2 \in \text{x86-64} \ar[d]^{\quad\text{run on an x86 machine}}\\
 & & n \in \mathbb{Z}   
 }
 \]
@@ -1097,13 +1098,13 @@ abstract syntax tree into the text representation for x86
 \begin{array}{lcl}
 \Arg &::=&  \INT{\Int} \mid \REG{\itm{register}}
     \mid \STACKLOC{\Int} \\ 
-\Instr &::=& (\key{add} \; \Arg\; \Arg) \mid 
-      (\key{sub} \; \Arg\; \Arg) \mid 
-      (\key{imul} \; \Arg\;\Arg) \mid 
-      (\key{neg} \; \Arg) \mid \\
-  && (\key{mov} \; \Arg\; \Arg) \mid 
+\Instr &::=& (\key{addq} \; \Arg\; \Arg) \mid 
+      (\key{subq} \; \Arg\; \Arg) \mid 
+      (\key{imulq} \; \Arg\;\Arg) \mid 
+      (\key{negq} \; \Arg) \mid \\
+  && (\key{movq} \; \Arg\; \Arg) \mid 
       (\key{call} \; \mathit{label}) \mid
-      (\key{push}\;\Arg) \mid (\key{pop}\;\Arg) \mid (\key{ret}) \\
+      (\key{pushq}\;\Arg) \mid (\key{popq}\;\Arg) \mid (\key{retq}) \\
 \Prog &::= & (\key{program} \;\itm{info} \; \Instr^{+})
 \end{array}
 \]
@@ -1390,17 +1391,18 @@ test your passes on the example programs.
 In the \key{select\_instructions} pass we begin the work of
 translating from $C_0$ to x86. The target language of this pass is a
 pseudo-x86 language that still uses variables, so we add an AST node
-of the form $\VAR{\itm{var}}$.  The \key{select\_instructions} pass
-deals with the differing format of arithmetic operations. For example,
-in $C_0$ an addition operation could take the following form:
+of the form $\VAR{\itm{var}}$ to the x86 abstract syntax.  The
+\key{select\_instructions} pass deals with the differing format of
+arithmetic operations. For example, in $C_0$ an addition operation
+could take the following form:
 \[
 \ASSIGN{x}{ \BINOP{+}{10}{32} }
 \]
 To translate to x86, we need to express this addition using the
-\key{add} instruction that does an inplace update. So we first move
-$10$ to $x$ then perform the \key{add}.
+\key{addq} instruction that does an inplace update. So we first move
+$10$ to $x$ then perform the \key{addq}.
 \[
-(\key{mov}\,\INT{10}\, \VAR{x})\; (\key{add} \;\INT{32}\; \VAR{x})
+(\key{mov}\,\INT{10}\, \VAR{x})\; (\key{addq} \;\INT{32}\; \VAR{x})
 \]
 
 There are some cases that require special care to avoid generating
@@ -1410,7 +1412,7 @@ extra move instruction.  For example, the following
 \[
 \ASSIGN{x}{ \BINOP{+}{10}{x} }
 \quad\text{should translate to}\quad
-(\key{add} \; \INT{10}\; \VAR{x})
+(\key{addq} \; \INT{10}\; \VAR{x})
 \]
 
 Regarding the \RETURN{e} statement of $C_0$, we recommend treating it
@@ -1427,10 +1429,10 @@ Consider again the example $S_0$ program $\BINOP{+}{52}{ \UNIOP{-}{10} }$,
 which after \key{select\_instructions} looks like the following.
 \[
 \begin{array}{l}
-(\key{mov}\;\INT{10}\; \VAR{x})\\
-(\key{neg}\; \VAR{x})\\
-(\key{mov}\; \INT{52}\; \REG{\itm{rax}})\\
-(\key{add}\; \VAR{x} \REG{\itm{rax}})
+(\key{movq}\;\INT{10}\; \VAR{x})\\
+(\key{negq}\; \VAR{x})\\
+(\key{movq}\; \INT{52}\; \REG{\itm{rax}})\\
+(\key{addq}\; \VAR{x} \REG{\itm{rax}})
 \end{array}
 \]
 The one and only variable $x$ is assigned to stack location
@@ -1438,10 +1440,10 @@ The one and only variable $x$ is assigned to stack location
 above to
 \[
 \begin{array}{l}
-(\key{mov}\;\INT{10}\; \STACKLOC{{-}8})\\
-(\key{neg}\; \STACKLOC{{-}8})\\
-(\key{mov}\; \INT{52}\; \REG{\itm{rax}})\\
-(\key{add}\; \STACKLOC{{-}8}\; \REG{\itm{rax}})
+(\key{movq}\;\INT{10}\; \STACKLOC{{-}8})\\
+(\key{negq}\; \STACKLOC{{-}8})\\
+(\key{movq}\; \INT{52}\; \REG{\itm{rax}})\\
+(\key{addq}\; \STACKLOC{{-}8}\; \REG{\itm{rax}})
 \end{array}
 \]
 
@@ -1464,44 +1466,49 @@ Consider again the following example.
 After \key{assign\_homes} pass, the above has been translated to
 \[
 \begin{array}{l}
-(\key{mov} \;\INT{42}\; \STACKLOC{{-}8})\\
-(\key{mov}\;\STACKLOC{{-}8}\; \STACKLOC{{-}16})\\
-(\key{mov}\;\STACKLOC{{-}16}\; \REG{\itm{rax}})
+(\key{movq} \;\INT{42}\; \STACKLOC{{-}8})\\
+(\key{movq}\;\STACKLOC{{-}8}\; \STACKLOC{{-}16})\\
+(\key{movq}\;\STACKLOC{{-}16}\; \REG{\itm{rax}})
 \end{array}
 \]
-The second \key{mov} instruction is problematic because both arguments
+The second \key{movq} instruction is problematic because both arguments
 are stack locations. We suggest fixing this problem by moving from the
 source to \key{rax} and then from \key{rax} to the destination, as
 follows.
 \[
 \begin{array}{l}
-(\key{mov} \;\INT{42}\; \STACKLOC{{-}8})\\
-(\key{mov}\;\STACKLOC{{-}8}\; \REG{\itm{rax}})\\
-(\key{mov}\;\REG{\itm{rax}}\; \STACKLOC{{-}16})\\
-(\key{mov}\;\STACKLOC{{-}16}\; \REG{\itm{rax}})
+(\key{movq} \;\INT{42}\; \STACKLOC{{-}8})\\
+(\key{movq}\;\STACKLOC{{-}8}\; \REG{\itm{rax}})\\
+(\key{movq}\;\REG{\itm{rax}}\; \STACKLOC{{-}16})\\
+(\key{movq}\;\STACKLOC{{-}16}\; \REG{\itm{rax}})
 \end{array}
 \]
 
-The \key{imul} instruction is a special case because the destination
+The \key{imulq} instruction is a special case because the destination
 argument must be a register.
 
-\section{Testing with Interpreters}
+\section{Print x86}
+\label{sec:print-x86}
 
-The typical way to test a compiler is to run the generated assembly
-code on a diverse set of programs and check whether they behave as
-expected. However, when a compiler is structured as our is, with many
-passes, when there is an error in the generated assembly code it can
-be hard to determine which pass contains the source of the error.  A
-good way to isolate the error is to not only test the generated
-assembly code but to also test the output of every pass. This requires
-having interpreters for all the intermediate languages.  Indeed, the
-file \key{interp.rkt} in the supplemental code provides interpreters
-for all the intermediate languages described in this book, starting
-with interpreters for $S_0$, $C_0$, and x86 (in abstract syntax).
+[To do: talk about printing the AST to x86.]
 
-The file \key{run-tests.rkt} automates the process of running the
-interpreters on the output programs of each pass and checking their
-result.
+%% \section{Testing with Interpreters}
+
+%% The typical way to test a compiler is to run the generated assembly
+%% code on a diverse set of programs and check whether they behave as
+%% expected. However, when a compiler is structured as our is, with many
+%% passes, when there is an error in the generated assembly code it can
+%% be hard to determine which pass contains the source of the error.  A
+%% good way to isolate the error is to not only test the generated
+%% assembly code but to also test the output of every pass. This requires
+%% having interpreters for all the intermediate languages.  Indeed, the
+%% file \key{interp.rkt} in the supplemental code provides interpreters
+%% for all the intermediate languages described in this book, starting
+%% with interpreters for $S_0$, $C_0$, and x86 (in abstract syntax).
+
+%% The file \key{run-tests.rkt} automates the process of running the
+%% interpreters on the output programs of each pass and checking their
+%% result.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Register Allocation}
@@ -1535,16 +1542,16 @@ Source program:
 After instruction selection:
 \begin{lstlisting}
   (program (v w x y z)
-    (mov (int 1) (var v))
-    (mov (int 46) (var w))
-    (mov (var v) (var x))
-    (add (int 7) (var x))
-    (mov (var x) (var y))
-    (add (int 4) (var y))
-    (mov (var x) (var z))
-    (add (var w) (var z))
-    (mov (var z) (reg rax))
-    (sub (var y) (reg rax)))
+    (movq (int 1) (var v))
+    (movq (int 46) (var w))
+    (movq (var v) (var x))
+    (addq (int 7) (var x))
+    (movq (var x) (var y))
+    (addq (int 4) (var y))
+    (movq (var x) (var z))
+    (addq (var w) (var z))
+    (movq (var z) (reg rax))
+    (subq (var y) (reg rax)))
 \end{lstlisting}
 \end{minipage}
 \caption{Running example for this chapter.}
@@ -1574,11 +1581,11 @@ To understand the latter condition, consider the following code
 fragment in which there are two writes to $b$. Are $a$ and
 $b$ both live at the same time? 
 \begin{lstlisting}[numbers=left,numberstyle=\tiny]
-(mov (int 5) (var a))    ; @$a \gets 5$@
-(mov (int 30) (var b))   ; @$b \gets 30$@
-(mov (var a) (var c))    ; @$c \gets x$@
-(mov (int 10) (var b))   ; @$b \gets 10$@
-(add (var b) (var c))    ; @$c \gets c + b$@
+(movq (int 5) (var a))    ; @$a \gets 5$@
+(movq (int 30) (var b))   ; @$b \gets 30$@
+(movq (var a) (var c))    ; @$c \gets x$@
+(movq (int 10) (var b))   ; @$b \gets 10$@
+(addq (var b) (var c))    ; @$c \gets c + b$@
 \end{lstlisting}
 The answer is no because the value $30$ written to $b$ on line 2 is
 never used. The variable $b$ is read on line 5 and there is an
@@ -1615,16 +1622,16 @@ $L_{\mathtt{after}}$ set.
 \begin{figure}[tbp]
 \begin{lstlisting}
   (program (v w x y z)
-    (mov (int 1) (var v))      @$\{ v \}$@
-    (mov (int 46) (var w))     @$\{ v, w \}$@
-    (mov (var v) (var x))      @$\{ w, x \}$@
-    (add (int 7) (var x))      @$\{ w, x \}$@
-    (mov (var x) (var y))      @$\{ w, x, y\}$@
-    (add (int 4) (var y))      @$\{ w, x, y \}$@
-    (mov (var x) (var z))      @$\{ w, y, z \}$@
-    (add (var w) (var z))      @$\{ y, z \}$@
-    (mov (var z) (reg rax))    @$\{ y \}$@
-    (sub (var y) (reg rax)))   @$\{\}$@
+    (movq (int 1) (var v))      @$\{ v \}$@
+    (movq (int 46) (var w))     @$\{ v, w \}$@
+    (movq (var v) (var x))      @$\{ w, x \}$@
+    (addq (int 7) (var x))      @$\{ w, x \}$@
+    (movq (var x) (var y))      @$\{ w, x, y\}$@
+    (addq (int 4) (var y))      @$\{ w, x, y \}$@
+    (movq (var x) (var z))      @$\{ w, y, z \}$@
+    (addq (var w) (var z))      @$\{ y, z \}$@
+    (movq (var z) (reg rax))    @$\{ y \}$@
+    (subq (var y) (reg rax)))   @$\{\}$@
 \end{lstlisting}
 \caption{Running example program annotated with live-after sets.}
 \label{fig:live-eg}
@@ -1657,12 +1664,12 @@ A better way to compute the edges of the intereference graph is given
 by the following rules.
 
 \begin{itemize}
-\item If instruction $I_k$ is a move: (\key{mov} $s$\, $d$), then add
+\item If instruction $I_k$ is a move: (\key{movq} $s$\, $d$), then add
   the edge $(d,v)$ for every $v \in L_{\mathsf{after}}(k)$ unless $v =
   d$ or $v = s$.
 
 \item If instruction $I_k$ is not a move but some other arithmetic
-  instruction such as (\key{add} $s$\, $d$), then add the edge $(d,v)$
+  instruction such as (\key{addq} $s$\, $d$), then add the edge $(d,v)$
   for every $v \in L_{\mathsf{after}}(k)$ unless $v = d$.
   
 \item If instruction $I_k$ is of the form (\key{call}
@@ -1868,16 +1875,16 @@ Applying this assignment to our running example
 % why frame size of 32? -JGS
 \begin{lstlisting}
 (program 32
-  (mov (int 1) (reg rbx))
-  (mov (int 46) (stack-loc -8))
-  (mov (reg rbx) (stack-loc -16))
-  (add (int 7) (stack-loc -16))
-  (mov (stack-loc 16) (reg rbx))
-  (add (int 4) (reg rbx))
-  (mov (stack-loc -16) (stack-loc -16))
-  (add (stack-loc -8) (stack-loc -16))
-  (mov (stack-loc -16) (reg rax))
-  (sub (reg rbx) (reg rax)))
+  (movq (int 1) (reg rbx))
+  (movq (int 46) (stack-loc -8))
+  (movq (reg rbx) (stack-loc -16))
+  (addq (int 7) (stack-loc -16))
+  (movq (stack-loc 16) (reg rbx))
+  (addq (int 4) (reg rbx))
+  (movq (stack-loc -16) (stack-loc -16))
+  (addq (stack-loc -8) (stack-loc -16))
+  (movq (stack-loc -16) (reg rax))
+  (subq (reg rbx) (reg rax)))
 \end{lstlisting}
 This program is almost an x86 program. The remaining step is to apply
 the patch instructions pass. In this example, the trivial move of
@@ -1886,9 +1893,9 @@ the patch instructions pass. In this example, the trivial move of
 \key{\%rax}. The following shows the portion of the program that
 changed.
 \begin{lstlisting}
-  (add (int 4) (reg rbx))
-  (mov (stack-loc -8) (reg rax)
-  (add (reg rax) (stack-loc -16))
+  (addq (int 4) (reg rbx))
+  (movq (stack-loc -8) (reg rax)
+  (addq (reg rax) (stack-loc -16))
 \end{lstlisting}
 An overview of all of the passes involved in register allocation is
 shown in Figure~\ref{fig:reg-alloc-passes}.
