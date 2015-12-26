@@ -1308,9 +1308,12 @@ and checking whether the output programs produce the same result as
 the input programs. The $S_0$ programs should be designed to test the
 most interesting parts of the \key{uniquify} pass, that is, the
 programs should include \key{let} constructs, variables, and variables
-that overshadow eachother.  
-
-[to do: explain the test-compiler function and interpret-S0.]
+that overshadow eachother.  The three programs should be in a
+subdirectory named \key{tests} and they shoul have the same file name
+except for a different integer at the end of the name, followed by the
+ending \key{.scm}.  Use the \key{interp-tests} function
+(Appendix~\ref{sec:utilities}) from \key{utilities.rkt} to test your
+\key{uniquify} pass on the example programs.
 
 %% You can use the interpreter \key{interpret-S0} defined in the
 %% \key{interp.rkt} file. The entire sequence of tests should be a short
@@ -1375,8 +1378,9 @@ of \key{flatten}.
 Implement the \key{flatten} pass and test it on all of the example
 programs that you created to test the \key{uniquify} pass and create
 three new example programs that are designed to exercise all of the
-interesting code in the \key{flatten} pass. 
-[to do: add to the test-compiler stuff]
+interesting code in the \key{flatten} pass. Use the \key{interp-tests}
+function (Appendix~\ref{sec:utilities}) from \key{utilities.rkt} to
+test your passes on the example programs.
 \end{exercise}
 
 
@@ -2108,15 +2112,50 @@ $S_1$.
 \section{Utility Functions}
 \label{sec:utilities}
 
+The utility function described in this section can be found in the
+\key{utilities.rkt} file.
+
+The \key{assert} function displays the error message \key{msg} if the
+Boolean \key{bool} is false.
 \begin{lstlisting}
-(define assert
-  (lambda (msg b)
-    (if (not b)
-	(begin
-	  (display "ERROR: ")
-	  (display msg)
-	  (newline))
-	(void))))
+(define (assert msg bool) ...)
+\end{lstlisting}
+
+The interp-tests function takes a compiler name (a string) a
+description of the passes a test family name (a string), and a list of
+test numbers, and runs the compiler passes and the interpreters to
+check whether the passes correct. The description of the passes is a
+list with one entry per pass.  An entry is a list with three things: a
+string giving the name of the pass, the function that implements the
+pass (a translator from AST to AST), and a function that implements
+the interpreter (a function from AST to result value).  This function
+assumes that the subdirectory \key{tests} has a bunch of Scheme
+programs whose names all start with the family name, followed by an
+underscore and then the test number, ending in \key{.scm}. Also, for
+each Scheme program there is a file with the same number except that
+it ends with \key{.in} that provides the input for the Scheme program.
+\begin{lstlisting}
+(define (interp-tests name passes test-family test-nums) ...
+\end{lstlisting}
+
+The compiler-tests function takes a compiler name (a string) a
+description of the passes (see the comment for \key{interp-tests}) a
+test family name (a string), and a list of test numbers (see the
+comment for interp-tests), and runs the compiler to generate x86 (a
+\key{.s} file) and then runs gcc to generate machine code.  It runs
+the machine code and checks that the output is 42.
+\begin{lstlisting}
+(define (compiler-tests name passes test-family test-nums) ...)
+\end{lstlisting}
+
+The compile-file function takes a description of the compiler passes
+(see the comment for \key{interp-tests}) and returns a function that,
+given a program file name (a string ending in \key{.scm}), applies all
+of the passes and writes the output to a file whose name is the same
+as the proram file name but with \key{.scm} replaced with \key{.s}.
+\begin{lstlisting}
+(define (compile-file passes)
+  (lambda (prog-file-name) ...))
 \end{lstlisting}
 
 \bibliographystyle{plainnat}
