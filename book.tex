@@ -738,7 +738,7 @@ test whether it produces programs that get the same result as the
 input program. That is, we can test whether it satisfies Diagram
 \eqref{eq:compile-correct}. The following code runs the partial
 evaluator on several examples and tests the output program.  The
-\texttt{assert} function is defined in Appendix~\ref{sec:utilities}.
+\texttt{assert} function is defined in Appendix~\ref{appendix:utilities}.
 \begin{lstlisting}
 (define (test-pe pe p)
   (assert "testing pe-arith"
@@ -915,7 +915,9 @@ refer to integer constants (called \emph{immediate values}), variables
 called \emph{registers}, and instructions may load and store values
 into \emph{memory}.  Memory is a mapping of 64-bit addresses to 64-bit
 values. Figure~\ref{fig:x86-a} defines the syntax for the subset of
-the x86-64 assembly language needed for this chapter.
+the x86-64 assembly language needed for this chapter.  (We use the
+AT\&T syntax that is expected by \key{gcc}, or rather, the GNU
+assembler inside \key{gcc}.)
 
 An immediate value is written using the notation \key{\$}$n$ where $n$
 is an integer. 
@@ -966,7 +968,7 @@ specified by the label, which we shall use to implement
 \]
 \end{minipage}
 }
-\caption{A subset of the x86-64 assembly language.}
+\caption{A subset of the x86-64 assembly language (AT\&T syntax).}
 \label{fig:x86-a}
 \end{figure}
 
@@ -1085,10 +1087,7 @@ The compiler will need a convenient representation for manipulating
 x86 programs, so we define an abstract syntax for x86 in
 Figure~\ref{fig:x86-ast-a}. The \itm{info} field of the \key{program}
 AST node is for storing auxilliary information that needs to be
-communicated from one step of the compiler to the next. The function
-\key{print-x86} provided in the supplemental code converts an x86
-abstract syntax tree into the text representation for x86
-(Figure~\ref{fig:x86-a}).
+communicated from one step of the compiler to the next. 
 
 \begin{figure}[tbp]
 \fbox{
@@ -1221,21 +1220,21 @@ To get from $C_0$ to x86-64 assembly requires three more steps, which
 we discuss below.
 \[\large
 \xymatrix@=50pt{
-  C_0 \ar@/^/[r]^-{\key{select\_instr.}}
-  & \text{x86}^{*} \ar@/^/[r]^-{\key{assign\_homes}} 
-  & \text{x86}^{*} \ar@/^/[r]^-{\key{patch\_instr.}}
+  C_0 \ar@/^/[r]^-{\key{select-instr.}}
+  & \text{x86}^{*} \ar@/^/[r]^-{\key{assign-homes}} 
+  & \text{x86}^{*} \ar@/^/[r]^-{\key{patch-instr.}}
   & \text{x86}
 }
 \]
 We handle difference \#1, concerning the format of arithmetic
-instructions, in the \key{select\_instructions} pass.  The result
+instructions, in the \key{select-instructions} pass.  The result
 of this pass produces programs consisting of x86-64 instructions that
 use variables.
 %
 As there are only 16 registers, we cannot always map variables to
 registers (difference \#3). Fortunately, the stack can grow quite
 large, so we can map variables to locations on the stack. This is
-handled in the \key{assign\_homes} pass. The topic of
+handled in the \key{assign-homes} pass. The topic of
 Chapter~\ref{ch:register-allocation} is implementing a smarter
 approach in which we make a best-effort to map variables to registers,
 resorting to the stack only when necessary.
@@ -1244,7 +1243,7 @@ The final pass in our journey to x86 handles an indiosycracy of x86
 assembly. Many x86 instructions have two arguments but only one of the
 arguments may be a memory reference. Because we are mapping variables
 to stack locations, many of our generated instructions will violate
-this restriction. The purpose of the \key{patch\_instructions} pass
+this restriction. The purpose of the \key{patch-instructions} pass
 is to fix this problem by replacing every violating instruction with a
 short sequence of instructions that use the \key{rax} register.
 
@@ -1313,7 +1312,7 @@ that overshadow eachother.  The three programs should be in a
 subdirectory named \key{tests} and they shoul have the same file name
 except for a different integer at the end of the name, followed by the
 ending \key{.scm}.  Use the \key{interp-tests} function
-(Appendix~\ref{sec:utilities}) from \key{utilities.rkt} to test your
+(Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to test your
 \key{uniquify} pass on the example programs.
 
 %% You can use the interpreter \key{interpret-S0} defined in the
@@ -1380,7 +1379,7 @@ Implement the \key{flatten} pass and test it on all of the example
 programs that you created to test the \key{uniquify} pass and create
 three new example programs that are designed to exercise all of the
 interesting code in the \key{flatten} pass. Use the \key{interp-tests}
-function (Appendix~\ref{sec:utilities}) from \key{utilities.rkt} to
+function (Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to
 test your passes on the example programs.
 \end{exercise}
 
@@ -1388,11 +1387,11 @@ test your passes on the example programs.
 \section{Select Instructions}
 \label{sec:select-s0}
 
-In the \key{select\_instructions} pass we begin the work of
+In the \key{select-instructions} pass we begin the work of
 translating from $C_0$ to x86. The target language of this pass is a
 pseudo-x86 language that still uses variables, so we add an AST node
 of the form $\VAR{\itm{var}}$ to the x86 abstract syntax.  The
-\key{select\_instructions} pass deals with the differing format of
+\key{select-instructions} pass deals with the differing format of
 arithmetic operations. For example, in $C_0$ an addition operation
 could take the following form:
 \[
@@ -1424,9 +1423,9 @@ procedure.
 \label{sec:assign-s0}
 
 As discussed in Section~\ref{sec:plan-s0-x86}, the
-\key{assign\_homes} pass places all of the variables on the stack.
+\key{assign-homes} pass places all of the variables on the stack.
 Consider again the example $S_0$ program $\BINOP{+}{52}{ \UNIOP{-}{10} }$,
-which after \key{select\_instructions} looks like the following.
+which after \key{select-instructions} looks like the following.
 \[
 \begin{array}{l}
 (\key{movq}\;\INT{10}\; \VAR{x})\\
@@ -1436,7 +1435,7 @@ which after \key{select\_instructions} looks like the following.
 \end{array}
 \]
 The one and only variable $x$ is assigned to stack location
-\key{-8(\%rbp)}, so the \key{assign\_homes} pass translates the
+\key{-8(\%rbp)}, so the \key{assign-homes} pass translates the
 above to
 \[
 \begin{array}{l}
@@ -1463,7 +1462,7 @@ Consider again the following example.
 \[
 \LET{a}{42}{ \LET{b}{a}{ b }}
 \]
-After \key{assign\_homes} pass, the above has been translated to
+After \key{assign-homes} pass, the above has been translated to
 \[
 \begin{array}{l}
 (\key{movq} \;\INT{42}\; \STACKLOC{{-}8})\\
@@ -1490,7 +1489,16 @@ argument must be a register.
 \section{Print x86}
 \label{sec:print-x86}
 
-[To do: talk about printing the AST to x86.]
+The last step of the compiler from $S_0$ to x86-64 is to convert the
+x86-64 AST (defined in Figure~\ref{fig:x86-ast-a}) to the string
+representation (defined in Figure~\ref{fig:x86-a}). The Racket
+\key{format} and \key{string-append} functions are useful in this
+regard. The main work that this step needs to perform is to create the
+\key{\_main} function and the standard instructions for its prelude
+and conclusion, as described in Section~\ref{sec:x86-64}. You need to
+know the number of stack-allocated variables, which is convenient to
+compute in the \key{assign-homes} pass (Section~\ref{sec:assign-s0})
+and then store in the $\itm{info}$ field of the \key{program}.
 
 %% \section{Testing with Interpreters}
 
@@ -1903,11 +1911,11 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \begin{figure}[tbp]
 \[
 \xymatrix{
-  C_0 \ar@/^/[r]^-{\key{select\_instr.}}
-    & \text{x86}^{*} \ar[d]^-{\key{uncover\_live}} \\
-    & \text{x86}^{*} \ar[d]^-{\key{build\_interference}} \\
-    & \text{x86}^{*} \ar[d]_-{\key{allocate\_register}} \\
-    & \text{x86}^{*} \ar@/^/[r]^-{\key{patch\_instr.}} 
+  C_0 \ar@/^/[r]^-{\key{select-instr.}}
+    & \text{x86}^{*} \ar[d]^-{\key{uncover-live}} \\
+    & \text{x86}^{*} \ar[d]^-{\key{build-interference}} \\
+    & \text{x86}^{*} \ar[d]_-{\key{allocate-registers}} \\
+    & \text{x86}^{*} \ar@/^/[r]^-{\key{patch-instr.}} 
     & \text{x86} 
 }
 \]
@@ -2116,8 +2124,19 @@ $S_1$.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Appendix}
 
+\section{Interpreters}
+\label{appendix:interp}
+
+We provide several interpreters in the \key{interp.rkt} file.  The
+\key{interp-scheme} function takes an AST in one of the Racket-like
+languages considered in this book ($S_0, S_1, \ldots$) and interprets
+the program, returning the result value.  The \key{interp-C} function
+interprets an AST for a program in one of the C-like languages ($C_0,
+C_1, \ldots$), and the \key{interp-x86} function interprets an AST for
+an x86 program.
+
 \section{Utility Functions}
-\label{sec:utilities}
+\label{appendix:utilities}
 
 The utility function described in this section can be found in the
 \key{utilities.rkt} file.
@@ -2128,19 +2147,21 @@ Boolean \key{bool} is false.
 (define (assert msg bool) ...)
 \end{lstlisting}
 
-The interp-tests function takes a compiler name (a string) a
+The \key{interp-tests} function takes a compiler name (a string) a
 description of the passes a test family name (a string), and a list of
 test numbers, and runs the compiler passes and the interpreters to
 check whether the passes correct. The description of the passes is a
 list with one entry per pass.  An entry is a list with three things: a
 string giving the name of the pass, the function that implements the
 pass (a translator from AST to AST), and a function that implements
-the interpreter (a function from AST to result value).  This function
-assumes that the subdirectory \key{tests} has a bunch of Scheme
-programs whose names all start with the family name, followed by an
-underscore and then the test number, ending in \key{.scm}. Also, for
-each Scheme program there is a file with the same number except that
-it ends with \key{.in} that provides the input for the Scheme program.
+the interpreter (a function from AST to result value).  The
+interpreters from Appendix~\ref{appendix:interp} make a good choice.
+The \key{interp-tests} function assumes that the subdirectory
+\key{tests} has a bunch of Scheme programs whose names all start with
+the family name, followed by an underscore and then the test number,
+ending in \key{.scm}. Also, for each Scheme program there is a file
+with the same number except that it ends with \key{.in} that provides
+the input for the Scheme program.
 \begin{lstlisting}
 (define (interp-tests name passes test-family test-nums) ...
 \end{lstlisting}
