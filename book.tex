@@ -14,6 +14,7 @@
 \usepackage{xypic}
 \usepackage{semantic}
 \usepackage{wrapfig}
+\usepackage{tikz}
 
 % Computer Modern is already the default. -Jeremy
 %\renewcommand{\ttdefault}{cmtt}
@@ -65,32 +66,7 @@ columns=fullflexible
   {\par\normalfont\hfill--\ \chapquote@author\hspace*{\@tempdima}\par\bigskip}
 \makeatother
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\newcommand{\itm}[1]{\ensuremath{\mathit{#1}}}
-\newcommand{\Stmt}{\itm{stmt}}
-\newcommand{\Exp}{\itm{exp}}
-\newcommand{\Instr}{\itm{instr}}
-\newcommand{\Prog}{\itm{prog}}
-\newcommand{\Arg}{\itm{arg}}
-\newcommand{\Int}{\itm{int}}
-\newcommand{\Var}{\itm{var}}
-\newcommand{\Op}{\itm{op}}
-\newcommand{\key}[1]{\texttt{#1}}
-\newcommand{\READ}{(\key{read})}
-\newcommand{\UNIOP}[2]{(\key{#1}\,#2)}
-\newcommand{\BINOP}[3]{(\key{#1}\,#2\,#3)}
-\newcommand{\LET}[3]{(\key{let}\,([#1\;#2])\,#3)}
-
-\newcommand{\ASSIGN}[2]{(\key{assign}\,#1\;#2)}
-\newcommand{\RETURN}[1]{(\key{return}\,#1)}
-
-\newcommand{\INT}[1]{(\key{int}\;#1)}
-\newcommand{\REG}[1]{(\key{reg}\;#1)}
-\newcommand{\VAR}[1]{(\key{var}\;#1)}
-\newcommand{\STACKLOC}[1]{(\key{stack}\;#1)}
-
-\newcommand{\IF}[3]{(\key{if}\,#1\;#2\;#3)}
+\input{defs}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -184,11 +160,17 @@ represented by the AST on the right.
 \end{minipage}
 \begin{minipage}{0.4\textwidth}
 \begin{equation}
-\xymatrix@=15pt{
-    & *++[Fo]{+} \ar[dl]\ar[dr]& \\
-*+[Fo]{\tt read}  &   & *++[Fo]{-} \ar[d] \\
-    &   & *++[Fo]{\tt 8} 
-} \label{eq:arith-prog}
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+ \node[draw, circle] (plus)  at (0 ,  0) {$+$};
+ \node[draw, circle] (read)  at (-1, -1.5) {$\tt read$};
+ \node[draw, circle] (minus) at (1 , -1.5) {$\text{--}$};
+ \node[draw, circle] (8)     at (1 , -3) {$8$};
+
+ \draw[->] (plus) to (read);
+ \draw[->] (plus) to (minus);
+ \draw[->] (minus) to (8);
+\end{tikzpicture}
+\label{eq:arith-prog}
 \end{equation}
 \end{minipage}
 \end{center}
@@ -255,10 +237,12 @@ rule \eqref{eq:arith-neg}, the following AST is an $\itm{arith}$.
 \end{minipage}
 \begin{minipage}{0.25\textwidth}
 \begin{equation}
-\xymatrix@=15pt{
- *+[Fo]{-} \ar[d] \\
- *+[Fo]{\tt 8} 
-}
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+ \node[draw, circle] (minus) at (0, 0)  {$\text{--}$};
+ \node[draw, circle] (8)     at (0, -1.2) {$8$};
+
+ \draw[->] (minus) to (8);
+\end{tikzpicture}
 \label{eq:arith-neg8}
 \end{equation}
 \end{minipage}
@@ -288,7 +272,7 @@ following vertical bar notation is used to gather several rules on one
 line.  We refer to each clause between a vertical bar as an
 ``alternative''.
 \[
-\itm{arith} ::= \Int \mid (\key{read}) \mid (\key{-} \; \itm{arith}) \mid
+\itm{arith} ::= \Int \mid ({\tt \key{read}}) \mid (\key{-} \; \itm{arith}) \mid
    (\key{+} \; \itm{arith} \; \itm{arith}) 
 \]
 
@@ -669,10 +653,15 @@ into program $P_2$ in language $\mathcal{L}_2$.  Then interpreting
 $P_1$ and $P_2$ on the respective interpreters for the two languages,
 and given the same inputs $i$, should yield the same output $o$.
 \begin{equation} \label{eq:compile-correct}
-\xymatrix@=50pt{
-  P_1 \ar[r]^{compile}\ar[dr]_{\mathcal{L}_1-interp(i)} & P_2 \ar[d]^{\mathcal{L}_2-interp(i)} \\
-   & o
-}
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+ \node (p1) at (0,  0) {$P_1$};
+ \node (p2) at (3,  0) {$P_2$};
+ \node (o)  at (3, -2.5) {o};
+
+ \path[->] (p1) edge [above] node {compile} (p2);
+ \path[->] (p2) edge [right] node {$\mathcal{L}_2$-interp(i)} (o);
+ \path[->] (p1) edge [left]  node {$\mathcal{L}_1$-interp(i)} (o);
+\end{tikzpicture}
 \end{equation}
 In the next section we will see our first example of a compiler, which
 is also be another example of structural recursion.
@@ -761,12 +750,12 @@ into
 \begin{lstlisting}
    (+ 2 (read))
 \end{lstlisting}
-To accomplish this, we recomend that your partial evaluator produce
+To accomplish this, we recommend that your partial evaluator produce
 output that takes the form of the $\itm{residual}$ non-terminal in the
 following grammar.
 \[
 \begin{array}{lcl}
-e &::=& (\key{read}) \mid (\key{-} \;(\key{read})) \mid (\key{+} \;e\; e)\\
+e &::=& (\TTKEY{read}) \mid (\key{-} \;({\tt \TTKEY{read}})) \mid (\key{+} \;e\; e)\\
 \itm{residual} &::=& \Int \mid (\key{+}\; \Int\; e) \mid e
 \end{array}
 \]
@@ -898,11 +887,15 @@ any program $P_1 \in S_0$ into a x86-64 assembly program $P_2$ such
 that the assembly program exhibits the same behavior on an x86
 computer as the $S_0$ program running in a Racket implementation.
 \[
-\xymatrix{
-P_1 \in S_0  \ar[rr]^{\text{compile}} \ar[drr]_{\text{run in Racket}\quad} 
-  &&  P_2 \in \text{x86-64} \ar[d]^{\quad\text{run on an x86 machine}}\\
-& & n \in \mathbb{Z}   
-}
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+ \node (p1) at (0,  0)   {$P_1 \in S_0$};
+ \node (p2) at (4,  0)   {$P_2 \in \text{x86-64}$};
+ \node (o)  at (4, -2) {$n \in \mathbb{Z}$};
+
+ \path[->] (p1) edge [above] node {\footnotesize compile} (p2);
+ \path[->] (p1) edge [left]  node {\footnotesize run in Racket} (o);
+ \path[->] (p2) edge [right] node {\footnotesize run on an x86 machine} (o);
+\end{tikzpicture}
 \]
 In the next section we introduce enough of the x86-64 assembly
 language to compile $S_0$.
@@ -1098,12 +1091,14 @@ communicated from one step of the compiler to the next.
 \Arg &::=&  \INT{\Int} \mid \REG{\itm{register}}
     \mid \STACKLOC{\Int} \\ 
 \Instr &::=& (\key{addq} \; \Arg\; \Arg) \mid 
-      (\key{subq} \; \Arg\; \Arg) \mid 
-      (\key{imulq} \; \Arg\;\Arg) \mid 
-      (\key{negq} \; \Arg) \mid \\
-  && (\key{movq} \; \Arg\; \Arg) \mid 
-      (\key{call} \; \mathit{label}) \mid
-      (\key{pushq}\;\Arg) \mid (\key{popq}\;\Arg) \mid (\key{retq}) \\
+             (\key{subq} \; \Arg\; \Arg) \mid 
+             (\key{imulq} \; \Arg\;\Arg) \mid 
+             (\key{negq} \; \Arg) \\
+      &\mid& (\key{movq} \; \Arg\; \Arg) \mid 
+             (\key{call} \; \mathit{label}) \\
+      &\mid& (\key{pushq}\;\Arg) \mid 
+             (\key{popq}\;\Arg) \mid 
+             (\key{retq}) \\
 \Prog &::= & (\key{program} \;\itm{info} \; \Instr^{+})
 \end{array}
 \]
@@ -1165,11 +1160,17 @@ if it changes the shadowing of variables. However, if we deal with \#4
 first, then it will not be an issue.  Thus, we arrive at the following
 ordering.
 \[
-\xymatrix{
-4 \ar[r] & 2 \ar[r] & 1 \ar[r] & 3
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\foreach \i/\p in {4/1,2/2,1/3,3/4}
+{ 
+  \node (\i) at (\p,0) {$\i$};
 }
+\foreach \x/\y in {4/2,2/1,1/3}
+{
+  \draw[->] (\x) to (\y);
+}
+\end{tikzpicture}
 \]
-
 We further simplify the translation from $S_0$ to x86 by identifying
 an intermediate language named $C_0$, roughly half-way between $S_0$
 and x86, to provide a rest stop along the way. We name the language
@@ -1178,12 +1179,17 @@ language~\citep{Kernighan:1988nx}. The differences \#4 and \#1,
 regarding variables and nested expressions, will be handled by two
 steps, \key{uniquify} and \key{flatten}, which bring us to
 $C_0$.
-\[\large
-\xymatrix@=50pt{
-  S_0 \ar@/^/[r]^-{\key{uniquify}} & 
-  S_0 \ar@/^/[r]^-{\key{flatten}} &
-  C_0 
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\foreach \i/\p in {S_0/1,S_0/2,C_0/3}
+{ 
+  \node (\p) at (\p*3,0) {\large $\i$};
 }
+\foreach \x/\y/\lbl in {1/2/uniquify,2/3/flatten}
+{
+ \path[->,bend left=15] (\x) edge [above] node {\ttfamily\footnotesize \lbl} (\y);
+}
+\end{tikzpicture}
 \]
 Each of these steps in the compiler is implemented by a function,
 typically a structurally recursive function that translates an input
@@ -1218,13 +1224,17 @@ include at least one \key{return} statement.
 
 To get from $C_0$ to x86-64 assembly requires three more steps, which
 we discuss below.
-\[\large
-\xymatrix@=50pt{
-  C_0 \ar@/^/[r]^-{\key{select-instr.}}
-  & \text{x86}^{*} \ar@/^/[r]^-{\key{assign-homes}} 
-  & \text{x86}^{*} \ar@/^/[r]^-{\key{patch-instr.}}
-  & \text{x86}
-}
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (1) at (0,0)  {\large $C_0$};
+\node (2) at (3,0)  {\large $\text{x86}^{*}$};
+\node (3) at (6,0)  {\large $\text{x86}^{*}$};
+\node (4) at (9,0) {\large $\text{x86}$};
+
+\path[->,bend left=15] (1) edge [above] node {\ttfamily\footnotesize select-instr.} (2);
+\path[->,bend left=15] (2) edge [above] node {\ttfamily\footnotesize assign-homes} (3);
+\path[->,bend left=15] (3) edge [above] node {\ttfamily\footnotesize patch-instr.} (4);
+\end{tikzpicture}
 \]
 We handle difference \#1, concerning the format of arithmetic
 instructions, in the \key{select-instructions} pass.  The result
@@ -1693,10 +1703,24 @@ Figure~\ref{fig:interfere}.
 \begin{figure}[tbp]
 \large
 \[
-\xymatrix@=40pt{
-  v \ar@{-}[r] & w \ar@{-}[r]\ar@{-}[d]\ar@{-}[dr] &  x \ar@{-}[dl]\\
-               & y \ar@{-}[r] & z
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (v) at (0,0)   {$v$};
+\node (w) at (2,0)   {$w$};
+\node (x) at (4,0)   {$x$};
+\node (y) at (2,-2)  {$y$};
+\node (z) at (4,-2)  {$z$};
+
+\draw (v) to (w);
+\foreach \i in {w,x,y} 
+{
+  \foreach \j in {w,x,y}
+  { 
+    \draw (\i) to (\j);
+  }
 }
+\draw (z) to (w);
+\draw (z) to (y);
+\end{tikzpicture}
 \]
 \caption{Interference graph for the running example.}
 \label{fig:interfere}
@@ -1812,58 +1836,135 @@ Figure~\ref{fig:interfere}. Initially, all of the nodes are not yet
 colored and they are unsaturated, so we annotate each of them with a
 dash for their color and an empty set for the saturation.
 \[
-\xymatrix{
-  v:-,\{\} \ar@{-}[r] & w:-,\{\} \ar@{-}[r]\ar@{-}[d]\ar@{-}[dr] &  x:-,\{\} \ar@{-}[dl]\\
-               & y:-,\{\} \ar@{-}[r] & z:-,\{\}
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (v) at (0,0)    {$v:-,\{\}$};
+\node (w) at (3,0)    {$w:-,\{\}$};
+\node (x) at (6,0)    {$x:-,\{\}$};
+\node (y) at (3,-1.5) {$y:-,\{\}$};
+\node (z) at (6,-1.5) {$z:-,\{\}$};
+\draw (v) to (w);
+\foreach \i in {w,x,y} 
+{
+  \foreach \j in {w,x,y}
+  { 
+    \draw (\i) to (\j);
+  }
 }
+\draw (z) to (w);
+\draw (z) to (y);
+\end{tikzpicture}
 \]
 We select a maximally saturated node and color it $0$. In this case we
 have a 5-way tie, so we arbitrarily pick $y$. The color $0$ is no
 longer available for $w$, $x$, and $z$ because they interfere with
 $y$.
 \[
-\xymatrix{
-  v:-,\{\} \ar@{-}[r] & w:-,\{0\} \ar@{-}[r]\ar@{-}[d]\ar@{-}[dr] &  x:-,\{0\} \ar@{-}[dl]\\
-               & y:0,\{\} \ar@{-}[r] & z:-,\{0\}
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (v) at (0,0)    {$v:-,\{\}$};
+\node (w) at (3,0)    {$w:-,\{0\}$};
+\node (x) at (6,0)    {$x:-,\{0\}$};
+\node (y) at (3,-1.5) {$y:0,\{\}$};
+\node (z) at (6,-1.5) {$z:-,\{0\}$};
+\draw (v) to (w);
+\foreach \i in {w,x,y} 
+{
+  \foreach \j in {w,x,y}
+  { 
+    \draw (\i) to (\j);
+  }
 }
+\draw (z) to (w);
+\draw (z) to (y);
+\end{tikzpicture}
 \]
 Now we repeat the process, selecting another maximally saturated node.
 This time there is a three-way tie between $w$, $x$, and $z$. We color
 $w$ with $1$.
 \[
-\xymatrix{
-  v:-,\{1\} \ar@{-}[r] & w:1,\{0\} \ar@{-}[r]\ar@{-}[d]\ar@{-}[dr] &  x:-,\{0,1\} \ar@{-}[dl]\\
-               & y:0,\{1\} \ar@{-}[r] & z:-,\{0,1\}
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (v) at (0,0)    {$v:-,\{1\}$};
+\node (w) at (3,0)    {$w:1,\{0\}$};
+\node (x) at (6,0)    {$x:-,\{0,1\}$};
+\node (y) at (3,-1.5) {$y:0,\{1\}$};
+\node (z) at (6,-1.5) {$z:-,\{0,1\}$};
+\draw (v) to (w);
+\foreach \i in {w,x,y} 
+{
+  \foreach \j in {w,x,y}
+  { 
+    \draw (\i) to (\j);
+  }
 }
+\draw (z) to (w);
+\draw (z) to (y);
+\end{tikzpicture}
 \]
 The most saturated nodes are now $x$ and $z$. We color $x$ with the
-next avialable color which is $2$.
+next available color which is $2$.
 \[
-\xymatrix{
-  v:-,\{1\} \ar@{-}[r] & w:1,\{0,2\} \ar@{-}[r]\ar@{-}[d]\ar@{-}[dr] &  x:2,\{0,1\} \ar@{-}[dl]\\
-               & y:0,\{1,2\} \ar@{-}[r] & z:-,\{0,1\}
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (v) at (0,0)    {$v:-,\{1\}$};
+\node (w) at (3,0)    {$w:1,\{0,2\}$};
+\node (x) at (6,0)    {$x:2,\{0,1\}$};
+\node (y) at (3,-1.5) {$y:0,\{1,2\}$};
+\node (z) at (6,-1.5) {$z:-,\{0,1\}$};
+\draw (v) to (w);
+\foreach \i in {w,x,y} 
+{
+  \foreach \j in {w,x,y}
+  { 
+    \draw (\i) to (\j);
+  }
 }
+\draw (z) to (w);
+\draw (z) to (y);
+\end{tikzpicture}
 \]
 We have only two nodes left to color, $v$ and $z$, but $z$ is
-more highly saturaded, so we color $z$ with $2$.
+more highly saturated, so we color $z$ with $2$.
 \[
-\xymatrix{
-  v:-,\{1\} \ar@{-}[r] & w:1,\{0,2\} \ar@{-}[r]\ar@{-}[d]\ar@{-}[dr] &  x:2,\{0,1\} \ar@{-}[dl]\\
-               & y:0,\{1,2\} \ar@{-}[r] & z:2,\{0,1\}
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (v) at (0,0)   {$v:-,\{1\}$};
+\node (w) at (3,0)   {$w:1,\{0,2\}$};
+\node (x) at (6,0)   {$x:2,\{0,1\}$};
+\node (y) at (3,-1.5)  {$y:0,\{1,2\}$};
+\node (z) at (6,-1.5)  {$z:2,\{0,1\}$};
+\draw (v) to (w);
+\foreach \i in {w,x,y} 
+{
+  \foreach \j in {w,x,y}
+  { 
+    \draw (\i) to (\j);
+  }
 }
+\draw (z) to (w);
+\draw (z) to (y);
+\end{tikzpicture}
 \]
 The last iteration of the coloring algorithm assigns color $0$ to $v$.
 \[
-\xymatrix{
-  v:0,\{1\} \ar@{-}[r] & w:1,\{0,2\} \ar@{-}[r]\ar@{-}[d]\ar@{-}[dr] &  x:2,\{0,1\} \ar@{-}[dl]\\
-               & y:0,\{1,2\} \ar@{-}[r] & z:2,\{0,1\}
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (v) at (0,0)   {$v:0,\{1\}$};
+\node (w) at (3,0)   {$w:1,\{0,2\}$};
+\node (x) at (6,0)   {$x:2,\{0,1\}$};
+\node (y) at (3,-1.5)  {$y:0,\{1,2\}$};
+\node (z) at (6,-1.5)  {$z:2,\{0,1\}$};
+\draw (v) to (w);
+\foreach \i in {w,x,y} 
+{
+  \foreach \j in {w,x,y}
+  { 
+    \draw (\i) to (\j);
+  }
 }
+\draw (z) to (w);
+\draw (z) to (y);
+\end{tikzpicture}
 \]
-
 With the coloring complete, we can finalize assignment of variables to
 registers and stack locations. Recall that if we have $k$ registers,
 we map the first $k$ colors to registers and the rest to stack
-lcoations. Suppose for the moment that we just have one extra register
+locations. Suppose for the moment that we just have one extra register
 to use for register allocation, just \key{rbx}. Then the following is
 the mapping of colors to registers and stack allocations.
 \[
@@ -1910,14 +2011,20 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 
 \begin{figure}[tbp]
 \[
-\xymatrix{
-  C_0 \ar@/^/[r]^-{\key{select-instr.}}
-    & \text{x86}^{*} \ar[d]^-{\key{uncover-live}} \\
-    & \text{x86}^{*} \ar[d]^-{\key{build-interference}} \\
-    & \text{x86}^{*} \ar[d]_-{\key{allocate-registers}} \\
-    & \text{x86}^{*} \ar@/^/[r]^-{\key{patch-instr.}} 
-    & \text{x86} 
-}
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (1) at (-2,0)     {$C_0$};
+\node (2)  at (0,0)     {$\text{x86}^{*}$};
+\node (3)  at (0,-1.5)  {$\text{x86}^{*}$};
+\node (4)  at (0,-3)    {$\text{x86}^{*}$};
+\node (5)  at (0,-4.5)  {$\text{x86}^{*}$};
+\node (6)  at (2,-4.5)  {$\text{x86}$};
+
+\path[->,bend left=15] (1) edge [above] node {\ttfamily\scriptsize select-instr.}      (2);
+\path[->,            ] (2) edge [right] node {\ttfamily\scriptsize uncover-live}       (3);
+\path[->,            ] (3) edge [right] node {\ttfamily\scriptsize build-interference} (4);
+\path[->,            ] (4) edge [left]  node {\ttfamily\scriptsize allocate-registers} (5);
+\path[->,bend left=15] (5) edge [above] node {\ttfamily\scriptsize patch-instr.}       (6);
+\end{tikzpicture}
 \]
 \caption{Diagram of the passes for register allocation.}
 \label{fig:reg-alloc-passes}
