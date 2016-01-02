@@ -15,6 +15,7 @@
 \usepackage{semantic}
 \usepackage{wrapfig}
 \usepackage{tikz}
+\usetikzlibrary{arrows}
 
 % Computer Modern is already the default. -Jeremy
 %\renewcommand{\ttdefault}{cmtt}
@@ -78,7 +79,8 @@ columns=fullflexible
   Indiana University \\
   \\
   with contributions from: \\
-  Carl Factora
+  Carl Factora \\
+  Cameron Swords
    }
 
 \begin{document}
@@ -120,13 +122,14 @@ Talk about pre-requisites.
 
 Need to give thanks to 
 \begin{itemize}
+\item Bor-Yuh Evan Chang
 \item Kent Dybvig
 \item Daniel P. Friedman
-\item Abdulaziz Ghuloum
-\item Oscar Waddell
-\item Dipanwita Sarkar
 \item Ronald Garcia
-\item Bor-Yuh Evan Chang
+\item Abdulaziz Ghuloum
+\item Ryan Newton
+\item Dipanwita Sarkar
+\item Oscar Waddell
 \end{itemize}
 
 %\mbox{}\\
@@ -140,9 +143,9 @@ Need to give thanks to
 In this chapter, we review the basic tools that are needed for
 implementing a compiler. We use abstract syntax trees (ASTs) in the
 form of S-expressions to represent programs (Section~\ref{sec:ast})
-and pattern matching to inspect an AST node
+and pattern matching to inspect individual nodes in an AST
 (Section~\ref{sec:pattern-matching}).  We use recursion to construct
-and deconstruct entire ASTs (Section~\ref{sec:recursion}).
+and deconstruct ASTs (Section~\ref{sec:recursion}).
 
 \section{Abstract Syntax Trees}
 \label{sec:ast}
@@ -152,6 +155,7 @@ programs is the \emph{abstract syntax tree} (AST). When considering
 some part of a program, a compiler needs to ask what kind of part it
 is and what sub-parts it has. For example, the program on the left is
 represented by the AST on the right.
+\marginpar{\scriptsize The arrow heads need to be bigger. -JGS}
 \begin{center}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -174,7 +178,7 @@ represented by the AST on the right.
 \end{equation}
 \end{minipage}
 \end{center}
-We shall use the standard terminology for trees: each square above is
+We shall use the standard terminology for trees: each circle above is
 called a \emph{node}. The arrows connect a node to its \emph{children}
 (which are also nodes). The top-most node is the \emph{root}.  Every
 node except for the root has a \emph{parent} (the node it is the child
@@ -182,14 +186,14 @@ of). If a node has no children, it is a \emph{leaf} node.  Otherwise
 it is an \emph{internal} node.
 
 When deciding how to compile the above program, we need to know that
-the root node an addition and that it has two children: \texttt{read}
-and the negation of \texttt{8}. The abstract syntax tree data
-structure directly supports these queries and hence is a good
+the root node operation is addition and that it has two children:
+\texttt{read} and the negation of \texttt{8}. The abstract syntax tree
+data structure directly supports these queries and hence is a good
 choice. In this book, we will often write down the textual
 representation of a program even when we really have in mind the AST,
-simply because the textual representation is easier to typeset.  We
-recommend that, in your mind, you should alway interpret programs as
-abstract syntax trees.
+because the textual representation is more concise.  We recommend
+that, in your mind, you alway interpret programs as abstract syntax
+trees.
 
 \section{Grammars}
 \label{sec:grammar}
@@ -214,7 +218,7 @@ reader already knows what an integer is.) A name such as $\itm{arith}$
 that is defined by the rules, is a \emph{non-terminal}.
 
 The second rule for the $\itm{arith}$ language is the \texttt{read}
-function to receive an input integer from the user of the program.
+operation that receives an input integer from the user of the program.
 \begin{equation}
   \itm{arith} ::= (\key{read}) \label{eq:arith-read}
 \end{equation}
@@ -227,8 +231,10 @@ another arith by negating it.
 Symbols such as \key{-} that play an auxilliary role in the abstract
 syntax are called \emph{terminal} symbols.
 
-By rule \eqref{eq:arith-int}, \texttt{8} is an $\itm{arith}$, then by
-rule \eqref{eq:arith-neg}, the following AST is an $\itm{arith}$.
+We can apply the rules to build ASTs in the $\itm{arith}$
+language. For example, by rule \eqref{eq:arith-int}, \texttt{8} is an
+$\itm{arith}$, then by rule \eqref{eq:arith-neg}, the following AST is
+an $\itm{arith}$.
 \begin{center}
 \begin{minipage}{0.25\textwidth}
 \begin{lstlisting}
@@ -259,18 +265,17 @@ $\itm{arith}$, so we can apply rule \eqref{eq:arith-add} to show that
 \texttt{(+ (read) (- 8))} is in the $\itm{arith}$ language.
 
 If you have an AST for which the above four rules do not apply, then
-the AST is not in $\itm{arith}$. For example, the AST \texttt{(- (read)
-  (+ 8))} is not in $\itm{arith}$ because there are no rules for $+$
-with only one argument, nor for $-$ with two arguments.  Whenever we
-define a language through a grammar, we implicitly mean for the
-language to be the smallest set of programs that are justified by the
-rules. That is, the language only includes those programs that the
-rules allow.
+the AST is not in $\itm{arith}$. For example, the AST \texttt{(-
+  (read) (+ 8))} is not in $\itm{arith}$ because there are no rules
+for \key{+} with only one argument, nor for \key{-} with two
+arguments.  Whenever we define a language with a grammar, we
+implicitly mean for the language to be the smallest set of programs
+that are justified by the rules. That is, the language only includes
+those programs that the rules allow.
 
 It is common to have many rules with the same left-hand side, so the
-following vertical bar notation is used to gather several rules on one
-line.  We refer to each clause between a vertical bar as an
-``alternative''.
+following vertical bar notation is used to gather several rules.  We
+refer to each clause between a vertical bar as an ``alternative''.
 \[
 \itm{arith} ::= \Int \mid ({\tt \key{read}}) \mid (\key{-} \; \itm{arith}) \mid
    (\key{+} \; \itm{arith} \; \itm{arith}) 
@@ -280,13 +285,13 @@ line.  We refer to each clause between a vertical bar as an
 \label{sec:s-expr}
 
 Racket, as a descendant of Lisp~\citep{McCarthy:1960dz}, has
-particularly convenient support for creating and manipulating abstract
-syntax trees with its \emph{symbolic expression} feature, or
-S-expression for short. We can create an S-expression simply by
-writing a backquote followed by the textual representation of the
-AST. (Technically speaking, this is called a \emph{quasiquote} in
-Racket.)  For example, an S-expression to represent the AST
-\eqref{eq:arith-prog} is created by the following Racket expression:
+convenient support for creating and manipulating abstract syntax trees
+with its \emph{symbolic expression} feature, or S-expression for
+short. We can create an S-expression simply by writing a backquote
+followed by the textual representation of the AST. (Technically
+speaking, this is called a \emph{quasiquote} in Racket.)  For example,
+an S-expression to represent the AST \eqref{eq:arith-prog} is created
+by the following Racket expression:
 \begin{center}
 \texttt{`(+ (read) (- 8))}
 \end{center}
@@ -500,10 +505,10 @@ arbitrary S-expression, {\tt sexp}, and determines whether or not {\tt
 one grammar rule for $\itm{arith}$ and the body of each clause makes a
 recursive call for each child node. This pattern of recursive function
 is so common that it has a name, \emph{structural recursion}.  In
-general, when a recursive function is defined using a set of match
-clauses that correspond to a grammar, and each clause body makes a
-recursive call on each child node, then we say the function is defined
-by structural recursion.
+general, when a recursive function is defined using a sequence of
+match clauses that correspond to a grammar, and each clause body makes
+a recursive call on each child node, then we say the function is
+defined by structural recursion.
 
 \begin{center}
 \begin{minipage}{0.7\textwidth}
@@ -589,7 +594,7 @@ by structural recursion.
 
 %% \end{verbatim}
 
-\section{Interpreter}
+\section{Interpreters}
 \label{sec:interp-arith}
 
 The meaning, or semantics, of a program is typically defined in the
@@ -739,6 +744,7 @@ evaluator on several examples and tests the output program.  The
 \end{lstlisting}
 
 \begin{exercise}
+\normalfont % I don't like the italics for exercises. -Jeremy
 We challenge the reader to improve on the simple partial evaluator in
 Figure~\ref{fig:pe-arith} by replacing the \texttt{pe-neg} and
 \texttt{pe-add} helper functions with functions that know more about
@@ -755,7 +761,7 @@ output that takes the form of the $\itm{residual}$ non-terminal in the
 following grammar.
 \[
 \begin{array}{lcl}
-e &::=& (\TTKEY{read}) \mid (\key{-} \;({\tt \TTKEY{read}})) \mid (\key{+} \;e\; e)\\
+e &::=& (\key{read}) \mid (\key{-} \;(\key{read})) \mid (\key{+} \; e \; e)\\
 \itm{residual} &::=& \Int \mid (\key{+}\; \Int\; e) \mid e
 \end{array}
 \]
@@ -1108,7 +1114,7 @@ communicated from one step of the compiler to the next.
 \label{fig:x86-ast-a}
 \end{figure}
 
-\section{From $S_0$ to x86-64 via $C_0$}
+\section{Planning the trip from $S_0$ to x86-64}
 \label{sec:plan-s0-x86}
 
 To compile one language to another it helps to focus on the
@@ -1289,6 +1295,7 @@ it to different expressions, as in the last clause for primitive
 operations in Figure~\ref{fig:uniquify-s0}.
 
 \begin{exercise}
+\normalfont % I don't like the italics for exercises. -Jeremy
 Complete the \key{uniquify} pass by filling in the blanks, that is,
 implement the clauses for variables and for the \key{let} construct.
 \end{exercise}
@@ -1313,6 +1320,7 @@ implement the clauses for variables and for the \key{let} construct.
 \end{figure}
 
 \begin{exercise}
+\normalfont % I don't like the italics for exercises. -Jeremy
 Test your \key{uniquify} pass by creating three example $S_0$ programs
 and checking whether the output programs produce the same result as
 the input programs. The $S_0$ programs should be designed to test the
@@ -1322,8 +1330,8 @@ that overshadow eachother.  The three programs should be in a
 subdirectory named \key{tests} and they shoul have the same file name
 except for a different integer at the end of the name, followed by the
 ending \key{.scm}.  Use the \key{interp-tests} function
-(Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to test your
-\key{uniquify} pass on the example programs.
+(Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to test
+your \key{uniquify} pass on the example programs.
 
 %% You can use the interpreter \key{interpret-S0} defined in the
 %% \key{interp.rkt} file. The entire sequence of tests should be a short
@@ -1385,6 +1393,7 @@ of \key{flatten}.
 \]
 
 \begin{exercise}
+\normalfont
 Implement the \key{flatten} pass and test it on all of the example
 programs that you created to test the \key{uniquify} pass and create
 three new example programs that are designed to exercise all of the
@@ -1496,7 +1505,7 @@ follows.
 The \key{imulq} instruction is a special case because the destination
 argument must be a register.
 
-\section{Print x86}
+\section{Print x86-64}
 \label{sec:print-x86}
 
 The last step of the compiler from $S_0$ to x86-64 is to convert the
@@ -1532,7 +1541,7 @@ and then store in the $\itm{info}$ field of the \key{program}.
 \chapter{Register Allocation}
 \label{ch:register-allocation}
 
-In Chapter~\ref{ch:int-exp} we simplified the generation of x86
+In Chapter~\ref{ch:int-exp} we simplified the generation of x86-64
 assembly by placing all variables on the stack. We can improve the
 performance of the generated code considerably if we instead try to
 place as many variables as possible into registers.  The CPU can
@@ -1541,7 +1550,7 @@ take from several cycles (to go to cache) to hundreds of cycles (to go
 to main memory).  Figure~\ref{fig:reg-eg} shows a program with four
 variables that serves as a running example. We show the source program
 and also the output of instruction selection. At that point the
-program is almost x86 assembly but not quite; it still contains
+program is almost x86-64 assembly but not quite; it still contains
 variables instead of stack locations or registers.
 
 \begin{figure}
@@ -1995,7 +2004,7 @@ Applying this assignment to our running example
   (movq (stack-loc -16) (reg rax))
   (subq (reg rbx) (reg rax)))
 \end{lstlisting}
-This program is almost an x86 program. The remaining step is to apply
+This program is almost an x86-64 program. The remaining step is to apply
 the patch instructions pass. In this example, the trivial move of
 \key{-16(\%rbp)} to itself is deleted and the addition of
 \key{-8(\%rbp)} to \key{-16(\%rbp)} is fixed by going through
@@ -2013,11 +2022,11 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (1) at (-2,0)     {$C_0$};
-\node (2)  at (0,0)     {$\text{x86}^{*}$};
-\node (3)  at (0,-1.5)  {$\text{x86}^{*}$};
-\node (4)  at (0,-3)    {$\text{x86}^{*}$};
-\node (5)  at (0,-4.5)  {$\text{x86}^{*}$};
-\node (6)  at (2,-4.5)  {$\text{x86}$};
+\node (2)  at (0,0)     {$\text{x86-64}^{*}$};
+\node (3)  at (0,-1.5)  {$\text{x86-64}^{*}$};
+\node (4)  at (0,-3)    {$\text{x86-64}^{*}$};
+\node (5)  at (0,-4.5)  {$\text{x86-64}^{*}$};
+\node (6)  at (2,-4.5)  {$\text{x86-64}$};
 
 \path[->,bend left=15] (1) edge [above] node {\ttfamily\scriptsize select-instr.}      (2);
 \path[->,            ] (2) edge [right] node {\ttfamily\scriptsize uncover-live}       (3);
@@ -2240,7 +2249,7 @@ languages considered in this book ($S_0, S_1, \ldots$) and interprets
 the program, returning the result value.  The \key{interp-C} function
 interprets an AST for a program in one of the C-like languages ($C_0,
 C_1, \ldots$), and the \key{interp-x86} function interprets an AST for
-an x86 program.
+an x86-64 program.
 
 \section{Utility Functions}
 \label{appendix:utilities}
@@ -2276,7 +2285,7 @@ the input for the Scheme program.
 The compiler-tests function takes a compiler name (a string) a
 description of the passes (see the comment for \key{interp-tests}) a
 test family name (a string), and a list of test numbers (see the
-comment for interp-tests), and runs the compiler to generate x86 (a
+comment for interp-tests), and runs the compiler to generate x86-64 (a
 \key{.s} file) and then runs gcc to generate machine code.  It runs
 the machine code and checks that the output is 42.
 \begin{lstlisting}
