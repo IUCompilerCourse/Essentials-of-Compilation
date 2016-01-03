@@ -14,8 +14,11 @@
 \usepackage{xypic}
 \usepackage{semantic}
 \usepackage{wrapfig}
+
+%% For pictures
 \usepackage{tikz}
-\usetikzlibrary{arrows}
+\usetikzlibrary{arrows.meta}
+\tikzset{baseline=(current bounding box.center), >/.tip={Triangle[scale=1.4]}}
 
 % Computer Modern is already the default. -Jeremy
 %\renewcommand{\ttdefault}{cmtt}
@@ -155,7 +158,6 @@ programs is the \emph{abstract syntax tree} (AST). When considering
 some part of a program, a compiler needs to ask what kind of part it
 is and what sub-parts it has. For example, the program on the left is
 represented by the AST on the right.
-\marginpar{\scriptsize The arrow heads need to be bigger. -JGS}
 \begin{center}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -164,7 +166,7 @@ represented by the AST on the right.
 \end{minipage}
 \begin{minipage}{0.4\textwidth}
 \begin{equation}
-\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\begin{tikzpicture}
  \node[draw, circle] (plus)  at (0 ,  0) {$+$};
  \node[draw, circle] (read)  at (-1, -1.5) {$\tt read$};
  \node[draw, circle] (minus) at (1 , -1.5) {$\text{--}$};
@@ -243,7 +245,7 @@ an $\itm{arith}$.
 \end{minipage}
 \begin{minipage}{0.25\textwidth}
 \begin{equation}
-\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\begin{tikzpicture}
  \node[draw, circle] (minus) at (0, 0)  {$\text{--}$};
  \node[draw, circle] (8)     at (0, -1.2) {$8$};
 
@@ -1255,6 +1257,11 @@ Chapter~\ref{ch:register-allocation} is implementing a smarter
 approach in which we make a best-effort to map variables to registers,
 resorting to the stack only when necessary.
 
+\marginpar{\scriptsize I'm confused: shouldn't `select instructions' do this?
+After all, that selects the x86-64 instructions. Even if it is separate,
+if we perform `patching' before register allocation, we aren't forced to rely on
+\key{rax} as much. This can ultimately make a more-performant result. --
+Cam}
 The final pass in our journey to x86 handles an indiosycracy of x86
 assembly. Many x86 instructions have two arguments but only one of the
 arguments may be a memory reference. Because we are mapping variables
@@ -1838,7 +1845,6 @@ while @$W \neq \emptyset$@ do
   \label{fig:satur-algo}
 \end{figure}
 
-
 With this algorithm in hand, let us return to the running example and
 consider how to color the interference graph in
 Figure~\ref{fig:interfere}. Initially, all of the nodes are not yet
@@ -1973,7 +1979,8 @@ The last iteration of the coloring algorithm assigns color $0$ to $v$.
 With the coloring complete, we can finalize assignment of variables to
 registers and stack locations. Recall that if we have $k$ registers,
 we map the first $k$ colors to registers and the rest to stack
-locations. Suppose for the moment that we just have one extra register
+locations.
+Suppose for the moment that we just have one extra register
 to use for register allocation, just \key{rbx}. Then the following is
 the mapping of colors to registers and stack allocations.
 \[
@@ -2021,18 +2028,18 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \begin{figure}[tbp]
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (1) at (-2,0)     {$C_0$};
+\node (1) at (-3.5,0)     {$C_0$};
 \node (2)  at (0,0)     {$\text{x86-64}^{*}$};
 \node (3)  at (0,-1.5)  {$\text{x86-64}^{*}$};
 \node (4)  at (0,-3)    {$\text{x86-64}^{*}$};
 \node (5)  at (0,-4.5)  {$\text{x86-64}^{*}$};
-\node (6)  at (2,-4.5)  {$\text{x86-64}$};
+\node (6)  at (3.5,-4.5)  {$\text{x86-64}$};
 
-\path[->,bend left=15] (1) edge [above] node {\ttfamily\scriptsize select-instr.}      (2);
-\path[->,            ] (2) edge [right] node {\ttfamily\scriptsize uncover-live}       (3);
-\path[->,            ] (3) edge [right] node {\ttfamily\scriptsize build-interference} (4);
-\path[->,            ] (4) edge [left]  node {\ttfamily\scriptsize allocate-registers} (5);
-\path[->,bend left=15] (5) edge [above] node {\ttfamily\scriptsize patch-instr.}       (6);
+\path[->] (1) edge [above] node {\ttfamily\scriptsize select-instr.}      (2);
+\path[->] (2) edge [right] node {\ttfamily\scriptsize uncover-live}       (3);
+\path[->] (3) edge [right] node {\ttfamily\scriptsize build-interference} (4);
+\path[->] (4) edge [left]  node {\ttfamily\scriptsize allocate-registers} (5);
+\path[->] (5) edge [above] node {\ttfamily\scriptsize patch-instr.}       (6);
 \end{tikzpicture}
 \]
 \caption{Diagram of the passes for register allocation.}
@@ -2066,6 +2073,7 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 
 \section{Type Checking $S_1$ Programs}
 
+\marginpar{\scriptsize Type checking is a difficult thing to cover, I think, without having 522 as a prerequisite for this course. -- Cam}
 % T ::= Integer | Boolean
 
 It is common practice to specify a type system by writing rules for
