@@ -1,4 +1,4 @@
-\documentclass[12pt]{book}
+\documentclass[11pt]{book}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
@@ -803,8 +803,7 @@ called \emph{registers}, and instructions may load and store values
 into \emph{memory}.  Memory is a mapping of 64-bit addresses to 64-bit
 values. Figure~\ref{fig:x86-a} defines the syntax for the subset of
 the x86-64 assembly language needed for this chapter.  (We use the
-AT\&T syntax that is expected by \key{gcc}, or rather, the GNU
-assembler inside \key{gcc}.)
+AT\&T syntax that is expected by the GNU assembler inside \key{gcc}.)
 
 An immediate value is written using the notation \key{\$}$n$ where $n$
 is an integer. 
@@ -836,18 +835,17 @@ specified by the label, which we shall use to implement
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-\itm{register} &::=& \key{rsp} \mid \key{rbp} \mid \key{rax} \mid \key{rbx} \mid \key{rcx}
+\Reg &::=& \key{rsp} \mid \key{rbp} \mid \key{rax} \mid \key{rbx} \mid \key{rcx}
               \mid \key{rdx} \mid \key{rsi} \mid \key{rdi} \mid \\
               && \key{r8} \mid \key{r9} \mid \key{r10}
               \mid \key{r11} \mid \key{r12} \mid \key{r13}
               \mid \key{r14} \mid \key{r15} \\
-\Arg &::=&  \key{\$}\Int \mid \key{\%}\itm{register} \mid \Int(\key{\%}\itm{register}) \\ 
+\Arg &::=&  \key{\$}\Int \mid \key{\%}\Reg \mid \Int(\key{\%}\Reg) \\ 
 \Instr &::=& \key{addq} \; \Arg, \Arg \mid 
       \key{subq} \; \Arg, \Arg \mid 
 %      \key{imulq} \; \Arg,\Arg \mid 
-      \key{negq} \; \Arg \mid \\
-  && \key{movq} \; \Arg, \Arg \mid 
-      \key{callq} \; \mathit{label} \mid
+      \key{negq} \; \Arg \mid \key{movq} \; \Arg, \Arg \mid \\
+  &&  \key{callq} \; \mathit{label} \mid
       \key{pushq}\;\Arg \mid \key{popq}\;\Arg \mid \key{retq} \\
 \Prog &::= & \key{.globl \_main}\\
       &    & \key{\_main:} \; \Instr^{+}
@@ -987,10 +985,9 @@ communicated from one step of the compiler to the next.
 \Instr &::=& (\key{addq} \; \Arg\; \Arg) \mid 
              (\key{subq} \; \Arg\; \Arg) \mid 
 %             (\key{imulq} \; \Arg\;\Arg) \mid 
-             (\key{negq} \; \Arg) \\
-      &\mid& (\key{movq} \; \Arg\; \Arg) \mid 
-             (\key{call} \; \mathit{label}) \\
-      &\mid& (\key{pushq}\;\Arg) \mid 
+             (\key{negq} \; \Arg) \mid (\key{movq} \; \Arg\; \Arg) \\
+      &\mid& (\key{call} \; \mathit{label}) \mid
+             (\key{pushq}\;\Arg) \mid 
              (\key{popq}\;\Arg) \mid 
              (\key{retq}) \\
 \Prog &::= & (\key{program} \;\itm{info} \; \Instr^{+})
@@ -1057,7 +1054,7 @@ ordering.
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \foreach \i/\p in {4/1,2/2,1/3,3/4}
 { 
-  \node (\i) at (\p,0) {$\i$};
+  \node (\i) at (\p*1.5,0) {$\i$};
 }
 \foreach \x/\y in {4/2,2/1,1/3}
 {
@@ -1116,8 +1113,21 @@ include at least one \key{return} statement.
 \end{figure}
 
 
-To get from $C_0$ to x86-64 assembly requires three more steps, which
-we discuss below.
+To get from $C_0$ to x86-64 assembly it remains to handle difference
+\#1 (the format of instructions) and difference \#3 (variables versus
+registers). These two differences are intertwined, creating a bit of a
+Gordian Knot. To handle difference \#3, we need to map some variables
+to registers (there are only 16 registers) and the remaining variables
+to locations on the stack (which is unbounded). To make good decisions
+regarding this mapping, we need the program to be close to its final
+form (in x86-64 assembly) so we know exactly when which variables are
+used.  However, the choice of x86-64 instruction depends on whether
+the arguments are registers or stack locations, so we have a circular
+dependency. We cut this knot by doing an optimistic selection of
+instructions in the \key{select-instructions} pass, followed by the
+\key{assign-homes} pass to map variables to registers or stack
+locations, and conclude by finalizing the instruction selection in the
+\key{patch-instructions} pass.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (1) at (0,0)  {\large $C_0$};
@@ -1130,31 +1140,39 @@ we discuss below.
 \path[->,bend left=15] (3) edge [above] node {\ttfamily\footnotesize patch-instr.} (4);
 \end{tikzpicture}
 \]
-We handle difference \#1, concerning the format of arithmetic
-instructions, in the \key{select-instructions} pass.  The result
-of this pass produces programs consisting of x86-64 instructions that
-use variables.
-%
-As there are only 16 registers, we cannot always map variables to
-registers (difference \#3). Fortunately, the stack can grow quite
-large, so we can map variables to locations on the stack. This is
-handled in the \key{assign-homes} pass. The topic of
-Chapter~\ref{ch:register-allocation} is implementing a smarter
-approach in which we make a best-effort to map variables to registers,
-resorting to the stack only when necessary.
 
-\marginpar{\scriptsize I'm confused: shouldn't `select instructions' do this?
-After all, that selects the x86-64 instructions. Even if it is separate,
-if we perform `patching' before register allocation, we aren't forced to rely on
-\key{rax} as much. This can ultimately make a more-performant result. --
-Cam}
-The final pass in our journey to x86 handles an indiosycracy of x86
+The \key{select-instructions} pass is optimistic in the sense that it
+treats variables as if they were all mapped to registers. The
+\key{select-instructions} pass generates a program that consists of
+x86-64 instructions but that still use variables, so it is an
+intermediate language that is technically different than x86-64, which
+explains the astericks in the diagram above.
+
+In this Chapter we shall take the easy road to implementing
+\key{assign-homes} and simply map all variables to stack locations.
+The topic of Chapter~\ref{ch:register-allocation} is implementing a
+smarter approach in which we make a best-effort to map variables to
+registers, resorting to the stack only when necessary.
+
+%% \marginpar{\scriptsize I'm confused: shouldn't `select instructions' do this?
+%% After all, that selects the x86-64 instructions. Even if it is separate,
+%% if we perform `patching' before register allocation, we aren't forced to rely on
+%% \key{rax} as much. This can ultimately make a more-performant result. --
+%% Cam}
+
+
+Once variables have been assigned to their homes, we can finalize the
+instruction selection by dealing with an indiosycracy of x86
 assembly. Many x86 instructions have two arguments but only one of the
-arguments may be a memory reference. Because we are mapping variables
-to stack locations, many of our generated instructions will violate
-this restriction. The purpose of the \key{patch-instructions} pass
-is to fix this problem by replacing every violating instruction with a
-short sequence of instructions that use the \key{rax} register.
+arguments may be a memory reference (the stack is a part of memory).
+Because some variables may get mapped to stack locations, some of our
+generated instructions may violate this restriction.  The purpose of
+the \key{patch-instructions} pass is to fix this problem by replacing
+every violating instruction with a short sequence of instructions that
+use the \key{rax} register. Once we have implemented a good register
+allocator (Chapter~\ref{ch:register-allocation}), the need to patch
+instructions will be relatively rare.
+
 
 \section{Uniquify Variables}
 \label{sec:uniquify-s0}
