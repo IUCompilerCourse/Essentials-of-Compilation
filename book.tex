@@ -206,37 +206,42 @@ programs), so one cannot simply describe a language by listing all of
 the programs in the language. Instead we write down a set of rules, a
 \emph{grammar}, for building programs. We shall write our rules in a
 variant of Backus-Naur Form (BNF)~\citep{Backus:1960aa,Knuth:1964aa}.
-As an example, we describe a small language, named $\itm{arith}$, of
+As an example, we describe a small language, named $R_0$, of
 integers and arithmetic operations. The first rule says that any
 integer is in the language:
 \begin{equation}
-\itm{arith} ::= \Int  \label{eq:arith-int}
+R_0 ::= \Int  \label{eq:arith-int}
 \end{equation}
 Each rule has a left-hand-side and a right-hand-side. The way to read
 a rule is that if you have all the program parts on the
 right-hand-side, then you can create and AST node and categorize it
 according to the left-hand-side. (We do not define $\Int$ because the
-reader already knows what an integer is.) A name such as $\itm{arith}$
+reader already knows what an integer is.) A name such as $R_0$
 that is defined by the rules, is a \emph{non-terminal}.
+We make the
+simplifying design decision that all of the languages in this book
+only handle machine-representable integers (those representable with
+64-bits, i.e., the range $-2^{63}$ to $2^{63}$) which corresponds to
+the \texttt{fixnum} datatype in Racket.
 
-The second rule for the $\itm{arith}$ language is the \texttt{read}
+The second rule for the $R_0$ language is the \texttt{read}
 operation that receives an input integer from the user of the program.
 \begin{equation}
-  \itm{arith} ::= (\key{read}) \label{eq:arith-read}
+  R_0 ::= (\key{read}) \label{eq:arith-read}
 \end{equation}
 
-The third rule says that, given an $\itm{arith}$, you can build
+The third rule says that, given an $R_0$, you can build
 another arith by negating it.
 \begin{equation}
-  \itm{arith} ::= (\key{-} \; \itm{arith})  \label{eq:arith-neg}
+  R_0 ::= (\key{-} \; R_0)  \label{eq:arith-neg}
 \end{equation}
-Symbols such as \key{-} that play an auxilliary role in the abstract
-syntax are called \emph{terminal} symbols.
+Symbols such as \key{-} in typewriter font are \emph{terminal} symbols
+and must appear literally in any program constructed with this rule.
 
-We can apply the rules to build ASTs in the $\itm{arith}$
+We can apply the rules to build ASTs in the $R_0$
 language. For example, by rule \eqref{eq:arith-int}, \texttt{8} is an
-$\itm{arith}$, then by rule \eqref{eq:arith-neg}, the following AST is
-an $\itm{arith}$.
+$R_0$, then by rule \eqref{eq:arith-neg}, the following AST is
+an $R_0$.
 \begin{center}
 \begin{minipage}{0.25\textwidth}
 \begin{lstlisting}
@@ -256,32 +261,42 @@ an $\itm{arith}$.
 \end{minipage}
 \end{center}
 
-The last rule for the $\itm{arith}$ language is for addition:
+The last rule for the $R_0$ language is for addition:
 \begin{equation}
-  \itm{arith} ::= (\key{+} \; \itm{arith} \; \itm{arith}) \label{eq:arith-add}
+  R_0 ::= (\key{+} \; R_0 \; R_0) \label{eq:arith-add}
 \end{equation}
-Now we can see that the AST \eqref{eq:arith-prog} is in $\itm{arith}$.
-We know that \lstinline{(read)} is in $\itm{arith}$ by rule
+Now we can see that the AST \eqref{eq:arith-prog} is in $R_0$.
+We know that \lstinline{(read)} is in $R_0$ by rule
 \eqref{eq:arith-read} and we have shown that \texttt{(- 8)} is in
-$\itm{arith}$, so we can apply rule \eqref{eq:arith-add} to show that
-\texttt{(+ (read) (- 8))} is in the $\itm{arith}$ language.
+$R_0$, so we can apply rule \eqref{eq:arith-add} to show that
+\texttt{(+ (read) (- 8))} is in the $R_0$ language.
 
 If you have an AST for which the above four rules do not apply, then
-the AST is not in $\itm{arith}$. For example, the AST \texttt{(-
-  (read) (+ 8))} is not in $\itm{arith}$ because there are no rules
+the AST is not in $R_0$. For example, the AST \texttt{(-
+  (read) (+ 8))} is not in $R_0$ because there are no rules
 for \key{+} with only one argument, nor for \key{-} with two
 arguments.  Whenever we define a language with a grammar, we
 implicitly mean for the language to be the smallest set of programs
 that are justified by the rules. That is, the language only includes
 those programs that the rules allow.
 
-It is common to have many rules with the same left-hand side, so the
-following vertical bar notation is used to gather several rules.  We
-refer to each clause between a vertical bar as an ``alternative''.
+It is common to have many rules with the same left-hand side, so there
+is a vertical bar notation for gathering several rules, as shown in
+Figure~\ref{fig:r0-syntax}. Each clause between a vertical bar is
+called an ``alternative''.
+
+\begin{figure}[tbp]
+\fbox{
+\begin{minipage}{\textwidth}
 \[
-\itm{arith} ::= \Int \mid ({\tt \key{read}}) \mid (\key{-} \; \itm{arith}) \mid
-   (\key{+} \; \itm{arith} \; \itm{arith}) 
+R_0 ::= \Int \mid ({\tt \key{read}}) \mid (\key{-} \; R_0) \mid
+   (\key{+} \; R_0 \; R_0) 
 \]
+\end{minipage}
+}
+\caption{The syntax of the $R_0$ language.}
+\label{fig:r0-syntax}
+\end{figure}
 
 \section{S-Expressions}
 \label{sec:s-expr}
@@ -349,7 +364,7 @@ that may contain pattern-variables (preceded by a comma).  The body
 may contain any Racket code.
 
 A \texttt{match} form may contain several clauses, as in the following
-function \texttt{leaf?} that recognizes when an $\itm{arith}$ node is
+function \texttt{leaf?} that recognizes when an $R_0$ node is
 a leaf. The \texttt{match} proceeds through the clauses in order,
 checking whether the pattern can match the input S-expression. The
 body of the first clause that matches is executed. The output of
@@ -389,122 +404,16 @@ S-expression to see if it is a machine-representable integer.
 \end{center}
 
 
-%% From this grammar, we have defined {\tt arith} by constraining its
-%% syntax.  Effectively, we have defined {\tt arith} by first defining
-%% what a legal expression (or program) within the language is. To
-%% clarify further, we can think of {\tt arith} as a \textit{set} of
-%% expressions, where, under syntax constraints, \mbox{{\tt (+ 1 1)}} and
-%% {\tt -1} are inhabitants and {\tt (+ 3.2 3)} and {\tt (++ 2 2)} are
-%% not (see ~Figure\ref{fig:ast}).
-
-%% The relationship between a grammar and an AST is then similar to that
-%% of a set and an inhabitant. From this, every syntaxically valid
-%% expression, under the constraints of a grammar, can be represented by
-%% an abstract syntax tree. This is because {\tt arith} is essentially a
-%% specification of a Tree-like data-structure. In this case, tree nodes
-%% are the arithmetic operators {\tt +} and {\tt -}, and the leaves are
-%% integer constants. From this, we can represent any expression of {\tt
-%%   arith} using a \textit{syntax expression} (s-exp).
-
-%% \begin{figure}[htbp]
-%% \centering
-%% \fbox{
-%% \begin{minipage}{0.85\textwidth}
-%% \[
-%% \begin{array}{lcl}
-%%   exp  &::=& sexp \mid (sexp*) \mid (unquote \; sexp)  \\
-%%   sexp &::=& Val \mid Var \mid (quote \; exp) \mid (quasiquote \; exp)
-%% \end{array}
-%% \]
-%% \end{minipage}
-%% }
-%% \caption{\textit{s-exp} syntax: $Val$ and $Var$ are shorthand for Value and Variable.}
-%% \label{fig:sexp-syntax}
-%% \end{figure}
-
-%% For our purposes, we will treat s-exps equivalent to \textit{possibly
-%%   deeply-nested lists}. For the sake of brevity, the symbols $single$
-%% $quote$ ('), $backquote$ (`), and $comma$ (,) are reader sugar for
-%% {\tt quote}, {\tt quasiquote}, and {\tt unquote}. We provide several
-%% examples of s-exps and functions that return s-exps below. We use the
-%% {\tt >} symbol to represent interaction with a Racket REPL.
-%% \begin{verbatim}
-%% (define 1plus1 `(1 + 1))
-%% (define (1plusX x) `(1 + ,x))
-%% (define (XplusY x y) `(,x + ,y))
-
-%% > 1plus1
-%% '(1 + 1)
-%% > (1plusX 1)
-%% '(1 + 1)
-%% > (XplusY 1 1)
-%% '(1 + 1)
-%% > `,1plus1
-%% '(1 + 1)
-%% \end{verbatim}
-%% In any expression wrapped with {\tt quasiquote} ({\tt `}), sub-expressions
-%% wrapped with an {\tt unquote} expression are evaluated before the entire 
-%% expression is returned wrapped in a {\tt quote} expression.
-
-% \marginpar{\scriptsize Introduce s-expressions, quote, and quasi-quote, and comma in
-%   this section. Make sure to include examples of ASTs. The description
-%   here of grammars is incomplete. It doesn't really say what grammars are or what they do, it
-%   just shows an example. I would recommend reading my blog post: a crash course on
-%   notation in PL theory, especially the sections on Definition by Rules
-%   and Language Syntax and Grammars. -JGS}
-% \marginpar{\scriptsize The lambda calculus is more complex of an example that what we really
-%   need at this point. I think we can make due with just integers and arithmetic. -JGS}
-% \marginpar{\scriptsize Regarding de-Bruijnizing as an example... that strikes me
-%   as something that may be foreign to many readers. The examples in this
-%   first chapter should try to be simple and hopefully connect with things
-%   that the reader is already familiar with. -JGS}
-
-
-% \begin{enumerate}
-% \item Syntax transformation
-% \item Some Racket examples (factorial?)
-% \end{enumerate}
-
-%% For our purposes, our compiler will take a Scheme-like expression and
-%% transform it to X86\_64 Assembly. Along the way, we transform each
-%% input expression into a handful of \textit{intermediary languages}
-%% (IL).  A key tool for transforming one language into another is
-%% \textit{pattern matching}.
-
-%% Racket provides a built-in pattern-matcher, {\tt match}, that we can
-%% use to perform operations on s-exps. As a preliminary example, we
-%% include a familiar definition of factorial, first without using match.
-%% \begin{verbatim}
-%% (define (! n)
-%%   (if (zero? n) 1
-%%       (* n (! (sub1 n)))))
-%% \end{verbatim}
-%% In this form of factorial, we are simply conditioning (viz. {\tt zero?})
-%% on the inputted natural number, {\tt n}. If we rewrite factorial using 
-%% {\tt match}, we can match on the actual value of {\tt n}.
-%% \begin{verbatim}
-%% (define (! n)
-%%   (match n
-%%     (0 1)
-%%     (n (* n (! (sub1 n))))))
-%% \end{verbatim}
-%% In this definition of factorial, the first {\tt match} line (viz. {\tt (0 1)})
-%% can be read as "if {\tt n} is 0, then return 1." The second line matches on an
-%% arbitrary variable, {\tt n}, and does not place any constraints on it. We could
-%% have also written this line as {\tt (else (* n (! (sub1 n))))}, where {\tt n}
-%% is scoped by {\tt match}. Of course, we can also use {\tt match} to pattern
-%% match on more complex expressions.
-
 \section{Recursion}
 \label{sec:recursion}
 
-Programs are inherently recursive in that an $\itm{arith}$ AST is made
-up of smaller $\itm{arith}$ ASTs. Thus, the natural way to process in
+Programs are inherently recursive in that an $R_0$ AST is made
+up of smaller $R_0$ ASTs. Thus, the natural way to process in
 entire program is with a recursive function.  As a first example of
 such a function, we define \texttt{arith?} below, which takes an
 arbitrary S-expression, {\tt sexp}, and determines whether or not {\tt
   sexp} is in {\tt arith}. Note that each match clause corresponds to
-one grammar rule for $\itm{arith}$ and the body of each clause makes a
+one grammar rule for $R_0$ and the body of each clause makes a
 recursive call for each child node. This pattern of recursive function
 is so common that it has a name, \emph{structural recursion}.  In
 general, when a recursive function is defined using a sequence of
@@ -547,57 +456,8 @@ defined by structural recursion.
 
 
 
-
-%% Here, {\tt \#:when} puts constraints on the value of matched expressions.
-%% In this case, we make sure that every sub-expression in \textit{op} position
-%% is either {\tt +} or {\tt -}. Otherwise, we return an error, signaling a
-%% non-{\tt arith} expression. As we mentioned earlier, every expression 
-%% wrapped in an {\tt unquote} is evaluated first. When used in a LHS {\tt match}
-%% sub-expression, these expressions evaluate to the actual value of the matched
-%% expression (i.e., {\tt arith-exp}). Thus, {\tt `(,e1 ,op ,e2)} and 
-%% {\tt `(e1 op e2)} are not equivalent.
-
-
-% \begin{enumerate}
-% \item \textit{What is a base case?}
-% \item Using on a language (lambda calculus -> 
-% \end{enumerate}
-%% Before getting into more complex {\tt match} examples, we first
-%% introduce the concept of \textit{structural recursion}, which is the
-%% general name for recurring over Tree-like or \textit{possibly
-%%   deeply-nested list} structures.  The key to performing structural
-%% recursion, which from now on we refer to simply as recursion, is to
-%% have some form of specification for the structure we are recurring
-%% on. Luckily, we are already familiar with one: a BNF or grammar.
-
-%% For example, let's take the grammar for $S_0$, which we include below. 
-%% Writing a recursive program that takes an arbitrary expression of $S_0$
-%% should handle each expression in the grammar. An example program that
-%% we can write is an $interpreter$. To keep our interpreter simple, we 
-%% ignore the {\tt read} operator.
-%% \begin{figure}[htbp]
-%% \centering
-%% \fbox{
-%% \begin{minipage}{0.85\textwidth}
-%% \[
-%% \begin{array}{lcl}
-%%   \Op  &::=& \key{+} \mid \key{-} \mid \key{*} \mid \key{read} \\
-%%   \Exp &::=& \Int \mid (\Op \; \Exp^{*}) \mid \Var \mid \LET{\Var}{\Exp}{\Exp}
-%% \end{array}
-%% \]
-%% \end{minipage}
-%% }
-%% \caption{The syntax of the $S_0$ language. The abbreviation \Op{} is
-%%   short for operator, \Exp{} is short for expression, \Int{} for integer,
-%%   and \Var{} for variable.}
-%% %\label{fig:s0-syntax}
-%% \end{figure}
-%% \begin{verbatim}
-
-%% \end{verbatim}
-
 \section{Interpreters}
-\label{sec:interp-arith}
+\label{sec:interp-R0}
 
 The meaning, or semantics, of a program is typically defined in the
 specification of the language. For example, the Scheme language is
@@ -606,48 +466,74 @@ defined in its reference manual~\citep{plt-tr}. In this book we use an
 interpreter to define the meaning of each language that we consider,
 following Reynold's advice in this
 regard~\citep{reynolds72:_def_interp}. Here we will warm up by writing
-an interpreter for the $\itm{arith}$ language, which will also serve
-as a second example of structural recursion. The \texttt{interp-arith}
-function is defined in Figure~\ref{fig:interp-arith}. The body of the
+an interpreter for the $R_0$ language, which will also serve
+as a second example of structural recursion. The \texttt{interp-R0}
+function is defined in Figure~\ref{fig:interp-R0}. The body of the
 function is a match on the input expression \texttt{e} and there is
-one clause per grammar rule for $\itm{arith}$. The clauses for
-internal AST nodes make recursive calls to \texttt{interp-arith} on
+one clause per grammar rule for $R_0$. The clauses for
+internal AST nodes make recursive calls to \texttt{interp-R0} on
 each child node.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-   (define (interp-arith e)
+   (define (interp-R0 e)
      (match e
        [(? fixnum?) e]
        [`(read)
         (define r (read))
         (cond [(fixnum? r) r]
-              [else (error 'interp-arith "expected an integer" r)])]
+              [else (error 'interp-R0 "expected an integer" r)])]
        [`(- ,e)
-        (fx- 0 (interp-arith e))]
+        (fx- 0 (interp-R0 e))]
        [`(+ ,e1 ,e2)
-        (fx+ (interp-arith e1) (interp-arith e2))]
+        (fx+ (interp-R0 e1) (interp-R0 e2))]
        ))
 \end{lstlisting}
-\caption{Interpreter for the $\itm{arith}$ language.}
-\label{fig:interp-arith}
+\caption{Interpreter for the $R_0$ language.}
+\label{fig:interp-R0}
 \end{figure}
 
-We make the simplifying design decision that the $\itm{arith}$
-language (and all of the languages in this book) only handle
-machine-representable integers, that is, the \texttt{fixnum} datatype
-in Racket. Thus, we implement the arithmetic operations using the
-appropriate fixnum operators.
+Let us consider the result of interpreting some example $R_0$
+programs. The following program simply adds two integers.
+\[
+\BINOP{+}{10}{32}
+\]
+The result is $42$, as you might expected. 
+%
+The next example demonstrates that expressions may be nested within
+each other, in this case nesting several additions and negations.
+\[
+\BINOP{+}{10}{ \UNIOP{-}{ \BINOP{+}{12}{20} } }
+\]
+What is the result of the above program?
 
 If we interpret the AST \eqref{eq:arith-prog} and give it the input
 \texttt{50}
 \begin{lstlisting}
-   (interp-arith ast1.1)
+   (interp-R0 ast1.1)
 \end{lstlisting}
-we get the answer to life, the universe, and everything
+we get the answer to life, the universe, and everything:
 \begin{lstlisting}
    42
 \end{lstlisting}
+
+Moving on, the \key{read} operation prompts the user of the program
+for an integer. Given an input of $10$, the following program produces
+$42$.
+\[
+\BINOP{+}{(\key{read})}{32}
+\]
+We include the \key{read} operation in $R_1$ to demonstrate that order
+of evaluation can make a different. 
+
+The behavior of the following program is somewhat subtle because
+Racket does not specify an evaluation order for arguments of an
+operator such as $-$.
+\[
+\BINOP{+}{\READ}{\UNIOP{-}{\READ}}
+\]
+Given the input $42$ then $10$, the above program can result in either
+$42$ or $-42$, depending on the whims of the Racket implementation.
 
 The job of a compiler is to translate programs in one language into
 programs in another language (typically but not always a language with
@@ -677,8 +563,8 @@ is also be another example of structural recursion.
 \section{Partial Evaluation}
 \label{sec:partial-evaluation}
 
-In this section we consider a compiler that translates $\itm{arith}$
-programs into $\itm{arith}$ programs that are more efficient, that is,
+In this section we consider a compiler that translates $R_0$
+programs into $R_0$ programs that are more efficient, that is,
 this compiler is an optimizer. Our optimizer will accomplish this by
 trying to eagerly compute the parts of the program that do not depend
 on any inputs. For example, given the following program
@@ -691,8 +577,8 @@ our compiler will translate it into the program
 \end{lstlisting}
 
 Figure~\ref{fig:pe-arith} gives the code for a simple partial
-evaluator for the $\itm{arith}$ language. The output of the partial
-evaluator is an $\itm{arith}$ program, which we build up using a
+evaluator for the $R_0$ language. The output of the partial
+evaluator is an $R_0$ program, which we build up using a
 combination of quasiquotes and commas. (Though no quasiquote is
 necessary for integers.) In Figure~\ref{fig:pe-arith}, the normal
 structural recursion is captured in the main \texttt{pe-arith}
@@ -719,7 +605,7 @@ functions is the output of partially evaluating the children nodes.
        [`(- ,e1) (pe-neg (pe-arith e1))]
        [`(+ ,e1 ,e2) (pe-add (pe-arith e1) (pe-arith e2))]))   
 \end{lstlisting}
-\caption{A partial evaluator for the $\itm{arith}$ language.}
+\caption{A partial evaluator for the $R_0$ language.}
 \label{fig:pe-arith}
 \end{figure}
 
@@ -738,7 +624,7 @@ evaluator on several examples and tests the output program.  The
 \begin{lstlisting}
 (define (test-pe pe p)
   (assert "testing pe-arith"
-     (equal? (interp-arith p) (interp-arith (pe-arith p)))))
+     (equal? (interp-R0 p) (interp-R0 (pe-arith p)))))
 
 (test-pe `(+ (read) (- (+ 5 3))))
 (test-pe `(+ 1 (+ (read) 1)))
@@ -775,75 +661,51 @@ e &::=& (\key{read}) \mid (\key{-} \;(\key{read})) \mid (\key{+} \; e \; e)\\
 \label{ch:int-exp}
 
 This chapter concerns the challenge of compiling a subset of Racket,
-which we name $S_0$, to x86-64 assembly code. The chapter begins with
-a description of the $S_0$ language (Section~\ref{sec:s0}) and then a
-description of x86-64 (Section~\ref{sec:x86-64}). The x86-64 assembly
-language is quite large, so we only discuss what is needed for
-compiling $S_0$. We will introduce more of x86-64 in later
-chapters. Once we have introduced $S_0$ and x86-64, we reflect on
-their differences and come up with a plan for a handful of steps that
-will take us from $S_0$ to x86-64 (Section~\ref{sec:plan-s0-x86}).
-The rest of the sections in this Chapter give detailed hints regarding
-what each step should do and how to organize your code
-(Sections~\ref{sec:uniquify-s0}, \ref{sec:flatten-s0},
-\ref{sec:select-s0} \ref{sec:assign-s0}, and \ref{sec:patch-s0}).  We
-hope to give enough hints that the well-prepared reader can implement
-a compiler from $S_0$ to x86-64 while at the same time leaving room
-for some fun and creativity.
+which we name $R_1$, to x86-64 assembly code~\citep{Matz:2013aa}. The
+chapter begins with a description of the $R_1$ language
+(Section~\ref{sec:s0}) and then a description of x86-64
+(Section~\ref{sec:x86-64}). The x86-64 assembly language is quite
+large, so we only discuss what is needed for compiling $R_1$. We will
+introduce more of x86-64 in later chapters. Once we have introduced
+$R_1$ and x86-64, we reflect on their differences and come up with a
+plan for a handful of steps that will take us from $R_1$ to x86-64
+(Section~\ref{sec:plan-s0-x86}).  The rest of the sections in this
+Chapter give detailed hints regarding what each step should do and how
+to organize your code (Sections~\ref{sec:uniquify-s0} through
+\ref{sec:patch-s0}).  We hope to give enough hints that the
+well-prepared reader can implement a compiler from $R_1$ to x86-64
+while at the same time leaving room for some fun and creativity.
 
-\section{The $S_0$ Language}
+\section{The $R_1$ Language}
 \label{sec:s0}
 
-The $S_0$ language includes integers, operations on integers
-(arithmetic and input), and variable definitions.  The syntax of the
-$S_0$ language is defined by the grammar in
-Figure~\ref{fig:s0-syntax}. This language is rich enough to exhibit
-several compilation techniques but simple enough so that we can
-implement a compiler for it in two weeks of hard work.  To give the
-reader a feeling for the scale of this first compiler, the instructor
-solution for the $S_0$ compiler consists of 6 recursive functions and
-a few small helper functions that together span 256 lines of code.
+The $R_1$ language extends the $R_0$ language
+(Figure~\ref{fig:r0-syntax}) with variable definitions.  The syntax of
+the $R_1$ language is defined by the grammar in
+Figure~\ref{fig:r1-syntax}. This language is rich enough to exhibit
+several compilation techniques but simple enough so that the reader
+can implement a compiler for it in a couple weeks of part-time work.
+To give the reader a feeling for the scale of this first compiler, the
+instructor solution for the $R_1$ compiler consists of 6 recursive
+functions and a few small helper functions that together span 256
+lines of code.
 
 \begin{figure}[btp]
 \centering
 \fbox{
-\begin{minipage}{0.85\textwidth}
+\begin{minipage}{\textwidth}
 \[
-\begin{array}{lcl}
-  \Op  &::=& \key{+} \mid \key{-} \mid \key{*} \mid \key{read} \\
-  \Exp &::=& \Int \mid (\Op \; \Exp^{*}) \mid \Var \mid \LET{\Var}{\Exp}{\Exp}
-\end{array}
+R_1 ::= \Int \mid ({\tt \key{read}}) \mid (\key{-} \; R_1) \mid
+   (\key{+} \; R_1 \; R_1)  \mid  \Var \mid \LET{\Var}{R_1}{R_1}
 \]
 \end{minipage}
 }
-\caption{The syntax of the $S_0$ language. The abbreviation \Op{} is
-  short for operator, \Exp{} is short for expression, \Int{} for integer,
-  and \Var{} for variable.}
-\label{fig:s0-syntax}
+\caption{The syntax of the $R_1$ language. 
+  The non-terminal \Var{} may be any Racket identifier.}
+\label{fig:r1-syntax}
 \end{figure}
 
-The result of evaluating an expression is a value.  For $S_0$, values
-are integers. To make it straightforward to map these integers onto
-x86-64 assembly~\citep{Matz:2013aa}, we restrict the integers to just
-those representable with 64-bits, the range $-2^{63}$ to $2^{63}$
-(``fixnums'' in Racket parlance).
-
-We start with some examples of $S_0$ programs, commenting on aspects
-of the language that will be relevant to compiling it.  We start with
-one of the simplest $S_0$ programs; it adds two integers.
-\[
-\BINOP{+}{10}{32}
-\]
-The result is $42$, as you might expected. 
-%
-The next example demonstrates that expressions may be nested within
-each other, in this case nesting several additions and negations.
-\[
-\BINOP{+}{10}{ \UNIOP{-}{ \BINOP{+}{12}{20} } }
-\]
-What is the result of the above program?
-
-The \key{let} construct defines a variable for used within it's body
+The \key{let} construct defines a variable for used within its body
 and initializes the variable with the value of an expression.  So the
 following program initializes $x$ to $32$ and then evaluates the body
 $\BINOP{+}{10}{x}$, producing $42$.
@@ -864,41 +726,65 @@ the same as your answer for this annotated version of the program.
 \[
 \LET{x_1}{32}{ \BINOP{+}{ \LET{x_2}{10}{x_2} }{ x_1 } }
 \]
-
-Moving on, the \key{read} operation prompts the user of the program
-for an integer. Given an input of $10$, the following program produces
-$42$.
-\[
-\BINOP{+}{(\key{read})}{32}
-\]
-We include the \key{read} operation in $S_0$ to demonstrate that order
-of evaluation can make a different. Given the input $52$ then $10$,
-the following produces $42$ (and not $-42$).
+The initializing expression is always evaluated before the body of the
+\key{let}, so in the following, the \key{read} for $x$ is performed
+before the \key{read} for $y$. Given the input $52$ then $10$, the
+following produces $42$ (and not $-42$).
 \[
 \LET{x}{\READ}{ \LET{y}{\READ}{ \BINOP{-}{x}{y} } }
 \]
-The initializing expression is always evaluated before the body of the
-\key{let}, so in the above, the \key{read} for $x$ is performed before
-the \key{read} for $y$.
-%
-The behavior of the following program is somewhat subtle because
-Racket does not specify an evaluation order for arguments of an
-operator such as $-$.
-\[
-\BINOP{-}{\READ}{\READ}
-\]
-Given the input $42$ then $10$, the above program can result in either
-$42$ or $-42$, depending on the whims of the Racket implementation.
+
+Figure~\ref{fig:interp-R1} shows the interpreter for the $R_1$
+language. It extends the interpreter for $R_0$ with two new
+\key{match} clauses for variables and for \key{let}.  For \key{let},
+we will need a way to communicate the initializing value of a variable
+to all the uses of a variable. To accomplish this, we maintain a
+mapping from variables to values, which is traditionally called an
+\emph{environment}. For simplicity, here we use an association list to
+represent the environment. The \key{interp-R1} function takes the
+current environment, \key{env}, as an extra parameter.  When the
+interpreter encounters a variable, it finds the corresponding value
+using the \key{lookup} function (Appendix~\ref{appendix:utilities}).
+When the interpreter encounters a \key{let}, it evaluates the
+initializing expression, extends the environment with the result bound
+to the variable, then evaluates the body of the let.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+   (define (interp-R1 env e)
+     (match e
+       [(? symbol?) (lookup e env)]
+       [`(let ([,x ,e]) ,body)
+        (define v (interp-R1 env e))
+        (define new-env (cons (cons x v) env))
+        (interp-R1 new-env body)]
+       [(? fixnum?) e]
+       [`(read)
+        (define r (read))
+        (cond [(fixnum? r) r]
+              [else (error 'interp-R1 "expected an integer" r)])]
+       [`(- ,e)
+        (fx- 0 (interp-R1 env e))]
+       [`(+ ,e1 ,e2)
+        (fx+ (interp-R1 env e1) (interp-R1 env e2))]
+       ))
+\end{lstlisting}
+\caption{Interpreter for the $R_1$ language.}
+\label{fig:interp-R1}
+\end{figure}
+
+
 
 The goal for this chapter is to implement a compiler that translates
-any program $P_1 \in S_0$ into a x86-64 assembly program $P_2$ such
+any program $P_1$ in $R_1$ into a x86-64 assembly program $P_2$ such
 that the assembly program exhibits the same behavior on an x86
-computer as the $S_0$ program running in a Racket implementation.
+computer as the $R_1$ program running in a Racket implementation.
+That is, they both output the same integer $n$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
- \node (p1) at (0,  0)   {$P_1 \in S_0$};
- \node (p2) at (4,  0)   {$P_2 \in \text{x86-64}$};
- \node (o)  at (4, -2) {$n \in \mathbb{Z}$};
+ \node (p1) at (0,  0)   {$P_1$};
+ \node (p2) at (4,  0)   {$P_2$};
+ \node (o)  at (4, -2) {$n$};
 
  \path[->] (p1) edge [above] node {\footnotesize compile} (p2);
  \path[->] (p1) edge [left]  node {\footnotesize run in Racket} (o);
@@ -906,7 +792,7 @@ computer as the $S_0$ program running in a Racket implementation.
 \end{tikzpicture}
 \]
 In the next section we introduce enough of the x86-64 assembly
-language to compile $S_0$.
+language to compile $R_1$.
 
 \section{The x86-64 Assembly Language}
 \label{sec:x86-64}
@@ -972,6 +858,7 @@ specified by the label, which we shall use to implement
 \caption{A subset of the x86-64 assembly language (AT\&T syntax).}
 \label{fig:x86-a}
 \end{figure}
+
 
 \begin{wrapfigure}{r}{2.25in}
 \begin{lstlisting}
@@ -1116,33 +1003,33 @@ communicated from one step of the compiler to the next.
 \label{fig:x86-ast-a}
 \end{figure}
 
-\section{Planning the trip from $S_0$ to x86-64}
+\section{Planning the trip from $R_1$ to x86-64}
 \label{sec:plan-s0-x86}
 
 To compile one language to another it helps to focus on the
 differences between the two languages. It is these differences that
 the compiler will need to bridge. What are the differences between
-$S_0$ and x86-64 assembly? Here we list some of the most important the
+$R_1$ and x86-64 assembly? Here we list some of the most important the
 differences.
 
 \begin{enumerate}
 \item x86-64 arithmetic instructions typically take two arguments and
-  update the second argument in place. In contrast, $S_0$ arithmetic
+  update the second argument in place. In contrast, $R_1$ arithmetic
   operations only read their arguments and produce a new value.
 
-\item An argument to an $S_0$ operator can be any expression, whereas
+\item An argument to an $R_1$ operator can be any expression, whereas
   x86-64 instructions restrict their arguments to integers, registers,
   and memory locations.
 
-\item An $S_0$ program can have any number of variables whereas x86-64
+\item An $R_1$ program can have any number of variables whereas x86-64
   has only 16 registers.
 
-\item Variables in $S_0$ can overshadow other variables with the same
+\item Variables in $R_1$ can overshadow other variables with the same
   name. The registers and memory locations of x86-64 all have unique
   names.
 \end{enumerate}
 
-We ease the challenge of compiling from $S_0$ to x86 by breaking down
+We ease the challenge of compiling from $R_1$ to x86 by breaking down
 the problem into several steps, dealing with the above differences one
 at a time. The main question then becomes: in what order do we tackle
 these differences? This is often one of the most challenging questions
@@ -1179,8 +1066,8 @@ ordering.
 }
 \end{tikzpicture}
 \]
-We further simplify the translation from $S_0$ to x86 by identifying
-an intermediate language named $C_0$, roughly half-way between $S_0$
+We further simplify the translation from $R_1$ to x86 by identifying
+an intermediate language named $C_0$, roughly half-way between $R_1$
 and x86, to provide a rest stop along the way. We name the language
 $C_0$ because it is vaguely similar to the $C$
 language~\citep{Kernighan:1988nx}. The differences \#4 and \#1,
@@ -1189,7 +1076,7 @@ steps, \key{uniquify} and \key{flatten}, which bring us to
 $C_0$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\foreach \i/\p in {S_0/1,S_0/2,C_0/3}
+\foreach \i/\p in {R_1/1,R_1/2,C_0/3}
 { 
   \node (\p) at (\p*3,0) {\large $\i$};
 }
@@ -1205,9 +1092,9 @@ AST into an output AST. We refer to such a function as a \emph{pass}
 because it makes a pass over the AST.
 
 The syntax for $C_0$ is defined in Figure~\ref{fig:c0-syntax}.  The
-$C_0$ language supports the same operators as $S_0$ but the arguments
+$C_0$ language supports the same operators as $R_1$ but the arguments
 of operators are now restricted to just variables and integers. The
-\key{let} construct of $S_0$ is replaced by an assignment statement
+\key{let} construct of $R_1$ is replaced by an assignment statement
 and there is a \key{return} construct to specify the return value of
 the program. A program consists of a sequence of statements that
 include at least one \key{return} statement.
@@ -1328,9 +1215,9 @@ implement the clauses for variables and for the \key{let} construct.
 
 \begin{exercise}
 \normalfont % I don't like the italics for exercises. -Jeremy
-Test your \key{uniquify} pass by creating three example $S_0$ programs
+Test your \key{uniquify} pass by creating three example $R_1$ programs
 and checking whether the output programs produce the same result as
-the input programs. The $S_0$ programs should be designed to test the
+the input programs. The $R_1$ programs should be designed to test the
 most interesting parts of the \key{uniquify} pass, that is, the
 programs should include \key{let} constructs, variables, and variables
 that overshadow eachother.  The three programs should be in a
@@ -1350,7 +1237,7 @@ your \key{uniquify} pass on the example programs.
 \section{Flatten Expressions}
 \label{sec:flatten-s0}
 
-The \key{flatten} pass will transform $S_0$ programs into $C_0$
+The \key{flatten} pass will transform $R_1$ programs into $C_0$
 programs. In particular, the purpose of the \key{flatten} pass is to
 get rid of nested expressions, such as the $\UNIOP{-}{10}$ in the
 following program.
@@ -1450,7 +1337,7 @@ procedure.
 
 As discussed in Section~\ref{sec:plan-s0-x86}, the
 \key{assign-homes} pass places all of the variables on the stack.
-Consider again the example $S_0$ program $\BINOP{+}{52}{ \UNIOP{-}{10} }$,
+Consider again the example $R_1$ program $\BINOP{+}{52}{ \UNIOP{-}{10} }$,
 which after \key{select-instructions} looks like the following.
 \[
 \begin{array}{l}
@@ -1515,7 +1402,7 @@ argument must be a register.
 \section{Print x86-64}
 \label{sec:print-x86}
 
-The last step of the compiler from $S_0$ to x86-64 is to convert the
+The last step of the compiler from $R_1$ to x86-64 is to convert the
 x86-64 AST (defined in Figure~\ref{fig:x86-ast-a}) to the string
 representation (defined in Figure~\ref{fig:x86-a}). The Racket
 \key{format} and \key{string-append} functions are useful in this
@@ -1538,7 +1425,7 @@ and then store in the $\itm{info}$ field of the \key{program}.
 %% having interpreters for all the intermediate languages.  Indeed, the
 %% file \key{interp.rkt} in the supplemental code provides interpreters
 %% for all the intermediate languages described in this book, starting
-%% with interpreters for $S_0$, $C_0$, and x86 (in abstract syntax).
+%% with interpreters for $R_1$, $C_0$, and x86 (in abstract syntax).
 
 %% The file \key{run-tests.rkt} automates the process of running the
 %% interpreters on the output programs of each pass and checking their
@@ -2051,7 +1938,7 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \chapter{Booleans, Type Checking, and Control Flow}
 \label{ch:bool-types}
 
-\section{The $S_1$ Language}
+\section{The $R_2$ Language}
 
 \begin{figure}[htbp]
 \centering
@@ -2066,12 +1953,12 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \]
 \end{minipage}
 }
-\caption{The $S_1$ language, an extension of $S_0$
+\caption{The $R_2$ language, an extension of $R_1$
   (Figure~\ref{fig:s0-syntax}).}
-\label{fig:s1-syntax}
+\label{fig:s2-syntax}
 \end{figure}
 
-\section{Type Checking $S_1$ Programs}
+\section{Type Checking $R_2$ Programs}
 
 \marginpar{\scriptsize Type checking is a difficult thing to cover, I think, without having 522 as a prerequisite for this course. -- Cam}
 % T ::= Integer | Boolean
@@ -2137,7 +2024,7 @@ Overall, the statement $\Gamma \vdash e : T$ is an example of what is
 called a \emph{judgment}.  In particular, this judgment says, ``In
 environment $\Gamma$, expression $e$ has type $T$.''
 Figure~\ref{fig:S1-type-system} shows the type checking rules for
-$S_1$.
+$R_2$.
 
 \begin{figure}
 \begin{gather*}
@@ -2162,7 +2049,7 @@ $S_1$.
              \Gamma \vdash e_3 : T}
   {\Gamma \vdash \IF{e_1}{e_2}{e_3} : T}
 \end{gather*}
-\caption{Type System for $S_1$.}
+\caption{Type System for $R_2$.}
 \label{fig:S1-type-system}
 \end{figure}
 
@@ -2253,7 +2140,7 @@ $S_1$.
 
 We provide several interpreters in the \key{interp.rkt} file.  The
 \key{interp-scheme} function takes an AST in one of the Racket-like
-languages considered in this book ($S_0, S_1, \ldots$) and interprets
+languages considered in this book ($R_1, R_2, \ldots$) and interprets
 the program, returning the result value.  The \key{interp-C} function
 interprets an AST for a program in one of the C-like languages ($C_0,
 C_1, \ldots$), and the \key{interp-x86} function interprets an AST for
@@ -2270,6 +2157,8 @@ Boolean \key{bool} is false.
 \begin{lstlisting}
 (define (assert msg bool) ...)
 \end{lstlisting}
+
+The \key{lookup} function ...
 
 The \key{interp-tests} function takes a compiler name (a string) a
 description of the passes a test family name (a string), and a list of
