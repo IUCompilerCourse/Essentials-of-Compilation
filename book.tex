@@ -148,7 +148,7 @@ implementing a compiler. We use abstract syntax trees (ASTs) in the
 form of S-expressions to represent programs (Section~\ref{sec:ast})
 and pattern matching to inspect individual nodes in an AST
 (Section~\ref{sec:pattern-matching}).  We use recursion to construct
-and deconstruct ASTs (Section~\ref{sec:recursion}).
+and deconstruct entire ASTs (Section~\ref{sec:recursion}).
 
 \section{Abstract Syntax Trees}
 \label{sec:ast}
@@ -167,10 +167,10 @@ represented by the AST on the right.
 \begin{minipage}{0.4\textwidth}
 \begin{equation}
 \begin{tikzpicture}
- \node[draw, circle] (plus)  at (0 ,  0) {$+$};
- \node[draw, circle] (read)  at (-1, -1.5) {$\tt read$};
- \node[draw, circle] (minus) at (1 , -1.5) {$\text{--}$};
- \node[draw, circle] (8)     at (1 , -3) {$8$};
+ \node[draw, circle] (plus)  at (0 ,  0) {\key{+}};
+ \node[draw, circle] (read)  at (-1, -1.5) {{\footnotesize\key{read}}};
+ \node[draw, circle] (minus) at (1 , -1.5) {$\key{-}$};
+ \node[draw, circle] (8)     at (1 , -3) {\key{8}};
 
  \draw[->] (plus) to (read);
  \draw[->] (plus) to (minus);
@@ -189,13 +189,12 @@ it is an \emph{internal} node.
 
 When deciding how to compile the above program, we need to know that
 the root node operation is addition and that it has two children:
-\texttt{read} and the negation of \texttt{8}. The abstract syntax tree
-data structure directly supports these queries and hence is a good
-choice. In this book, we will often write down the textual
-representation of a program even when we really have in mind the AST,
-because the textual representation is more concise.  We recommend
-that, in your mind, you alway interpret programs as abstract syntax
-trees.
+\texttt{read} and a negation. The abstract syntax tree data structure
+directly supports these queries and hence is a good choice. In this
+book, we will often write down the textual representation of a program
+even when we really have in mind the AST because the textual
+representation is more concise.  We recommend that, in your mind, you
+alway interpret programs as abstract syntax trees.
 
 \section{Grammars}
 \label{sec:grammar}
@@ -216,13 +215,12 @@ Each rule has a left-hand-side and a right-hand-side. The way to read
 a rule is that if you have all the program parts on the
 right-hand-side, then you can create and AST node and categorize it
 according to the left-hand-side. (We do not define $\Int$ because the
-reader already knows what an integer is.) A name such as $R_0$
-that is defined by the rules, is a \emph{non-terminal}.
-We make the
-simplifying design decision that all of the languages in this book
-only handle machine-representable integers (those representable with
-64-bits, i.e., the range $-2^{63}$ to $2^{63}$) which corresponds to
-the \texttt{fixnum} datatype in Racket.
+reader already knows what an integer is.) We make the simplifying
+design decision that all of the languages in this book only handle
+machine-representable integers (those representable with 64-bits,
+i.e., the range $-2^{63}$ to $2^{63}$) which corresponds to the
+\texttt{fixnum} datatype in Racket. A name such as $R_0$ that is
+defined by the grammar rules is a \emph{non-terminal}.
 
 The second rule for the $R_0$ language is the \texttt{read}
 operation that receives an input integer from the user of the program.
@@ -230,13 +228,14 @@ operation that receives an input integer from the user of the program.
   R_0 ::= (\key{read}) \label{eq:arith-read}
 \end{equation}
 
-The third rule says that, given an $R_0$, you can build
-another arith by negating it.
+The third rule says that, given an $R_0$ node, you can build another
+$R_0$ node by negating it.
 \begin{equation}
   R_0 ::= (\key{-} \; R_0)  \label{eq:arith-neg}
 \end{equation}
 Symbols such as \key{-} in typewriter font are \emph{terminal} symbols
-and must appear literally in any program constructed with this rule.
+and must literally appear in the program for the rule to be
+applicable.
 
 We can apply the rules to build ASTs in the $R_0$
 language. For example, by rule \eqref{eq:arith-int}, \texttt{8} is an
@@ -649,8 +648,8 @@ output that takes the form of the $\itm{residual}$ non-terminal in the
 following grammar.
 \[
 \begin{array}{lcl}
-e &::=& (\key{read}) \mid (\key{-} \;(\key{read})) \mid (\key{+} \; e \; e)\\
-\itm{residual} &::=& \Int \mid (\key{+}\; \Int\; e) \mid e
+\Exp &::=& (\key{read}) \mid (\key{-} \;(\key{read})) \mid (\key{+} \; \Exp \; \Exp)\\
+\itm{residual} &::=& \Int \mid (\key{+}\; \Int\; \Exp) \mid \Exp
 \end{array}
 \]
 \end{exercise}
@@ -665,16 +664,16 @@ which we name $R_1$, to x86-64 assembly code~\citep{Matz:2013aa}. The
 chapter begins with a description of the $R_1$ language
 (Section~\ref{sec:s0}) and then a description of x86-64
 (Section~\ref{sec:x86-64}). The x86-64 assembly language is quite
-large, so we only discuss what is needed for compiling $R_1$. We will
+large, so we only discuss what is needed for compiling $R_1$. We
 introduce more of x86-64 in later chapters. Once we have introduced
 $R_1$ and x86-64, we reflect on their differences and come up with a
-plan for a handful of steps that will take us from $R_1$ to x86-64
-(Section~\ref{sec:plan-s0-x86}).  The rest of the sections in this
-Chapter give detailed hints regarding what each step should do and how
-to organize your code (Sections~\ref{sec:uniquify-s0} through
-\ref{sec:patch-s0}).  We hope to give enough hints that the
-well-prepared reader can implement a compiler from $R_1$ to x86-64
-while at the same time leaving room for some fun and creativity.
+plan breaking down the translation from $R_1$ to x86-64 into a handful
+of steps (Section~\ref{sec:plan-s0-x86}).  The rest of the sections in
+this Chapter give detailed hints regarding each step
+(Sections~\ref{sec:uniquify-s0} through \ref{sec:patch-s0}).  We hope
+to give enough hints that the well-prepared reader can implement a
+compiler from $R_1$ to x86-64 while at the same time leaving room for
+some fun and creativity.
 
 \section{The $R_1$ Language}
 \label{sec:s0}
