@@ -26,8 +26,8 @@
 \lstset{%
 language=Lisp,
 basicstyle=\ttfamily\small,
-escapechar=@,
-columns=fullflexible
+escapechar=|,
+columns=flexible
 }
 
 \newtheorem{theorem}{Theorem}
@@ -192,9 +192,9 @@ prior to reading this book. There are many other excellent resources
 for learning Racket and
 Scheme~\citep{Dybvig:1987aa,Abelson:1996uq,Friedman:1996aa,Felleisen:2001aa,Felleisen:2013aa,Flatt:2014aa}. It
 is helpful but not necessary for the student to have prior exposure to
-the x86 (or x86-64) assembly language, as one might get from a
-computer systems course~\citep{Bryant:2005aa,Bryant:2010aa}.  This
-book will introduce the basics of the x86-64 assembly language.
+x86 (or x86-64) assembly language, as one might obtain from a computer
+systems course~\citep{Bryant:2005aa,Bryant:2010aa}.  This book
+introduces the parts of x86-64 assembly language that are needed.
 
 %\section*{Structure of book}
 % You might want to add short description about each chapter in this book.
@@ -224,7 +224,8 @@ Need to give thanks to
 
 \mbox{}\\
 \noindent Jeremy G. Siek \\
-\noindent \url{http://homes.soic.indiana.edu/jsiek}
+\noindent \url{http://homes.soic.indiana.edu/jsiek} \\
+\noindent Spring 2016 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Preliminaries}
@@ -581,16 +582,16 @@ each child node.
 
 Let us consider the result of interpreting some example $R_0$
 programs. The following program simply adds two integers.
-\[
-\BINOP{+}{10}{32}
-\]
-The result is $42$, as you might expected. 
+\begin{lstlisting}
+   (+ 10 32)
+\end{lstlisting}
+The result is \key{42}, as you might expected. 
 %
 The next example demonstrates that expressions may be nested within
 each other, in this case nesting several additions and negations.
-\[
-\BINOP{+}{10}{ \UNIOP{-}{ \BINOP{+}{12}{20} } }
-\]
+\begin{lstlisting}
+   (+ 10 (- (+ 12 20)))
+\end{lstlisting}
 What is the result of the above program?
 
 If we interpret the AST \eqref{eq:arith-prog} and give it the input
@@ -604,47 +605,49 @@ we get the answer to life, the universe, and everything:
 \end{lstlisting}
 
 Moving on, the \key{read} operation prompts the user of the program
-for an integer. Given an input of $10$, the following program produces
-$42$.
-\[
-\BINOP{+}{(\key{read})}{32}
-\]
-We include the \key{read} operation in $R_1$ to demonstrate that order
-of evaluation can make a different. 
+for an integer. Given an input of \key{10}, the following program
+produces \key{42}.
+\begin{lstlisting}
+   (+ (read) 32)
+\end{lstlisting}
+We include the \key{read} operation in $R_1$ so that a compiler for
+$R_1$ cannot be implemented simply by running the interpreter at
+compilation time to obtain the output and then generating the trivial
+code to return the output. (A clever student at Colorado did this the
+first time I taught the course.)
 
-The behavior of the following program is somewhat subtle because
-Racket does not specify an evaluation order for arguments of an
-operator such as $-$.
-\marginpar{\scriptsize This is not true of Racket. \\ --Jeremy}
-\[
-\BINOP{+}{\READ}{\UNIOP{-}{\READ}}
-\]
-Given the input $42$ then $10$, the above program can result in either
-$42$ or $-42$, depending on the whims of the Racket implementation.
+%% The behavior of the following program is somewhat subtle because
+%% Racket does not specify an evaluation order for arguments of an
+%% operator such as $-$.
+%% \marginpar{\scriptsize This is not true of Racket. \\ --Jeremy}
+%% \[
+%% \BINOP{+}{\READ}{\UNIOP{-}{\READ}}
+%% \]
+%% Given the input $42$ then $10$, the above program can result in either
+%% $42$ or $-42$, depending on the whims of the Racket implementation.
 
-The job of a compiler is to translate programs in one language into
-programs in another language (typically but not always a language with
-a lower level of abstraction) in such a way that each output program
-behaves the same way as the input program. This idea is depicted in
-the following diagram. Suppose we have two languages, $\mathcal{L}_1$
-and $\mathcal{L}_2$, and an interpreter for each language.  Suppose
-that the compiler translates program $P_1$ in language $\mathcal{L}_1$
-into program $P_2$ in language $\mathcal{L}_2$.  Then interpreting
-$P_1$ and $P_2$ on the respective interpreters for the two languages,
-and given the same inputs $i$, should yield the same output $o$.
+The job of a compiler is to translate a program in one language into a
+program in another language so that the output program behaves the
+same way as the input program. This idea is depicted in the following
+diagram. Suppose we have two languages, $\mathcal{L}_1$ and
+$\mathcal{L}_2$, and an interpreter for each language.  Suppose that
+the compiler translates program $P_1$ in language $\mathcal{L}_1$ into
+program $P_2$ in language $\mathcal{L}_2$.  Then interpreting $P_1$
+and $P_2$ on their respective interpreters with input $i$ should yield
+the same output $o$.
 \begin{equation} \label{eq:compile-correct}
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
  \node (p1) at (0,  0) {$P_1$};
  \node (p2) at (3,  0) {$P_2$};
- \node (o)  at (3, -2.5) {o};
+ \node (o)  at (3, -2.5) {$o$};
 
  \path[->] (p1) edge [above] node {compile} (p2);
- \path[->] (p2) edge [right] node {$\mathcal{L}_2$-interp(i)} (o);
- \path[->] (p1) edge [left]  node {$\mathcal{L}_1$-interp(i)} (o);
+ \path[->] (p2) edge [right] node {interp-$\mathcal{L}_2$($i$)} (o);
+ \path[->] (p1) edge [left]  node {interp-$\mathcal{L}_1$($i$)} (o);
 \end{tikzpicture}
 \end{equation}
-In the next section we will see our first example of a compiler, which
-is also be another example of structural recursion.
+In the next section we see our first example of a compiler, which is
+another example of structural recursion.
 
 
 \section{Partial Evaluation}
@@ -656,11 +659,11 @@ this compiler is an optimizer. Our optimizer will accomplish this by
 trying to eagerly compute the parts of the program that do not depend
 on any inputs. For example, given the following program
 \begin{lstlisting}
-(+ (read) (- (+ 5 3)))
+   (+ (read) (- (+ 5 3)))
 \end{lstlisting}
 our compiler will translate it into the program
 \begin{lstlisting}
-(+ (read) -8)
+   (+ (read) -8)
 \end{lstlisting}
 
 Figure~\ref{fig:pe-arith} gives the code for a simple partial
@@ -769,22 +772,25 @@ some fun and creativity.
 The $R_1$ language extends the $R_0$ language
 (Figure~\ref{fig:r0-syntax}) with variable definitions.  The syntax of
 the $R_1$ language is defined by the grammar in
-Figure~\ref{fig:r1-syntax}. This language is rich enough to exhibit
-several compilation techniques but simple enough so that the reader
-can implement a compiler for it in a couple weeks of part-time work.
-To give the reader a feeling for the scale of this first compiler, the
-instructor solution for the $R_1$ compiler consists of 6 recursive
-functions and a few small helper functions that together span 256
-lines of code.
+Figure~\ref{fig:r1-syntax}. In addition to variable definitions, the
+$R_1$ language includes the \key{program} form to mark the top of the
+program, which is helpful in some of the compiler passes.  The $R_1$
+language is rich enough to exhibit several compilation techniques but
+simple enough so that the reader can implement a compiler for it in a
+couple weeks of part-time work.  To give the reader a feeling for the
+scale of this first compiler, the instructor solution for the $R_1$
+compiler consists of 6 recursive functions and a few small helper
+functions that together span 256 lines of code.
 
 \begin{figure}[btp]
 \centering
 \fbox{
 \begin{minipage}{\textwidth}
-\[
-R_1 ::= \Int \mid ({\tt \key{read}}) \mid (\key{-} \; R_1) \mid
-   (\key{+} \; R_1 \; R_1)  \mid  \Var \mid \LET{\Var}{R_1}{R_1}
-\]
+\begin{align*}
+\Exp &::= \Int \mid ({\tt \key{read}}) \mid (\key{-} \; \Exp) \mid
+   (\key{+} \; \Exp \; \Exp)  \mid  \Var \mid \LET{\Var}{\Exp}{\Exp} \\
+R_1 &::= (\key{program} \; () \; \Exp)
+\end{align*}
 \end{minipage}
 }
 \caption{The syntax of the $R_1$ language. 
@@ -792,34 +798,39 @@ R_1 ::= \Int \mid ({\tt \key{read}}) \mid (\key{-} \; R_1) \mid
 \label{fig:r1-syntax}
 \end{figure}
 
-The \key{let} construct defines a variable for used within its body
+The \key{let} construct defines a variable for use within its body
 and initializes the variable with the value of an expression.  So the
-following program initializes $x$ to $32$ and then evaluates the body
-$\BINOP{+}{10}{x}$, producing $42$.
-\[
-\LET{x}{ \BINOP{+}{12}{20} }{ \BINOP{+}{10}{x} } 
-\]
+following program initializes \code{x} to \code{32} and then evaluates
+the body \code{(+ 10 x)}, producing \code{42}.
+\begin{lstlisting}
+   (program ()
+      (let ([x (+ 12 20)]) (+ 10 x)))
+\end{lstlisting}
 When there are multiple \key{let}'s for the same variable, the closest
 enclosing \key{let} is used. That is, variable definitions overshadow
 prior definitions. Consider the following program with two \key{let}'s
-that define variables named $x$. Can you figure out the result?
-\[
-\LET{x}{32}{ \BINOP{+}{ \LET{x}{10}{x} }{ x } }
-\]
+that define variables named \code{x}. Can you figure out the result?
+\begin{lstlisting}
+   (program ()
+      (let ([x 32]) (+ (let ([x 10]) x) x)))
+\end{lstlisting}
 For the purposes of showing which variable uses correspond to which
-definitions, the following shows the $x$'s annotated with subscripts
+definitions, the following shows the \code{x}'s annotated with subscripts
 to distinguish them. Double check that your answer for the above is
 the same as your answer for this annotated version of the program.
-\[
-\LET{x_1}{32}{ \BINOP{+}{ \LET{x_2}{10}{x_2} }{ x_1 } }
-\]
+\begin{lstlisting}
+   (program ()
+      (let ([x|$_1$| 32]) (+ (let ([x|$_2$| 10]) x|$_2$|) x|$_1$|)))
+\end{lstlisting}
 The initializing expression is always evaluated before the body of the
-\key{let}, so in the following, the \key{read} for $x$ is performed
-before the \key{read} for $y$. Given the input $52$ then $10$, the
-following produces $42$ (and not $-42$).
-\[
-\LET{x}{\READ}{ \LET{y}{\READ}{ \BINOP{-}{x}{y} } }
-\]
+\key{let}, so in the following, the \key{read} for \code{x} is
+performed before the \key{read} for \code{y}. Given the input
+\code{52} then \code{10}, the following produces \code{42} (and not
+\code{-42}).
+\begin{lstlisting}
+   (program ()
+     (let ([x (read)]) (let ([y (read)]) (- x y))))
+\end{lstlisting}
 
 Figure~\ref{fig:interp-R1} shows the interpreter for the $R_1$
 language. It extends the interpreter for $R_0$ with two new
@@ -828,13 +839,13 @@ we will need a way to communicate the initializing value of a variable
 to all the uses of a variable. To accomplish this, we maintain a
 mapping from variables to values, which is traditionally called an
 \emph{environment}. For simplicity, here we use an association list to
-represent the environment. The \key{interp-R1} function takes the
-current environment, \key{env}, as an extra parameter.  When the
+represent the environment. The \code{interp-R1} function takes the
+current environment, \code{env}, as an extra parameter.  When the
 interpreter encounters a variable, it finds the corresponding value
-using the \key{lookup} function (Appendix~\ref{appendix:utilities}).
+using the \code{lookup} function (Appendix~\ref{appendix:utilities}).
 When the interpreter encounters a \key{let}, it evaluates the
 initializing expression, extends the environment with the result bound
-to the variable, then evaluates the body of the let.
+to the variable, then evaluates the body of the \key{let}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -854,6 +865,7 @@ to the variable, then evaluates the body of the let.
         (fx- 0 (interp-R1 env e))]
        [`(+ ,e1 ,e2)
         (fx+ (interp-R1 env e1) (interp-R1 env e2))]
+       [`(program () ,e) (interp-R1 '() e)]
        ))
 \end{lstlisting}
 \caption{Interpreter for the $R_1$ language.}
@@ -863,8 +875,8 @@ to the variable, then evaluates the body of the let.
 
 
 The goal for this chapter is to implement a compiler that translates
-any program $P_1$ in $R_1$ into a x86-64 assembly program $P_2$ such
-that the assembly program exhibits the same behavior on an x86
+any program $P_1$ in the $R_1$ language into an x86-64 assembly
+program $P_2$ such that $P_2$ exhibits the same behavior on an x86
 computer as the $R_1$ program running in a Racket implementation.
 That is, they both output the same integer $n$.
 \[
@@ -874,8 +886,8 @@ That is, they both output the same integer $n$.
  \node (o)  at (4, -2) {$n$};
 
  \path[->] (p1) edge [above] node {\footnotesize compile} (p2);
- \path[->] (p1) edge [left]  node {\footnotesize run in Racket} (o);
- \path[->] (p2) edge [right] node {\footnotesize run on an x86 machine} (o);
+ \path[->] (p1) edge [left]  node {\footnotesize interp-$R_1$} (o);
+ \path[->] (p2) edge [right] node {\footnotesize interp-x86} (o);
 \end{tikzpicture}
 \]
 In the next section we introduce enough of the x86-64 assembly
@@ -906,9 +918,9 @@ whether it occurs as a source or destination argument of an
 instruction.
 
 An arithmetic instruction, such as $\key{addq}\,s\,d$, reads from the
-source argument $s$ and destination argument $d$, applies the
-arithmetic operation, then write the result in the destination $d$. In
-this case, computing $d \gets d + s$.
+source $s$ and destination $d$, applies the arithmetic operation, then
+write the result in $d$. So the \key{addq} instruction computes $d
+\gets d + s$.
 %
 The move instruction, $\key{movq}\,s\,d$ reads from $s$ and stores the
 result in $d$. 
@@ -957,8 +969,8 @@ _main:
 \label{fig:p0-x86}
 \end{wrapfigure}
 
-Figure~\ref{fig:p0-x86} depicts an x86-64 program that is equivalent to
-$\BINOP{+}{10}{32}$. The \key{globl} directive says that the
+Figure~\ref{fig:p0-x86} depicts an x86-64 program that is equivalent
+to \code{(+ 10 32)}. The \key{globl} directive says that the
 \key{\_main} procedure is externally visible, which is necessary so
 that the operating system can call it. The label \key{\_main:}
 indicates the beginning of the \key{\_main} procedure which is where
@@ -1172,7 +1184,7 @@ $C_0$.
 Each of these steps in the compiler is implemented by a function,
 typically a structurally recursive function that translates an input
 AST into an output AST. We refer to such a function as a \emph{pass}
-because it makes a pass over the AST.
+because it makes a pass over, i.e. traverses, the entire AST.
 
 The syntax for $C_0$ is defined in Figure~\ref{fig:c0-syntax}.  The
 $C_0$ language supports the same operators as $R_1$ but the arguments
@@ -1180,7 +1192,11 @@ of operators are now restricted to just variables and integers. The
 \key{let} construct of $R_1$ is replaced by an assignment statement
 and there is a \key{return} construct to specify the return value of
 the program. A program consists of a sequence of statements that
-include at least one \key{return} statement.
+include at least one \key{return} statement. Each program is also
+annotated with a list of variables. At the start of the program, these
+variables are uninitialized (they contain garbage) and each variable
+becomes initialized on its first assignment. All of the variables used
+in the program must be present in this list.
 
 \begin{figure}[tbp]
 \fbox{
@@ -1190,7 +1206,7 @@ include at least one \key{return} statement.
 \Arg &::=& \Int \mid \Var \\
 \Exp &::=& \Arg \mid (\Op \; \Arg^{*})\\
 \Stmt &::=& \ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg} \\
-\Prog & ::= & (\key{program}\;\itm{info}\;\Stmt^{+})
+\Prog & ::= & (\key{program}\;(\Var^{*})\;\Stmt^{+})
 \end{array}
 \]
 \end{minipage}
@@ -1199,19 +1215,20 @@ include at least one \key{return} statement.
 \label{fig:c0-syntax}
 \end{figure}
 
-
-To get from $C_0$ to x86-64 assembly it remains to handle difference
-\#1 (the format of instructions) and difference \#3 (variables versus
-registers). These two differences are intertwined, creating a bit of a
-Gordian Knot. To handle difference \#3, we need to map some variables
-to registers (there are only 16 registers) and the remaining variables
-to locations on the stack (which is unbounded). To make good decisions
-regarding this mapping, we need the program to be close to its final
-form (in x86-64 assembly) so we know exactly when which variables are
-used.  However, the choice of x86-64 instruction depends on whether
-the arguments are registers or stack locations, so we have a circular
-dependency. We cut this knot by doing an optimistic selection of
-instructions in the \key{select-instructions} pass, followed by the
+To get from $C_0$ to x86-64 assembly it remains for us to handle
+difference \#1 (the format of instructions) and difference \#3
+(variables versus registers). These two differences are intertwined,
+creating a bit of a Gordian Knot. To handle difference \#3, we need to
+map some variables to registers (there are only 16 registers) and the
+remaining variables to locations on the stack (which is unbounded). To
+make good decisions regarding this mapping, we need the program to be
+close to its final form (in x86-64 assembly) so we know exactly when
+which variables are used. After all, variables that are used in
+disjoint parts of the program can be assigned to the same register.
+However, our choice of x86-64 instructions depends on whether the
+variables are mapped to registers or stack locations, so we have a
+circular dependency. We cut this knot by doing an optimistic selection
+of instructions in the \key{select-instructions} pass, followed by the
 \key{assign-homes} pass to map variables to registers or stack
 locations, and conclude by finalizing the instruction selection in the
 \key{patch-instructions} pass.
@@ -1251,50 +1268,92 @@ registers, resorting to the stack only when necessary.
 Once variables have been assigned to their homes, we can finalize the
 instruction selection by dealing with an indiosycracy of x86
 assembly. Many x86 instructions have two arguments but only one of the
-arguments may be a memory reference (the stack is a part of memory).
-Because some variables may get mapped to stack locations, some of our
-generated instructions may violate this restriction.  The purpose of
-the \key{patch-instructions} pass is to fix this problem by replacing
-every violating instruction with a short sequence of instructions that
-use the \key{rax} register. Once we have implemented a good register
-allocator (Chapter~\ref{ch:register-allocation}), the need to patch
-instructions will be relatively rare.
+arguments may be a memory reference (and the stack is a part of
+memory).  Because some variables may get mapped to stack locations,
+some of our generated instructions may violate this restriction.  The
+purpose of the \key{patch-instructions} pass is to fix this problem by
+replacing every violating instruction with a short sequence of
+instructions that use the \key{rax} register. Once we have implemented
+a good register allocator (Chapter~\ref{ch:register-allocation}), the
+need to patch instructions will be relatively rare.
 
 
 \section{Uniquify Variables}
 \label{sec:uniquify-s0}
 
 The purpose of this pass is to make sure that each \key{let} uses a
-unique variable name. For example, the \key{uniquify} pass could
-translate
-\[
-\LET{x}{32}{ \BINOP{+}{ \LET{x}{10}{x} }{ x } }
-\]
-to
-\[
-\LET{x.1}{32}{ \BINOP{+}{ \LET{x.2}{10}{x.2} }{ x.1 } }
-\]
+unique variable name. For example, the \code{uniquify} pass should
+translate the program on the left into the program on the right. \\
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+ (program ()
+   (let ([x 32])
+     (+ (let ([x 10]) x) x)))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(program ()
+  (let ([x.1 32])
+    (+ (let ([x.2 10]) x.2) x.1)))
+\end{lstlisting}
+\end{minipage}
+\end{tabular} \\
+%
+The following is another example translation, this time of a program
+with a \key{let} nested inside the initializing expression of another
+\key{let}.\\
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(program ()
+  (let ([x (let ([x 4])
+             (+ x 1))])
+    (+ x 2)))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(program ()
+  (let ([x.2 (let ([x.1 4])
+               (+ x.1 1))])
+    (+ x.2 2)))
+\end{lstlisting}
+\end{minipage}
+\end{tabular}
 
-We recommend implementing \key{uniquify} as a recursive function that
-mostly just copies the input program. However, when encountering a
-\key{let}, it should generate a unique name for the variable (the
-Racket function \key{gensym} is handy for this) and associate the old
-name with the new unique name in an association list. The
-\key{uniquify} function will need to access this association list when
-it gets to a variable reference, so we add another paramter to
-\key{uniquify} for the association list. It is quite common for a
-compiler pass to need a map to store extra information about
-variables. Such maps are often called \emph{symbol tables}.
+We recommend implementing \code{uniquify} as a structurally recursive
+function that mostly copies the input program. However, when
+encountering a \key{let}, it should generate a unique name for the
+variable (the Racket function \code{gensym} is handy for this) and
+associate the old name with the new unique name in an association
+list. The \code{uniquify} function will need to access this
+association list when it gets to a variable reference, so we add
+another parameter to \code{uniquify} for the association list. It is
+quite common for a compiler pass to need a map to store extra
+information about variables. Such maps are often called \emph{symbol
+  tables}.
 
-The skeleton of the \key{uniquify} function is shown in
+The skeleton of the \code{uniquify} function is shown in
 Figure~\ref{fig:uniquify-s0}.  The function is curried so that it is
 convenient to partially apply it to an association list and then apply
 it to different expressions, as in the last clause for primitive
-operations in Figure~\ref{fig:uniquify-s0}.
+operations in Figure~\ref{fig:uniquify-s0}. In the last \key{match}
+clause for the primitive operators, note the use of the comma-@
+operator to splice a list of S-expressions into an enclosing
+S-expression.
 
 \begin{exercise}
 \normalfont % I don't like the italics for exercises. -Jeremy
-Complete the \key{uniquify} pass by filling in the blanks, that is,
+
+Complete the \code{uniquify} pass by filling in the blanks, that is,
 implement the clauses for variables and for the \key{let} construct.
 \end{exercise}
 
@@ -1318,14 +1377,15 @@ implement the clauses for variables and for the \key{let} construct.
 \end{figure}
 
 \begin{exercise}
-\normalfont % I don't like the italics for exercises. -Jeremy
-Test your \key{uniquify} pass by creating three example $R_1$ programs
+\normalfont % I don't like the italics for exercises. -Jeremy 
+
+Test your \key{uniquify} pass by creating five example $R_1$ programs
 and checking whether the output programs produce the same result as
 the input programs. The $R_1$ programs should be designed to test the
 most interesting parts of the \key{uniquify} pass, that is, the
 programs should include \key{let} constructs, variables, and variables
-that overshadow eachother.  The three programs should be in a
-subdirectory named \key{tests} and they shoul have the same file name
+that overshadow each other.  The five programs should be in a
+subdirectory named \key{tests} and they should have the same file name
 except for a different integer at the end of the name, followed by the
 ending \key{.scm}.  Use the \key{interp-tests} function
 (Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to test
@@ -1345,20 +1405,20 @@ The \key{flatten} pass will transform $R_1$ programs into $C_0$
 programs. In particular, the purpose of the \key{flatten} pass is to
 get rid of nested expressions, such as the $\UNIOP{-}{10}$ in the
 following program.
-\[
-\BINOP{+}{52}{ \UNIOP{-}{10} }
-\]
+\begin{lstlisting}
+   (program ()
+     (+ 52 (- 10)))
+\end{lstlisting}
 This can be accomplished by introducing a new variable, assigning the
 nested expression to the new variable, and then using the new variable
 in place of the nested expressions. For example, the above program is
 translated to the following one.
-\[
-\begin{array}{l}
-\ASSIGN{ \itm{x} }{ \UNIOP{-}{10} } \\
-\ASSIGN{ \itm{y} }{ \BINOP{+}{52}{ \itm{x} } } \\
-\RETURN{ y }
-\end{array}
-\]
+\begin{lstlisting}
+   (program (x y)
+     (assign x (- 10))
+     (assign y (+ 52 x))
+     (return y))
+\end{lstlisting}
 
 We recommend implementing \key{flatten} as a structurally recursive
 function that returns two things, 1) the newly flattened expression,
@@ -1370,25 +1430,38 @@ can receive multiple things from a function call using the
 constructs, the Racket documentation will be of help.
 
 Take special care for programs such as the following that initialize
-variables with integers or other variables.
-\[
-\LET{a}{42}{ \LET{b}{a}{ b }}
-\]
-This program should be translated to 
-\[
-\ASSIGN{a}{42} \;
-\ASSIGN{b}{a} \;
-\RETURN{b}
-\]
-and not the following, which could result from a naive implementation
-of \key{flatten}.
-\[
-\ASSIGN{x.1}{42}\;
-\ASSIGN{a}{x.1}\;
-\ASSIGN{x.2}{a}\;
-\ASSIGN{b}{x.2}\;
-\RETURN{b}
-\]
+variables with integers or other variables. It should be translated
+to the program on the right \\
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+  (let ([a 42])
+    (let ([b a])
+      b))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(program (a b)
+  (assign a 42)
+  (assign b a)
+  (return b))
+\end{lstlisting}
+\end{minipage}
+\end{tabular} \\
+and not to the following, which could result from a naive
+implementation of \key{flatten}.
+\begin{lstlisting}
+   (program (x.1 a x.2 b)
+     (assign x.1 42)
+     (assign a x.1)
+     (assign x.2 a)
+     (assign b x.2)
+     (return b))
+\end{lstlisting}
 
 \begin{exercise}
 \normalfont
@@ -1606,11 +1679,11 @@ To understand the latter condition, consider the following code
 fragment in which there are two writes to $b$. Are $a$ and
 $b$ both live at the same time? 
 \begin{lstlisting}[numbers=left,numberstyle=\tiny]
-(movq (int 5) (var a))    ; @$a \gets 5$@
-(movq (int 30) (var b))   ; @$b \gets 30$@
-(movq (var a) (var c))    ; @$c \gets x$@
-(movq (int 10) (var b))   ; @$b \gets 10$@
-(addq (var b) (var c))    ; @$c \gets c + b$@
+(movq (int 5) (var a))    ; |$a \gets 5$|
+(movq (int 30) (var b))   ; |$b \gets 30$|
+(movq (var a) (var c))    ; |$c \gets x$|
+(movq (int 10) (var b))   ; |$b \gets 10$|
+(addq (var b) (var c))    ; |$c \gets c + b$|
 \end{lstlisting}
 The answer is no because the value $30$ written to $b$ on line 2 is
 never used. The variable $b$ is read on line 5 and there is an
@@ -1647,16 +1720,16 @@ $L_{\mathtt{after}}$ set.
 \begin{figure}[tbp]
 \begin{lstlisting}
   (program (v w x y z)
-    (movq (int 1) (var v))      @$\{ v \}$@
-    (movq (int 46) (var w))     @$\{ v, w \}$@
-    (movq (var v) (var x))      @$\{ w, x \}$@
-    (addq (int 7) (var x))      @$\{ w, x \}$@
-    (movq (var x) (var y))      @$\{ w, x, y\}$@
-    (addq (int 4) (var y))      @$\{ w, x, y \}$@
-    (movq (var x) (var z))      @$\{ w, y, z \}$@
-    (addq (var w) (var z))      @$\{ y, z \}$@
-    (movq (var z) (reg rax))    @$\{ y \}$@
-    (subq (var y) (reg rax)))   @$\{\}$@
+    (movq (int 1) (var v))      |$\{ v \}$|
+    (movq (int 46) (var w))     |$\{ v, w \}$|
+    (movq (var v) (var x))      |$\{ w, x \}$|
+    (addq (int 7) (var x))      |$\{ w, x \}$|
+    (movq (var x) (var y))      |$\{ w, x, y\}$|
+    (addq (int 4) (var y))      |$\{ w, x, y \}$|
+    (movq (var x) (var z))      |$\{ w, y, z \}$|
+    (addq (var w) (var z))      |$\{ y, z \}$|
+    (movq (var z) (reg rax))    |$\{ y \}$|
+    (subq (var y) (reg rax)))   |$\{\}$|
 \end{lstlisting}
 \caption{Running example program annotated with live-after sets.}
 \label{fig:live-eg}
@@ -1821,16 +1894,16 @@ rest of the integers corresponding to stack locations.
   \centering
 \begin{lstlisting}[basicstyle=\rmfamily,deletekeywords={for,from,with,is,not,in,find},morekeywords={while},columns=fullflexible]
 Algorithm: DSATUR
-Input: a graph @$G$@
-Output: an assignment @$\mathrm{color}[v]$@ for each node @$v \in G$@
+Input: a graph |$G$|
+Output: an assignment |$\mathrm{color}[v]$| for each node |$v \in G$|
 
-@$W \gets \mathit{vertices}(G)$@
-while @$W \neq \emptyset$@ do
-    pick a node @$u$@ from @$W$@ with the highest saturation,
+|$W \gets \mathit{vertices}(G)$|
+while |$W \neq \emptyset$| do
+    pick a node |$u$| from |$W$| with the highest saturation,
         breaking ties randomly
-    find the lowest color @$c$@ that is not in @$\{ \mathrm{color}[v] \;|\; v \in \mathrm{Adj}(v)\}$@
-    @$\mathrm{color}[u] \gets c$@
-    @$W \gets W - \{u\}$@
+    find the lowest color |$c$| that is not in |$\{ \mathrm{color}[v] \;:\; v \in \mathrm{Adj}(v)\}$|
+    |$\mathrm{color}[u] \gets c$|
+    |$W \gets W - \{u\}$|
 \end{lstlisting}
   \caption{Saturation-based greedy graph coloring algorithm.}
   \label{fig:satur-algo}
