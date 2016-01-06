@@ -1249,7 +1249,7 @@ locations, and conclude by finalizing the instruction selection in the
 The \key{select-instructions} pass is optimistic in the sense that it
 treats variables as if they were all mapped to registers. The
 \key{select-instructions} pass generates a program that consists of
-x86-64 instructions but that still use variables, so it is an
+x86-64 instructions but that still uses variables, so it is an
 intermediate language that is technically different than x86-64, which
 explains the astericks in the diagram above.
 
@@ -1459,7 +1459,9 @@ We recommend implementing \key{flatten} as a structurally recursive
 function that returns two things, 1) the newly flattened expression,
 and 2) a list of assignment statements, one for each of the new
 variables introduced while flattening the expression.  The newly
-flattened expression should be leaf node. You can return multiple
+flattened expression should be a \emph{simple} expression, that is, an
+integer or a variable. (There will be more kinds of simple expressions
+in the input languages of later Chapters.) You can return multiple
 things from a function using the \key{values} form and you can receive
 multiple things from a function call using the \key{define-values}
 form. If you are not familiar with these constructs, the Racket
@@ -2291,10 +2293,54 @@ to replace the variables with their homes.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{Booleans, Type Checking, and Control Flow}
+\chapter{Booleans, Control Flow, and Type Checking}
 \label{ch:bool-types}
 
+Up until now the input languages have only included a single kind of
+value, the integers. In this Chapter we add a second kind of value,
+the Booleans (true and false), togther with some new operations
+(\key{and}, \key{not}, \key{eq?}) and conditional expressions to create
+the $R_2$ language.  With the addition of conditional expressions,
+programs can have non-trivial control flow which has an impact on
+several parts of the compiler. Also, because we now have two kinds of
+values, we need to worry about programs that apply an operation to the
+wrong kind of value, such as \code{(not 1)}.
+
+There are two language design options for such situations.  One option
+is to signal an error and the other is to provide a wider
+interpretation of the operation. The Racket language uses a mixture of
+these two options, depending on the operation and on the kind of
+value. For example, the result of \code{(not 1)} in Racket is
+\code{\#f} (that is, false) because Racket treats non-zero integers as
+true. On the other hand, \code{(car 1)} results in a run-time error in
+Racket, which states that \code{car} expects a pair.
+
+The Typed Racket language makes similar design choices as Racket,
+except much of the error detection happens at compile time instead of
+run time. Like Racket, Typed Racket accepts and runs \code{(not 1)},
+producing \code{\#f}. But in the case of \code{(car 1)}, Typed Racket
+reports a compile-time error because the type of the argument is
+expected to be of the form \code{(Listof T)} or \code{(Pairof T1 T2)}.
+
+For the $R_2$ language we choose to be more like Typed Racket in that
+we shall perform type checking during compilation.  However, we shall
+take a narrower interpretation of the operations, rejecting
+\code{(not 1)}. Despite this difference in design,
+$R_2$ is literally a subset of Typed Racket.  Every $R_2$
+program is a Typed Racket program.
+
+This chapter is organized as follows.  We begin by defining the syntax
+and interpreter for the $R_2$ language (Section~\ref{sec:r2-lang}). We
+then introduce the idea of type checking and build a type checker for
+$R_2$ (Section~\ref{sec:type-check-r2}). To compile $R_2$ we need to
+enlarge the intermediate language $C_0$ into $C_1$, which we do in
+Section~\ref{sec:c1}. The remaining sections of this Chapter discuss
+how our compiler passes need to change to accomodate Booleans and
+conditional control flow.
+
+
 \section{The $R_2$ Language}
+\label{sec:r2-lang}
 
 \begin{figure}[htbp]
 \centering
@@ -2302,9 +2348,10 @@ to replace the variables with their homes.
 \begin{minipage}{0.85\textwidth}
 \[
 \begin{array}{lcl}
-  \Op  &::=& \ldots \mid \key{and} \mid \key{or} \mid \key{not} \mid \key{eq?} \\
+  \Op  &::=& \ldots \mid \key{and} \mid \key{not} \mid \key{eq?} \\
   \Exp &::=& \ldots \mid \key{\#t} \mid \key{\#f} \mid
-      \IF{\Exp}{\Exp}{\Exp}
+      \IF{\Exp}{\Exp}{\Exp} \\
+  R_2 &::=& (\key{program} \; \Exp)
 \end{array}
 \]
 \end{minipage}
@@ -2315,8 +2362,9 @@ to replace the variables with their homes.
 \end{figure}
 
 \section{Type Checking $R_2$ Programs}
+\label{sec:type-check-r2}
 
-\marginpar{\scriptsize Type checking is a difficult thing to cover, I think, without having 522 as a prerequisite for this course. -- Cam}
+
 % T ::= Integer | Boolean
 
 It is common practice to specify a type system by writing rules for
@@ -2414,12 +2462,12 @@ $R_2$.
 
 \begin{align*}
 \Delta(\key{+},\key{Integer},\key{Integer}) &= \key{Integer} \\
-\Delta(\key{-},\key{Integer},\key{Integer}) &= \key{Integer} \\
+%\Delta(\key{-},\key{Integer},\key{Integer}) &= \key{Integer} \\
 \Delta(\key{-},\key{Integer}) &= \key{Integer} \\
-\Delta(\key{*},\key{Integer},\key{Integer}) &= \key{Integer} \\
+%\Delta(\key{*},\key{Integer},\key{Integer}) &= \key{Integer} \\
 \Delta(\key{read}) &= \key{Integer} \\
 \Delta(\key{and},\key{Boolean},\key{Boolean}) &= \key{Boolean} \\
-\Delta(\key{or},\key{Boolean},\key{Boolean}) &= \key{Boolean} \\
+%\Delta(\key{or},\key{Boolean},\key{Boolean}) &= \key{Boolean} \\
 \Delta(\key{not},\key{Boolean}) &= \key{Boolean} \\
 \Delta(\key{eq?},\key{Integer},\key{Integer}) &= \key{Boolean} \\
 \Delta(\key{eq?},\key{Boolean},\key{Boolean}) &= \key{Boolean} 
@@ -2430,6 +2478,7 @@ $R_2$.
 
 
 \section{The $C_1$ Language}
+\label{sec:c1}
 
 \begin{figure}[htbp]
 \[
