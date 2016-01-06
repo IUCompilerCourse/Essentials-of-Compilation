@@ -1414,10 +1414,10 @@ nested expression to the new variable, and then using the new variable
 in place of the nested expressions. For example, the above program is
 translated to the following one.
 \begin{lstlisting}
-   (program (x y)
-     (assign x (- 10))
-     (assign y (+ 52 x))
-     (return y))
+   (program (tmp.1 tmp.2)
+     (assign tmp.1 (- 10))
+     (assign tmp.2 (+ 52 tmp.1))
+     (return tmp.2))
 \end{lstlisting}
 
 We recommend implementing \key{flatten} as a structurally recursive
@@ -1428,6 +1428,14 @@ multiple things from a function using the \key{values} form and you
 can receive multiple things from a function call using the
 \key{define-values} form. If you are not familiar with these
 constructs, the Racket documentation will be of help.
+
+The clause of \key{flatten} for the \key{program} node needs to
+recursively flatten the body of the program and also compute the list
+of variables used in the program.  I recommend traversing the
+statements in the body of the program (after it has been flattened)
+and collect all variables that appear on the left-hand-side of an
+assignment. Note that each variable should only occur ones in the list
+of variables that you place in the \key{program} form.
 
 Take special care for programs such as the following that initialize
 variables with integers or other variables. It should be translated
@@ -1455,11 +1463,11 @@ $\Rightarrow$
 and not to the following, which could result from a naive
 implementation of \key{flatten}.
 \begin{lstlisting}
-   (program (x.1 a x.2 b)
-     (assign x.1 42)
-     (assign a x.1)
-     (assign x.2 a)
-     (assign b x.2)
+   (program (tmp.1 a tmp.2 b)
+     (assign tmp.1 42)
+     (assign a tmp.1)
+     (assign tmp.2 a)
+     (assign b tmp.2)
      (return b))
 \end{lstlisting}
 
