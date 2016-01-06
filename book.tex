@@ -374,7 +374,7 @@ called an ``alternative''.
 
 \begin{figure}[tbp]
 \fbox{
-\begin{minipage}{\textwidth}
+\begin{minipage}{0.96\textwidth}
 \[
 R_0 ::= \Int \mid ({\tt \key{read}}) \mid (\key{-} \; R_0) \mid
    (\key{+} \; R_0 \; R_0) 
@@ -772,25 +772,29 @@ some fun and creativity.
 The $R_1$ language extends the $R_0$ language
 (Figure~\ref{fig:r0-syntax}) with variable definitions.  The syntax of
 the $R_1$ language is defined by the grammar in
-Figure~\ref{fig:r1-syntax}. In addition to variable definitions, the
-$R_1$ language includes the \key{program} form to mark the top of the
-program, which is helpful in some of the compiler passes.  The $R_1$
-language is rich enough to exhibit several compilation techniques but
-simple enough so that the reader can implement a compiler for it in a
-couple weeks of part-time work.  To give the reader a feeling for the
-scale of this first compiler, the instructor solution for the $R_1$
-compiler consists of 6 recursive functions and a few small helper
-functions that together span 256 lines of code.
+Figure~\ref{fig:r1-syntax}. As in $R_0$, \key{read} is a nullary
+operator, \key{-} is a unary operator, and \key{+} is a binary
+operator. In addition to variable definitions, the $R_1$ language
+includes the \key{program} form to mark the top of the program, which
+is helpful in some of the compiler passes.  The $R_1$ language is rich
+enough to exhibit several compilation techniques but simple enough so
+that the reader can implement a compiler for it in a week of part-time
+work.  To give the reader a feeling for the scale of this first
+compiler, the instructor solution for the $R_1$ compiler consists of 6
+recursive functions and a few small helper functions that together
+span 256 lines of code.
 
 \begin{figure}[btp]
 \centering
 \fbox{
-\begin{minipage}{\textwidth}
-\begin{align*}
-\Exp &::= \Int \mid ({\tt \key{read}}) \mid (\key{-} \; \Exp) \mid
-   (\key{+} \; \Exp \; \Exp)  \mid  \Var \mid \LET{\Var}{\Exp}{\Exp} \\
-R_1 &::= (\key{program} \; () \; \Exp)
-\end{align*}
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{rcl}
+\Op  &::=& \key{read} \mid \key{-} \mid \key{+} \\
+\Exp &::=& \Int \mid (\Op \; \Exp^{*})  \mid  \Var \mid \LET{\Var}{\Exp}{\Exp} \\
+R_1  &::=& (\key{program} \; \Exp)
+\end{array}
+\]
 \end{minipage}
 }
 \caption{The syntax of the $R_1$ language. 
@@ -803,7 +807,7 @@ and initializes the variable with the value of an expression.  So the
 following program initializes \code{x} to \code{32} and then evaluates
 the body \code{(+ 10 x)}, producing \code{42}.
 \begin{lstlisting}
-   (program ()
+   (program
       (let ([x (+ 12 20)]) (+ 10 x)))
 \end{lstlisting}
 When there are multiple \key{let}'s for the same variable, the closest
@@ -811,7 +815,7 @@ enclosing \key{let} is used. That is, variable definitions overshadow
 prior definitions. Consider the following program with two \key{let}'s
 that define variables named \code{x}. Can you figure out the result?
 \begin{lstlisting}
-   (program ()
+   (program
       (let ([x 32]) (+ (let ([x 10]) x) x)))
 \end{lstlisting}
 For the purposes of showing which variable uses correspond to which
@@ -819,7 +823,7 @@ definitions, the following shows the \code{x}'s annotated with subscripts
 to distinguish them. Double check that your answer for the above is
 the same as your answer for this annotated version of the program.
 \begin{lstlisting}
-   (program ()
+   (program
       (let ([x|$_1$| 32]) (+ (let ([x|$_2$| 10]) x|$_2$|) x|$_1$|)))
 \end{lstlisting}
 The initializing expression is always evaluated before the body of the
@@ -828,7 +832,7 @@ performed before the \key{read} for \code{y}. Given the input
 \code{52} then \code{10}, the following produces \code{42} (and not
 \code{-42}).
 \begin{lstlisting}
-   (program ()
+   (program
      (let ([x (read)]) (let ([y (read)]) (- x y))))
 \end{lstlisting}
 
@@ -865,7 +869,7 @@ to the variable, then evaluates the body of the \key{let}.
         (fx- 0 (interp-R1 env e))]
        [`(+ ,e1 ,e2)
         (fx+ (interp-R1 env e1) (interp-R1 env e2))]
-       [`(program () ,e) (interp-R1 '() e)]
+       [`(program ,e) (interp-R1 '() e)]
        ))
 \end{lstlisting}
 \caption{Interpreter for the $R_1$ language.}
@@ -1287,7 +1291,7 @@ translate the program on the left into the program on the right. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
- (program ()
+ (program
    (let ([x 32])
      (+ (let ([x 10]) x) x)))
 \end{lstlisting}
@@ -1297,7 +1301,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program ()
+(program
   (let ([x.1 32])
     (+ (let ([x.2 10]) x.2) x.1)))
 \end{lstlisting}
@@ -1310,7 +1314,7 @@ with a \key{let} nested inside the initializing expression of another
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program ()
+(program
   (let ([x (let ([x 4])
              (+ x 1))])
     (+ x 2)))
@@ -1321,7 +1325,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program ()
+(program
   (let ([x.2 (let ([x.1 4])
                (+ x.1 1))])
     (+ x.2 2)))
@@ -1366,8 +1370,8 @@ implement the clauses for variables and for the \key{let} construct.
            [(? symbol?) ___]
            [(? integer?) e]
            [`(let ([,x ,e]) ,body) ___]
-           [`(program ,info ,e)
-            `(program ,info ,((uniquify alist) e))]
+           [`(program ,e)
+            `(program ,((uniquify alist) e))]
            [`(,op ,es ...)
             `(,op ,@(map (uniquify alist) es))]
            ))))
@@ -1401,33 +1405,68 @@ your \key{uniquify} pass on the example programs.
 \section{Flatten Expressions}
 \label{sec:flatten-s0}
 
-The \key{flatten} pass will transform $R_1$ programs into $C_0$
-programs. In particular, the purpose of the \key{flatten} pass is to
-get rid of nested expressions, such as the $\UNIOP{-}{10}$ in the
-following program.
+The \code{flatten} pass will transform $R_1$ programs into $C_0$
+programs. In particular, the purpose of the \code{flatten} pass is to
+get rid of nested expressions, such as the \code{(- 10)} in the below
+program. This can be accomplished by introducing a new variable,
+assigning the nested expression to the new variable, and then using
+the new variable in place of the nested expressions, as shown in the
+output of \code{flatten} on the right.\\
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-   (program ()
-     (+ 52 (- 10)))
+ (program
+   (+ 52 (- 10)))
 \end{lstlisting}
-This can be accomplished by introducing a new variable, assigning the
-nested expression to the new variable, and then using the new variable
-in place of the nested expressions. For example, the above program is
-translated to the following one.
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-   (program (tmp.1 tmp.2)
-     (assign tmp.1 (- 10))
-     (assign tmp.2 (+ 52 tmp.1))
-     (return tmp.2))
+(program (tmp.1 tmp.2)
+  (assign tmp.1 (- 10))
+  (assign tmp.2 (+ 52 tmp.1))
+  (return tmp.2))
 \end{lstlisting}
+\end{minipage}
+\end{tabular}
+
+The clause of \code{flatten} for \key{let} is straightforward to
+implement as it just requires the generation of an assignment
+statement for the \key{let}-bound variable. The following shows the
+result of \code{flatten} for a \key{let}. \\
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+ (program
+   (let ([x (+ (- 10) 11)])
+     (+ x 41)))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(program (tmp.1 x tmp.2)
+  (assign tmp.1 (- 10))
+  (assign x (+ tmp.1 11))
+  (assign tmp.2 (+ x 41))
+  (return tmp.2))
+\end{lstlisting}
+\end{minipage}
+\end{tabular}
 
 We recommend implementing \key{flatten} as a structurally recursive
 function that returns two things, 1) the newly flattened expression,
 and 2) a list of assignment statements, one for each of the new
-variables introduced while flattening the expression. You can return
-multiple things from a function using the \key{values} form and you
-can receive multiple things from a function call using the
-\key{define-values} form. If you are not familiar with these
-constructs, the Racket documentation will be of help.
+variables introduced while flattening the expression.  The newly
+flattened expression should be leaf node. You can return multiple
+things from a function using the \key{values} form and you can receive
+multiple things from a function call using the \key{define-values}
+form. If you are not familiar with these constructs, the Racket
+documentation will be of help.
 
 The clause of \key{flatten} for the \key{program} node needs to
 recursively flatten the body of the program and also compute the list
@@ -1492,61 +1531,90 @@ of the form $\VAR{\itm{var}}$ to the x86 abstract syntax.  The
 \key{select-instructions} pass deals with the differing format of
 arithmetic operations. For example, in $C_0$ an addition operation
 could take the following form:
-\[
-\ASSIGN{x}{ \BINOP{+}{10}{32} }
-\]
+\begin{lstlisting}
+   (assign x (+ 10 32))
+\end{lstlisting}
 To translate to x86, we need to express this addition using the
 \key{addq} instruction that does an inplace update. So we first move
-$10$ to $x$ then perform the \key{addq}.
-\[
-(\key{mov}\,\INT{10}\, \VAR{x})\; (\key{addq} \;\INT{32}\; \VAR{x})
-\]
+\code{10} to \code{x} then perform the \key{addq}.
+\begin{lstlisting}
+  (movq (int 10) (var x))
+  (addq (int 32) (var x))
+\end{lstlisting}
 
 There are some cases that require special care to avoid generating
 needlessly complicated code. If one of the arguments is the same as
 the left-hand side of the assignment, then there is no need for the
-extra move instruction.  For example, the following
-\[
-\ASSIGN{x}{ \BINOP{+}{10}{x} }
-\quad\text{should translate to}\quad
-(\key{addq} \; \INT{10}\; \VAR{x})
-\]
+extra move instruction.  For example, the following assignment
+statement can be translated into a single \key{addq} instruction.\\
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+ (assign x (+ 10 x))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(addq (int 10) (var x))
+\end{lstlisting}
+\end{minipage}
+\end{tabular} \\
 
 Regarding the \RETURN{e} statement of $C_0$, we recommend treating it
 as an assignment to the \key{rax} register and let the procedure
 conclusion handle the transfer of control back to the calling
 procedure.
 
+\begin{exercise}
+\normalfont
+Implement the \key{select-instructions} pass and test it on all of the
+example programs that you created for the previous passes and create
+three new example programs that are designed to exercise all of the
+interesting code in this pass. Use the \key{interp-tests} function
+(Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to test
+your passes on the example programs.
+\end{exercise}
+
 \section{Assign Homes}
 \label{sec:assign-s0}
 
 As discussed in Section~\ref{sec:plan-s0-x86}, the
 \key{assign-homes} pass places all of the variables on the stack.
-Consider again the example $R_1$ program $\BINOP{+}{52}{ \UNIOP{-}{10} }$,
+Consider again the example $R_1$ program \code{(+ 52 (- 10))},
 which after \key{select-instructions} looks like the following.
-\[
-\begin{array}{l}
-(\key{movq}\;\INT{10}\; \VAR{x})\\
-(\key{negq}\; \VAR{x})\\
-(\key{movq}\; \INT{52}\; \REG{\itm{rax}})\\
-(\key{addq}\; \VAR{x} \REG{\itm{rax}})
-\end{array}
-\]
-The one and only variable $x$ is assigned to stack location
-\key{-8(\%rbp)}, so the \key{assign-homes} pass translates the
+\begin{lstlisting}
+   (movq (int 10) (var x))
+   (negq (var x))
+   (movq (int 52) (reg rax))
+   (addq (var x) (reg rax))
+\end{lstlisting}
+The one and only variable \code{x} is assigned to stack location
+\code{-8(\%rbp)}, so the \code{assign-homes} pass translates the
 above to
-\[
-\begin{array}{l}
-(\key{movq}\;\INT{10}\; \STACKLOC{{-}8})\\
-(\key{negq}\; \STACKLOC{{-}8})\\
-(\key{movq}\; \INT{52}\; \REG{\itm{rax}})\\
-(\key{addq}\; \STACKLOC{{-}8}\; \REG{\itm{rax}})
-\end{array}
-\]
+\begin{lstlisting}
+   (movq (int 10) (stack -8))
+   (negq (stack -8))
+   (movq (int 52) (reg rax))
+   (addq (stack -8) (reg rax))
+\end{lstlisting}
 
 In the process of assigning stack locations to variables, it is
-convenient to compute and store the size of the frame which will be
-needed later to generate the procedure conclusion.
+convenient to compute and store the size of the frame in the
+$\itm{info}$ field of the \key{program} node which will be needed
+later to generate the procedure conclusion. Some operating systems
+place restrictions on the frame size. For example, Mac OS X requires
+the frame size to be a multiple of 16 bytes.
+
+\begin{exercise}
+\normalfont
+Implement the \key{assign-homes} pass and test it on all of the
+example programs that you created for the previous passes pass. Use
+the \key{interp-tests} function (Appendix~\ref{appendix:utilities})
+from \key{utilities.rkt} to test your passes on the example programs.
+\end{exercise}
 
 \section{Patch Instructions}
 \label{sec:patch-s0}
@@ -1557,32 +1625,38 @@ references. For most instructions, the rule is that at most one
 argument may be a memory reference.
 
 Consider again the following example.
-\[
-\LET{a}{42}{ \LET{b}{a}{ b }}
-\]
+\begin{lstlisting}
+   (let ([a 42])
+     (let ([b a])
+       b))
+\end{lstlisting}
 After \key{assign-homes} pass, the above has been translated to
-\[
-\begin{array}{l}
-(\key{movq} \;\INT{42}\; \STACKLOC{{-}8})\\
-(\key{movq}\;\STACKLOC{{-}8}\; \STACKLOC{{-}16})\\
-(\key{movq}\;\STACKLOC{{-}16}\; \REG{\itm{rax}})
-\end{array}
-\]
+\begin{lstlisting}
+   (movq (int 42) (stack -8))
+   (movq (stack -8) (stack -16))
+   (movq (stack -16) (reg rax))
+\end{lstlisting}
 The second \key{movq} instruction is problematic because both arguments
 are stack locations. We suggest fixing this problem by moving from the
 source to \key{rax} and then from \key{rax} to the destination, as
 follows.
-\[
-\begin{array}{l}
-(\key{movq} \;\INT{42}\; \STACKLOC{{-}8})\\
-(\key{movq}\;\STACKLOC{{-}8}\; \REG{\itm{rax}})\\
-(\key{movq}\;\REG{\itm{rax}}\; \STACKLOC{{-}16})\\
-(\key{movq}\;\STACKLOC{{-}16}\; \REG{\itm{rax}})
-\end{array}
-\]
+\begin{lstlisting}
+   (movq (int 42) (stack -8))
+   (movq (stack -8) (reg rax))
+   (movq (reg rax) (stack -16))
+   (movq (stack -16) (reg rax))
+\end{lstlisting}
 
-%% The \key{imulq} instruction is a special case because the destination
-%% argument must be a register.
+\begin{exercise}
+\normalfont
+Implement the \key{patch-instructions} pass and test it on all of the
+example programs that you created for the previous passes and create
+three new example programs that are designed to exercise all of the
+interesting code in this pass. Use the \key{interp-tests} function
+(Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to test
+your passes on the example programs.
+\end{exercise}
+
 
 \section{Print x86-64}
 \label{sec:print-x86}
@@ -1593,10 +1667,19 @@ representation (defined in Figure~\ref{fig:x86-a}). The Racket
 \key{format} and \key{string-append} functions are useful in this
 regard. The main work that this step needs to perform is to create the
 \key{\_main} function and the standard instructions for its prelude
-and conclusion, as described in Section~\ref{sec:x86-64}. You need to
-know the number of stack-allocated variables, which is convenient to
-compute in the \key{assign-homes} pass (Section~\ref{sec:assign-s0})
-and then store in the $\itm{info}$ field of the \key{program}.
+and conclusion, as shown in Figure~\ref{fig:p1-x86} of
+Section~\ref{sec:x86-64}. You need to know the number of
+stack-allocated variables, for which it is suggest that you compute in
+the \key{assign-homes} pass (Section~\ref{sec:assign-s0}) and store in
+the $\itm{info}$ field of the \key{program} node.
+
+\begin{exercise}
+\normalfont Implement the \key{print-x86} pass and test it on all of
+the example programs that you created for the previous passes. Use the
+\key{compiler-tests} function (Appendix~\ref{appendix:utilities}) from
+\key{utilities.rkt} to test your complete compiler on the example
+programs.
+\end{exercise}
 
 %% \section{Testing with Interpreters}
 
