@@ -1649,11 +1649,12 @@ place restrictions on the frame size. For example, Mac OS X requires
 the frame size to be a multiple of 16 bytes.
 
 \begin{exercise}
-\normalfont
-Implement the \key{assign-homes} pass and test it on all of the
-example programs that you created for the previous passes pass. Use
-the \key{interp-tests} function (Appendix~\ref{appendix:utilities})
-from \key{utilities.rkt} to test your passes on the example programs.
+\normalfont Implement the \key{assign-homes} pass and test it on all
+of the example programs that you created for the previous passes pass.
+I recommend that \key{assign-homes} take an extra parameter that is a
+mapping of variable names to homes (stack locations for now).  Use the
+\key{interp-tests} function (Appendix~\ref{appendix:utilities}) from
+\key{utilities.rkt} to test your passes on the example programs.
 \end{exercise}
 
 \section{Patch Instructions}
@@ -1759,12 +1760,13 @@ variables instead of stack locations or registers.
 \begin{minipage}{0.45\textwidth}
 Source program:
 \begin{lstlisting}
+(program
   (let ([v 1])
   (let ([w 46])
   (let ([x (+ v 7)])
   (let ([y (+ 4 x)])
   (let ([z (+ x w)])
-       (- z y))))))
+       (- z y)))))))
 \end{lstlisting}
 \end{minipage}
 \begin{minipage}{0.45\textwidth}
@@ -1789,15 +1791,15 @@ After instruction selection:
 
 The goal of register allocation is to fit as many variables into
 registers as possible. It is often the case that we have more
-variables than registers, so we can't naively map each variable to a
+variables than registers, so we cannot naively map each variable to a
 register. Fortunately, it is also common for different variables to be
 needed during different periods of time, and in such cases the
-variables can be mapped to the same register.  Consider variables $x$
-and $y$ in Figure~\ref{fig:reg-eg}.  After the variable $x$ is moved
-to $z$ it is no longer needed.  Variable $y$, on the other hand, is
-used only after this point, so $x$ and $y$ could share the same
-register. The topic of the next section is how we compute where a
-variable is needed.
+variables can be mapped to the same register.  Consider variables
+\code{x} and \code{y} in Figure~\ref{fig:reg-eg}.  After the variable
+\code{x} is moved to \code{z} it is no longer needed.  Variable
+\code{y}, on the other hand, is used only after this point, so
+\code{x} and \code{y} could share the same register. The topic of the
+next section is how we compute where a variable is needed.
 
 
 \section{Liveness Analysis}
@@ -1807,19 +1809,19 @@ in the program and there is not an intervening assignment to the
 variable.
 %
 To understand the latter condition, consider the following code
-fragment in which there are two writes to $b$. Are $a$ and
-$b$ both live at the same time? 
+fragment in which there are two writes to \code{b}. Are \code{a} and
+\code{b} both live at the same time?
 \begin{lstlisting}[numbers=left,numberstyle=\tiny]
-(movq (int 5) (var a))    ; |$a \gets 5$|
-(movq (int 30) (var b))   ; |$b \gets 30$|
-(movq (var a) (var c))    ; |$c \gets x$|
-(movq (int 10) (var b))   ; |$b \gets 10$|
-(addq (var b) (var c))    ; |$c \gets c + b$|
+   (movq (int 5) (var a))
+   (movq (int 30) (var b))
+   (movq (var a) (var c))
+   (movq (int 10) (var b))
+   (addq (var b) (var c))
 \end{lstlisting}
-The answer is no because the value $30$ written to $b$ on line 2 is
-never used. The variable $b$ is read on line 5 and there is an
-intervening write to $b$ on line 4, so the read on line 5 receives the
-value written on line 4, not line 2.
+The answer is no because the value \code{30} written to \code{b} on
+line 2 is never used. The variable \code{b} is read on line 5 and
+there is an intervening write to \code{b} on line 4, so the read on
+line 5 receives the value written on line 4, not line 2.
 
 The live variables can be computed by traversing the instruction
 sequence back to front (i.e., backwards in execution order).  Let
@@ -1845,7 +1847,7 @@ instruction sequence back to front.
 where $W(k)$ are the variables written to by instruction $I_k$ and
 $R(k)$ are the variables read by instruction $I_k$.
 Figure~\ref{fig:live-eg} shows the results of live variables analysis
-for the running example. Next to each instruction we write its
+for the running example. Next to each instruction we have written its
 $L_{\mathtt{after}}$ set.
 
 \begin{figure}[tbp]
@@ -1867,17 +1869,39 @@ $L_{\mathtt{after}}$ set.
 \end{figure}
 
 
+\begin{exercise}\normalfont
+Implement the compiler pass named \code{uncover-live} that computes
+the live-after sets. We recommend storing this information (a list of
+lists of variables) in the $\itm{info}$ field of the \key{program}
+node alongside the list of variables as follows.
+\begin{lstlisting}
+   (program (|$\Var^{*}$| |$\itm{live{-}afters}$|) |$\Instr^{+}$|)
+\end{lstlisting}
+I recommend organizing your code to use a helper function that takes a
+list of statements and an initial live-after set (typically empty) and
+returns the list of statements and the list of live-after sets.  For
+this chapter, returning the list of statements is unecessary, as they
+will be unchanged, but in Chatper~\ref{ch:bool-types} we will
+introduce \key{if} statements and will need to annotate them with the
+live-after sets of the two branches.
+
+I recommend creating helper functions to 1) compute the set of
+variables that appear in an argument (of an instruction), 2) compute
+the variables read by an instruction which corresponds to the $R$
+function discussed above, and 3) the variables written by an
+instruction which corresponds to $W$.
+\end{exercise}
+
 \section{Building the Interference Graph}
 
-Based on the liveness analysis, we know the program regions where each
-variable is needed.  However, during register allocation, we need to
-answer questions of the specific form: are variables $u$ and $v$ ever
-live at the same time?  (And therefore cannot be assigned to the same
-register.)  To make this question easier to answer, we create an
-explicit data structure, an \emph{interference graph}.  An
-interference graph is an undirected graph that has an edge between two
-variables if they are live at the same time, that is, if they
-interfere with each other.
+Based on the liveness analysis, we know where each variable is needed.
+However, during register allocation, we need to answer questions of
+the specific form: are variables $u$ and $v$ live at the same time?
+(And therefore cannot be assigned to the same register.)  To make this
+question easier to answer, we create an explicit data structure, an
+\emph{interference graph}.  An interference graph is an undirected
+graph that has an edge between two variables if they are live at the
+same time, that is, if they interfere with each other.
 
 The most obvious way to compute the interference graph is to look at
 the set of live variables between each statement in the program, and
@@ -1889,8 +1913,8 @@ which two variables that are live at the same time do not actually
 interfere with each other: when they both contain the same value
 because we have assigned one to the other.
 
-A better way to compute the edges of the intereference graph is given
-by the following rules.
+A better way to compute the intereference graph is given by the
+following.
 
 \begin{itemize}
 \item If instruction $I_k$ is a move: (\key{movq} $s$\, $d$), then add
@@ -1938,6 +1962,20 @@ Figure~\ref{fig:interfere}.
 \end{figure}
 
 
+\begin{exercise}\normalfont
+Implement the compiler pass named \code{build-interference} according
+to the algorithm suggested above.  There are several helper functions
+in \code{utilities.rkt} for representing graphs: \code{make-graph},
+\code{add-edge}, and \code{adjacent}
+(Appendix~\ref{appendix:utilities}). The output of this pass should
+replace the live-after sets with the interference $\itm{graph}$ as
+follows.
+\begin{lstlisting}
+   (program (|$\Var^{*}$| |$\itm{graph}$|) |$\Instr^{+}$|)
+\end{lstlisting}
+
+\end{exercise}
+
 \section{Graph Coloring via Sudoku}
 
 We now come to the main event, mapping variables to registers (or to
@@ -1952,45 +1990,41 @@ problem~\citep{Balakrishnan:1996ve,Rosen:2002bh}.
 The reader may be more familar with the graph coloring problem then he
 or she realizes; the popular game of Sudoku is an instance of the
 graph coloring problem. The following describes how to build a graph
-out of a Sudoku board.
+out of an initial Sudoku board.
 \begin{itemize}
 \item There is one node in the graph for each Sudoku square.
 \item There is an edge between two nodes if the corresponding squares
-  are in the same row or column, or if the squares are in the same
-  $3\times 3$ region.
+  are in the same row, in the same column, or if the squares are in
+  the same $3\times 3$ region.
 \item Choose nine colors to correspond to the numbers $1$ to $9$.
 \item Based on the initial assignment of numbers to squares in the
   Sudoku board, assign the corresponding colors to the corresponding
   nodes in the graph.
 \end{itemize}
 If you can color the remaining nodes in the graph with the nine
-colors, then you've also solved the corresponding game of Sudoku.
+colors, then you have also solved the corresponding game of Sudoku.
 
 Given that Sudoku is graph coloring, one can use Sudoku strategies to
 come up with an algorithm for allocating registers. For example, one
-of the basic techniques for Sudoku is Pencil Marks. The idea is that
-you use a process of elimination to determine what numbers still make
-sense for a square, and write down those numbers in the square
-(writing very small). At first, each number might be a
-possibility, but as the board fills up, more and more of the
-possibilities are crossed off (or erased). For example, if the number
-$1$ is assigned to a square, then by process of elimination, you can
-cross off the $1$ pencil mark from all the squares in the same row,
-column, and region. Many Sudoku computer games provide automatic
-support for Pencil Marks. This heuristic also reduces the degree of
-branching in the search tree.
+of the basic techniques for Sudoku is called Pencil Marks. The idea is
+that you use a process of elimination to determine what numbers no
+longer make sense for a square, and write down those numbers in the
+square (writing very small). For example, if the number $1$ is
+assigned to a square, then by process of elimination, you can write
+the pencil mark $1$ in all the squares in the same row, column, and
+region. Many Sudoku computer games provide automatic support for
+Pencil Marks. This heuristic also reduces the degree of branching in
+the search tree.
 
 The Pencil Marks technique corresponds to the notion of color
-\emph{saturation} due to \cite{Brelaz:1979eu}.  The
-saturation of a node, in Sudoku terms, is the number of possibilities
-that have been crossed off using the process of elimination mentioned
-above. In graph terminology, we have the following definition:
+\emph{saturation} due to \cite{Brelaz:1979eu}.  The saturation of a
+node, in Sudoku terms, is the set of colors that are no longer
+available. In graph terminology, we have the following definition:
 \begin{equation*}
-  \mathrm{saturation}(u) = |\{ c \;|\; \exists v. v \in \mathrm{Adj}(u) 
-     \text{ and } \mathrm{color}(v) = c \}|
+  \mathrm{saturation}(u) = \{ c \;|\; \exists v. v \in \mathrm{adjacent}(u) 
+     \text{ and } \mathrm{color}(v) = c \}
 \end{equation*}
-where $\mathrm{Adj}(u)$ is the set of nodes adjacent to $u$ and
-the notation $|S|$ stands for the size of the set $S$.
+where $\mathrm{adjacent}(u)$ is the set of nodes adjacent to $u$.
 
 Using the Pencil Marks technique leads to a simple strategy for
 filling in numbers: if there is a square with only one possible number
@@ -1998,28 +2032,28 @@ left, then write down that number! But what if there are no squares
 with only one possibility left? One brute-force approach is to just
 make a guess. If that guess ultimately leads to a solution, great.  If
 not, backtrack to the guess and make a different guess.  Of course,
-this is horribly time consuming. One standard way to reduce the amount
-of backtracking is to use the most-constrained-first heuristic. That
-is, when making a guess, always choose a square with the fewest
-possibilities left (the node with the highest saturation).  The idea
-is that choosing highly constrained squares earlier rather than later
-is better because later there may not be any possibilities left.
+backtracking can be horribly time consuming. One standard way to
+reduce the amount of backtracking is to use the most-constrained-first
+heuristic. That is, when making a guess, always choose a square with
+the fewest possibilities left (the node with the highest saturation).
+The idea is that choosing highly constrained squares earlier rather
+than later is better because later there may not be any possibilities.
 
 In some sense, register allocation is easier than Sudoku because we
-can always cheat and add more numbers by spilling variables to the
-stack. Also, we'd like to minimize the time needed to color the graph,
-and backtracking is expensive. Thus, it makes sense to keep the
-most-constrained-first heuristic but drop the backtracking in favor of
-greedy search (guess and just keep going).
+can always cheat and add more numbers by mapping variables to the
+stack. We say that a variable is \emph{spilled} when we decide to map
+it to a stack location. We would like to minimize the time needed to
+color the graph, and backtracking is expensive. Thus, it makes sense
+to keep the most-constrained-first heuristic but drop the backtracking
+in favor of greedy search (guess and just keep going).
 Figure~\ref{fig:satur-algo} gives the pseudo-code for this simple
 greedy algorithm for register allocation based on saturation and the
 most-constrained-first heuristic, which is roughly equivalent to the
-DSATUR algorithm of \cite{Brelaz:1979eu} (also known as
-saturation degree ordering
-(SDO)~\citep{Gebremedhin:1999fk,Omari:2006uq}).  Just as in Sudoku,
-the algorithm represents colors with integers, with the first $k$
-colors corresponding to the $k$ registers in a given machine and the
-rest of the integers corresponding to stack locations.
+DSATUR algorithm of \cite{Brelaz:1979eu} (also known as saturation
+degree ordering (SDO)~\citep{Gebremedhin:1999fk,Omari:2006uq}).  Just
+as in Sudoku, the algorithm represents colors with integers, with the
+first $k$ colors corresponding to the $k$ registers in a given machine
+and the rest of the integers corresponding to stack locations.
 
 \begin{figure}[btp]
   \centering
@@ -2032,7 +2066,7 @@ Output: an assignment |$\mathrm{color}[v]$| for each node |$v \in G$|
 while |$W \neq \emptyset$| do
     pick a node |$u$| from |$W$| with the highest saturation,
         breaking ties randomly
-    find the lowest color |$c$| that is not in |$\{ \mathrm{color}[v] \;:\; v \in \mathrm{Adj}(v)\}$|
+    find the lowest color |$c$| that is not in |$\{ \mathrm{color}[v] \;:\; v \in \mathrm{adjacent}(v)\}$|
     |$\mathrm{color}[u] \gets c$|
     |$W \gets W - \{u\}$|
 \end{lstlisting}
@@ -2065,9 +2099,9 @@ dash for their color and an empty set for the saturation.
 \end{tikzpicture}
 \]
 We select a maximally saturated node and color it $0$. In this case we
-have a 5-way tie, so we arbitrarily pick $y$. The color $0$ is no
-longer available for $w$, $x$, and $z$ because they interfere with
-$y$.
+have a 5-way tie, so we arbitrarily pick $y$. The then mark color $0$
+as no longer available for $w$, $x$, and $z$ because they interfere
+with $y$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (v) at (0,0)    {$v:-,\{\}$};
@@ -2171,13 +2205,12 @@ The last iteration of the coloring algorithm assigns color $0$ to $v$.
 \draw (z) to (y);
 \end{tikzpicture}
 \]
-With the coloring complete, we can finalize assignment of variables to
-registers and stack locations. Recall that if we have $k$ registers,
-we map the first $k$ colors to registers and the rest to stack
-locations.
-Suppose for the moment that we just have one extra register
-to use for register allocation, just \key{rbx}. Then the following is
-the mapping of colors to registers and stack allocations.
+With the coloring complete, we can finalize the assignment of
+variables to registers and stack locations. Recall that if we have $k$
+registers, we map the first $k$ colors to registers and the rest to
+stack locations.  Suppose for the moment that we just have one extra
+register to use for register allocation, just \key{rbx}. Then the
+following is the mapping of colors to registers and stack allocations.
 \[
   \{ 0 \mapsto \key{\%rbx}, \; 1 \mapsto \key{-8(\%rbp)}, \; 2 \mapsto \key{-16(\%rbp)}, \ldots \}
 \]
@@ -2196,26 +2229,26 @@ Applying this assignment to our running example
 \begin{lstlisting}
 (program 32
   (movq (int 1) (reg rbx))
-  (movq (int 46) (stack-loc -8))
-  (movq (reg rbx) (stack-loc -16))
-  (addq (int 7) (stack-loc -16))
-  (movq (stack-loc 16) (reg rbx))
+  (movq (int 46) (stack -8))
+  (movq (reg rbx) (stack -16))
+  (addq (int 7) (stack -16))
+  (movq (stack 16) (reg rbx))
   (addq (int 4) (reg rbx))
-  (movq (stack-loc -16) (stack-loc -16))
-  (addq (stack-loc -8) (stack-loc -16))
-  (movq (stack-loc -16) (reg rax))
+  (movq (stack -16) (stack -16))
+  (addq (stack -8) (stack -16))
+  (movq (stack -16) (reg rax))
   (subq (reg rbx) (reg rax)))
 \end{lstlisting}
 This program is almost an x86-64 program. The remaining step is to apply
 the patch instructions pass. In this example, the trivial move of
-\key{-16(\%rbp)} to itself is deleted and the addition of
-\key{-8(\%rbp)} to \key{-16(\%rbp)} is fixed by going through
-\key{\%rax}. The following shows the portion of the program that
+\code{-16(\%rbp)} to itself is deleted and the addition of
+\code{-8(\%rbp)} to \key{-16(\%rbp)} is fixed by going through
+\code{rax}. The following shows the portion of the program that
 changed.
 \begin{lstlisting}
   (addq (int 4) (reg rbx))
-  (movq (stack-loc -8) (reg rax)
-  (addq (reg rax) (stack-loc -16))
+  (movq (stack -8) (reg rax)
+  (addq (reg rax) (stack -16))
 \end{lstlisting}
 An overview of all of the passes involved in register allocation is
 shown in Figure~\ref{fig:reg-alloc-passes}.
@@ -2230,16 +2263,34 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \node (5)  at (0,-4.5)  {$\text{x86-64}^{*}$};
 \node (6)  at (3.5,-4.5)  {$\text{x86-64}$};
 
-\path[->] (1) edge [above] node {\ttfamily\scriptsize select-instr.}      (2);
+\path[->] (1) edge [above] node {\ttfamily\scriptsize select-instructions} (2);
 \path[->] (2) edge [right] node {\ttfamily\scriptsize uncover-live}       (3);
 \path[->] (3) edge [right] node {\ttfamily\scriptsize build-interference} (4);
 \path[->] (4) edge [left]  node {\ttfamily\scriptsize allocate-registers} (5);
-\path[->] (5) edge [above] node {\ttfamily\scriptsize patch-instr.}       (6);
+\path[->] (5) edge [above] node {\ttfamily\scriptsize patch-instructions} (6);
 \end{tikzpicture}
 \]
 \caption{Diagram of the passes for register allocation.}
 \label{fig:reg-alloc-passes}
 \end{figure}
+
+\begin{exercise}\normalfont
+Implement the pass \code{allocate-registers} and test it by creating
+new example programs that exercise all of the register allocation
+algorithm, such as forcing variables to be spilled to the stack.
+
+I recommend organizing our code by creating a helper function named
+\code{allocate-homes} that takes an interference graph, a list of all
+the variables in the program, and the list of statements. This
+function should return a mapping of variables to their homes
+(registers or stack locations) and the total size needed for the
+stack. By creating this helper function, we will be able to reuse it
+in Chapter~\ref{ch:functions} when we add support for functions.
+
+Once you have obtained the mapping from \code{allocate-homes}, you can
+use the \code{assign-homes} function from Section~\ref{sec:assign-s0}
+to replace the variables with their homes.
+\end{exercise}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2469,6 +2520,9 @@ Boolean \key{bool} is false.
 The \key{lookup} function ...
 
 The \key{map2} function ...
+
+The \code{make-graph}, \code{add-edge}, and \code{adjacent}
+functions...
 
 The \key{interp-tests} function takes a compiler name (a string) a
 description of the passes a test family name (a string), and a list of
