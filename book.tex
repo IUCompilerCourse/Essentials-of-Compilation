@@ -166,14 +166,14 @@ Racket (at least in Indiana), so the course is now about implementing,
 in Racket~\citep{plt-tr}, a subset of Racket.
 
 This is the textbook for the incremental version of the compiler
-course at Indiana University (Spring 2016) and it is the first attempt
-to create a textbook for the Indiana compiler course.  With this book
-I hope to make the Indiana compiler course available to people that
-have not had the chance to study here in person.  Many of the compiler
-design decisions in this book are drawn from the assignment
-descriptions of \cite{Dybvig:2010aa}. I have captured what I think are
-the most important topics from \cite{Dybvig:2010aa} but have omitted
-topics that I think are less interesting conceptually and I have made
+course at Indiana University (Spring 2016) and it is the first
+textbook for an Indiana compiler course.  With this book I hope to
+make the Indiana compiler course available to people that have not had
+the chance to study here in person.  Many of the compiler design
+decisions in this book are drawn from the assignment descriptions of
+\cite{Dybvig:2010aa}. I have captured what I think are the most
+important topics from \cite{Dybvig:2010aa} but have omitted topics
+that I think are less interesting conceptually and I have made
 simplifications to reduce complexity.  In this way, this book leans
 more towards pedagogy than towards absolute efficiency. Also, the book
 differs in places where I saw the opportunity to make the topics more
@@ -1080,7 +1080,7 @@ communicated from one step of the compiler to the next.
 
 \begin{figure}[tbp]
 \fbox{
-\begin{minipage}{\textwidth}
+\begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
 \Arg &::=&  \INT{\Int} \mid \REG{\itm{register}}
@@ -1089,7 +1089,7 @@ communicated from one step of the compiler to the next.
              (\key{subq} \; \Arg\; \Arg) \mid 
 %             (\key{imulq} \; \Arg\;\Arg) \mid 
              (\key{negq} \; \Arg) \mid (\key{movq} \; \Arg\; \Arg) \\
-      &\mid& (\key{call} \; \mathit{label}) \mid
+      &\mid& (\key{callq} \; \mathit{label}) \mid
              (\key{pushq}\;\Arg) \mid 
              (\key{popq}\;\Arg) \mid 
              (\key{retq}) \\
@@ -1466,7 +1466,10 @@ flattened expression should be leaf node. You can return multiple
 things from a function using the \key{values} form and you can receive
 multiple things from a function call using the \key{define-values}
 form. If you are not familiar with these constructs, the Racket
-documentation will be of help.
+documentation will be of help. Also, the \key{map2} function
+(Appendix~\ref{appendix:utilities}) is useful for applying a function
+to each element of a list, in the case where the function returns two
+values. The result of \key{map2} is two lists.
 
 The clause of \key{flatten} for the \key{program} node needs to
 recursively flatten the body of the program and also compute the list
@@ -1524,23 +1527,31 @@ test your passes on the example programs.
 \section{Select Instructions}
 \label{sec:select-s0}
 
-In the \key{select-instructions} pass we begin the work of
-translating from $C_0$ to x86. The target language of this pass is a
-pseudo-x86 language that still uses variables, so we add an AST node
-of the form $\VAR{\itm{var}}$ to the x86 abstract syntax.  The
+In the \key{select-instructions} pass we begin the work of translating
+from $C_0$ to x86. The target language of this pass is a pseudo-x86
+language that still uses variables, so we add an AST node of the form
+$\VAR{\itm{var}}$ to the x86 abstract syntax.  The
 \key{select-instructions} pass deals with the differing format of
-arithmetic operations. For example, in $C_0$ an addition operation
-could take the following form:
+arithmetic operations. For example, in $C_0$ an addition operation can
+take the form below.  To translate to x86, we need to use the
+\key{addq} instruction which does an inplace update. So we must first
+move \code{10} to \code{x}. \\
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-   (assign x (+ 10 32))
+ (assign x (+ 10 32))
 \end{lstlisting}
-To translate to x86, we need to express this addition using the
-\key{addq} instruction that does an inplace update. So we first move
-\code{10} to \code{x} then perform the \key{addq}.
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-  (movq (int 10) (var x))
-  (addq (int 32) (var x))
+   (movq (int 10) (var x))
+   (addq (int 32) (var x))
 \end{lstlisting}
+\end{minipage}
+\end{tabular} \\
 
 There are some cases that require special care to avoid generating
 needlessly complicated code. If one of the arguments is the same as
@@ -1559,6 +1570,35 @@ $\Rightarrow$
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
 (addq (int 10) (var x))
+\end{lstlisting}
+\end{minipage}
+\end{tabular} \\
+
+The \key{read} operation does not have a direct counterpart in x86-64
+assembly, so we have instead implemented this functionality in the C
+language, with the function \code{read\_int} in the file
+\code{runtime.c}. In general, we have refer to all of the
+functionality in this file as the \emph{runtime system}, or simply
+\emph{runtime} for short. When compiling your generated x86-64
+assembly code, you will need to compile \code{runtime.c} and link it
+in. For for purposes of code generation, all you need to do is
+translate an assignment of \key{read} to some left-hand side
+$\itm{lhs}$ into call to the \code{read\_int} function followed by a
+move from \code{rax} into $\itm{lhs}$. (Recall that the return value
+of a function is typically placed in the \code{rax} register.)  \\
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+ (assign |$\itm{lhs}$| (read))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(callq _read_int)
+(movq (reg rax) |$\itm{lhs}$|)
 \end{lstlisting}
 \end{minipage}
 \end{tabular} \\
@@ -1861,7 +1901,7 @@ by the following rules.
   instruction such as (\key{addq} $s$\, $d$), then add the edge $(d,v)$
   for every $v \in L_{\mathsf{after}}(k)$ unless $v = d$.
   
-\item If instruction $I_k$ is of the form (\key{call}
+\item If instruction $I_k$ is of the form (\key{callq}
   $\mathit{label}$), then add an edge $(r,v)$ for every caller-save
   register $r$ and every variable $v \in L_{\mathsf{after}}(k)$.
 \end{itemize}
@@ -2222,8 +2262,8 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \end{minipage}
 }
 \caption{The $R_2$ language, an extension of $R_1$
-  (Figure~\ref{fig:s0-syntax}).}
-\label{fig:s2-syntax}
+  (Figure~\ref{fig:r1-syntax}).}
+\label{fig:r2-syntax}
 \end{figure}
 
 \section{Type Checking $R_2$ Programs}
@@ -2427,6 +2467,8 @@ Boolean \key{bool} is false.
 \end{lstlisting}
 
 The \key{lookup} function ...
+
+The \key{map2} function ...
 
 The \key{interp-tests} function takes a compiler name (a string) a
 description of the passes a test family name (a string), and a list of
