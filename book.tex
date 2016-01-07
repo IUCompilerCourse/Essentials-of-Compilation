@@ -1846,35 +1846,51 @@ instruction sequence back to front.
 where $W(k)$ are the variables written to by instruction $I_k$ and
 $R(k)$ are the variables read by instruction $I_k$.
 Figure~\ref{fig:live-eg} shows the results of live variables analysis
-for the running example. Next to each instruction we have written its
-$L_{\mathtt{after}}$ set.
+for the running example. Next to each instruction we have written 
+a comment with its $L_{\mathtt{after}}$ set.
 
 \begin{figure}[tbp]
+\hspace{20pt}
+\begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
   (program (v w x y z)
-    (movq (int 1) (var v))      |$\{ v \}$|
-    (movq (int 46) (var w))     |$\{ v, w \}$|
-    (movq (var v) (var x))      |$\{ w, x \}$|
-    (addq (int 7) (var x))      |$\{ w, x \}$|
-    (movq (var x) (var y))      |$\{ w, x, y\}$|
-    (addq (int 4) (var y))      |$\{ w, x, y \}$|
-    (movq (var x) (var z))      |$\{ w, y, z \}$|
-    (addq (var w) (var z))      |$\{ y, z \}$|
-    (movq (var z) (reg rax))    |$\{ y \}$|
-    (subq (var y) (reg rax)))   |$\{\}$|
+    (movq (int 1) (var v))
+    (movq (int 46) (var w))
+    (movq (var v) (var x))
+    (addq (int 7) (var x))
+    (movq (var x) (var y))
+    (addq (int 4) (var y))
+    (movq (var x) (var z))
+    (addq (var w) (var z))
+    (movq (var z) (reg rax))
+    (subq (var y) (reg rax)))
 \end{lstlisting}
-\caption{Running example program annotated with live-after sets.}
+\end{minipage}
+\vrule\hspace{10pt}
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+
+|$\{ v \}$|
+|$\{ v, w \}$|
+|$\{ w, x \}$|
+|$\{ w, x \}$|
+|$\{ w, x, y\}$|
+|$\{ w, x, y \}$|
+|$\{ w, y, z \}$|
+|$\{ y, z \}$|
+|$\{ y \}$|
+|$\{\}$|
+\end{lstlisting}
+\end{minipage}
+
+\caption{The running example and its live-after sets.}
 \label{fig:live-eg}
 \end{figure}
-\marginpar{This doesn't quite agree with the instructor solution. The
-  annotations appear in the actual {\tt program} wrapper. Perhaps consider
-  clarifying why the annotations appear to the right of each instruction.}
-
 
 \begin{exercise}\normalfont
 Implement the compiler pass named \code{uncover-live} that computes
-the live-after sets. We recommend storing this information (a list of
-lists of variables) in the $\itm{info}$ field of the \key{program}
+the live-after sets. We recommend storing the live-after sets (a list
+of lists of variables) in the $\itm{info}$ field of the \key{program}
 node alongside the list of variables as follows.
 \begin{lstlisting}
    (program (|$\Var^{*}$| |$\itm{live{-}afters}$|) |$\Instr^{+}$|)
@@ -1883,9 +1899,9 @@ I recommend organizing your code to use a helper function that takes a
 list of statements and an initial live-after set (typically empty) and
 returns the list of statements and the list of live-after sets.  For
 this chapter, returning the list of statements is unecessary, as they
-will be unchanged, but in Chatper~\ref{ch:bool-types} we will
-introduce \key{if} statements and will need to annotate them with the
-live-after sets of the two branches.
+will be unchanged, but in Chapter~\ref{ch:bool-types} we introduce
+\key{if} statements and will need to annotate them with the live-after
+sets of the two branches.
 
 I recommend creating helper functions to 1) compute the set of
 variables that appear in an argument (of an instruction), 2) compute
@@ -2415,10 +2431,10 @@ expression \code{e2} is not evaluated if \code{e1} evaluates to
 \label{sec:type-check-r2}
 
 It is helpful to think about type checking into two complementary
-ways. It helps to think of a type checker as trying to predict the
-\emph{type} of value that will be produced by each expression in the
-program.  For $R_2$, we have just two types, \key{Integer} and
-\key{Boolean}. So a type checker should predict that
+ways. A type checker predicts the \emph{type} of value that will be
+produced by each expression in the program.  For $R_2$, we have just
+two types, \key{Integer} and \key{Boolean}. So a type checker should
+predict that
 \begin{lstlisting}
    (+ 10 (- (+ 12 20)))
 \end{lstlisting}
@@ -2428,12 +2444,12 @@ produces an \key{Integer} while
 \end{lstlisting}
 produces a \key{Boolean}.
 
-As mentioned at the beginning of this chapter, a type checker is also
-responsible for reject programs that apply operators to the wrong type
-of value. Our type checker for $R_2$ will signal an error for the
-following because, as we have seen above, the expression \code{(+ 10
-  ...)} has type \key{Integer}, and we shall require an argument of
-\code{not} to have type \key{Boolean}.
+As mentioned at the beginning of this chapter, a type checker also
+rejects programs that apply operators to the wrong type of value. Our
+type checker for $R_2$ will signal an error for the following because,
+as we have seen above, the expression \code{(+ 10 ...)} has type
+\key{Integer}, and we shall require an argument of \code{not} to have
+type \key{Boolean}.
 \begin{lstlisting}
    (not (+ 10 (- (+ 12 20))))
 \end{lstlisting}
@@ -2475,6 +2491,22 @@ use of a variable, it can lookup its type in the associaton list.
 \label{fig:type-check-R2}
 \end{figure}
 
+
+
+
+\begin{exercise}\normalfont
+Complete the implementation of \code{typecheck-R2} and test it on 10
+new example programs in $R_2$ that you choose based on how thoroughly
+they test the type checking algorithm. Half of the example programs
+should have a type error, to make sure that your type checker properly
+rejects them. The other half of the example programs should not have
+type errors. Your testing should check that the result of the type
+checker agrees with the value returned by the interpreter, that is, if
+the type checker returns \key{Integer}, then the interpreter should
+return an integer. Likewise, if the type checker returns
+\key{Boolean}, then the interpreter should return \code{\#t} or
+\code{\#f}.
+\end{exercise}
 
 %% % T ::= Integer | Boolean
 
