@@ -1207,7 +1207,7 @@ in the program must be present in this list.
 \Arg &::=& \Int \mid \Var \\
 \Exp &::=& \Arg \mid (\Op \; \Arg^{*})\\
 \Stmt &::=& \ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg} \\
-\Prog & ::= & (\key{program}\;(\Var^{*})\;\Stmt^{+})
+C_0 & ::= & (\key{program}\;(\Var^{*})\;\Stmt^{+})
 \end{array}
 \]
 \end{minipage}
@@ -1400,7 +1400,7 @@ your \key{uniquify} pass on the example programs.
 
 
 \section{Flatten Expressions}
-\label{sec:flatten-s0}
+\label{sec:flatten-r1}
 
 The \code{flatten} pass will transform $R_1$ programs into $C_0$
 programs. In particular, the purpose of the \code{flatten} pass is to
@@ -2369,10 +2369,10 @@ expression. The operators are expanded to include the \key{and} and
 \key{not} operations on Booleans and the \key{eq?} operation for
 comparing two integers and for comparing two Booleans.
 
-\begin{figure}[htbp]
+\begin{figure}[tbp]
 \centering
 \fbox{
-\begin{minipage}{0.85\textwidth}
+\begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
   \Op  &::=& \ldots \mid \key{and} \mid \key{not} \mid \key{eq?} \\
@@ -2491,9 +2491,6 @@ use of a variable, it can lookup its type in the associaton list.
 \label{fig:type-check-R2}
 \end{figure}
 
-
-
-
 \begin{exercise}\normalfont
 Complete the implementation of \code{typecheck-R2} and test it on 10
 new example programs in $R_2$ that you choose based on how thoroughly
@@ -2505,137 +2502,122 @@ checker agrees with the value returned by the interpreter, that is, if
 the type checker returns \key{Integer}, then the interpreter should
 return an integer. Likewise, if the type checker returns
 \key{Boolean}, then the interpreter should return \code{\#t} or
-\code{\#f}.
+\code{\#f}. Note that if your type checker does not signal an error
+for a program, then interpreting that program should not encounter an
+error.  If it does, there is something wrong with your type checker.
 \end{exercise}
-
-%% % T ::= Integer | Boolean
-
-%% It is common practice to specify a type system by writing rules for
-%% each kind of AST node. For example, the rule for \key{if} is:
-%% \begin{quote}
-%%   For any expressions $e_1, e_2, e_3$ and any type $T$, if $e_1$ has
-%%   type \key{bool}, $e_2$ has type $T$, and $e_3$ has type $T$, then
-%%   $\IF{e_1}{e_2}{e_3}$ has type $T$.
-%% \end{quote}
-%% It is also common practice to write rules using a horizontal line,
-%% with the conditions written above the line and the conclusion written
-%% below the line.
-%% \begin{equation*}
-%%   \inference{e_1 \text{ has type } \key{bool} & 
-%%         e_2 \text{ has type } T & e_3 \text{ has type } T}
-%%   {\IF{e_1}{e_2}{e_3} \text{ has type } T}
-%% \end{equation*}
-%% Because the phrase ``has type'' is repeated so often in these type
-%% checking rules, it is abbreviated to just a colon. So the above rule
-%% is abbreviated to the following.
-%% \begin{equation*}
-%%   \inference{e_1 : \key{bool} & e_2 : T & e_3 : T}
-%%             {\IF{e_1}{e_2}{e_3} : T}
-%% \end{equation*}
-
-%% The $\LET{x}{e_1}{e_2}$ construct poses an interesting challenge. The
-%% variable $x$ is assigned the value of $e_1$ and then $x$ can be used
-%% inside $e_2$. When we get to an occurrence of $x$ inside $e_2$, how do
-%% we know what type the variable should be?  The answer is that we need
-%% a way to map from variable names to types.  Such a mapping is called a
-%% \emph{type environment} (aka. \emph{symbol table}). The capital Greek
-%% letter gamma, written $\Gamma$, is used for referring to type
-%% environments environments. The notation $\Gamma, x : T$ stands for
-%% making a copy of the environment $\Gamma$ and then associating $T$
-%% with the variable $x$ in the new environment.  We write $\Gamma(x)$ to
-%% lookup the associated type for $x$.  The type checking rules for
-%% \key{let} and variables are as follows.
-%% \begin{equation*}
-%%   \inference{e_1 : T_1 \text{ in } \Gamma &
-%%              e_2 : T_2 \text{ in } \Gamma,x:T_1}
-%%             {\LET{x}{e_1}{e_2} : T_2 \text{ in } \Gamma} 
-%%   \qquad
-%%   \inference{\Gamma(x) = T}
-%%             {x : T \text{ in } \Gamma}
-%% \end{equation*}
-%% Type checking has roots in logic, and logicians have a tradition of
-%% writing the environment on the left-hand side and separating it from
-%% the expression with a turn-stile ($\vdash$).  The turn-stile does not
-%% have any intrinsic meaning per se.  It is punctuation that separates
-%% the environment $\Gamma$ from the expression $e$.  So the above typing
-%% rules are written as follows.
-%% \begin{equation*}
-%%   \inference{\Gamma \vdash e_1 : T_1 &
-%%              \Gamma,x:T_1 \vdash e_2 : T_2}
-%%             {\Gamma \vdash \LET{x}{e_1}{e_2} : T_2} 
-%%    \qquad
-%%   \inference{\Gamma(x) = T}
-%%             {\Gamma \vdash x : T}
-%% \end{equation*}
-%% Overall, the statement $\Gamma \vdash e : T$ is an example of what is
-%% called a \emph{judgment}.  In particular, this judgment says, ``In
-%% environment $\Gamma$, expression $e$ has type $T$.''
-%% Figure~\ref{fig:S1-type-system} shows the type checking rules for
-%% $R_2$.
-
-%% \begin{figure}
-%% \begin{gather*}
-%%   \inference{\Gamma(x) = T}
-%%             {\Gamma \vdash x : T}
-%%    \qquad
-%%   \inference{\Gamma \vdash e_1 : T_1 &
-%%              \Gamma,x:T_1 \vdash e_2 : T_2}
-%%             {\Gamma \vdash \LET{x}{e_1}{e_2} : T_2} 
-%%   \\[2ex]
-%%   \inference{}{\Gamma \vdash n : \key{Integer}}
-%%   \quad
-%%   \inference{\Gamma \vdash e_i : T_i \ ^{\forall i \in 1\ldots n} & \Delta(\Op,T_1,\ldots,T_n) = T}
-%%             {\Gamma \vdash (\Op \; e_1 \ldots e_n) : T}
-%%   \\[2ex]
-%%   \inference{}{\Gamma \vdash \key{\#t} : \key{Boolean}}
-%%   \quad
-%%   \inference{}{\Gamma \vdash \key{\#f} : \key{Boolean}}
-%%   \quad
-%%   \inference{\Gamma \vdash e_1 : \key{bool} \\
-%%              \Gamma \vdash e_2 : T &
-%%              \Gamma \vdash e_3 : T}
-%%   {\Gamma \vdash \IF{e_1}{e_2}{e_3} : T}
-%% \end{gather*}
-%% \caption{Type System for $R_2$.}
-%% \label{fig:S1-type-system}
-%% \end{figure}
-
-
-%% \begin{figure}
-
-%% \begin{align*}
-%% \Delta(\key{+},\key{Integer},\key{Integer}) &= \key{Integer} \\
-%% %\Delta(\key{-},\key{Integer},\key{Integer}) &= \key{Integer} \\
-%% \Delta(\key{-},\key{Integer}) &= \key{Integer} \\
-%% %\Delta(\key{*},\key{Integer},\key{Integer}) &= \key{Integer} \\
-%% \Delta(\key{read}) &= \key{Integer} \\
-%% \Delta(\key{and},\key{Boolean},\key{Boolean}) &= \key{Boolean} \\
-%% %\Delta(\key{or},\key{Boolean},\key{Boolean}) &= \key{Boolean} \\
-%% \Delta(\key{not},\key{Boolean}) &= \key{Boolean} \\
-%% \Delta(\key{eq?},\key{Integer},\key{Integer}) &= \key{Boolean} \\
-%% \Delta(\key{eq?},\key{Boolean},\key{Boolean}) &= \key{Boolean} 
-%% \end{align*}
-
-%% \caption{Types for the primitives operators.}
-%% \end{figure}
-
 
 \section{The $C_1$ Language}
 \label{sec:c1}
 
-\begin{figure}[htbp]
+The $R_2$ language adds Booleans and conditional expressions to $R_1$.
+As with $R_1$, we shall compile to a C-like intermediate language, but
+we need to grow that intermediate language to handle the new features
+in $R_2$. Figure~\ref{fig:c1-syntax} shows the new features of $C_1$;
+we add \key{\#t} and \key{\#f} to the $\Arg$ non-terminal and we add
+an \key{if} statement.
+
+\begin{figure}[tbp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
 \Arg &::=& \ldots \mid \key{\#t} \mid \key{\#f} \\
-\Stmt &::=& \ldots \mid \IF{\Exp}{\Stmt^{*}}{\Stmt^{*}} 
+\Stmt &::=& \ldots \mid \IF{\Exp}{\Stmt^{*}}{\Stmt^{*}} \\
+C_1 & ::= & (\key{program}\;(\Var^{*})\;\Stmt^{+})
 \end{array}
 \]
+\end{minipage}
+}
 \caption{The $C_1$ intermediate language, an extension of $C_0$
   (Figure~\ref{fig:c0-syntax}).}
 \label{fig:c1-syntax}
 \end{figure}
 
 \section{Flatten Expressions}
+\label{sec:flatten-r2}
+
+The \code{flatten} pass needs to be expanded to handle the Boolean
+literals \key{\#t} and \key{\#f} as well as the \key{if}
+expressions. We shall start with a simple example of translating a
+\key{if} expression, shown below on the left. \\
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+ (program (if #f 0 42))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(program (if.1)
+  (if #f
+    ((assign if.1 0))
+    ((assign if.1 42)))
+  (return if.1))
+\end{lstlisting}
+\end{minipage}
+\end{tabular} \\
+The value of the \key{if} expression is the value of the branch that
+is selected. Recall that in the \code{flatten} pass we need to replace
+complex expressions with simple expressions (variables or
+literals). In the translation above, on the right, we have translated
+the \key{if} expression into a new variable \key{if.1} and we have
+produced code that will assign the appropriate value to \key{if.1}.
+For $R_1$, the \code{flatten} pass returned a list of assignment
+statements. Here, for $R_2$, we return a list of statements that can
+include both \key{if} statements and assignment statements.
+
+The next example is a bit more involved, showing what happens then
+there are complex expressions in the condition and branch expressions
+of an \key{if}, including nested \key{if} expressions.
+
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(program
+  (if (eq? (read) 0)
+      777
+      (+ 2 (if (eq? (read) 0)
+               40
+               444))))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(program (t.1 t.2 if.1 t.3 
+           t.4 if.2 t.5)
+  (assign t.1 (read))
+  (assign t.2 (eq? t.1 0))
+  (if t.2
+    ((assign if.1 777))
+    ((assign t.3 (read))
+     (assign t.4 (eq? t.3 0))
+     (if t.4
+       ((assign if.2 40))
+       ((assign if.2 444)))
+     (assign t.5 (+ 2 if.2))
+     (assign if.1 t.5)))
+  (return if.1))
+\end{lstlisting}
+\end{minipage}
+\end{tabular} \\
+
+\begin{exercise}\normalfont
+Expand your \code{flatten} pass to handle $R_2$, that is, handle the
+Boolean literals and the \key{if} expressions. Create 4 more test
+cases that expose whether your coe for flattening Booleans and
+\key{if} expressions is correct. Test your \code{flatten} pass by
+running the output programs with \code{interp-C}
+(Appendix~\ref{appendix:interp}).
+\end{exercise}
+
+
 
 \section{Select Instructions}
 
