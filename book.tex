@@ -192,9 +192,10 @@ prior to reading this book. There are many other excellent resources
 for learning Racket and
 Scheme~\citep{Dybvig:1987aa,Abelson:1996uq,Friedman:1996aa,Felleisen:2001aa,Felleisen:2013aa,Flatt:2014aa}. It
 is helpful but not necessary for the student to have prior exposure to
-x86 (or x86-64) assembly language, as one might obtain from a computer
-systems course~\citep{Bryant:2005aa,Bryant:2010aa}.  This book
-introduces the parts of x86-64 assembly language that are needed.
+x86 (or x86-64) assembly language~\citep{Intel:2015aa}, as one might
+obtain from a computer systems
+course~\citep{Bryant:2005aa,Bryant:2010aa}.  This book introduces the
+parts of x86-64 assembly language that are needed.
 
 %\section*{Structure of book}
 % You might want to add short description about each chapter in this book.
@@ -751,7 +752,7 @@ following grammar.
 \label{ch:int-exp}
 
 This chapter concerns the challenge of compiling a subset of Racket,
-which we name $R_1$, to x86-64 assembly code~\citep{Matz:2013aa}. The
+which we name $R_1$, to x86-64 assembly code~\citep{Intel:2015aa}. The
 chapter begins with a description of the $R_1$ language
 (Section~\ref{sec:s0}) and then a description of x86-64
 (Section~\ref{sec:x86-64}). The x86-64 assembly language is quite
@@ -1090,7 +1091,7 @@ communicated from one step of the compiler to the next.
              (\key{pushq}\;\Arg) \mid 
              (\key{popq}\;\Arg) \mid 
              (\key{retq}) \\
-\Prog &::= & (\key{program} \;\itm{info} \; \Instr^{+})
+x86^{*}_0 &::= & (\key{program} \;\itm{info} \; \Instr^{+})
 \end{array}
 \]
 \end{minipage}
@@ -2010,6 +2011,8 @@ The reader may be more familar with the graph coloring problem then he
 or she realizes; the popular game of Sudoku is an instance of the
 graph coloring problem. The following describes how to build a graph
 out of an initial Sudoku board.
+\marginpar{\scriptsize To do: create a figure with a Sudoku
+board and its corresponding graph. --Jeremy}
 \begin{itemize}
 \item There is one node in the graph for each Sudoku square.
 \item There is an edge between two nodes if the corresponding squares
@@ -2619,10 +2622,134 @@ running the output programs with \code{interp-C}
 \end{exercise}
 
 
+\section{More x86-64}
+\label{sec:x86-1}
+
+To implement the new logical operations, the comparison \key{eq?}, and
+the \key{if} statement, we need to delve further into the x86-64
+language. Figure~\ref{fig:x86-ast-b} defines the abstract syntax for a
+larger subset of x86-64 that includes instructions for logical
+operations, comparisons, and jumps.  The logical instructions
+(\key{andq} and \key{notq}) are quite similar to the arithmetic
+instructions, so we focus on the comparison and jump instructions.
+
+\begin{figure}[tbp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{lcl}
+\Arg &::=&  \ldots \mid (\key{byte-reg}\; \itm{register}) \\ 
+\Instr &::=& \ldots \mid (\key{andq} \; \Arg\; \Arg) \mid (\key{notq} \; \Arg)\\
+       &\mid& (\key{cmpq} \; \Arg\; \Arg) \mid (\key{sete} \; \Arg) 
+              \mid (\key{movzx}\;\Arg\;\Arg) \\
+      &\mid&  (\key{jmp} \; \itm{label}) \mid (\key{je} \; \itm{label}) \mid
+             (\key{label} \; \itm{label}) \\
+x86^{*}_1 &::= & (\key{program} \;\itm{info} \; \Instr^{+})
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The x86$^{*}_1$ language (extends x86$^{*}_0$ of Figure~\ref{fig:x86-ast-a}).}
+\label{fig:x86-ast-b}
+\end{figure}
+
+The \key{cmpq} instruction is somewhat unusual in that its arguments
+are the two things to be compared and the result (less than, greater
+than, equal, not equal, etc.) is placed in the special EFLAGS
+register. This register cannot be accessed directly but it can be
+queried by a number of instructions, including the \key{sete}
+instruction. The \key{sete} instruction puts a \key{1} or \key{0} into
+its destination depending on whether the comparison came out as equal
+or not, respectively. The \key{sete} instruction has an annoying quirk
+in that its destination argument must be single byte register, such as
+\code{al}, which is part of the \code{rax} register.  The following
+instruction sequence shows an example of comparing two integers stored
+in \code{rbx} and \code{rcx} and store the result of the comparison in
+\code{rdx}. The \key{movzx} instruction is used to move from a smaller
+register to a larger register, filling the rest of the bits in the
+larger register with $0$'s.
+\begin{lstlisting}
+	cmpq	%rbx, %rcx
+	sete	%al
+	movzx	%al, %rdx
+\end{lstlisting}
+
+The \key{jmp} instruction jumps to the instruction after the indicated
+label.  The \key{je} instruction jumps to the instruction after the
+indicated label if the result in the EFLAGS register is equal, whereas
+the \key{je} instruction just falls through to the next instruction if
+EFLAGS is not equal.
 
 \section{Select Instructions}
 
+
+
+Figure~\ref{fig:if-example-x86} shows a simple example program in
+$R_2$ together with its translation to $C_1$ and x86-64.
+
+
+
+\begin{figure}[tbp]
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(if (eq? (read) 1) 42 0)
+\end{lstlisting}
+$\Downarrow$
+\begin{lstlisting}
+(program (t.1 t.2 if.1)
+  (assign t.1 (read))
+  (assign t.2 (eq? t.1 1))
+  (if t.2
+    ((assign if.1 42))
+    ((assign if.1 0)))
+  (return if.1))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+	.globl _main
+_main:
+	pushq	%rbp
+	movq	%rsp, %rbp
+	subq	$16, %rsp
+	callq	_read_int
+	movq	%rax, %rcx
+	cmpq	$1, %rcx
+	movq	$0, %rax
+	sete	%al
+	movq	%rax, %rcx
+	cmpq	$0, %rcx
+	je else_1
+	movq	$42, %rbx
+	jmp if_end_1
+else_1:
+	movq	$0, %rbx
+if_end_1:
+	movq	%rbx, %rax
+	addq	$16, %rsp
+	popq	%rbp
+	retq
+\end{lstlisting}
+\end{minipage}
+\end{tabular} 
+\caption{Example compilation of \key{if} expression to x86-64.}
+\label{fig:if-example-x86}
+\end{figure}
+
+
+
+
+
+
+
 \section{Register Allocation}
+
+
+
 
 \section{Patch Instructions}
 
@@ -2651,7 +2778,7 @@ running the output programs with \code{interp-C}
 \label{ch:mutable-data}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{The Dynamic Type}
+\chapter{Dynamic Typing}
 \label{ch:type-dynamic}
 
 
