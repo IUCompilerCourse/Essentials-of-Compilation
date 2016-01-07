@@ -1091,7 +1091,7 @@ communicated from one step of the compiler to the next.
              (\key{pushq}\;\Arg) \mid 
              (\key{popq}\;\Arg) \mid 
              (\key{retq}) \\
-x86^{*}_0 &::= & (\key{program} \;\itm{info} \; \Instr^{+})
+x86_0 &::= & (\key{program} \;\itm{info} \; \Instr^{+})
 \end{array}
 \]
 \end{minipage}
@@ -1803,6 +1803,7 @@ next section is how we compute where a variable is needed.
 
 
 \section{Liveness Analysis}
+\label{sec:liveness-analysis}
 
 A variable is \emph{live} if the variable is used at some later point
 in the program and there is not an intervening assignment to the
@@ -2644,12 +2645,12 @@ instructions, so we focus on the comparison and jump instructions.
               \mid (\key{movzx}\;\Arg\;\Arg) \\
       &\mid&  (\key{jmp} \; \itm{label}) \mid (\key{je} \; \itm{label}) \mid
              (\key{label} \; \itm{label}) \\
-x86^{*}_1 &::= & (\key{program} \;\itm{info} \; \Instr^{+})
+x86_1 &::= & (\key{program} \;\itm{info} \; \Instr^{+})
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The x86$^{*}_1$ language (extends x86$^{*}_0$ of Figure~\ref{fig:x86-ast-a}).}
+\caption{The x86$_1$ language (extends x86$^{*}_0$ of Figure~\ref{fig:x86-ast-a}).}
 \label{fig:x86-ast-b}
 \end{figure}
 
@@ -2662,38 +2663,179 @@ instruction. The \key{sete} instruction puts a \key{1} or \key{0} into
 its destination depending on whether the comparison came out as equal
 or not, respectively. The \key{sete} instruction has an annoying quirk
 in that its destination argument must be single byte register, such as
-\code{al}, which is part of the \code{rax} register.  The following
-instruction sequence shows an example of comparing two integers stored
-in \code{rbx} and \code{rcx} and store the result of the comparison in
-\code{rdx}. The \key{movzx} instruction is used to move from a smaller
-register to a larger register, filling the rest of the bits in the
-larger register with $0$'s.
-\begin{lstlisting}
-	cmpq	%rbx, %rcx
-	sete	%al
-	movzx	%al, %rdx
-\end{lstlisting}
+\code{al}, which is part of the \code{rax} register.  Thankfully, the
+\key{movzx} instruction can then be used to move from a single byte
+register to a normal 64-bit register.
 
 The \key{jmp} instruction jumps to the instruction after the indicated
 label.  The \key{je} instruction jumps to the instruction after the
 indicated label if the result in the EFLAGS register is equal, whereas
-the \key{je} instruction just falls through to the next instruction if
+the \key{je} instruction falls through to the next instruction if
 EFLAGS is not equal.
 
 \section{Select Instructions}
+\label{sec:select-r2}
 
+The \code{select-instructions} pass needs to lower from $C_1$ to an
+intermediate representation suitable for conducting register
+allocation, i.e., close to x86$_1$. We can take the usual approach of
+encoding Booleans as integers, with true as 1 and false as 0.
+\[
+\key{\#t} \Rightarrow \key{1}
+\qquad
+\key{\#f} \Rightarrow \key{0}
+\]
 
-
-Figure~\ref{fig:if-example-x86} shows a simple example program in
-$R_2$ together with its translation to $C_1$ and x86-64.
-
-
-
-\begin{figure}[tbp]
+Translating the \code{eq?} operation to x86 is slightly involved due
+to the unusual nature of the \key{cmpq} instruction discussed above.
+We recommend translating an assignment from \code{eq?} into the
+following sequence of three instructions. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(if (eq? (read) 1) 42 0)
+ (assign |$\itm{lhs}$| (eq? |$\Arg_1$| |$\Arg_2$|))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(cmpq |$\Arg_1$| |$\Arg_2$|)
+(sete (byte-reg al))
+(movzx (byte-reg al) |$\itm{lhs}$|)
+\end{lstlisting}
+\end{minipage}
+\end{tabular}  \\
+One further caveat is that the arguments of the \key{cmpq} instruction
+may not both be immediate values. In that case you must insert another
+\key{movq} instruction to put one of the immediate values in
+\key{rax}.
+
+Regarding \key{if} statements, we recommend that you not lower them in
+\code{select-instructions} but instead lower them in
+\code{patch-instructions}.  The reason is that for purposes of
+liveness analysis, \key{if} statments are easier to deal with than
+jump instructions.
+
+\section{Register Allocation}
+\label{sec:register-allocation-r2}
+
+\subsection{Liveness Analysis}
+\label{sec:liveness-analysis-r2}
+
+The addition of \key{if} statements brings up an interesting issue in
+liveness analysis. Recall that liveness analysis works backwards
+through the program, for each instruction computing the variables that
+are live before the instruction based on which variables are live
+after the instruction. Now consider the situation for \code{(\key{if}
+  $\itm{cnd}$ $\itm{thns}$ $\itm{elss}$)}, where we know the
+$L_{\mathsf{after}}$ set and need to produce the $L_{\mathsf{before}}$
+set.  We can recusively perform liveness analysis on the $\itm{thns}$
+and $\itm{elss}$ branches, using $L_{\mathsf{after}}$ as the starting
+point, to obtain $L^{\mathsf{thns}}_{\mathsf{before}}$ and
+$L^{\mathsf{elss}}_{\mathsf{before}}$ respectively. However, we do not
+know, during compilation, which way the branch will go, so we do not
+know whether to use $L^{\mathsf{thns}}_{\mathsf{before}}$ or
+$L^{\mathsf{elss}}_{\mathsf{before}}$ as the $L_{\mathsf{before}}$ for
+the entire \key{if} statement. The solution comes from the observation
+that there is no harm in identifying more variables as live than
+absolutely necessary. Thus, we can take the union of the live
+variables from the two branches to be the live set for the whole
+\key{if}, as shown below. Of course, we also need to include the
+variables that are read in the $\itm{cnd}$ argument.
+\[
+  L_{\mathsf{before}} = L^{\mathsf{thns}}_{\mathsf{before}} \cup 
+  L^{\mathsf{elss}}_{\mathsf{before}} \cup \mathit{Vars}(\itm{cnd})
+\]
+We need the live-after sets for all the instructions in both branches
+of the \key{if} when we build the interference graph, so I recommend
+storing that data in the \key{if} statement AST as follows:
+\begin{lstlisting}
+   (if |$\itm{cnd}$| |$\itm{thns}$| |$\itm{thn{-}lives}$| |$\itm{elss}$| |$\itm{els{-}lives}$|)
+\end{lstlisting}
+
+If you wrote helper functions for computing the variables in an
+argument and the variables read-from ($R$) or written-to ($W$) by an
+instruction, you need to be update them to handle the new kinds of
+arguments and instructions in x86$_1$.
+
+\subsection{Build Interference}
+\label{sec:build-interference-r2}
+
+Many of the new instructions, such as the logical operations, can be
+handled in the same way as the arithmetic instructions. Thus, if your
+code was already quite general, it will not need to be changed to
+handle the logical operations. If not, I recommend that you change
+your code to be more general. The \key{movzx} instruction should be
+handled like the \key{movq} instruction. The \key{if} statement is
+straightfoward to handle because we stored the live-after sets for the
+two branches in the AST node as described above. Here we just need to
+recursively process the two branches. The output of this pass can
+discard the live after sets, as they are no longer needed.
+
+\subsection{Assign Homes}
+\label{sec:assign-homes-r2}
+
+The \code{assign-homes} function (Section~\ref{sec:assign-s0}) needs
+to be updated to handle the \key{if} statement, simply by recursively
+processing the child nodes.  Hopefully your code already handles the
+other new instructions, but if not, you can generalize your code.
+
+\section{Patch Instructions}
+\label{sec:patch-instructions-r2}
+
+In the \code{select-instructions} pass we decided to procrastinate in
+the lowering of the \key{if} statement (thereby making liveness
+analysis easier). Now we need to make up for that and turn the
+\key{if} statement into the appropriate instruction sequence.  The
+following translation gives the general idea. If the condition
+$\itm{cnd}$ is false then we need to execute the $\itm{elss}$
+branch. So we compare $\itm{cnd}$ with $0$ and do a conditional jump
+to the $\itm{elselabel}$ (which we can generate with \code{gensym}).
+Otherwise we fall through to the $\itm{thns}$ branch. At the end of
+the $\itm{thns}$ branch we need to take care to not fall through to
+the $\itm{elss}$ branch. So we jump to the $\itm{endlabel}$ (also
+generated with \code{gensym}).
+
+\begin{tabular}{lll}
+\begin{minipage}{0.3\textwidth}
+\begin{lstlisting}
+ (if |$\itm{cnd}$| |$\itm{thns}$| |$\itm{elss}$|)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+ (cmpq (int 0) |$\itm{cnd}$|)
+ (je |$\itm{elselabel}$|)
+ |$\itm{thns}$|
+ (jmp |$\itm{endlabel}$|)
+ (label |$\itm{elselabel}$|)
+ |$\itm{elss}$|
+ (label |$\itm{endlabel}$|)
+\end{lstlisting}
+\end{minipage}
+\end{tabular} 
+
+
+
+\section{An Example Translation}
+
+
+Figure~\ref{fig:if-example-x86} shows a simple example program in
+$R_2$ translated to x86-64, showing the results of \code{flatten},
+\code{select-instructions}, \code{allocate-registers}, and the final
+x86-64 assembly.
+
+\begin{figure}[tbp]
+\begin{tabular}{lll}
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+(program
+  (if (eq? (read) 1) 42 0))
 \end{lstlisting}
 $\Downarrow$
 \begin{lstlisting}
@@ -2705,11 +2847,37 @@ $\Downarrow$
     ((assign if.1 0)))
   (return if.1))
 \end{lstlisting}
+$\Downarrow$
+\begin{lstlisting}
+(program (t.1 t.2 if.1)
+  (callq _read_int)
+  (movq (reg rax) (var t.1))
+  (cmpq (int 1) (var t.1))
+  (sete (byte-reg al))
+  (movzx (byte-reg al) (var t.2))
+  (if (var t.2)
+    ((movq (int 42) (var if.1)))
+    ((movq (int 0) (var if.1))))
+  (movq (var if.1) (reg rax)))
+\end{lstlisting}
+$\Downarrow$
+\begin{lstlisting}
+(program 16
+  (callq _read_int)
+  (movq (reg rax) (reg rcx))
+  (cmpq (int 1) (reg rcx))
+  (sete (byte-reg al))
+  (movzx (byte-reg al) (reg rcx))
+  (if (reg rcx)
+    ((movq (int 42)
+     (reg rbx)))
+    ((movq (int 0) (reg rbx))))
+  (movq (reg rbx) (reg rax)))
+\end{lstlisting}
 \end{minipage}
 &
-$\Rightarrow$
-&
 \begin{minipage}{0.4\textwidth}
+$\Downarrow$
 \begin{lstlisting}
 	.globl _main
 _main:
@@ -2719,16 +2887,15 @@ _main:
 	callq	_read_int
 	movq	%rax, %rcx
 	cmpq	$1, %rcx
-	movq	$0, %rax
 	sete	%al
-	movq	%rax, %rcx
+	movzx	%al, %rcx
 	cmpq	$0, %rcx
-	je else_1
+	je else1326
 	movq	$42, %rbx
-	jmp if_end_1
-else_1:
+	jmp if_end1327
+else1326:
 	movq	$0, %rbx
-if_end_1:
+if_end1327:
 	movq	%rbx, %rax
 	addq	$16, %rsp
 	popq	%rbp
@@ -2736,7 +2903,7 @@ if_end_1:
 \end{lstlisting}
 \end{minipage}
 \end{tabular} 
-\caption{Example compilation of \key{if} expression to x86-64.}
+\caption{Example compilation of an \key{if} expression to x86-64.}
 \label{fig:if-example-x86}
 \end{figure}
 
@@ -2746,12 +2913,6 @@ if_end_1:
 
 
 
-\section{Register Allocation}
-
-
-
-
-\section{Patch Instructions}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
