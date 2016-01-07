@@ -2342,6 +2342,14 @@ conditional control flow.
 \section{The $R_2$ Language}
 \label{sec:r2-lang}
 
+The syntax of the $R_2$ language is defined in
+Figure~\ref{fig:r2-syntax}. It includes all of $R_1$, so we only show
+the new operators and expressions. We add the Boolean literals
+\code{\#t} and \code{\#f} for true and false and the conditional
+expression. The operators are expanded to include the \key{and} and
+\key{not} operations on Booleans and the \key{eq?} operation for
+comparing two integers and for comparing two Booleans.
+
 \begin{figure}[htbp]
 \centering
 \fbox{
@@ -2361,120 +2369,220 @@ conditional control flow.
 \label{fig:r2-syntax}
 \end{figure}
 
+Figure~\ref{fig:interp-R2} defines the interpreter for $R_2$, omiting
+the parts that are the same as the interpreter for $R_1$
+(Figure~\ref{fig:interp-R1}). The literals \code{\#t} and \code{\#f}
+simply evaluate to themselves. The conditional expression \code{(if
+  cnd thn els)} evaluates the Boolean expression \code{cnd} and then
+either evaluates \code{thn} or \code{els} depending on whether
+\code{cnd} produced \code{\#t} or \code{\#f}. The logical operations
+\code{not} and \code{and} behave as you might expect, but note that
+the \code{and} operation is short-circuiting. That is, the second
+expression \code{e2} is not evaluated if \code{e1} evaluates to
+\code{\#f}.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+   (define (interp-R2 env e)
+     (match e
+       ...
+       [(? boolean?) e]
+       [`(if ,cnd ,thn ,els)
+        (match (interp-R2 env cnd)
+          [#t (interp-R2 env thn)]
+          [#f (interp-R2 env els)])]
+       [`(not ,e)
+        (match (interp-R2 env e) [#t #f] [#f #t])]
+       [`(and ,e1 ,e2)
+         (match (interp-R2 env e1)
+           [#t (match (interp-R2 env e2) [#t #t] [#f #f])]
+           [#f #f])]
+       [`(eq? ,e1 ,e2)
+         (let ([v1 (interp-R2 env e1)] [v2 (interp-R2 env e2)])
+           (cond [(and (fixnum? v1) (fixnum? v2)) (eq? v1 v2)]
+                 [(and (boolean? v1) (boolean? v2)) (eq? v1 v2)]))]
+       ))
+\end{lstlisting}
+\caption{Interpreter for the $R_2$ language.}
+\label{fig:interp-R2}
+\end{figure}
+
+
 \section{Type Checking $R_2$ Programs}
 \label{sec:type-check-r2}
 
+It is helpful to think about type checking into two complementary
+ways. It helps to think of a type checker as trying to predict the
+\emph{type} of value that will be produced by each expression in the
+program.  For $R_2$, we have just two types, \key{Integer} and
+\key{Boolean}. So a type checker should predict that
+\begin{lstlisting}
+   (+ 10 (- (+ 12 20)))
+\end{lstlisting}
+produces an \key{Integer} while
+\begin{lstlisting}
+   (and (not #f) #t)
+\end{lstlisting}
+produces a \key{Boolean}.
 
-% T ::= Integer | Boolean
+As mentioned at the beginning of this chapter, a type checker is also
+responsible for reject programs that apply operators to the wrong type
+of value. Our type checker for $R_2$ will signal an error for the
+following because, as we have seen above, the expression \code{(+ 10
+  ...)} has type \key{Integer}, and we shall require an argument of
+\code{not} to have type \key{Boolean}.
+\begin{lstlisting}
+   (not (+ 10 (- (+ 12 20))))
+\end{lstlisting}
 
-It is common practice to specify a type system by writing rules for
-each kind of AST node. For example, the rule for \key{if} is:
-\begin{quote}
-  For any expressions $e_1, e_2, e_3$ and any type $T$, if $e_1$ has
-  type \key{bool}, $e_2$ has type $T$, and $e_3$ has type $T$, then
-  $\IF{e_1}{e_2}{e_3}$ has type $T$.
-\end{quote}
-It is also common practice to write rules using a horizontal line,
-with the conditions written above the line and the conclusion written
-below the line.
-\begin{equation*}
-  \inference{e_1 \text{ has type } \key{bool} & 
-        e_2 \text{ has type } T & e_3 \text{ has type } T}
-  {\IF{e_1}{e_2}{e_3} \text{ has type } T}
-\end{equation*}
-Because the phrase ``has type'' is repeated so often in these type
-checking rules, it is abbreviated to just a colon. So the above rule
-is abbreviated to the following.
-\begin{equation*}
-  \inference{e_1 : \key{bool} & e_2 : T & e_3 : T}
-            {\IF{e_1}{e_2}{e_3} : T}
-\end{equation*}
+The type checker for $R_2$ is best implemented as a structurally
+recursive function over the AST. Figure~\ref{fig:type-check-R2} shows
+many of the clauses for the \code{typecheck-R2} function.  Given an
+input expression \code{e}, the type checker either returns the type
+(\key{Integer} or \key{Boolean}) or it signals an error.  Of course,
+the type of an integer literal is \code{Integer} and the type of a
+Boolean literal is \code{Boolean}.  To handle variables, the type
+checker, like the interpreter, uses an associaton list. However, in
+this case the associaton list maps variables to types instead of
+values. Consider the clause for \key{let}.  We type check the
+initializing expression to obtain its type \key{T} and then map the
+variable \code{x} to \code{T}. When the type checker encounters the
+use of a variable, it can lookup its type in the associaton list.
 
-The $\LET{x}{e_1}{e_2}$ construct poses an interesting challenge. The
-variable $x$ is assigned the value of $e_1$ and then $x$ can be used
-inside $e_2$. When we get to an occurrence of $x$ inside $e_2$, how do
-we know what type the variable should be?  The answer is that we need
-a way to map from variable names to types.  Such a mapping is called a
-\emph{type environment} (aka. \emph{symbol table}). The capital Greek
-letter gamma, written $\Gamma$, is used for referring to type
-environments environments. The notation $\Gamma, x : T$ stands for
-making a copy of the environment $\Gamma$ and then associating $T$
-with the variable $x$ in the new environment.  We write $\Gamma(x)$ to
-lookup the associated type for $x$.  The type checking rules for
-\key{let} and variables are as follows.
-\begin{equation*}
-  \inference{e_1 : T_1 \text{ in } \Gamma &
-             e_2 : T_2 \text{ in } \Gamma,x:T_1}
-            {\LET{x}{e_1}{e_2} : T_2 \text{ in } \Gamma} 
-  \qquad
-  \inference{\Gamma(x) = T}
-            {x : T \text{ in } \Gamma}
-\end{equation*}
-Type checking has roots in logic, and logicians have a tradition of
-writing the environment on the left-hand side and separating it from
-the expression with a turn-stile ($\vdash$).  The turn-stile does not
-have any intrinsic meaning per se.  It is punctuation that separates
-the environment $\Gamma$ from the expression $e$.  So the above typing
-rules are written as follows.
-\begin{equation*}
-  \inference{\Gamma \vdash e_1 : T_1 &
-             \Gamma,x:T_1 \vdash e_2 : T_2}
-            {\Gamma \vdash \LET{x}{e_1}{e_2} : T_2} 
-   \qquad
-  \inference{\Gamma(x) = T}
-            {\Gamma \vdash x : T}
-\end{equation*}
-Overall, the statement $\Gamma \vdash e : T$ is an example of what is
-called a \emph{judgment}.  In particular, this judgment says, ``In
-environment $\Gamma$, expression $e$ has type $T$.''
-Figure~\ref{fig:S1-type-system} shows the type checking rules for
-$R_2$.
-
-\begin{figure}
-\begin{gather*}
-  \inference{\Gamma(x) = T}
-            {\Gamma \vdash x : T}
-   \qquad
-  \inference{\Gamma \vdash e_1 : T_1 &
-             \Gamma,x:T_1 \vdash e_2 : T_2}
-            {\Gamma \vdash \LET{x}{e_1}{e_2} : T_2} 
-  \\[2ex]
-  \inference{}{\Gamma \vdash n : \key{Integer}}
-  \quad
-  \inference{\Gamma \vdash e_i : T_i \ ^{\forall i \in 1\ldots n} & \Delta(\Op,T_1,\ldots,T_n) = T}
-            {\Gamma \vdash (\Op \; e_1 \ldots e_n) : T}
-  \\[2ex]
-  \inference{}{\Gamma \vdash \key{\#t} : \key{Boolean}}
-  \quad
-  \inference{}{\Gamma \vdash \key{\#f} : \key{Boolean}}
-  \quad
-  \inference{\Gamma \vdash e_1 : \key{bool} \\
-             \Gamma \vdash e_2 : T &
-             \Gamma \vdash e_3 : T}
-  {\Gamma \vdash \IF{e_1}{e_2}{e_3} : T}
-\end{gather*}
-\caption{Type System for $R_2$.}
-\label{fig:S1-type-system}
+\begin{figure}[tbp]
+\begin{lstlisting}
+   (define (typecheck-R2 env e)
+     (match e
+       [(? fixnum?) 'Integer]
+       [(? boolean?) 'Boolean]
+       [(? symbol?) (lookup e env)]
+       [`(let ([,x ,e]) ,body)
+        (define T (typecheck-R2 env e))
+        (define new-env (cons (cons x T) env))
+        (typecheck-R2 new-env body)]
+       ...
+       [`(not ,e)
+        (match (typecheck-R2 env e)
+          ['Boolean 'Boolean]
+          [else (error 'typecheck-R2 "'not' expects a Boolean" e)])]
+       ...
+       ))
+\end{lstlisting}
+\caption{Skeleton of a type checker for the $R_2$ language.}
+\label{fig:type-check-R2}
 \end{figure}
 
 
-\begin{figure}
+%% % T ::= Integer | Boolean
 
-\begin{align*}
-\Delta(\key{+},\key{Integer},\key{Integer}) &= \key{Integer} \\
-%\Delta(\key{-},\key{Integer},\key{Integer}) &= \key{Integer} \\
-\Delta(\key{-},\key{Integer}) &= \key{Integer} \\
-%\Delta(\key{*},\key{Integer},\key{Integer}) &= \key{Integer} \\
-\Delta(\key{read}) &= \key{Integer} \\
-\Delta(\key{and},\key{Boolean},\key{Boolean}) &= \key{Boolean} \\
-%\Delta(\key{or},\key{Boolean},\key{Boolean}) &= \key{Boolean} \\
-\Delta(\key{not},\key{Boolean}) &= \key{Boolean} \\
-\Delta(\key{eq?},\key{Integer},\key{Integer}) &= \key{Boolean} \\
-\Delta(\key{eq?},\key{Boolean},\key{Boolean}) &= \key{Boolean} 
-\end{align*}
+%% It is common practice to specify a type system by writing rules for
+%% each kind of AST node. For example, the rule for \key{if} is:
+%% \begin{quote}
+%%   For any expressions $e_1, e_2, e_3$ and any type $T$, if $e_1$ has
+%%   type \key{bool}, $e_2$ has type $T$, and $e_3$ has type $T$, then
+%%   $\IF{e_1}{e_2}{e_3}$ has type $T$.
+%% \end{quote}
+%% It is also common practice to write rules using a horizontal line,
+%% with the conditions written above the line and the conclusion written
+%% below the line.
+%% \begin{equation*}
+%%   \inference{e_1 \text{ has type } \key{bool} & 
+%%         e_2 \text{ has type } T & e_3 \text{ has type } T}
+%%   {\IF{e_1}{e_2}{e_3} \text{ has type } T}
+%% \end{equation*}
+%% Because the phrase ``has type'' is repeated so often in these type
+%% checking rules, it is abbreviated to just a colon. So the above rule
+%% is abbreviated to the following.
+%% \begin{equation*}
+%%   \inference{e_1 : \key{bool} & e_2 : T & e_3 : T}
+%%             {\IF{e_1}{e_2}{e_3} : T}
+%% \end{equation*}
 
-\caption{Types for the primitives operators.}
-\end{figure}
+%% The $\LET{x}{e_1}{e_2}$ construct poses an interesting challenge. The
+%% variable $x$ is assigned the value of $e_1$ and then $x$ can be used
+%% inside $e_2$. When we get to an occurrence of $x$ inside $e_2$, how do
+%% we know what type the variable should be?  The answer is that we need
+%% a way to map from variable names to types.  Such a mapping is called a
+%% \emph{type environment} (aka. \emph{symbol table}). The capital Greek
+%% letter gamma, written $\Gamma$, is used for referring to type
+%% environments environments. The notation $\Gamma, x : T$ stands for
+%% making a copy of the environment $\Gamma$ and then associating $T$
+%% with the variable $x$ in the new environment.  We write $\Gamma(x)$ to
+%% lookup the associated type for $x$.  The type checking rules for
+%% \key{let} and variables are as follows.
+%% \begin{equation*}
+%%   \inference{e_1 : T_1 \text{ in } \Gamma &
+%%              e_2 : T_2 \text{ in } \Gamma,x:T_1}
+%%             {\LET{x}{e_1}{e_2} : T_2 \text{ in } \Gamma} 
+%%   \qquad
+%%   \inference{\Gamma(x) = T}
+%%             {x : T \text{ in } \Gamma}
+%% \end{equation*}
+%% Type checking has roots in logic, and logicians have a tradition of
+%% writing the environment on the left-hand side and separating it from
+%% the expression with a turn-stile ($\vdash$).  The turn-stile does not
+%% have any intrinsic meaning per se.  It is punctuation that separates
+%% the environment $\Gamma$ from the expression $e$.  So the above typing
+%% rules are written as follows.
+%% \begin{equation*}
+%%   \inference{\Gamma \vdash e_1 : T_1 &
+%%              \Gamma,x:T_1 \vdash e_2 : T_2}
+%%             {\Gamma \vdash \LET{x}{e_1}{e_2} : T_2} 
+%%    \qquad
+%%   \inference{\Gamma(x) = T}
+%%             {\Gamma \vdash x : T}
+%% \end{equation*}
+%% Overall, the statement $\Gamma \vdash e : T$ is an example of what is
+%% called a \emph{judgment}.  In particular, this judgment says, ``In
+%% environment $\Gamma$, expression $e$ has type $T$.''
+%% Figure~\ref{fig:S1-type-system} shows the type checking rules for
+%% $R_2$.
+
+%% \begin{figure}
+%% \begin{gather*}
+%%   \inference{\Gamma(x) = T}
+%%             {\Gamma \vdash x : T}
+%%    \qquad
+%%   \inference{\Gamma \vdash e_1 : T_1 &
+%%              \Gamma,x:T_1 \vdash e_2 : T_2}
+%%             {\Gamma \vdash \LET{x}{e_1}{e_2} : T_2} 
+%%   \\[2ex]
+%%   \inference{}{\Gamma \vdash n : \key{Integer}}
+%%   \quad
+%%   \inference{\Gamma \vdash e_i : T_i \ ^{\forall i \in 1\ldots n} & \Delta(\Op,T_1,\ldots,T_n) = T}
+%%             {\Gamma \vdash (\Op \; e_1 \ldots e_n) : T}
+%%   \\[2ex]
+%%   \inference{}{\Gamma \vdash \key{\#t} : \key{Boolean}}
+%%   \quad
+%%   \inference{}{\Gamma \vdash \key{\#f} : \key{Boolean}}
+%%   \quad
+%%   \inference{\Gamma \vdash e_1 : \key{bool} \\
+%%              \Gamma \vdash e_2 : T &
+%%              \Gamma \vdash e_3 : T}
+%%   {\Gamma \vdash \IF{e_1}{e_2}{e_3} : T}
+%% \end{gather*}
+%% \caption{Type System for $R_2$.}
+%% \label{fig:S1-type-system}
+%% \end{figure}
+
+
+%% \begin{figure}
+
+%% \begin{align*}
+%% \Delta(\key{+},\key{Integer},\key{Integer}) &= \key{Integer} \\
+%% %\Delta(\key{-},\key{Integer},\key{Integer}) &= \key{Integer} \\
+%% \Delta(\key{-},\key{Integer}) &= \key{Integer} \\
+%% %\Delta(\key{*},\key{Integer},\key{Integer}) &= \key{Integer} \\
+%% \Delta(\key{read}) &= \key{Integer} \\
+%% \Delta(\key{and},\key{Boolean},\key{Boolean}) &= \key{Boolean} \\
+%% %\Delta(\key{or},\key{Boolean},\key{Boolean}) &= \key{Boolean} \\
+%% \Delta(\key{not},\key{Boolean}) &= \key{Boolean} \\
+%% \Delta(\key{eq?},\key{Integer},\key{Integer}) &= \key{Boolean} \\
+%% \Delta(\key{eq?},\key{Boolean},\key{Boolean}) &= \key{Boolean} 
+%% \end{align*}
+
+%% \caption{Types for the primitives operators.}
+%% \end{figure}
 
 
 \section{The $C_1$ Language}
