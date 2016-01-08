@@ -2316,6 +2316,9 @@ to replace the variables with their homes.
 \end{exercise}
 
 
+\marginpar{\scriptsize To do: a challenge exercise on move biasing. \\ --Jeremy}
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Booleans, Control Flow, and Type Checking}
 \label{ch:bool-types}
@@ -2519,14 +2522,18 @@ The $R_2$ language adds Booleans and conditional expressions to $R_1$.
 As with $R_1$, we shall compile to a C-like intermediate language, but
 we need to grow that intermediate language to handle the new features
 in $R_2$. Figure~\ref{fig:c1-syntax} shows the new features of $C_1$;
-we add \key{\#t} and \key{\#f} to the $\Arg$ non-terminal and we add
-an \key{if} statement.
+we add the new logic and comparison operators to the $\Op$
+non-terminal, the literals \key{\#t} and \key{\#f} to the $\Arg$
+non-terminal, and we add an \key{if} statement. Unlike $R_2$, the
+\key{and} operation is not short-circuiting; it evaluates both
+arguments unconditionally.
 
 \begin{figure}[tbp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
+\Op  &::=& \ldots \mid \key{and} \mid \key{not} \mid \key{eq?} \\
 \Arg &::=& \ldots \mid \key{\#t} \mid \key{\#f} \\
 \Stmt &::=& \ldots \mid \IF{\Exp}{\Stmt^{*}}{\Stmt^{*}} \\
 C_1 & ::= & (\key{program}\;(\Var^{*})\;\Stmt^{+})
@@ -2543,9 +2550,10 @@ C_1 & ::= & (\key{program}\;(\Var^{*})\;\Stmt^{+})
 \label{sec:flatten-r2}
 
 The \code{flatten} pass needs to be expanded to handle the Boolean
-literals \key{\#t} and \key{\#f} as well as the \key{if}
-expressions. We shall start with a simple example of translating a
-\key{if} expression, shown below on the left. \\
+literals \key{\#t} and \key{\#f}, the new logic and comparison
+operations, and \key{if} expressions. We shall start with a simple
+example of translating a \key{if} expression, shown below on the
+left. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -2575,7 +2583,7 @@ For $R_1$, the \code{flatten} pass returned a list of assignment
 statements. Here, for $R_2$, we return a list of statements that can
 include both \key{if} statements and assignment statements.
 
-The next example is a bit more involved, showing what happens then
+The next example is a bit more involved, showing what happens when
 there are complex expressions in the condition and branch expressions
 of an \key{if}, including nested \key{if} expressions.
 
@@ -2613,11 +2621,20 @@ $\Rightarrow$
 \end{minipage}
 \end{tabular} \\
 
+The \code{flatten} clauses for the Boolean literals and the operations
+\key{not} and \key{eq?} are straightforward.  However, the
+\code{flatten} clause for \key{and} requires some care to properly
+imitate the order of evaluation of the interpreter for $R_2$
+(Figure~\ref{fig:interp-R2}). Recall that the \key{and} operator of
+$C_1$ does not perform short circuiting, but evaluates both arguments
+unconditionally. We recommend using an \key{if} statement in the code
+you generate for \key{and}.
+
 \begin{exercise}\normalfont
 Expand your \code{flatten} pass to handle $R_2$, that is, handle the
-Boolean literals and the \key{if} expressions. Create 4 more test
-cases that expose whether your coe for flattening Booleans and
-\key{if} expressions is correct. Test your \code{flatten} pass by
+Boolean literals, the new logic and comparison operations, and the
+\key{if} expressions. Create 4 more test cases that expose whether
+your flattening code is correct. Test your \code{flatten} pass by
 running the output programs with \code{interp-C}
 (Appendix~\ref{appendix:interp}).
 \end{exercise}
@@ -2857,7 +2874,7 @@ x86-64 assembly.
 
 \begin{figure}[tbp]
 \begin{tabular}{lll}
-\begin{minipage}{0.45\textwidth}
+\begin{minipage}{0.5\textwidth}
 \begin{lstlisting}
 (program
   (if (eq? (read) 1) 42 0))
@@ -2885,6 +2902,9 @@ $\Downarrow$
     ((movq (int 0) (var if.1))))
   (movq (var if.1) (reg rax)))
 \end{lstlisting}
+\end{minipage}
+&
+\begin{minipage}{0.4\textwidth}
 $\Downarrow$
 \begin{lstlisting}
 (program 16
@@ -2899,9 +2919,6 @@ $\Downarrow$
     ((movq (int 0) (reg rbx))))
   (movq (reg rbx) (reg rax)))
 \end{lstlisting}
-\end{minipage}
-&
-\begin{minipage}{0.4\textwidth}
 $\Downarrow$
 \begin{lstlisting}
 	.globl _main
@@ -2981,6 +2998,39 @@ the element at index $0$ of the 1-tuple.
   \Type ::= \ldots \mid (\key{Vector}\;\Type^{+}) 
 \]
 
+\begin{figure}[tbp]
+\begin{lstlisting}
+    (define primitives (set '+ '- 'eq? 'not 'read 
+                         'vector 'vector-ref 'vector-set!))
+
+    (define (interp-op op)
+      (match op
+         ['+ fx+]
+         ['- (lambda (n) (fx- 0 n))]
+         ['eq? (lambda (v1 v2)
+                 (cond [(or (and (fixnum? v1) (fixnum? v2))
+                            (and (boolean? v1) (boolean? v2))
+                            (and (vector? v1) (vector? v2)))
+                        (eq? v1 v2)]))]
+         ['not (lambda (v) (match v [#t #f] [#f #t]))]
+	 ['read read-fixnum]
+         ['vector vector] ['vector-ref vector-ref]
+	 ['vector-set! vector-set!]
+	 [else (error 'interp-op "unknown operator")]))
+
+   (define (interp-R3 env)
+     (lambda (e)
+       (match e
+         ...
+         [`(,op ,args ...) #:when (set-member? primitives op)
+           (apply (interp-op op) (map (interp-R3 env) args))]
+         [else (error 'interp-R3 "unrecognized expression")]
+         )))
+\end{lstlisting}
+\caption{Interpreter for the $R_3$ language.}
+\label{fig:interp-R3}
+\end{figure}
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Functions}
@@ -3057,8 +3107,8 @@ We provide several interpreters in the \key{interp.rkt} file.  The
 languages considered in this book ($R_1, R_2, \ldots$) and interprets
 the program, returning the result value.  The \key{interp-C} function
 interprets an AST for a program in one of the C-like languages ($C_0,
-C_1, \ldots$), and the \code{interp-x86} function interprets an AST for
-an x86-64 program.
+C_1, \ldots$), and the \code{interp-x86} function interprets an AST
+for an x86-64 program.
 
 \section{Utility Functions}
 \label{appendix:utilities}
