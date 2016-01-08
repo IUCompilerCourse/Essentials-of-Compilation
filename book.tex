@@ -2642,7 +2642,7 @@ instructions, so we focus on the comparison and jump instructions.
 \Arg &::=&  \ldots \mid (\key{byte-reg}\; \itm{register}) \\ 
 \Instr &::=& \ldots \mid (\key{andq} \; \Arg\; \Arg) \mid (\key{notq} \; \Arg)\\
        &\mid& (\key{cmpq} \; \Arg\; \Arg) \mid (\key{sete} \; \Arg) 
-              \mid (\key{movzx}\;\Arg\;\Arg) \\
+              \mid (\key{movzbq}\;\Arg\;\Arg) \\
       &\mid&  (\key{jmp} \; \itm{label}) \mid (\key{je} \; \itm{label}) \mid
              (\key{label} \; \itm{label}) \\
 x86_1 &::= & (\key{program} \;\itm{info} \; \Instr^{+})
@@ -2664,7 +2664,7 @@ its destination depending on whether the comparison came out as equal
 or not, respectively. The \key{sete} instruction has an annoying quirk
 in that its destination argument must be single byte register, such as
 \code{al}, which is part of the \code{rax} register.  Thankfully, the
-\key{movzx} instruction can then be used to move from a single byte
+\key{movzbq} instruction can then be used to move from a single byte
 register to a normal 64-bit register.
 
 The \key{jmp} instruction jumps to the instruction after the indicated
@@ -2703,7 +2703,7 @@ $\Rightarrow$
 \begin{lstlisting}
 (cmpq |$\Arg_1$| |$\Arg_2$|)
 (sete (byte-reg al))
-(movzx (byte-reg al) |$\itm{lhs}$|)
+(movzbq (byte-reg al) |$\itm{lhs}$|)
 \end{lstlisting}
 \end{minipage}
 \end{tabular}  \\
@@ -2767,7 +2767,7 @@ Many of the new instructions, such as the logical operations, can be
 handled in the same way as the arithmetic instructions. Thus, if your
 code was already quite general, it will not need to be changed to
 handle the logical operations. If not, I recommend that you change
-your code to be more general. The \key{movzx} instruction should be
+your code to be more general. The \key{movzbq} instruction should be
 handled like the \key{movq} instruction. The \key{if} statement is
 straightfoward to handle because we stored the live-after sets for the
 two branches in the AST node as described above. Here we just need to
@@ -2854,7 +2854,7 @@ $\Downarrow$
   (movq (reg rax) (var t.1))
   (cmpq (int 1) (var t.1))
   (sete (byte-reg al))
-  (movzx (byte-reg al) (var t.2))
+  (movzbq (byte-reg al) (var t.2))
   (if (var t.2)
     ((movq (int 42) (var if.1)))
     ((movq (int 0) (var if.1))))
@@ -2867,7 +2867,7 @@ $\Downarrow$
   (movq (reg rax) (reg rcx))
   (cmpq (int 1) (reg rcx))
   (sete (byte-reg al))
-  (movzx (byte-reg al) (reg rcx))
+  (movzbq (byte-reg al) (reg rcx))
   (if (reg rcx)
     ((movq (int 42)
      (reg rbx)))
@@ -2888,7 +2888,7 @@ _main:
 	movq	%rax, %rcx
 	cmpq	$1, %rcx
 	sete	%al
-	movzx	%al, %rcx
+	movzbq	%al, %rcx
 	cmpq	$0, %rcx
 	je else1326
 	movq	$42, %rbx
