@@ -283,7 +283,7 @@ directly supports these queries and hence is a good choice. In this
 book, we will often write down the textual representation of a program
 even when we really have in mind the AST because the textual
 representation is more concise.  We recommend that, in your mind, you
-alway interpret programs as abstract syntax trees.
+always interpret programs as abstract syntax trees.
 
 \section{Grammars}
 \label{sec:grammar}
@@ -681,14 +681,11 @@ functions is the output of partially evaluating the children nodes.
 \begin{figure}[tbp]
 \begin{lstlisting}
    (define (pe-neg r)
-     (match r
-       [(? fixnum?) (fx- 0 r)]
-       [else `(- ,r)]))
+     (cond [(fixnum? r) (fx- 0 r)]
+           [else `(- ,r)]))
    (define (pe-add r1 r2)
-     (match (list r1 r2)
-       [`(,n1 ,n2) #:when (and (fixnum? n1) (fixnum? n2))
-        (fx+ r1 r2)]
-       [else `(+ ,r1 ,r2)]))
+     (cond [(and (fixnum? r1) (fixnum? r2)) (fx+ r1 r2)]
+           [else `(+ ,r1 ,r2)]))
    (define (pe-arith e)
      (match e
        [(? fixnum?) e]
@@ -791,8 +788,7 @@ span 256 lines of code.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{rcl}
-\Op  &::=& \key{read} \mid \key{-} \mid \key{+} \\
-\Exp &::=& \Int \mid (\Op \; \Exp^{*})  \mid  \Var \mid \LET{\Var}{\Exp}{\Exp} \\
+\Exp &::=& \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)  \mid  \Var \mid \LET{\Var}{\Exp}{\Exp} \\
 R_1  &::=& (\key{program} \; \Exp)
 \end{array}
 \]
@@ -1073,7 +1069,7 @@ pointer.
 The compiler will need a convenient representation for manipulating
 x86 programs, so we define an abstract syntax for x86 in
 Figure~\ref{fig:x86-ast-a}. The \itm{info} field of the \key{program}
-AST node is for storing auxilliary information that needs to be
+AST node is for storing auxiliary information that needs to be
 communicated from one step of the compiler to the next. 
 
 \begin{figure}[tbp]
@@ -1206,7 +1202,7 @@ in the program must be present in this list.
 \[
 \begin{array}{lcl}
 \Arg &::=& \Int \mid \Var \\
-\Exp &::=& \Arg \mid (\Op \; \Arg^{*})\\
+\Exp &::=& \Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)\\
 \Stmt &::=& \ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg} \\
 C_0 & ::= & (\key{program}\;(\Var^{*})\;\Stmt^{+})
 \end{array}
@@ -1252,7 +1248,7 @@ treats variables as if they were all mapped to registers. The
 \key{select-instructions} pass generates a program that consists of
 x86-64 instructions but that still uses variables, so it is an
 intermediate language that is technically different than x86-64, which
-explains the astericks in the diagram above.
+explains the asterisks in the diagram above.
 
 In this Chapter we shall take the easy road to implementing
 \key{assign-homes} and simply map all variables to stack locations.
@@ -1268,7 +1264,7 @@ registers, resorting to the stack only when necessary.
 
 
 Once variables have been assigned to their homes, we can finalize the
-instruction selection by dealing with an indiosycracy of x86
+instruction selection by dealing with an idiosyncrasy of x86
 assembly. Many x86 instructions have two arguments but only one of the
 arguments may be a memory reference (and the stack is a part of
 memory).  Because some variables may get mapped to stack locations,
@@ -1534,7 +1530,7 @@ $\VAR{\itm{var}}$ to the x86 abstract syntax.  The
 \key{select-instructions} pass deals with the differing format of
 arithmetic operations. For example, in $C_0$ an addition operation can
 take the form below.  To translate to x86, we need to use the
-\key{addq} instruction which does an inplace update. So we must first
+\key{addq} instruction which does an in-place update. So we must first
 move \code{10} to \code{x}. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
@@ -1901,7 +1897,7 @@ node alongside the list of variables as follows.
 I recommend organizing your code to use a helper function that takes a
 list of statements and an initial live-after set (typically empty) and
 returns the list of statements and the list of live-after sets.  For
-this chapter, returning the list of statements is unecessary, as they
+this chapter, returning the list of statements is unnecessary, as they
 will be unchanged, but in Chapter~\ref{ch:bool-types} we introduce
 \key{if} statements and will need to annotate them with the live-after
 sets of the two branches.
@@ -1934,7 +1930,7 @@ which two variables that are live at the same time do not actually
 interfere with each other: when they both contain the same value
 because we have assigned one to the other.
 
-A better way to compute the intereference graph is given by the
+A better way to compute the interference graph is given by the
 following.
 
 \begin{itemize}
@@ -2008,7 +2004,7 @@ If we think of registers as colors, the register allocation problem
 becomes the widely-studied graph coloring
 problem~\citep{Balakrishnan:1996ve,Rosen:2002bh}.  
 
-The reader may be more familar with the graph coloring problem then he
+The reader may be more familiar with the graph coloring problem then he
 or she realizes; the popular game of Sudoku is an instance of the
 graph coloring problem. The following describes how to build a graph
 out of an initial Sudoku board.
@@ -2073,7 +2069,7 @@ Figure~\ref{fig:satur-algo} gives the pseudo-code for this simple
 greedy algorithm for register allocation based on saturation and the
 most-constrained-first heuristic, which is roughly equivalent to the
 DSATUR algorithm of \cite{Brelaz:1979eu} (also known as saturation
-degree ordering (SDO)~\citep{Gebremedhin:1999fk,Omari:2006uq}).  Just
+degree ordering~\citep{Gebremedhin:1999fk,Omari:2006uq}).  Just
 as in Sudoku, the algorithm represents colors with integers, with the
 first $k$ colors corresponding to the $k$ registers in a given machine
 and the rest of the integers corresponding to stack locations.
@@ -2325,7 +2321,7 @@ to replace the variables with their homes.
 
 Up until now the input languages have only included a single kind of
 value, the integers. In this Chapter we add a second kind of value,
-the Booleans (true and false), togther with some new operations
+the Booleans (true and false), together with some new operations
 (\key{and}, \key{not}, \key{eq?}) and conditional expressions to create
 the $R_2$ language.  With the addition of conditional expressions,
 programs can have non-trivial control flow which has an impact on
@@ -2362,7 +2358,7 @@ then introduce the idea of type checking and build a type checker for
 $R_2$ (Section~\ref{sec:type-check-r2}). To compile $R_2$ we need to
 enlarge the intermediate language $C_0$ into $C_1$, which we do in
 Section~\ref{sec:c1}. The remaining sections of this Chapter discuss
-how our compiler passes need to change to accomodate Booleans and
+how our compiler passes need to change to accommodate Booleans and
 conditional control flow.
 
 
@@ -2396,7 +2392,7 @@ comparing two integers and for comparing two Booleans.
 \label{fig:r2-syntax}
 \end{figure}
 
-Figure~\ref{fig:interp-R2} defines the interpreter for $R_2$, omiting
+Figure~\ref{fig:interp-R2} defines the interpreter for $R_2$, omitting
 the parts that are the same as the interpreter for $R_1$
 (Figure~\ref{fig:interp-R1}). The literals \code{\#t} and \code{\#f}
 simply evaluate to themselves. The conditional expression \code{(if
@@ -2469,12 +2465,12 @@ input expression \code{e}, the type checker either returns the type
 (\key{Integer} or \key{Boolean}) or it signals an error.  Of course,
 the type of an integer literal is \code{Integer} and the type of a
 Boolean literal is \code{Boolean}.  To handle variables, the type
-checker, like the interpreter, uses an associaton list. However, in
-this case the associaton list maps variables to types instead of
+checker, like the interpreter, uses an association list. However, in
+this case the association list maps variables to types instead of
 values. Consider the clause for \key{let}.  We type check the
 initializing expression to obtain its type \key{T} and then map the
 variable \code{x} to \code{T}. When the type checker encounters the
-use of a variable, it can lookup its type in the associaton list.
+use of a variable, it can lookup its type in the association list.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -2732,7 +2728,7 @@ may not both be immediate values. In that case you must insert another
 Regarding \key{if} statements, we recommend that you not lower them in
 \code{select-instructions} but instead lower them in
 \code{patch-instructions}.  The reason is that for purposes of
-liveness analysis, \key{if} statments are easier to deal with than
+liveness analysis, \key{if} statements are easier to deal with than
 jump instructions.
 
 \begin{exercise}\normalfont
@@ -2761,7 +2757,7 @@ are live before the instruction based on which variables are live
 after the instruction. Now consider the situation for \code{(\key{if}
   $\itm{cnd}$ $\itm{thns}$ $\itm{elss}$)}, where we know the
 $L_{\mathsf{after}}$ set and need to produce the $L_{\mathsf{before}}$
-set.  We can recusively perform liveness analysis on the $\itm{thns}$
+set.  We can recursively perform liveness analysis on the $\itm{thns}$
 and $\itm{elss}$ branches, using $L_{\mathsf{after}}$ as the starting
 point, to obtain $L^{\mathsf{thns}}_{\mathsf{before}}$ and
 $L^{\mathsf{elss}}_{\mathsf{before}}$ respectively. However, we do not
@@ -2799,7 +2795,7 @@ code was already quite general, it will not need to be changed to
 handle the logical operations. If not, I recommend that you change
 your code to be more general. The \key{movzbq} instruction should be
 handled like the \key{movq} instruction. The \key{if} statement is
-straightfoward to handle because we stored the live-after sets for the
+straightforward to handle because we stored the live-after sets for the
 two branches in the AST node as described above. Here we just need to
 recursively process the two branches. The output of this pass can
 discard the live after sets, as they are no longer needed.
@@ -3036,6 +3032,23 @@ the element at index $0$ of the 1-tuple.
 \chapter{Functions}
 \label{ch:functions}
 
+This chapter studies the compilation of functions (aka. procedures) as
+they appear in the C language. The syntax for function definitions and
+function application (aka. function call) is shown in
+Figure~\ref{fig:r4-syntax}, where we define the $R_4$ language.  These
+functions are first-class in the sense that a function pointer is data
+and can be stored in memory or passed as a parameter to another
+function.  Thus, we introduce a function type, written
+\begin{lstlisting}
+   (|$\Type_1$| |$\cdots$| |$\Type_n$| -> |$\Type_r$|)
+\end{lstlisting}
+for a function whose $n$ parameters have the types $\Type_1$ through
+$\Type_n$ and whose return type is $\Type_r$. The main limitation of
+these functions is that they are not lexically scoped. That is, the
+only external entities that can be referenced from inside a function
+body are other globally-defined functions. The syntax of $R_4$
+prevents functions from being nested inside each other; they can only
+be defined at the top level.
 
 \begin{figure}[tbp]
 \centering
@@ -3056,14 +3069,104 @@ the element at index $0$ of the 1-tuple.
 \label{fig:r4-syntax}
 \end{figure}
 
+The program in Figure~\ref{fig:r4-function-example} shows a
+representative example of definition and using functions in $R_4$.  We
+define a function \code{map} that applies some other function \code{f}
+to both elements of a 2-tuple and returns a new 2-tuple containing the
+results. We also define a function \code{add1} that does what its name
+suggests. The program then applies \code{map} to \code{add1} and
+\code{(vector 0 41)}.  The result is \code{(vector 1 42)}, from which
+we return the \code{42}.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+(program
+  (define (map [f : (Integer -> Integer)]
+                [v : (Vector Integer Integer)])
+    : (Vector Integer Integer)
+      (vector (f (vector-ref v 0)) 
+               (f (vector-ref v 1))))
+  (define (add1 [x : Integer]) : Integer
+      (+ x 1))
+  (vector-ref (map add1 (vector 0 41)) 1)
+  )
+\end{lstlisting}
+\caption{Example of using functions in $R_4$.}
+\label{fig:r4-function-example}
+\end{figure}
+
+\section{Functions in x86}
+
+The x86 architecture provides a few features to support the
+implementation of functions. We have already seen that x86 provides
+labels so that one can refer to the location of an instruction, as is
+needed for jump instructions. Labels can also be used to mark the
+beginning of the instructions for a function.  Going further, we can
+obtain the address of a label by using the \key{leaq} instruction and
+\key{rip}-relative addressing. For example, the following puts the
+address of the \code{add1} label into the \code{rbx} register.
+\begin{lstlisting}
+   leaq add1(%rip), %rbx
+\end{lstlisting}
+
+In Sections~\ref{sec:x86-64} and \ref{sec:select-s0} we saw the use of
+the \code{callq} instruction for jumping to a function as specified by
+a label. The use of the instruction changes slightly if the function
+is specified by an address in a register, that is, an \emph{indirect
+  function call}. The x86 syntax is to give the register name prefixed
+with an asterisk.
+\begin{lstlisting}
+   callq *%rbx
+\end{lstlisting}
+
+The x86 architecture does not directly support passing arguments to
+functions; instead we use a combination of registers and stack
+locations for passing arguments, following the conventions used by
+\code{gcc} as described by \cite{Matz:2013aa}. Up to six arguments may
+be passed in registers, using the registers \code{rdi}, \code{rsi},
+\code{rdx}, \code{rcx}, \code{r8}, and \code{r9}. If there are more
+than six arguments, then the rest must be placed on the stack, which
+we call \emph{stack arguments}.
+
+Recall from Section~\ref{sec:x86-64} that the stack is also used for
+local variables, and that at the beginning of a function we move the
+stack pointer \code{rsp} down to make room for them.  To make
+additional room for passing arguments, we shall move the stack pointer
+even further down. We count how many stack arguments are needed for
+each function call that occurs inside the body of the function and
+take their max. Adding this number to the number of local variables
+gives us how much the \code{rsp} should be moved at the beginning of
+the function. In preparation for a function call, we offset from
+\code{rsp} to set up the stack arguments. We put the first stack
+argument in \code{0(\%rsp)}, the second in \code{8(\%rsp)}, and so on.
+
+Upon calling the function, the stack arguments are retrieved by the
+callee using the base pointer \code{rbp} (recall
+Figure~\ref{fig:frame}).  The address \code{16(\%rbp)} is the location
+of the first stack argument, \code{24(\%rbp)} is the address of the
+second, and so on.
+
+
+\marginpar{\scriptsize
+to do: talk about caller and callee-save registers. --Jeremy}
+
+
+
+
+
+
+
 
 % reveal-functions
 %   * differentiate variables and function names
 %   * differentiate primitive operations and function application
+%
 % flatten
 %   * function-ref not simple, why? have to use the leaq instruction
 %       to put the function label in to a register.
+%
 % select-instructions
+%   * function defs. deal with parameters
 %   * (assign lhs (function-ref f)) => (leaq (function-ref f) lhs)
 %   * (assign lhs (app f es ...))
 %     - pass some args in registers, rest on the stack (stack-arg)
@@ -3076,6 +3179,24 @@ the element at index $0$ of the 1-tuple.
 %   * read-vars: leaq, indirect-callq
 %   * write-vars: leaq, indirect-callq (all caller save!)
 %   * uncover-live: treat functions like the main program.
+%
+% build interferece:
+%   * treat functions like the main function
+%
+% assign-homes
+%   * add cases for: stack, stack-arg, indirect-callq, function-ref
+%
+% allocate-registers
+%   * treat functions like the main function
+%
+% patch-instructions
+%   * add cases for: function defs, indirect-callq, leaq (target must be reg.)
+%
+% print-x86
+%   * function-ref uses rip
+%   * indirect-callq => callq *
+%   * stack-arg  => rsp
+%   * function defs: save and restore callee-save registers
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Lexically Scoped Functions}
@@ -3182,7 +3303,7 @@ The compile-file function takes a description of the compiler passes
 (see the comment for \key{interp-tests}) and returns a function that,
 given a program file name (a string ending in \key{.scm}), applies all
 of the passes and writes the output to a file whose name is the same
-as the proram file name but with \key{.scm} replaced with \key{.s}.
+as the program file name but with \key{.scm} replaced with \key{.s}.
 \begin{lstlisting}
 (define (compile-file passes)
   (lambda (prog-file-name) ...))
@@ -3193,5 +3314,18 @@ as the proram file name but with \key{.scm} replaced with \key{.s}.
 
 \end{document}
 
-%%  LocalWords:  Dybvig Waddell Abdulaziz Ghuloum Dipanwita
-%%  LocalWords:  Sarkar lcl Matz aa representable
+%%  LocalWords:  Dybvig Waddell Abdulaziz Ghuloum Dipanwita Sussman
+%%  LocalWords:  Sarkar lcl Matz aa representable Chez Ph Dan's nano
+%%  LocalWords:  fk bh Siek plt uq Felleisen Bor Yuh ASTs AST Naur eq
+%%  LocalWords:  BNF fixnum datatype arith prog backquote quasiquote
+%%  LocalWords:  ast sexp Reynold's reynolds interp cond fx evaluator
+%%  LocalWords:  quasiquotes pe nullary unary rcl env lookup gcc rax
+%%  LocalWords:  addq movq callq rsp rbp rbx rcx rdx rsi rdi subq nx
+%%  LocalWords:  negq pushq popq retq globl Kernighan uniquify lll ve
+%%  LocalWords:  allocator gensym alist subdirectory scm rkt tmp lhs
+%%  LocalWords:  runtime Liveness liveness undirected Balakrishnan je
+%%  LocalWords:  Rosen DSATUR SDO Gebremedhin Omari morekeywords cnd
+%%  LocalWords:  fullflexible vertices Booleans Listof Pairof thn els
+%%  LocalWords:  boolean typecheck andq notq cmpq sete movzbq jmp al
+%%  LocalWords:  EFLAGS thns elss elselabel endlabel Tuples tuples
+%%  LocalWords:  tuple args lexically leaq Polymorphism msg bool nums
