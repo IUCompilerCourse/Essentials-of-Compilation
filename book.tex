@@ -84,6 +84,7 @@ columns=flexible
   \\
   with contributions from: \\
   Carl Factora \\
+  Michael M. Vitousek \\
   Cameron Swords
    }
 
@@ -297,9 +298,9 @@ the programs in the language. Instead we write down a set of rules, a
 variant of Backus-Naur Form (BNF)~\citep{Backus:1960aa,Knuth:1964aa}.
 As an example, we describe a small language, named $R_0$, of
 integers and arithmetic operations. The first rule says that any
-integer is in the language:
+integer is an expression, $\Exp$, in the language:
 \begin{equation}
-R_0 ::= \Int  \label{eq:arith-int}
+\Exp ::= \Int  \label{eq:arith-int}
 \end{equation}
 Each rule has a left-hand-side and a right-hand-side. The way to read
 a rule is that if you have all the program parts on the
@@ -309,19 +310,19 @@ reader already knows what an integer is.) We make the simplifying
 design decision that all of the languages in this book only handle
 machine-representable integers (those representable with 64-bits,
 i.e., the range $-2^{63}$ to $2^{63}$) which corresponds to the
-\texttt{fixnum} datatype in Racket. A name such as $R_0$ that is
+\texttt{fixnum} datatype in Racket. A name such as $\Exp$ that is
 defined by the grammar rules is a \emph{non-terminal}.
 
-The second rule for the $R_0$ language is the \texttt{read}
-operation that receives an input integer from the user of the program.
+The second grammar rule is the \texttt{read} operation that receives
+an input integer from the user of the program.
 \begin{equation}
-  R_0 ::= (\key{read}) \label{eq:arith-read}
+  \Exp ::= (\key{read}) \label{eq:arith-read}
 \end{equation}
 
-The third rule says that, given an $R_0$ node, you can build another
-$R_0$ node by negating it.
+The third rule says that, given an $\Exp$ node, you can build another
+$\Exp$ node by negating it.
 \begin{equation}
-  R_0 ::= (\key{-} \; R_0)  \label{eq:arith-neg}
+  \Exp ::= (\key{-} \; \Exp)  \label{eq:arith-neg}
 \end{equation}
 Symbols such as \key{-} in typewriter font are \emph{terminal} symbols
 and must literally appear in the program for the rule to be
@@ -329,8 +330,8 @@ applicable.
 
 We can apply the rules to build ASTs in the $R_0$
 language. For example, by rule \eqref{eq:arith-int}, \texttt{8} is an
-$R_0$, then by rule \eqref{eq:arith-neg}, the following AST is
-an $R_0$.
+$\Exp$, then by rule \eqref{eq:arith-neg}, the following AST is
+an $\Exp$.
 \begin{center}
 \begin{minipage}{0.25\textwidth}
 \begin{lstlisting}
@@ -350,27 +351,33 @@ an $R_0$.
 \end{minipage}
 \end{center}
 
-The last rule for the $R_0$ language is for addition:
+The following grammar rule defines addition expressions:
 \begin{equation}
-  R_0 ::= (\key{+} \; R_0 \; R_0) \label{eq:arith-add}
+  \Exp ::= (\key{+} \; \Exp \; \Exp) \label{eq:arith-add}
 \end{equation}
-Now we can see that the AST \eqref{eq:arith-prog} is in $R_0$.
-We know that \lstinline{(read)} is in $R_0$ by rule
-\eqref{eq:arith-read} and we have shown that \texttt{(- 8)} is in
-$R_0$, so we can apply rule \eqref{eq:arith-add} to show that
-\texttt{(+ (read) (- 8))} is in the $R_0$ language.
+Now we can see that the AST \eqref{eq:arith-prog} is an $\Exp$ in
+$R_0$.  We know that \lstinline{(read)} is an $\Exp$ by rule
+\eqref{eq:arith-read} and we have shown that \texttt{(- 8)} is an
+$\Exp$, so we can apply rule \eqref{eq:arith-add} to show that
+\texttt{(+ (read) (- 8))} is an $\Exp$ in the $R_0$ language.
 
-If you have an AST for which the above four rules do not apply, then
-the AST is not in $R_0$. For example, the AST \texttt{(-
-  (read) (+ 8))} is not in $R_0$ because there are no rules
-for \key{+} with only one argument, nor for \key{-} with two
-arguments.  Whenever we define a language with a grammar, we
-implicitly mean for the language to be the smallest set of programs
-that are justified by the rules. That is, the language only includes
-those programs that the rules allow.
+If you have an AST for which the above rules do not apply, then the
+AST is not in $R_0$. For example, the AST \texttt{(- (read) (+ 8))} is
+not in $R_0$ because there are no rules for \key{+} with only one
+argument, nor for \key{-} with two arguments.  Whenever we define a
+language with a grammar, we implicitly mean for the language to be the
+smallest set of programs that are justified by the rules. That is, the
+language only includes those programs that the rules allow.
 
-It is common to have many rules with the same left-hand side, so there
-is a vertical bar notation for gathering several rules, as shown in
+The last grammar for $R_0$ states that there is a \key{program} node
+to mark the top of the whole program:
+\[
+  R_0 ::= (\key{program} \; \Exp)
+\]
+
+It is common to have many rules with the same left-hand side, such as
+$\Exp$ in the grammar for $R_0$, so there is a vertical bar notation
+for gathering several rules, as shown in
 Figure~\ref{fig:r0-syntax}. Each clause between a vertical bar is
 called an {\em alternative}.
 
@@ -378,8 +385,11 @@ called an {\em alternative}.
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \[
-R_0 ::= \Int \mid ({\tt \key{read}}) \mid (\key{-} \; R_0) \mid
-   (\key{+} \; R_0 \; R_0) 
+\begin{array}{rcl}
+\Exp &::=& \Int \mid ({\tt \key{read}}) \mid (\key{-} \; \Exp) \mid
+   (\key{+} \; \Exp \; \Exp)  \\
+R_0  &::=& (\key{program} \; \Exp)
+\end{array}
 \]
 \end{minipage}
 }
@@ -789,7 +799,8 @@ span 256 lines of code.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{rcl}
-\Exp &::=& \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)  \mid  \Var \mid \LET{\Var}{\Exp}{\Exp} \\
+\Exp &::=& \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)  \\
+     &\mid&  \Var \mid \LET{\Var}{\Exp}{\Exp} \\
 R_1  &::=& (\key{program} \; \Exp)
 \end{array}
 \]
