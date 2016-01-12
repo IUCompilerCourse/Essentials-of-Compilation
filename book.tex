@@ -945,8 +945,8 @@ specified by the label.
       \key{negq} \; \Arg \mid \key{movq} \; \Arg, \Arg \mid \\
   &&  \key{callq} \; \mathit{label} \mid
       \key{pushq}\;\Arg \mid \key{popq}\;\Arg \mid \key{retq} \\
-\Prog &::= & \key{.globl \_main}\\
-      &    & \key{\_main:} \; \Instr^{+}
+\Prog &::= & \key{.globl main}\\
+      &    & \key{main:} \; \Instr^{+}
 \end{array}
 \]
 \end{minipage}
@@ -958,8 +958,8 @@ specified by the label.
 
 \begin{wrapfigure}{r}{2.25in}
 \begin{lstlisting}
-	.globl _main
-_main:
+	.globl main
+main:
 	movq	$10, %rax
 	addq	$32, %rax
 	retq
@@ -972,22 +972,22 @@ _main:
 
 Figure~\ref{fig:p0-x86} depicts an x86-64 program that is equivalent
 to \code{(+ 10 32)}. The \key{globl} directive says that the
-\key{\_main} procedure is externally visible, which is necessary so
-that the operating system can call it. The label \key{\_main:}
-indicates the beginning of the \key{\_main} procedure which is where
+\key{main} procedure is externally visible, which is necessary so
+that the operating system can call it. The label \key{main:}
+indicates the beginning of the \key{main} procedure which is where
 the operating system starts executing this program.  The instruction
 \lstinline{movq $10, %rax} puts $10$ into register \key{rax}. The
 following instruction \lstinline{addq $32, %rax} adds $32$ to the
 $10$ in \key{rax} and puts the result, $42$, back into
-\key{rax}. The instruction \key{retq} finishes the \key{\_main}
+\key{rax}. The instruction \key{retq} finishes the \key{main}
 function by returning the integer in \key{rax} to the
 operating system.
 
 
 \begin{wrapfigure}{r}{2.25in}
 \begin{lstlisting}
-	.globl _main
-_main:
+	.globl main
+main:
 	pushq	%rbp
 	movq	%rsp, %rbp
 	subq	$16, %rsp
@@ -1004,6 +1004,19 @@ _main:
 \caption{An x86-64 program equivalent to $\BINOP{+}{52}{\UNIOP{-}{10} }$.}
 \label{fig:p1-x86}
 \end{wrapfigure}
+
+Unfortunately, correct x86-64 varies in some ways depending on what operating system
+it is assembled in. The code examples shown here are correct on the Unix platform,
+but when assembled on Mac OSX, labels like \key{main} must be prepended by an underscore.
+So the correct output for the above program on Mac would begin with:
+
+\begin{lstlisting}
+	.globl _main
+_main:
+	pushq	%rbp
+	...
+\end{lstlisting}
+
 
 The next example exhibits the use of memory.  Figure~\ref{fig:p1-x86}
 lists an x86-64 program that is equivalent to $\BINOP{+}{52}{
@@ -1600,7 +1613,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(callq _read_int)
+(callq read_int)
 (movq (reg rax) |$\itm{lhs}$|)
 \end{lstlisting}
 \end{minipage}
@@ -1710,19 +1723,25 @@ x86-64 AST (defined in Figure~\ref{fig:x86-ast-a}) to the string
 representation (defined in Figure~\ref{fig:x86-a}). The Racket
 \key{format} and \key{string-append} functions are useful in this
 regard. The main work that this step needs to perform is to create the
-\key{\_main} function and the standard instructions for its prelude
+\key{main} function and the standard instructions for its prelude
 and conclusion, as shown in Figure~\ref{fig:p1-x86} of
 Section~\ref{sec:x86-64}. You need to know the number of
 stack-allocated variables, for which it is suggest that you compute in
 the \key{assign-homes} pass (Section~\ref{sec:assign-s0}) and store in
 the $\itm{info}$ field of the \key{program} node.
 
+If you want your program to run on Mac OSX, at this stage your code also has to determine whether or not it is running on a Mac, and prepend underscores to labels like \key{main} if it is. 
+You can determine the platform your compiler is being run on with the Racket 
+call \code{(system-type 'os)}, which returns \code{'macosx}, \code{'unix}, or \code{'windows}.
+In addition to placing underscores on \key{main}, you'll also have to put them in front of 
+\key{callq} labels (so \code{callq read\_int} becomes \code{callq \_read\_int}).
+
 \begin{exercise}
 \normalfont Implement the \key{print-x86} pass and test it on all of
 the example programs that you created for the previous passes. Use the
 \key{compiler-tests} function (Appendix~\ref{appendix:utilities}) from
 \key{utilities.rkt} to test your complete compiler on the example
-programs.
+programs. Mac support is optional, but your compiler has to output valid code for Unix machines.
 \end{exercise}
 
 %% \section{Testing with Interpreters}
