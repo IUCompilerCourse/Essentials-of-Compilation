@@ -975,11 +975,12 @@ main:
 	addq	$32, %rax
 	retq
 \end{lstlisting}
-\caption{An x86-64 program equivalent to $\BINOP{+}{10}{32}$.}
+\caption{\it An x86-64 program equivalent to $\BINOP{+}{10}{32}$.}
 \label{fig:p0-x86}
 \end{wrapfigure}
-\marginpar{Consider using italics for the texts in these figures.
-  It can get confusing to differentiate them from the main text.}
+%% \marginpar{Consider using italics for the texts in these figures.
+%%   It can get confusing to differentiate them from the main text.}
+%% It looks pretty ugly in italics.-Jeremy
 
 Figure~\ref{fig:p0-x86} depicts an x86-64 program that is equivalent
 to \code{(+ 10 32)}. The \key{globl} directive says that the
@@ -1016,10 +1017,11 @@ main:
 \label{fig:p1-x86}
 \end{wrapfigure}
 
-Unfortunately, correct x86-64 varies in some ways depending on what operating system
-it is assembled in. The code examples shown here are correct on the Unix platform,
-but when assembled on Mac OSX, labels like \key{main} must be prepended by an underscore.
-So the correct output for the above program on Mac would begin with:
+Unfortunately, x86-64 varies in a couple ways depending on what
+operating system it is assembled in. The code examples shown here are
+correct on the Unix platform, but when assembled on Mac OSX, labels
+like \key{main} must be prepended by an underscore.  So the correct
+output for the above program on Mac would begin with:
 
 \begin{lstlisting}
 	.globl _main
@@ -1095,11 +1097,15 @@ pointer.
 
 The compiler will need a convenient representation for manipulating
 x86 programs, so we define an abstract syntax for x86 in
-Figure~\ref{fig:x86-ast-a}. The \itm{info} field of the \key{program}
-AST node is for storing auxiliary information that needs to be
-communicated from one step of the compiler to the next. 
-\marginpar{Consider mentioning PseudoX86, since I think that's what
-  you actually are referring to.}
+Figure~\ref{fig:x86-ast-a}. The $\Int$ field of the \key{program} AST
+node is number of bytes of stack space needed for variables in the
+program. (Some of the intermediate languages will store other
+information in that location for the purposes of communicating
+auxilliary data from one step of the compiler to the next. )
+%% \marginpar{Consider mentioning PseudoX86, since I think that's what
+%%   you actually are referring to.}
+%% Not here. PseudoX86 is the language with variables and
+%% instructions that don't obey the x86 rules. -Jeremy
 
 \begin{figure}[tbp]
 \fbox{
@@ -1116,7 +1122,7 @@ communicated from one step of the compiler to the next.
              (\key{pushq}\;\Arg) \mid 
              (\key{popq}\;\Arg) \mid 
              (\key{retq}) \\
-x86_0 &::= & (\key{program} \;\itm{info} \; \Instr^{+})
+x86_0 &::= & (\key{program} \;\Int \; \Instr^{+})
 \end{array}
 \]
 \end{minipage}
@@ -1415,15 +1421,10 @@ programs should include \key{let} constructs, variables, and variables
 that overshadow each other.  The five programs should be in a
 subdirectory named \key{tests} and they should have the same file name
 except for a different integer at the end of the name, followed by the
-ending \key{.scm}.  Use the \key{interp-tests} function
+ending \key{.rkt}.  Use the \key{interp-tests} function
 (Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to test
 your \key{uniquify} pass on the example programs.
-\marginpar{Tests should be {\tt .scm} files or {\tt .rkt} files?}
 
-%% You can use the interpreter \key{interpret-S0} defined in the
-%% \key{interp.rkt} file. The entire sequence of tests should be a short
-%% Racket program so you can re-run all the tests by running the Racket
-%% program. We refer to this as the \emph{regression test} program.
 \end{exercise}
 
 
@@ -1728,7 +1729,11 @@ your passes on the example programs.
 
 \section{Print x86-64}
 \label{sec:print-x86}
-\marginpar{The input isn't quite x86-64 right? It's PseudoX86.}
+%\marginpar{The input isn't quite x86-64 right? It's PseudoX86.}
+% No, it really is x86-64 at this point because all the
+% variables should be gone and the patch-instructions pass
+% has made sure that all the instructions follow the
+% x86-64 rules. -Jeremy
 The last step of the compiler from $R_1$ to x86-64 is to convert the
 x86-64 AST (defined in Figure~\ref{fig:x86-ast-a}) to the string
 representation (defined in Figure~\ref{fig:x86-a}). The Racket
@@ -3069,14 +3074,14 @@ the element at index $0$ of the 1-tuple.
 \chapter{Functions}
 \label{ch:functions}
 
-This chapter studies the compilation of functions (aka. procedures) as
-they appear in the C language. The syntax for function definitions and
-function application (aka. function call) is shown in
+This chapter studies the compilation of functions (aka. procedures) at
+the level of abstraction of the C language. The syntax for function
+definitions and function application (aka. function call) is shown in
 Figure~\ref{fig:r4-syntax}, where we define the $R_4$ language.
-Programs now start with zero or more function definitions.  The
+Programs in $R_4$ start with zero or more function definitions.  The
 function names from these definitions are in-scope for the entire
 program, including all other function definitions (so the ordering of
-function definitions does not matter). 
+function definitions does not matter).
 
 Functions are first-class in the sense that a function pointer is data
 and can be stored in memory or passed as a parameter to another
@@ -3086,11 +3091,11 @@ function.  Thus, we introduce a function type, written
 \end{lstlisting}
 for a function whose $n$ parameters have the types $\Type_1$ through
 $\Type_n$ and whose return type is $\Type_r$. The main limitation of
-these functions is that they are not lexically scoped. That is, the
-only external entities that can be referenced from inside a function
-body are other globally-defined functions. The syntax of $R_4$
-prevents functions from being nested inside each other; they can only
-be defined at the top level.
+these functions (with respect to Racket functions) is that they are
+not lexically scoped. That is, the only external entities that can be
+referenced from inside a function body are other globally-defined
+functions. The syntax of $R_4$ prevents functions from being nested
+inside each other; they can only be defined at the top level.
 
 \begin{figure}[tbp]
 \centering
@@ -3111,26 +3116,25 @@ be defined at the top level.
 \label{fig:r4-syntax}
 \end{figure}
 
-The program in Figure~\ref{fig:r4-function-example} shows a
-representative example of definition and using functions in $R_4$.  We
-define a function \code{map} that applies some other function \code{f}
-to both elements of a 2-tuple and returns a new 2-tuple containing the
-results. We also define a function \code{add1} that does what its name
-suggests. The program then applies \code{map} to \code{add1} and
-\code{(vector 0 41)}.  The result is \code{(vector 1 42)}, from which
-we return the \code{42}.
+The program in Figure~\ref{fig:r4-function-example} is a
+representative example of defining and using functions in $R_4$.  We
+define a function \code{map-vec} that applies some other function
+\code{f} to both elements of a vector (a 2-tuple) and returns a new
+vector containing the results. We also define a function \code{add1}
+that does what its name suggests. The program then applies
+\code{map-vec} to \code{add1} and \code{(vector 0 41)}.  The result is
+\code{(vector 1 42)}, from which we return the \code{42}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
 (program
-  (define (map [f : (Integer -> Integer)]
-                [v : (Vector Integer Integer)])
-    : (Vector Integer Integer)
-      (vector (f (vector-ref v 0)) 
-               (f (vector-ref v 1))))
+  (define (map-vec [f : (Integer -> Integer)]
+                     [v : (Vector Integer Integer)])
+          : (Vector Integer Integer)
+    (vector (f (vector-ref v 0)) (f (vector-ref v 1))))
   (define (add1 [x : Integer]) : Integer
-      (+ x 1))
-  (vector-ref (map add1 (vector 0 41)) 1)
+    (+ x 1))
+  (vector-ref (map-vec add1 (vector 0 41)) 1)
   )
 \end{lstlisting}
 \caption{Example of using functions in $R_4$.}
@@ -3138,7 +3142,7 @@ we return the \code{42}.
 \end{figure}
 
 
-
+\marginpar{\scriptsize to do: interpreter for $R_4$. \\ --Jeremy}
 
 \section{Functions in x86}
 
@@ -3185,12 +3189,22 @@ callee is responsible for saving and restoring some other registers,
 the \emph{callee save registers}, before and after using them. The
 caller save registers are
 \begin{lstlisting}
-rdx rcx rsi rdi r8 r9 r10 r11
+  rax rdx rcx rsi rdi r8 r9 r10 r11
 \end{lstlisting}
 while the callee save registers are 
 \begin{lstlisting}
-rsp rbp rbx r12 r13 r14 r15
+  rsp rbp rbx r12 r13 r14 r15
 \end{lstlisting}
+Another way to think about this caller/callee convention is the
+following. The caller should assume that all the caller save registers
+get overwritten with arbitrary values by the callee.  On the other
+hand, the caller can safely assume that all the callee save registers
+contain the same values after the call that they did before the call.
+The callee can freely use any of the caller save registers.  However,
+if the callee wants to use a callee save register, the callee must
+arrange to put the original value back in the register prior to
+returning to the caller, which is usually accomplished by saving and
+restoring the value from the stack.
 
 Recall from Section~\ref{sec:x86-64} that the stack is also used for
 local variables, and that at the beginning of a function we move the
@@ -3211,7 +3225,7 @@ address of the second, and so on. Figure~\ref{fig:call-frames} shows
 the layout of the caller and callee frames. Notice how important it is
 that we correctly compute the maximum number of arguments needed for
 function calls; if that number is too small then the arguments and
-local variables will overlap in memory!
+local variables will smash into each other!
 
 \begin{figure}[tbp]
 \centering
@@ -3238,14 +3252,40 @@ $8n-8$\key{(\%rsp)} & $8n+8$(\key{\%rbp})& argument $n$ \\
 \end{figure}
 
 
+\section{Planning the compilation of functions}
+
+Now that we have a good understanding of functions as they appear in
+$R_4$ and the support for functions in x86-64, we need to plan the
+changes to our compiler, that is, do we need any new passes and/or do
+we need to change any existing passes? Also, do we need to add new
+kinds of AST nodes to any of the intermediate languages?
+
+To begin with, the syntax of $R_4$ is inconvenient for purposes of
+compilation because it conflates the use of function names and local
+variables and it conflates the application of primitive operations and
+the application of functions. This is a problem because we need to
+compile the use of a function name differently than the use of a local
+variable; we need to use \code{leaq} to move the function name to a
+register. Similarly, the application of a function is going to require
+a complex sequence of instructions, unlike the primitive
+operations. Thus, it is a good idea to create a new pass that changes
+references to function names from just a symbol $f$ to
+\code{(function-ref $f$)} and that changes function application from
+\code{($e_0$ $e_1$ $\ldots$ $e_n$)} to the explicitly tagged
+\code{(app $e_0$ $e_1$ $\ldots$ $e_n$)}. A good name for this pass is
+\code{reveal-functions}. Placing this pass after \code{uniquify} is a
+good idea, because it will make sure that there are no local variables
+and functions that share the same name. On the other hand,
+\code{reveal-functions} needs to come before the \code{flatten} pass
+because \code{flatten} will help us compiler \code{function-ref}.
+
+Because each \code{function-ref} needs to eventually become an
+\code{leaq} instruction, it needs to become an assignment
+statement. This can be handled easily in the \code{flatten} pass by
+categorizing \code{function-ref} as a complex expression.
 
 
 
-
-% reveal-functions
-%   * differentiate variables and function names
-%   * differentiate primitive operations and function application
-%
 % flatten
 %   * function-ref not simple, why? have to use the leaq instruction
 %       to put the function label in to a register.
