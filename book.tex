@@ -517,7 +517,7 @@ S-expression to see if it is a machine-representable integer.
 Programs are inherently recursive in that an $R_0$ AST is made
 up of smaller $R_0$ ASTs. Thus, the natural way to process in
 entire program is with a recursive function.  As a first example of
-such a function, we define \texttt{arith?} below, which takes an
+such a function, we define \texttt{R0?} below, which takes an
 arbitrary S-expression, {\tt sexp}, and determines whether or not {\tt
   sexp} is in {\tt arith}. Note that each match clause corresponds to
 one grammar rule for $R_0$ and the body of each clause makes a
@@ -527,21 +527,21 @@ general, when a recursive function is defined using a sequence of
 match clauses that correspond to a grammar, and each clause body makes
 a recursive call on each child node, then we say the function is
 defined by structural recursion.
-%% {Should this be R0 and not {\tt arith?}}
 \begin{center}
 \begin{minipage}{0.7\textwidth}
 \begin{lstlisting}
-(define (arith? sexp)
+(define (R0? sexp)
   (match sexp
     [(? fixnum?) #t]
     [`(read) #t]
-    [`(- ,e) (arith? e)]
+    [`(- ,e) (R0? e)]
     [`(+ ,e1 ,e2)
-     (and (arith? e1) (arith? e2))]
+     (and (R0? e1) (R0? e2))]
+    [`(program ,e) (R0? e)]
     [else #f]))
 
-(arith? `(+ (read) (- 8)))
-(arith? `(- (read) (+ 8)))
+(R0? `(+ (read) (- 8)))
+(R0? `(- (read) (+ 8)))
 \end{lstlisting}
 \end{minipage}
 \vrule
@@ -594,6 +594,7 @@ each child node.
         (fx- 0 (interp-R0 e))]
        [`(+ ,e1 ,e2)
         (fx+ (interp-R0 e1) (interp-R0 e2))]
+       [`(program ,e) (interp-R0 e)]
        ))
 \end{lstlisting}
 \caption{Interpreter for the $R_0$ language.}
