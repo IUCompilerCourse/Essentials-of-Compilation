@@ -3145,6 +3145,7 @@ that does what its name suggests. The program then applies
 \marginpar{\scriptsize to do: interpreter for $R_4$. \\ --Jeremy}
 
 \section{Functions in x86}
+\label{sec:fun-x86}
 
 The x86 architecture provides a few features to support the
 implementation of functions. We have already seen that x86 provides
@@ -3252,7 +3253,7 @@ $8n-8$\key{(\%rsp)} & $8n+8$(\key{\%rbp})& argument $n$ \\
 \end{figure}
 
 
-\section{Planning the compilation of functions}
+\section{The compilation of functions}
 
 Now that we have a good understanding of functions as they appear in
 $R_4$ and the support for functions in x86-64, we need to plan the
@@ -3269,10 +3270,10 @@ variable; we need to use \code{leaq} to move the function name to a
 register. Similarly, the application of a function is going to require
 a complex sequence of instructions, unlike the primitive
 operations. Thus, it is a good idea to create a new pass that changes
-references to function names from just a symbol $f$ to
-\code{(function-ref $f$)} and that changes function application from
-\code{($e_0$ $e_1$ $\ldots$ $e_n$)} to the explicitly tagged
-\code{(app $e_0$ $e_1$ $\ldots$ $e_n$)}. A good name for this pass is
+function references from just a symbol $f$ to \code{(function-ref
+  $f$)} and that changes function application from \code{($e_0$ $e_1$
+  $\ldots$ $e_n$)} to the explicitly tagged AST \code{(app $e_0$ $e_1$
+  $\ldots$ $e_n$)}. A good name for this pass is
 \code{reveal-functions}. Placing this pass after \code{uniquify} is a
 good idea, because it will make sure that there are no local variables
 and functions that share the same name. On the other hand,
@@ -3280,48 +3281,205 @@ and functions that share the same name. On the other hand,
 because \code{flatten} will help us compiler \code{function-ref}.
 
 Because each \code{function-ref} needs to eventually become an
-\code{leaq} instruction, it needs to become an assignment
-statement. This can be handled easily in the \code{flatten} pass by
-categorizing \code{function-ref} as a complex expression.
+\code{leaq} instruction, it first needs to become an assignment
+statement so there is a left-hand side in which to put the
+result. This can be handled easily in the \code{flatten} pass by
+categorizing \code{function-ref} as a complex expression.  Then, in
+the \code{select-instructions} pass, an assignment of
+\code{function-ref} becomes a \code{leaq} instruction as follows: \\
+\begin{tabular}{lll}
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+  (assign |$\itm{lhs}$| (function-ref |$f$|))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(leaq (function-ref |$f$|) |$\itm{lhs}$|)
+\end{lstlisting}
+\end{minipage}
+\end{tabular} 
+
+Next we consider compiling function definitions.  The \code{flatten}
+pass should handle function definitions a lot like a \code{program}
+node; after all, the \code{program} node represents the \code{main}
+function. So the \code{flatten} pass, in addition to flattening the
+body of the function into a sequence of statements, should record the
+local variables in the $\Var^{*}$ field as shown below.
+\begin{lstlisting}
+   (define (|$f$| [|\itm{xs}| : |\itm{ts}|]|$^{*}$|) : |\itm{rt}| (|$\Var^{*}$|) |$\Stmt^{+}$|)
+\end{lstlisting}
+In the \code{select-instructions} pass, we need to encode the
+parameter passing in terms of the conventions discussed in
+Section~\ref{sec:fun-x86}. So depending on the length of the parameter
+list \itm{xs}, some of them may be in registers and some of them may
+be on the stack. I recommend generating \code{movq} instructions to
+move the parameters from their registers and stack locations into the
+variables \itm{xs}, then let register allocation handle the assignment
+of those variables to homes. After this pass, the \itm{xs} can be
+added to the list of local variables. As mentioned in
+Section~\ref{sec:fun-x86}, we need to find out how far to move the
+stack pointer to ensure we have enough space for stack arguments in
+all the calls inside the body of this function. This pass is a good
+place to do this and store the result in the \itm{maxStack} field of
+the output \code{define} shown below.
+\begin{lstlisting}
+  (define (|$f$|) |\itm{numParams}| (|$\Var^{*}$| |\itm{maxStack}|) |$\Instr^{+}$|)
+\end{lstlisting}
+
+Next, consider the compilation of function applications, which have
+the following form at the start of \code{select-instructions}.
+\begin{lstlisting}
+  (assign |\itm{lhs}| (app |\itm{fun}| |\itm{args}| |$\ldots$|))
+\end{lstlisting}
+In the mirror image of handling the parameters of function
+definitions, some of the arguments \itm{args} need to be moved to the
+argument passing registers and the rest should be moved to the
+appropriate stack locations, as discussed in
+Section~\ref{sec:fun-x86}. You might want to introduce a new kind of
+AST node for stack arguments, \code{(stack-arg $i$)} where $i$ is the
+index of this argument with respect to the other stack arguments. As
+you're generate this code for parameter passing, take note of how many
+stack arguments are needed for purposes of computing the
+\itm{maxStack} discussed above.
+
+Once the instructions for parameter passing have been generated, the
+function call itself can be performed with an indirect function call,
+for which I recommend creating the new instruction
+\code{indirect-callq}. Of course, the return value from the function
+is stored in \code{rax}, so it needs to be moved into the \itm{lhs}.
+\begin{lstlisting}
+  (indirect-callq |\itm{fun}|)
+  (movq (reg rax) |\itm{lhs}|)
+\end{lstlisting}
+
+The rest of the passes need only minor modifications to handle the new
+kinds of AST nodes: \code{function-ref}, \code{indirect-callq}, and
+\code{leaq}. Inside \code{uncover-live}, when computing the $W$ set
+(written variables) for an \code{indirect-callq} instruction, I
+recommend including all the caller save registers, which will have the
+affect of making sure that no caller save register actually need to be
+saved. In \code{patch-instructions}, you should deal with the x86
+idiosyncracy that the destination argument of \code{leaq} must be a
+register.
+
+For the \code{print-x86} pass, I recommend the following translations:
+\begin{lstlisting}
+  (function-ref |\itm{label}|) |$\Rightarrow$| |\itm{label}|(%rip)
+  (indirect-callq |\itm{arg}|) |$\Rightarrow$| callq *|\itm{arg}|
+  (stack-arg |$i$|) |$\Rightarrow$| |$i$|(%rsp)
+\end{lstlisting}
+For function definitions, the \code{print-x86} pass should add the
+code for saving and restoring the callee save registers, if you
+haven't already done that.
+
+\section{An Example Translation}
+
+Figure~\ref{fig:add-fun} shows an example translation of a simple
+function in $R_4$ to x86-64. The figure includes the results of the
+\code{flatten} and \code{select-instructions} passes.  Can you see any
+obvious ways to improve the translation?
+
+\begin{figure}[tbp]
+\begin{tabular}{lll}
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}
+(program
+ (define (add [x : Integer] 
+                [y : Integer]) 
+    : Integer (+ x y))
+ (add 40 2))
+\end{lstlisting}
+$\Downarrow$
+\begin{lstlisting}
+(program (t.1 t.2)
+  ((define (add.1 [x.1 : Integer] 
+                    [y.1 : Integer])
+     : Integer (t.3)
+     (assign t.3 (+ x.1 y.1))
+     (return t.3)))
+  (assign t.1 (function-ref add.1))
+  (assign t.2 (app t.1 40 2))
+  (return t.2))
+\end{lstlisting}
+$\Downarrow$
+\begin{lstlisting}
+(program ((t.1 t.2) 0)
+  ((define (add.1) 2 ((x.1 y.1 t.3) 0)
+     (movq (reg rdi) (var x.1))
+     (movq (reg rsi) (var y.1))
+     (movq (var x.1) (var t.3))
+     (addq (var y.1) (var t.3))
+     (movq (var t.3) (reg rax))))
+  (leaq (function-ref add.1) (var t.1))
+  (movq (int 40) (reg rdi))
+  (movq (int 2) (reg rsi))
+  (indirect-callq (var t.1))
+  (movq (reg rax) (var t.2))
+  (movq (var t.2) (reg rax)))
+\end{lstlisting}
+\end{minipage}
+&
+\begin{minipage}{0.4\textwidth}
+$\Downarrow$
+\begin{lstlisting}
+	.globl add_1
+add_1:
+	pushq	%rbp
+	movq	%rsp, %rbp
+	pushq	%r15
+	pushq	%r14
+	pushq	%r13
+	pushq	%r12
+	pushq	%rbx
+	subq	$16, %rsp
+	movq	%rdi, %rbx
+	movq	%rsi, %rcx
+	addq	%rcx, %rbx
+	movq	%rbx, %rax
+	addq	$16, %rsp
+	popq	%rbx
+	popq	%r12
+	popq	%r13
+	popq	%r14
+	popq	%r15
+	popq	%rbp
+	retq
+
+	.globl _main
+_main:
+	pushq	%rbp
+	movq	%rsp, %rbp
+	subq	$16, %rsp
+	leaq	add_1(%rip), %rbx
+	movq	$40, %rdi
+	movq	$2, %rsi
+	callq	*%rbx
+	movq	%rax, %rbx
+	movq	%rbx, %rax
+	addq	$16, %rsp
+	popq	%rbp
+	retq
+\end{lstlisting}
+\end{minipage}
+\end{tabular} 
+\caption{Example compilation of a simple function to x86-64.}
+\label{fig:add-fun}
+\end{figure}
 
 
 
-% flatten
-%   * function-ref not simple, why? have to use the leaq instruction
-%       to put the function label in to a register.
-%
-% select-instructions
-%   * function defs. deal with parameters
-%   * (assign lhs (function-ref f)) => (leaq (function-ref f) lhs)
-%   * (assign lhs (app f es ...))
-%     - pass some args in registers, rest on the stack (stack-arg)
-%     - need to keep track of how large the stack needs to grow across
-%       all the function calls in the body of a function
-%     - indirect-callq f; movq rax lhs
-%
-% uncover-live
-%   * free-vars: function-ref, stack-arg
-%   * read-vars: leaq, indirect-callq
-%   * write-vars: leaq, indirect-callq (all caller save!)
-%   * uncover-live: treat functions like the main program.
-%
-% build interferece:
-%   * treat functions like the main function
-%
-% assign-homes
-%   * add cases for: stack, stack-arg, indirect-callq, function-ref
-%
-% allocate-registers
-%   * treat functions like the main function
-%
-% patch-instructions
-%   * add cases for: function defs, indirect-callq, leaq (target must be reg.)
-%
-% print-x86
-%   * function-ref uses rip
-%   * indirect-callq => callq *
-%   * stack-arg  => rsp
-%   * function defs: save and restore callee-save registers
+\begin{exercise}\normalfont
+Expand your compiler to handle $R_4$ as outlined in this section.
+Create 5 new programs that use functions, including examples that pass
+functions and return functions from other functions, and test your
+compiler on these new programs and all of your previously created test
+programs.
+\end{exercise}
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Lexically Scoped Functions}
