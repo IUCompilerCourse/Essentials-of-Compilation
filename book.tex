@@ -981,6 +981,8 @@ specified by the label.
 main:
 	movq	$10, %rax
 	addq	$32, %rax
+	movq	%rax, %rdi
+	callq	print_int
 	retq
 \end{lstlisting}
 \caption{\it An x86-64 program equivalent to $\BINOP{+}{10}{32}$.}
@@ -999,7 +1001,11 @@ the operating system starts executing this program.  The instruction
 \lstinline{movq $10, %rax} puts $10$ into register \key{rax}. The
 following instruction \lstinline{addq $32, %rax} adds $32$ to the
 $10$ in \key{rax} and puts the result, $42$, back into
-\key{rax}. The instruction \key{retq} finishes the \key{main}
+\key{rax}. The instruction \lstinline{movq %rax, %rdi} moves the value 
+in \key{rax} into another register, \key{rdi}, and 
+\lstinline{callq print_int} calls the external function \code{print\_int}, which
+prints the value in \key{rdi}.
+The instruction \key{retq} finishes the \key{main}
 function by returning the integer in \key{rax} to the
 operating system.
 
@@ -1016,7 +1022,9 @@ main:
 	negq	-8(%rbp)
 	movq	$52, %rax
 	addq	-8(%rbp), %rax
-
+	
+	movq	%rax, %rdi
+	callq	print_int
 	addq	$16, %rsp
 	popq	%rbp
 	retq
@@ -1092,8 +1100,8 @@ places $52$ in the register \key{rax} and \key{addq -8(\%rbp), \%rax}
 adds the contents of variable $1$ to \key{rax}, at which point
 \key{rax} contains $42$.
 
-The last three instructions are the typical \emph{conclusion} of a
-procedure. These instructions are necessary to get the state of the
+The last five instructions are the typical \emph{conclusion} of a
+procedure. The first two print the final result of the program. The latter three are necessary to get the state of the
 machine back to where it was before the current procedure was called.
 The \key{addq \$16, \%rsp} instruction moves the stack pointer back to
 point at the old base pointer. The amount added here needs to match
@@ -1754,11 +1762,25 @@ stack-allocated variables, for which it is suggest that you compute in
 the \key{assign-homes} pass (Section~\ref{sec:assign-s0}) and store in
 the $\itm{info}$ field of the \key{program} node.
 
+Your compiled code should print the result of the program's execution by using the
+\code{print\_int} function provided in \code{runtime.c}. If your compiler has been implemented correctly so far, this final result should be stored in the \key{rax} register.
+We'll talk more about
+how to perform function calls with arguments in general later on, but
+for now, make sure that your x86 printer includes the following code as part of the conclusion:
+
+\begin{lstlisting}
+    movq %rax, %rdi
+    callq print_int
+\end{lstlisting}
+
+These lines move the value in \key{rax} into the \key{rdi} register, which
+stores the first argument to be passed into \key{print\_int}.
+
 If you want your program to run on Mac OSX, at this stage your code also has to determine whether or not it is running on a Mac, and prepend underscores to labels like \key{main} if it is. 
 You can determine the platform your compiler is being run on with the Racket 
 call \code{(system-type 'os)}, which returns \code{'macosx}, \code{'unix}, or \code{'windows}.
 In addition to placing underscores on \key{main}, you'll also have to put them in front of 
-\key{callq} labels (so \code{callq read\_int} becomes \code{callq \_read\_int}).
+\key{callq} labels (so \code{callq print\_int} becomes \code{callq \_print\_int}).
 
 \begin{exercise}
 \normalfont Implement the \key{print-x86} pass and test it on all of
