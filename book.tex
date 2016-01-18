@@ -1014,8 +1014,8 @@ main:
 
 Unfortunately, x86-64 varies in a couple ways depending on what
 operating system it is assembled in. The code examples shown here are
-correct on the Unix platform, but when assembled on Mac OSX, labels
-like \key{main} must be prepended by an underscore.  So the correct
+correct on the Unix platform, but when assembled on Mac OS X, labels
+like \key{main} must be prefixed with an underscore.  So the correct
 output for the above program on Mac would begin with:
 \begin{lstlisting}
 	.globl _main
@@ -1119,7 +1119,7 @@ Figure~\ref{fig:x86-ast-a}. The $\Int$ field of the \key{program} AST
 node is number of bytes of stack space needed for variables in the
 program. (Some of the intermediate languages will store other
 information in that location for the purposes of communicating
-auxilliary data from one step of the compiler to the next. )
+auxiliary data from one step of the compiler to the next. )
 %% \marginpar{Consider mentioning PseudoX86, since I think that's what
 %%   you actually are referring to.}
 %% Not here. PseudoX86 is the language with variables and
@@ -1518,7 +1518,7 @@ function returns two values. The result of \key{map2} is two lists.
 
 The clause of \key{flatten} for the \key{program} node needs to
 recursively flatten the body of the program and the newly flattened
-expression should be placed in a \key{return} statment.  The
+expression should be placed in a \key{return} statement.  The
 \key{flatten} pass should also compute the list of variables used in
 the program.  I recommend traversing the statements in the body of the
 program (after it has been flattened) and collect all variables that
@@ -1787,11 +1787,14 @@ for now, make sure that your x86 printer includes the following code as part of 
 These lines move the value in \key{rax} into the \key{rdi} register, which
 stores the first argument to be passed into \key{print\_int}.
 
-If you want your program to run on Mac OSX, at this stage your code also has to determine whether or not it is running on a Mac, and prepend underscores to labels like \key{main} if it is. 
-You can determine the platform your compiler is being run on with the Racket 
-call \code{(system-type 'os)}, which returns \code{'macosx}, \code{'unix}, or \code{'windows}.
-In addition to placing underscores on \key{main}, you'll also have to put them in front of 
-\key{callq} labels (so \code{callq print\_int} becomes \code{callq \_print\_int}).
+If you want your program to run on Mac OS X, your code needs to
+determine whether or not it is running on a Mac, and prefix
+underscores to labels like \key{main}.  You can determine the platform
+with the Racket call \code{(system-type 'os)}, which returns
+\code{'macosx}, \code{'unix}, or \code{'windows}.  In addition to
+placing underscores on \key{main}, you need to put them in front of
+\key{callq} labels (so \code{callq print\_int} becomes \code{callq
+  \_print\_int}).
 
 \begin{exercise}
 \normalfont Implement the \key{print-x86} pass and test it on all of
@@ -2049,7 +2052,7 @@ Line 10: \key{rax} interferes with $y$, \\
 Line 11: no interference. 
 \end{quote}
 The resulting interference graph is shown in
-Figure~\ref{fig:interfere}.
+Figure~\ref{fig:interfere}. 
 
 \begin{figure}[tbp]
 \large
@@ -2079,13 +2082,30 @@ Figure~\ref{fig:interfere}.
 \label{fig:interfere}
 \end{figure}
 
+Our next concern is to choose a data structure for representing the
+interference graph. There are many standard choices for how to
+represent a graph: \emph{adjacency matrix}, \emph{adjacency list}, and
+\emph{edge set}~\citep{Cormen:2001uq}. The right way to choose a data
+structure is to study the algorithm that uses the data structure,
+determine what operations need to be performed, and then choose the
+data structure that provide the most efficient implementations of
+those operations. Often times the choice of data structure can have an
+affect on the time complexity of the algorithm, as it does here. If
+you skim the next section, you will see that the register allocation
+algorithm needs to ask the graph for all of its vertices and, given a
+vertex, it needs to known all of the adjacent vertices. Thus, the
+correct choice of graph representation is that of an adjacency
+list. There are helper functions in \code{utilities.rkt} for
+representing graphs using the adjacency list representation:
+\code{make-graph}, \code{add-edge}, and \code{adjacent}
+(Appendix~\ref{appendix:utilities}).  In particular, those functions
+use a hash table to map each vertex to the set of adjacent vertices,
+and the sets are represented using Racket's \key{set}, which is also a
+hash table.
 
 \begin{exercise}\normalfont
 Implement the compiler pass named \code{build-interference} according
-to the algorithm suggested above.  There are several helper functions
-in \code{utilities.rkt} for representing graphs: \code{make-graph},
-\code{add-edge}, and \code{adjacent}
-(Appendix~\ref{appendix:utilities}). The output of this pass should
+to the algorithm suggested above.  The output of this pass should
 replace the live-after sets with the interference $\itm{graph}$ as
 follows.
 \begin{lstlisting}
@@ -2196,9 +2216,11 @@ while |$W \neq \emptyset$| do
 
 With this algorithm in hand, let us return to the running example and
 consider how to color the interference graph in
-Figure~\ref{fig:interfere}. Initially, all of the nodes are not yet
-colored and they are unsaturated, so we annotate each of them with a
-dash for their color and an empty set for the saturation.
+Figure~\ref{fig:interfere}. We shall not use register \key{rax} for
+register allocation because we use it to patch instructions, so we
+remove that vertex from the graph.  Initially, all of the nodes are
+not yet colored and they are unsaturated, so we annotate each of them
+with a dash for their color and an empty set for the saturation.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (v) at (0,0)    {$v:-,\{\}$};
@@ -3424,7 +3446,7 @@ kinds of AST nodes: \code{function-ref}, \code{indirect-callq}, and
 recommend including all the caller save registers, which will have the
 affect of making sure that no caller save register actually need to be
 saved. In \code{patch-instructions}, you should deal with the x86
-idiosyncracy that the destination argument of \code{leaq} must be a
+idiosyncrasy that the destination argument of \code{leaq} must be a
 register.
 
 For the \code{print-x86} pass, I recommend the following translations:
@@ -3603,7 +3625,7 @@ The utility function described in this section can be found in the
 \key{utilities.rkt} file.
 
 The \key{read-program} function takes a file path and parses that file
-(it must be a Racket proram) into an abstract syntax tree (as an
+(it must be a Racket program) into an abstract syntax tree (as an
 S-expression) with a \key{program} AST at the top.
 
 The \key{assert} function displays the error message \key{msg} if the
@@ -3677,5 +3699,7 @@ as the program file name but with \key{.scm} replaced with \key{.s}.
 %%  LocalWords:  Rosen DSATUR SDO Gebremedhin Omari morekeywords cnd
 %%  LocalWords:  fullflexible vertices Booleans Listof Pairof thn els
 %%  LocalWords:  boolean typecheck andq notq cmpq sete movzbq jmp al
-%%  LocalWords:  EFLAGS thns elss elselabel endlabel Tuples tuples
+%%  LocalWords:  EFLAGS thns elss elselabel endlabel Tuples tuples os
 %%  LocalWords:  tuple args lexically leaq Polymorphism msg bool nums
+%%  LocalWords:  macosx unix Cormen vec callee xs maxStack numParams
+%%  LocalWords:  arg
