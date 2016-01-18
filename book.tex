@@ -926,28 +926,6 @@ values. Figure~\ref{fig:x86-a} defines the syntax for the subset of
 the x86-64 assembly language needed for this chapter.  (We use the
 AT\&T syntax expected by the GNU assembler inside \key{gcc}.)
 
-An immediate value is written using the notation \key{\$}$n$ where $n$
-is an integer. 
-%
-A register is written with a \key{\%} followed by the register name,
-such as \key{\%rax}.
-%
-An access to memory is specified using the syntax $n(\key{\%}r)$,
-which reads register $r$ and then offsets the address by $n$ bytes
-(8 bits). The address is then used to either load or store to memory
-depending on whether it occurs as a source or destination argument of
-an instruction.
-
-An arithmetic instruction, such as $\key{addq}\,s,\,d$, reads from the
-source $s$ and destination $d$, applies the arithmetic operation, then
-writes the result in $d$.
-%
-The move instruction, $\key{movq}\,s\,d$ reads from $s$ and stores the
-result in $d$. 
-%
-The $\key{callq}\,\mathit{label}$ instruction executes the procedure
-specified by the label.
-
 \begin{figure}[tbp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
@@ -975,23 +953,27 @@ specified by the label.
 \label{fig:x86-a}
 \end{figure}
 
+An immediate value is written using the notation \key{\$}$n$ where $n$
+is an integer. 
+%
+A register is written with a \key{\%} followed by the register name,
+such as \key{\%rax}.
+%
+An access to memory is specified using the syntax $n(\key{\%}r)$,
+which reads register $r$ and then offsets the address by $n$ bytes
+(8 bits). The address is then used to either load or store to memory
+depending on whether it occurs as a source or destination argument of
+an instruction.
 
-\begin{wrapfigure}{r}{2.25in}
-\begin{lstlisting}
-	.globl main
-main:
-	movq	$10, %rax
-	addq	$32, %rax
-	movq	%rax, %rdi
-	callq	print_int
-	retq
-\end{lstlisting}
-\caption{An x86-64 program equivalent to $\BINOP{+}{10}{32}$.}
-\label{fig:p0-x86}
-\end{wrapfigure}
-%% \marginpar{Consider using italics for the texts in these figures.
-%%   It can get confusing to differentiate them from the main text.}
-%% It looks pretty ugly in italics.-Jeremy
+An arithmetic instruction, such as $\key{addq}\,s,\,d$, reads from the
+source $s$ and destination $d$, applies the arithmetic operation, then
+writes the result in $d$.
+%
+The move instruction, $\key{movq}\,s\,d$ reads from $s$ and stores the
+result in $d$. 
+%
+The $\key{callq}\,\mathit{label}$ instruction executes the procedure
+specified by the label.
 
 Figure~\ref{fig:p0-x86} depicts an x86-64 program that is equivalent
 to \code{(+ 10 32)}. The \key{globl} directive says that the
@@ -1011,42 +993,35 @@ function by returning the integer in \key{rax} to the
 operating system.
 
 
-\begin{wrapfigure}{r}{2.25in}
+%\begin{wrapfigure}{r}{2.25in}
+\begin{figure}[tbp]
 \begin{lstlisting}
 	.globl main
 main:
-	pushq	%rbp
-	movq	%rsp, %rbp
-	subq	$16, %rsp
-
-	movq	$10, -8(%rbp)
-	negq	-8(%rbp)
-	movq	$52, %rax
-	addq	-8(%rbp), %rax
-	
+	movq	$10, %rax
+	addq	$32, %rax
 	movq	%rax, %rdi
 	callq	print_int
-	addq	$16, %rsp
-	popq	%rbp
 	retq
 \end{lstlisting}
-\caption{An x86-64 program equivalent to $\BINOP{+}{52}{\UNIOP{-}{10} }$.}
-\label{fig:p1-x86}
-\end{wrapfigure}
+\caption{An x86-64 program equivalent to $\BINOP{+}{10}{32}$.}
+\label{fig:p0-x86}
+%\end{wrapfigure}
+\end{figure}
+%% \marginpar{Consider using italics for the texts in these figures.
+%%   It can get confusing to differentiate them from the main text.}
+%% It looks pretty ugly in italics.-Jeremy
 
 Unfortunately, x86-64 varies in a couple ways depending on what
 operating system it is assembled in. The code examples shown here are
 correct on the Unix platform, but when assembled on Mac OSX, labels
 like \key{main} must be prepended by an underscore.  So the correct
 output for the above program on Mac would begin with:
-
 \begin{lstlisting}
 	.globl _main
 _main:
-	pushq	%rbp
 	...
 \end{lstlisting}
-
 
 The next example exhibits the use of memory.  Figure~\ref{fig:p1-x86}
 lists an x86-64 program that is equivalent to $\BINOP{+}{52}{
@@ -1065,6 +1040,32 @@ procedure that called the current one and 2) it is used to access
 variables associated with the current procedure. We number the
 variables from $1$ to $n$. Variable $1$ is stored at address
 $-8\key{(\%rbp)}$, variable $2$ at $-16\key{(\%rbp)}$, etc.
+
+%\begin{wrapfigure}{r}{2.1in}
+\begin{figure}[tbp]
+\begin{lstlisting}
+	.globl main
+main:
+	pushq	%rbp
+	movq	%rsp, %rbp
+	subq	$16, %rsp
+
+	movq	$10, -8(%rbp)
+	negq	-8(%rbp)
+	movq	$52, %rax
+	addq	-8(%rbp), %rax
+
+	movq	%rax, %rdi
+	callq	print_int
+	addq	$16, %rsp
+	popq	%rbp
+	retq
+\end{lstlisting}
+\caption{An x86-64 program equivalent to $\BINOP{+}{52}{\UNIOP{-}{10} }$.}
+\label{fig:p1-x86}
+\end{figure}
+%\end{wrapfigure}
+
 
 \begin{figure}[tbp]
 \centering
@@ -1797,7 +1798,10 @@ In addition to placing underscores on \key{main}, you'll also have to put them i
 the example programs that you created for the previous passes. Use the
 \key{compiler-tests} function (Appendix~\ref{appendix:utilities}) from
 \key{utilities.rkt} to test your complete compiler on the example
-programs. Mac support is optional, but your compiler has to output valid code for Unix machines.
+programs. 
+% The following is specific to P423/P523. -Jeremy
+%Mac support is optional, but your compiler has to output
+%valid code for Unix machines.
 \end{exercise}
 
 %% \section{Testing with Interpreters}
