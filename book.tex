@@ -2368,8 +2368,8 @@ following is the mapping of colors to registers and stack allocations.
 \[
   \{ 0 \mapsto \key{\%rbx}, \; 1 \mapsto \key{-8(\%rbp)}, \; 2 \mapsto \key{-16(\%rbp)}, \ldots \}
 \]
-Putting this together with the above coloring of the variables, we
-arrive at the following assignment.
+Putting this mapping together with the above coloring of the variables, we
+arrive at the assignment:
 \[
   \{ v \mapsto \key{\%rbx}, \;
   w \mapsto \key{-8(\%rbp)},  \;
@@ -2378,8 +2378,26 @@ arrive at the following assignment.
   z\mapsto \key{-16(\%rbp)} \}
 \]
 Applying this assignment to our running example
-(Figure~\ref{fig:reg-eg}) yields the following program.
+(Figure~\ref{fig:reg-eg}) yields the program on the right.
+
 % why frame size of 32? -JGS
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+  (program (v w x y z)
+    (movq (int 1) (var v))
+    (movq (int 46) (var w))
+    (movq (var v) (var x))
+    (addq (int 7) (var x))
+    (movq (var x) (var y))
+    (addq (int 4) (var y))
+    (movq (var x) (var z))
+    (addq (var w) (var z))
+    (movq (var z) (reg rax))
+    (subq (var y) (reg rax)))
+\end{lstlisting}
+\end{minipage}
+$\Rightarrow$
+\begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
 (program 32
   (movq (int 1) (reg rbx))
@@ -2393,9 +2411,11 @@ Applying this assignment to our running example
   (movq (stack -16) (reg rax))
   (subq (reg rbx) (reg rax)))
 \end{lstlisting}
-This program is almost an x86-64 program. The remaining step is to apply
-the patch instructions pass. In this example, the trivial move of
-\code{-16(\%rbp)} to itself is deleted and the addition of
+\end{minipage}
+
+The resulting program is almost an x86-64 program. The remaining step
+is to apply the patch instructions pass. In this example, the trivial
+move of \code{-16(\%rbp)} to itself is deleted and the addition of
 \code{-8(\%rbp)} to \key{-16(\%rbp)} is fixed by going through
 \code{rax}. The following shows the portion of the program that
 changed.
@@ -2447,7 +2467,216 @@ to replace the variables with their homes.
 \end{exercise}
 
 
-\marginpar{\scriptsize To do: a challenge exercise on move biasing. \\ --Jeremy}
+\section{Challenge: Move Biasing$^{*}$}
+\label{sec:move-biasing}
+
+This section describes an optional enhancement to register allocation
+for those students who are looking for an extra challenge or who have
+a deeper interest in register allocation.
+
+We return to the running example, but we remove the supposition that
+we only have one register to use. So we have the following mapping of
+color numbers to registers.
+\[
+  \{ 0 \mapsto \key{\%rbx}, \; 1 \mapsto \key{\%rcx}, \; 2 \mapsto \key{\%rdx}, \ldots \}
+\]
+Using the same assignment that was produced by register allocator
+described in the last section, we get the following program.
+
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+  (program (v w x y z)
+    (movq (int 1) (var v))
+    (movq (int 46) (var w))
+    (movq (var v) (var x))
+    (addq (int 7) (var x))
+    (movq (var x) (var y))
+    (addq (int 4) (var y))
+    (movq (var x) (var z))
+    (addq (var w) (var z))
+    (movq (var z) (reg rax))
+    (subq (var y) (reg rax)))
+\end{lstlisting}
+\end{minipage}
+$\Rightarrow$
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+  (program 0
+    (movq (int 1) (reg rbx))
+    (movq (int 46) (reg rcx))
+    (movq (reg rbx) (reg rdx))
+    (addq (int 7) (reg rdx))
+    (movq (reg rdx) (reg rbx))
+    (addq (int 4) (reg rbx))
+    (movq (reg rdx) (reg rdx))
+    (addq (reg rcx) (reg rdx))
+    (movq (reg rdx) (reg rax))
+    (subq (reg rbx) (reg rax)))
+\end{lstlisting}
+\end{minipage}
+
+While this allocation is quite good, we could do better. For example,
+the variables \key{v} and \key{x} ended up in different registers, but
+if they had been placed in the same register, then the move from
+\key{v} to \key{x} could be removed. 
+
+We say that two variables $p$ and $q$ are \emph{move related} if they
+participate together in a \key{movq} instruction, that is, \key{movq
+  p, q} or \key{movq q, p}. When the register allocator chooses a
+color for a variable, it should prefer a color that has already been
+used for a move-related variable (assuming that they do not
+interfere). Of course, this preference should not override the
+preference for registers over stack locations, but should only be used
+as a tie breaker when choosing between registers or when choosing
+between stack locations.
+
+We recommend that you represent the move relationships in a graph,
+similar to how we represented interference.  The following is the
+\emph{move graph} for our running example.
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (v) at (0,0)    {$v$};
+\node (w) at (3,0)    {$w$};
+\node (x) at (6,0)    {$x$};
+\node (y) at (3,-1.5) {$y$};
+\node (z) at (6,-1.5) {$z$};
+\draw[bend left=20] (v) to (x);
+\draw (x) to (y);
+\draw (x) to (z);
+\end{tikzpicture}
+\]
+
+Now we replay the graph coloring, pausing to see the coloring of $z$
+and $v$. So we have the following coloring so far and the most
+saturated vertex is $z$.
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (v) at (0,0)    {$v:-,\{1\}$};
+\node (w) at (3,0)    {$w:1,\{0,2\}$};
+\node (x) at (6,0)    {$x:2,\{0,1\}$};
+\node (y) at (3,-1.5) {$y:0,\{1,2\}$};
+\node (z) at (6,-1.5) {$z:-,\{0,1\}$};
+\draw (v) to (w);
+\foreach \i in {w,x,y} 
+{
+  \foreach \j in {w,x,y}
+  { 
+    \draw (\i) to (\j);
+  }
+}
+\draw (z) to (w);
+\draw (z) to (y);
+\end{tikzpicture}
+\]
+Last time we chose to color $z$ with $2$, which so happens to be the
+color of $x$, and $z$ is move related to $x$. This was rather lucky,
+and if the program had been a little different, and say $x$ had been
+already assigned to $3$, then $z$ would still get $2$ and our luck
+would have run out. With move biasing, we use the fact that $z$ and
+$x$ are move related to influence the choice of color for $z$, in this
+case choosing $2$ because that's the color of $x$.
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (v) at (0,0)    {$v:-,\{1\}$};
+\node (w) at (3,0)    {$w:1,\{0,2\}$};
+\node (x) at (6,0)    {$x:2,\{0,1\}$};
+\node (y) at (3,-1.5) {$y:0,\{1,2\}$};
+\node (z) at (6,-1.5) {$z:2,\{0,1\}$};
+\draw (v) to (w);
+\foreach \i in {w,x,y} 
+{
+  \foreach \j in {w,x,y}
+  { 
+    \draw (\i) to (\j);
+  }
+}
+\draw (z) to (w);
+\draw (z) to (y);
+\end{tikzpicture}
+\]
+
+The last variable to color is $v$, and we just need to avoid choosing
+$1$ because of the interference with $w$. Last time we choose the
+color $0$, simply because it was the lowest, but this time we know
+that $v$ is move related to $x$, so we choose the color $2$.
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (v) at (0,0)    {$v:2,\{1\}$};
+\node (w) at (3,0)    {$w:1,\{0,2\}$};
+\node (x) at (6,0)    {$x:2,\{0,1\}$};
+\node (y) at (3,-1.5) {$y:0,\{1,2\}$};
+\node (z) at (6,-1.5) {$z:2,\{0,1\}$};
+\draw (v) to (w);
+\foreach \i in {w,x,y} 
+{
+  \foreach \j in {w,x,y}
+  { 
+    \draw (\i) to (\j);
+  }
+}
+\draw (z) to (w);
+\draw (z) to (y);
+\end{tikzpicture}
+\]
+
+We apply this register assignment to the running example, on the left,
+to obtain the code on right.
+
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+  (program (v w x y z)
+    (movq (int 1) (var v))
+    (movq (int 46) (var w))
+    (movq (var v) (var x))
+    (addq (int 7) (var x))
+    (movq (var x) (var y))
+    (addq (int 4) (var y))
+    (movq (var x) (var z))
+    (addq (var w) (var z))
+    (movq (var z) (reg rax))
+    (subq (var y) (reg rax)))
+\end{lstlisting}
+\end{minipage}
+$\Rightarrow$
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+  (program 0
+    (movq (int 1) (reg rdx))
+    (movq (int 46) (reg rcx))
+    (movq (reg rdx) (reg rdx))
+    (addq (int 7) (reg rdx))
+    (movq (reg rdx) (reg rbx))
+    (addq (int 4) (reg rbx))
+    (movq (reg rdx) (reg rdx))
+    (addq (reg rcx) (reg rdx))
+    (movq (reg rdx) (reg rax))
+    (subq (reg rbx) (reg rax)))
+\end{lstlisting}
+\end{minipage}
+
+The \code{patch-instructions} then removes the trivial moves from
+\key{v} to \key{x} and from \key{x} to \key{z} to obtain the following
+result.
+\begin{lstlisting}
+  (program 0
+    (movq (int 1) (reg rdx))
+    (movq (int 46) (reg rcx))
+    (addq (int 7) (reg rdx))
+    (movq (reg rdx) (reg rbx))
+    (addq (int 4) (reg rbx))
+    (addq (reg rcx) (reg rdx))
+    (movq (reg rdx) (reg rax))
+    (subq (reg rbx) (reg rax)))
+\end{lstlisting}
+
+\begin{exercise}\normalfont
+Change your implementation of \code{allocate-registers} to take move
+biasing into account. Make sure that your compiler still passes all of
+the previous tests. Create two new tests that include at least one
+opportunity for move biasing and visually inspect the output x86
+programs to make sure that your move biasing is working properly.
+\end{exercise}
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
