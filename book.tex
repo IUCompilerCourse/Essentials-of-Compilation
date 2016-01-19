@@ -1809,23 +1809,37 @@ programs.
 %valid code for Unix machines.
 \end{exercise}
 
-%% \section{Testing with Interpreters}
+\begin{figure}[p]
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (R1) at (0,2)  {\large $R_1$};
+\node (R1-2) at (3,2)  {\large $R_1$};
+\node (C0-1) at (3,0)  {\large $C_0$};
 
-%% The typical way to test a compiler is to run the generated assembly
-%% code on a diverse set of programs and check whether they behave as
-%% expected. However, when a compiler is structured as our is, with many
-%% passes, when there is an error in the generated assembly code it can
-%% be hard to determine which pass contains the source of the error.  A
-%% good way to isolate the error is to not only test the generated
-%% assembly code but to also test the output of every pass. This requires
-%% having interpreters for all the intermediate languages.  Indeed, the
-%% file \key{interp.rkt} in the supplemental code provides interpreters
-%% for all the intermediate languages described in this book, starting
-%% with interpreters for $R_1$, $C_0$, and x86 (in abstract syntax).
+\node (x86-2) at (3,-2)  {\large $\text{x86}^{*}$};
+\node (x86-3) at (6,-2)  {\large $\text{x86}^{*}$};
+\node (x86-4) at (9,-2) {\large $\text{x86}$};
+\node (x86-5) at (12,-2) {\large $\text{x86}^{\dagger}$};
 
-%% The file \key{run-tests.rkt} automates the process of running the
-%% interpreters on the output programs of each pass and checking their
-%% result.
+\path[->,bend left=15] (R1) edge [above] node {\ttfamily\footnotesize uniquify} (R1-2);
+\path[->,bend left=15] (R1-2) edge [right] node {\ttfamily\footnotesize flatten} (C0-1);
+\path[->,bend right=15] (C0-1) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
+\path[->,bend left=15] (x86-2) edge [above] node {\ttfamily\footnotesize assign-homes} (x86-3);
+\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-4);
+\path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize print-x86} (x86-5);
+\end{tikzpicture}
+
+\caption{Overview of the passes for compiling $R_1$.  The x86$^{*}$
+  language extends x86 with variables and looser rules regarding
+  instruction arguments. The x86$^{\dagger}$ language is the concrete
+  syntax (string) for x86.}
+\label{fig:R1-passes}
+\end{figure}
+
+
+Figure~\ref{fig:R1-passes} provides an overview of all the compiler
+passes described in this Chapter.
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Register Allocation}
@@ -2429,24 +2443,31 @@ changed.
 An overview of all of the passes involved in register allocation is
 shown in Figure~\ref{fig:reg-alloc-passes}.
 
-\begin{figure}[tbp]
-\[
+\begin{figure}[p]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (1) at (-3.5,0)     {$C_0$};
-\node (2)  at (0,0)     {$\text{x86-64}^{*}$};
-\node (3)  at (0,-1.5)  {$\text{x86-64}^{*}$};
-\node (4)  at (0,-3)    {$\text{x86-64}^{*}$};
-\node (5)  at (0,-4.5)  {$\text{x86-64}^{*}$};
-\node (6)  at (3.5,-4.5)  {$\text{x86-64}$};
+\node (R1) at (0,2)  {\large $R_1$};
+\node (R1-2) at (3,2)  {\large $R_1$};
+\node (C0-1) at (3,0)  {\large $C_0$};
 
-\path[->] (1) edge [above] node {\ttfamily\scriptsize select-instructions} (2);
-\path[->] (2) edge [right] node {\ttfamily\scriptsize uncover-live}       (3);
-\path[->] (3) edge [right] node {\ttfamily\scriptsize build-interference} (4);
-\path[->] (4) edge [left]  node {\ttfamily\scriptsize allocate-registers} (5);
-\path[->] (5) edge [above] node {\ttfamily\scriptsize patch-instructions} (6);
+\node (x86-2) at (3,-2)  {\large $\text{x86}^{*}$};
+\node (x86-3) at (6,-2)  {\large $\text{x86}^{*}$};
+\node (x86-4) at (9,-2) {\large $\text{x86}$};
+\node (x86-5) at (12,-2) {\large $\text{x86}^{\dagger}$};
+
+\node (x86-2-1) at (3,-4)  {\large $\text{x86}^{*}$};
+\node (x86-2-2) at (6,-4)  {\large $\text{x86}^{*}$};
+
+\path[->,bend left=15] (R1) edge [above] node {\ttfamily\footnotesize uniquify} (R1-2);
+\path[->,bend left=15] (R1-2) edge [right] node {\ttfamily\footnotesize flatten} (C0-1);
+\path[->,bend right=15] (C0-1) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
+\path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize uncover-live} (x86-2-1);
+\path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build-inter.} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate-reg.} (x86-3);
+\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-4);
+\path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize print-x86} (x86-5);
 \end{tikzpicture}
-\]
-\caption{Diagram of the passes for register allocation.}
+\caption{Diagram of the passes for compiling $R_1$, including the
+  three new passes for register allocation.}
 \label{fig:reg-alloc-passes}
 \end{figure}
 
@@ -2855,6 +2876,9 @@ use of a variable, it can lookup its type in the association list.
           ['Boolean 'Boolean]
           [else (error 'typecheck-R2 "'not' expects a Boolean" e)])]
        ...
+       [`(program ,body)
+         (typecheck-R2 '() body)
+         `(program ,body)]
        ))
 \end{lstlisting}
 \caption{Skeleton of a type checker for the $R_2$ language.}
@@ -3311,6 +3335,40 @@ if_end1327:
 \caption{Example compilation of an \key{if} expression to x86-64.}
 \label{fig:if-example-x86}
 \end{figure}
+
+
+\begin{figure}[p]
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (R1) at (0,2)  {\large $R_1$};
+\node (R1-2) at (3,2)  {\large $R_1$};
+\node (R1-3) at (6,2)  {\large $R_1$};
+\node (C0-1) at (3,0)  {\large $C_0$};
+
+\node (x86-2) at (3,-2)  {\large $\text{x86}^{*}$};
+\node (x86-3) at (6,-2)  {\large $\text{x86}^{*}$};
+\node (x86-4) at (9,-2) {\large $\text{x86}$};
+\node (x86-5) at (12,-2) {\large $\text{x86}^{\dagger}$};
+
+\node (x86-2-1) at (3,-4)  {\large $\text{x86}^{*}$};
+\node (x86-2-2) at (6,-4)  {\large $\text{x86}^{*}$};
+
+\path[->,bend left=15] (R1) edge [above] node {\ttfamily\footnotesize typecheck} (R1-2);
+\path[->,bend left=15] (R1-2) edge [above] node {\ttfamily\footnotesize uniquify} (R1-3);
+\path[->,bend left=15] (R1-3) edge [right] node {\ttfamily\footnotesize flatten} (C0-1);
+\path[->,bend right=15] (C0-1) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
+\path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize uncover-live} (x86-2-1);
+\path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build-inter.} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate-reg.} (x86-3);
+\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-4);
+\path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize print-x86} (x86-5);
+\end{tikzpicture}
+\caption{Diagram of the passes for compiling $R_2$, including the
+  new type checking pass.}
+\label{fig:R2-passes}
+\end{figure}
+
+Figure~\ref{fig:R2-passes} gives an overview of all the passes needed
+for the compilation of $R_2$.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
