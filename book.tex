@@ -637,16 +637,6 @@ compilation time to obtain the output and then generating the trivial
 code to return the output. (A clever student at Colorado did this the
 first time I taught the course.)
 
-%% The behavior of the following program is somewhat subtle because
-%% Racket does not specify an evaluation order for arguments of an
-%% operator such as $-$.
-%% \marginpar{\scriptsize This is not true of Racket. \\ --Jeremy}
-%% \[
-%% \BINOP{+}{\READ}{\UNIOP{-}{\READ}}
-%% \]
-%% Given the input $42$ then $10$, the above program can result in either
-%% $42$ or $-42$, depending on the whims of the Racket implementation.
-
 The job of a compiler is to translate a program in one language into a
 program in another language so that the output program behaves the
 same way as the input program. This idea is depicted in the following
@@ -2766,9 +2756,10 @@ comparing two integers and for comparing two Booleans.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-  \Op  &::=& \ldots \mid \key{and} \mid \key{not} \mid \key{eq?} \\
   \Exp &::=& \ldots \mid \key{\#t} \mid \key{\#f} \mid
-      \IF{\Exp}{\Exp}{\Exp} \\
+      (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp) \mid\\
+      &&(\key{eq?}\;\Exp\;\Exp) \mid  
+       \IF{\Exp}{\Exp}{\Exp} \\
   R_2 &::=& (\key{program} \; \Exp)
 \end{array}
 \]
@@ -2919,7 +2910,7 @@ arguments unconditionally.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-\Op  &::=& \ldots \mid \key{and} \mid \key{not} \mid \key{eq?} \\
+\Op  &::=& \ldots \mid \key{not} \mid \key{eq?} \\
 \Arg &::=& \ldots \mid \key{\#t} \mid \key{\#f} \\
 \Stmt &::=& \ldots \mid \IF{\Exp}{\Stmt^{*}}{\Stmt^{*}} \\
 C_1 & ::= & (\key{program}\;(\Var^{*})\;\Stmt^{+})
@@ -3034,9 +3025,9 @@ To implement the new logical operations, the comparison \key{eq?}, and
 the \key{if} statement, we need to delve further into the x86-64
 language. Figure~\ref{fig:x86-ast-b} defines the abstract syntax for a
 larger subset of x86-64 that includes instructions for logical
-operations, comparisons, and jumps.  The logical instructions
-(\key{andq} and \key{notq}) are quite similar to the arithmetic
-instructions, so we focus on the comparison and jump instructions.
+operations, comparisons, and jumps.  The logical instruction
+\key{notq} is quite similar to the arithmetic instructions, so we
+focus on the comparison and jump instructions.
 
 \begin{figure}[tbp]
 \fbox{
@@ -3371,20 +3362,23 @@ Figure~\ref{fig:R2-passes} gives an overview of all the passes needed
 for the compilation of $R_2$.
 
 
+\marginpar{\scriptsize To do: create a challenge section. \\ --Jeremy}
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Tuples and Garbage Collection}
 \label{ch:tuples}
 
 In this chapter we study the compilation of mutable tuples (called
-vectors in Racket). Figure~\ref{fig:r3-syntax} defines the syntax for
-$R_3$, which includes three new forms for creating a tuple, reading an
-element of a tuple, and writing an element into a tuple. The following
-program shows the usage of tuples in Racket. We create a 3-tuple
-\code{t} and a 1-tuple. The 1-tuple is stored at index $2$ of the
-3-tuple, showing that tuples are first-class values.  The element at
-index $1$ of \code{t} is \code{\#t}, so the ``then'' branch is taken.
-The element at index $0$ of \code{t} is $40$, to which we add the $2$,
-the element at index $0$ of the 1-tuple.
+``vectors'' in Racket). Figure~\ref{fig:r3-syntax} defines the syntax
+for $R_3$, which includes three new forms for creating a tuple,
+reading an element of a tuple, and writing an element into a
+tuple. The following program shows the usage of tuples in Racket. We
+create a 3-tuple \code{t} and a 1-tuple. The 1-tuple is stored at
+index $2$ of the 3-tuple, showing that tuples are first-class values.
+The element at index $1$ of \code{t} is \code{\#t}, so the ``then''
+branch is taken.  The element at index $0$ of \code{t} is $40$, to
+which we add the $2$, the element at index $0$ of the 1-tuple.
 \begin{lstlisting}
 (program
   (let ([t (vector 40 #t (vector 2))])
@@ -3394,7 +3388,49 @@ the element at index $0$ of the 1-tuple.
         44)))
 \end{lstlisting}
 
-\marginpar{\scriptsize To do: interpreter for $R_3$ \\ --Jeremy}
+Figure~\ref{fig:interp-R3} shows the interpreter for the $R_3$
+language. With the addition of the vector operations, there are quite
+a few primitive operations and the interpreter code for them is
+somewhat repetative. In Figure~\ref{fig:interp-R3} we factor out the
+different parts into the \code{interp-op} function and the similar
+parts into the one match clause shown in
+Figure~\ref{fig:interp-R3}. It is important for that match clause to
+come last because it matches \emph{any} compound S-expression.  We do
+not use \code{interp-op} for the \code{and} operation because of the
+short-circuiting behavior in the order of evaluation of its arguments.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+   (define (interp-op op)
+     (match op
+       ['+ fx+]
+       ['- (lambda (n) (fx- 0 n))]
+       ['read read-fixnum]
+       ['not (lambda (v) (match v [#t #f] [#f #t]))]
+       ['eq? (lambda (v1 v2)
+               (cond [(or (and (fixnum? v1) (fixnum? v2)) 
+                           (and (boolean? v1) (boolean? v2))
+                           (and (vector? v1) (vector? v2)))
+                      (eq? v1 v2)]))]
+       ['vector vector]
+       ['vector-ref vector-ref]
+       ['vector-set! vector-set!]
+       [else (error "in interp-op S0, unmatched" op)]))
+
+   (define (interp-R3 env e)
+     (match e
+       ...
+       [`(,op ,args ...)
+        (apply (interp-op op)
+                (map (lambda (e) (interp-R3 env e)) args))]
+       ))
+\end{lstlisting}
+\caption{Interpreter for the $R_3$ language. We combine the code for
+  most of the primitive operations, including the new vector
+  operations, into the one match clause and factor their differences
+  into the \code{interp-op} function. }
+\label{fig:interp-R3}
+\end{figure}
 
 \begin{figure}[tbp]
 \centering
@@ -3402,6 +3438,7 @@ the element at index $0$ of the 1-tuple.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
+  \Type &::=& \ldots \mid (\key{Vector}\;\Type^{+}) \\
   \Exp &::=& \ldots \mid (\key{vector}\;\Exp^{+}) \mid 
     (\key{vector-ref}\;\Exp\;\Exp) \\
   &\mid& (\key{vector-set!}\;\Exp\;\Exp\;\Exp)\\
@@ -3414,10 +3451,6 @@ the element at index $0$ of the 1-tuple.
   (Figure~\ref{fig:r2-syntax}).}
 \label{fig:r3-syntax}
 \end{figure}
-
-\[
-  \Type ::= \ldots \mid (\key{Vector}\;\Type^{+}) 
-\]
 
 \begin{figure}[tbp]
 \begin{lstlisting}
