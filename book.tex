@@ -15,6 +15,11 @@
 \usepackage{semantic}
 \usepackage{wrapfig}
 \usepackage{multirow}
+\usepackage{color}
+
+\definecolor{lightgray}{gray}{1}
+\newcommand{\black}[1]{{\color{black} #1}}
+\newcommand{\gray}[1]{{\color{lightgray} #1}}
 
 %% For pictures
 \usepackage{tikz}
@@ -759,19 +764,20 @@ following grammar.
 \label{ch:int-exp}
 
 This chapter concerns the challenge of compiling a subset of Racket,
-which we name $R_1$, to x86-64 assembly code~\citep{Intel:2015aa}. The
-chapter begins with a description of the $R_1$ language
-(Section~\ref{sec:s0}) and then a description of x86-64
-(Section~\ref{sec:x86-64}). The x86-64 assembly language is quite
-large, so we only discuss what is needed for compiling $R_1$. We
-introduce more of x86-64 in later chapters. Once we have introduced
-$R_1$ and x86-64, we reflect on their differences and come up with a
-plan breaking down the translation from $R_1$ to x86-64 into a handful
-of steps (Section~\ref{sec:plan-s0-x86}).  The rest of the sections in
-this Chapter give detailed hints regarding each step
+which we name $R_1$, to x86-64 assembly code~\citep{Intel:2015aa}.
+(Henceforce we shall refer to x86-64 simply as x86).  The chapter
+begins with a description of the $R_1$ language (Section~\ref{sec:s0})
+and then a description of x86 (Section~\ref{sec:x86}). The
+x86 assembly language is quite large, so we only discuss what is
+needed for compiling $R_1$. We introduce more of x86 in later
+chapters. Once we have introduced $R_1$ and x86, we reflect on
+their differences and come up with a plan breaking down the
+translation from $R_1$ to x86 into a handful of steps
+(Section~\ref{sec:plan-s0-x86}).  The rest of the sections in this
+Chapter give detailed hints regarding each step
 (Sections~\ref{sec:uniquify-s0} through \ref{sec:patch-s0}).  We hope
 to give enough hints that the well-prepared reader can implement a
-compiler from $R_1$ to x86-64 while at the same time leaving room for
+compiler from $R_1$ to x86 while at the same time leaving room for
 some fun and creativity.
 
 \section{The $R_1$ Language}
@@ -887,7 +893,7 @@ to the variable, then evaluates the body of the \key{let}.
 
 
 The goal for this chapter is to implement a compiler that translates
-any program $P_1$ in the $R_1$ language into an x86-64 assembly
+any program $P_1$ in the $R_1$ language into an x86 assembly
 program $P_2$ such that $P_2$ exhibits the same behavior on an x86
 computer as the $R_1$ program running in a Racket implementation.
 That is, they both output the same integer $n$.
@@ -902,18 +908,18 @@ That is, they both output the same integer $n$.
  \path[->] (p2) edge [right] node {\footnotesize interp-x86} (o);
 \end{tikzpicture}
 \]
-In the next section we introduce enough of the x86-64 assembly
+In the next section we introduce enough of the x86 assembly
 language to compile $R_1$.
 
-\section{The x86-64 Assembly Language}
-\label{sec:x86-64}
+\section{The x86 Assembly Language}
+\label{sec:x86}
 
-An x86-64 program is a sequence of instructions. The instructions may
+An x86 program is a sequence of instructions. The instructions may
 refer to integer constants (called \emph{immediate values}), variables
 called \emph{registers}, and instructions may load and store values
 into \emph{memory}.  Memory is a mapping of 64-bit addresses to 64-bit
 values. Figure~\ref{fig:x86-a} defines the syntax for the subset of
-the x86-64 assembly language needed for this chapter.  (We use the
+the x86 assembly language needed for this chapter.  (We use the
 AT\&T syntax expected by the GNU assembler inside \key{gcc}.)
 
 \begin{figure}[tbp]
@@ -939,7 +945,7 @@ AT\&T syntax expected by the GNU assembler inside \key{gcc}.)
 \]
 \end{minipage}
 }
-\caption{A subset of the x86-64 assembly language (AT\&T syntax).}
+\caption{A subset of the x86 assembly language (AT\&T syntax).}
 \label{fig:x86-a}
 \end{figure}
 
@@ -965,7 +971,7 @@ result in $d$.
 The $\key{callq}\,\mathit{label}$ instruction executes the procedure
 specified by the label.
 
-Figure~\ref{fig:p0-x86} depicts an x86-64 program that is equivalent
+Figure~\ref{fig:p0-x86} depicts an x86 program that is equivalent
 to \code{(+ 10 32)}. The \key{globl} directive says that the
 \key{main} procedure is externally visible, which is necessary so
 that the operating system can call it. The label \key{main:}
@@ -994,7 +1000,7 @@ main:
 	callq	print_int
 	retq
 \end{lstlisting}
-\caption{An x86-64 program equivalent to $\BINOP{+}{10}{32}$.}
+\caption{An x86 program equivalent to $\BINOP{+}{10}{32}$.}
 \label{fig:p0-x86}
 %\end{wrapfigure}
 \end{figure}
@@ -1002,7 +1008,7 @@ main:
 %%   It can get confusing to differentiate them from the main text.}
 %% It looks pretty ugly in italics.-Jeremy
 
-Unfortunately, x86-64 varies in a couple ways depending on what
+Unfortunately, x86 varies in a couple ways depending on what
 operating system it is assembled in. The code examples shown here are
 correct on the Unix platform, but when assembled on Mac OS X, labels
 like \key{main} must be prefixed with an underscore.  So the correct
@@ -1014,8 +1020,8 @@ _main:
 \end{lstlisting}
 
 The next example exhibits the use of memory.  Figure~\ref{fig:p1-x86}
-lists an x86-64 program that is equivalent to $\BINOP{+}{52}{
-  \UNIOP{-}{10} }$. To understand how this x86-64 program works, we
+lists an x86 program that is equivalent to $\BINOP{+}{52}{
+  \UNIOP{-}{10} }$. To understand how this x86 program works, we
 need to explain a region of memory called the \emph{procedure call
   stack} (or \emph{stack} for short). The stack consists of a separate
 \emph{frame} for each procedure call. The memory layout for an
@@ -1051,7 +1057,7 @@ main:
 	popq	%rbp
 	retq
 \end{lstlisting}
-\caption{An x86-64 program equivalent to $\BINOP{+}{52}{\UNIOP{-}{10} }$.}
+\caption{An x86 program equivalent to $\BINOP{+}{52}{\UNIOP{-}{10} }$.}
 \label{fig:p1-x86}
 \end{figure}
 %\end{wrapfigure}
@@ -1074,15 +1080,15 @@ Position & Contents \\ \hline
 \end{figure}
 
 Getting back to the program in Figure~\ref{fig:p1-x86}, the first
-three instructions are the typical prelude for a procedure.  The
-instruction \key{pushq \%rbp} saves the base pointer for the procedure
-that called the current one onto the stack and subtracts $8$ from the
-stack pointer. The second instruction \key{movq \%rsp, \%rbp} changes
-the base pointer to the top of the stack. The instruction \key{subq
-  \$16, \%rsp} moves the stack pointer down to make enough room for
-storing variables.  This program just needs one variable ($8$ bytes)
-but because the frame size is required to be a multiple of 16 bytes,
-it rounds to 16 bytes.
+three instructions are the typical \emph{prelude} for a procedure.
+The instruction \key{pushq \%rbp} saves the base pointer for the
+procedure that called the current one onto the stack and subtracts $8$
+from the stack pointer. The second instruction \key{movq \%rsp, \%rbp}
+changes the base pointer to the top of the stack. The instruction
+\key{subq \$16, \%rsp} moves the stack pointer down to make enough
+room for storing variables.  This program just needs one variable ($8$
+bytes) but because the frame size is required to be a multiple of 16
+bytes, it rounds to 16 bytes.
 
 The next four instructions carry out the work of computing
 $\BINOP{+}{52}{\UNIOP{-}{10} }$. The first instruction \key{movq \$10,
@@ -1093,15 +1099,15 @@ adds the contents of variable $1$ to \key{rax}, at which point
 \key{rax} contains $42$.
 
 The last five instructions are the typical \emph{conclusion} of a
-procedure. The first two print the final result of the program. The latter three are necessary to get the state of the
-machine back to where it was before the current procedure was called.
-The \key{addq \$16, \%rsp} instruction moves the stack pointer back to
-point at the old base pointer. The amount added here needs to match
-the amount that was subtracted in the prelude of the procedure.  Then
-\key{popq \%rbp} returns the old base pointer to \key{rbp} and adds
-$8$ to the stack pointer.  The \key{retq} instruction jumps back to
-the procedure that called this one and subtracts 8 from the stack
-pointer.
+procedure. The first two print the final result of the program. The
+latter three are necessary to get the state of the machine back to
+where it was before the current procedure was called.  The \key{addq
+  \$16, \%rsp} instruction moves the stack pointer back to point at
+the old base pointer. The amount added here needs to match the amount
+that was subtracted in the prelude of the procedure.  Then \key{popq
+  \%rbp} returns the old base pointer to \key{rbp} and adds $8$ to the
+stack pointer.  The \key{retq} instruction jumps back to the procedure
+that called this one and subtracts 8 from the stack pointer.
 
 The compiler will need a convenient representation for manipulating
 x86 programs, so we define an abstract syntax for x86 in
@@ -1135,34 +1141,34 @@ x86_0 &::= & (\key{program} \;\Int \; \Instr^{+})
 \]
 \end{minipage}
 }
-\caption{Abstract syntax for x86-64 assembly.}
+\caption{Abstract syntax for x86 assembly.}
 \label{fig:x86-ast-a}
 \end{figure}
-%% \marginpar{I think this is PseudoX86, not x86-64.}
+%% \marginpar{I think this is PseudoX86, not x86.}
 
-\section{Planning the trip from $R_1$ to x86-64}
+\section{Planning the trip from $R_1$ to x86}
 \label{sec:plan-s0-x86}
 
 To compile one language to another it helps to focus on the
 differences between the two languages. It is these differences that
 the compiler will need to bridge. What are the differences between
-$R_1$ and x86-64 assembly? Here we list some of the most important the
+$R_1$ and x86 assembly? Here we list some of the most important the
 differences.
 
 \begin{enumerate}
-\item x86-64 arithmetic instructions typically take two arguments and
+\item x86 arithmetic instructions typically take two arguments and
   update the second argument in place. In contrast, $R_1$ arithmetic
   operations only read their arguments and produce a new value.
 
 \item An argument to an $R_1$ operator can be any expression, whereas
-  x86-64 instructions restrict their arguments to integers, registers,
+  x86 instructions restrict their arguments to integers, registers,
   and memory locations.
 
-\item An $R_1$ program can have any number of variables whereas x86-64
+\item An $R_1$ program can have any number of variables whereas x86
   has only 16 registers.
 
 \item Variables in $R_1$ can overshadow other variables with the same
-  name. The registers and memory locations of x86-64 all have unique
+  name. The registers and memory locations of x86 all have unique
   names.
 \end{enumerate}
 
@@ -1257,17 +1263,17 @@ C_0 & ::= & (\key{program}\;(\Var^{*})\;\Stmt^{+})
 \label{fig:c0-syntax}
 \end{figure}
 
-To get from $C_0$ to x86-64 assembly it remains for us to handle
+To get from $C_0$ to x86 assembly it remains for us to handle
 difference \#1 (the format of instructions) and difference \#3
 (variables versus registers). These two differences are intertwined,
 creating a bit of a Gordian Knot. To handle difference \#3, we need to
 map some variables to registers (there are only 16 registers) and the
 remaining variables to locations on the stack (which is unbounded). To
 make good decisions regarding this mapping, we need the program to be
-close to its final form (in x86-64 assembly) so we know exactly when
+close to its final form (in x86 assembly) so we know exactly when
 which variables are used. After all, variables that are used in
 disjoint parts of the program can be assigned to the same register.
-However, our choice of x86-64 instructions depends on whether the
+However, our choice of x86 instructions depends on whether the
 variables are mapped to registers or stack locations, so we have a
 circular dependency. We cut this knot by doing an optimistic selection
 of instructions in the \key{select-instructions} pass, followed by the
@@ -1290,8 +1296,8 @@ locations, and conclude by finalizing the instruction selection in the
 The \key{select-instructions} pass is optimistic in the sense that it
 treats variables as if they were all mapped to registers. The
 \key{select-instructions} pass generates a program that consists of
-x86-64 instructions but that still uses variables, so it is an
-intermediate language that is technically different than x86-64, which
+x86 instructions but that still uses variables, so it is an
+intermediate language that is technically different than x86, which
 explains the asterisks in the diagram above.
 
 In this Chapter we shall take the easy road to implementing
@@ -1301,7 +1307,7 @@ smarter approach in which we make a best-effort to map variables to
 registers, resorting to the stack only when necessary.
 
 %% \marginpar{\scriptsize I'm confused: shouldn't `select instructions' do this?
-%% After all, that selects the x86-64 instructions. Even if it is separate,
+%% After all, that selects the x86 instructions. Even if it is separate,
 %% if we perform `patching' before register allocation, we aren't forced to rely on
 %% \key{rax} as much. This can ultimately make a more-performant result. --
 %% Cam}
@@ -1615,12 +1621,12 @@ $\Rightarrow$
 \end{minipage}
 \end{tabular} \\
 
-The \key{read} operation does not have a direct counterpart in x86-64
+The \key{read} operation does not have a direct counterpart in x86
 assembly, so we have instead implemented this functionality in the C
 language, with the function \code{read\_int} in the file
 \code{runtime.c}. In general, we refer to all of the functionality in
 this file as the \emph{runtime system}, or simply the \emph{runtime}
-for short. When compiling your generated x86-64 assembly code, you
+for short. When compiling your generated x86 assembly code, you
 will need to compile \code{runtime.c} to \code{runtime.o} (an ``object
 file'', using \code{gcc} option \code{-c}) and link it into the final
 executable. For our purposes of code generation, all you need to do is
@@ -1746,21 +1752,17 @@ your passes on the example programs.
 \end{exercise}
 
 
-\section{Print x86-64}
+\section{Print x86}
 \label{sec:print-x86}
-%\marginpar{The input isn't quite x86-64 right? It's PseudoX86.}
-% No, it really is x86-64 at this point because all the
-% variables should be gone and the patch-instructions pass
-% has made sure that all the instructions follow the
-% x86-64 rules. -Jeremy
-The last step of the compiler from $R_1$ to x86-64 is to convert the
-x86-64 AST (defined in Figure~\ref{fig:x86-ast-a}) to the string
+
+The last step of the compiler from $R_1$ to x86 is to convert the
+x86 AST (defined in Figure~\ref{fig:x86-ast-a}) to the string
 representation (defined in Figure~\ref{fig:x86-a}). The Racket
 \key{format} and \key{string-append} functions are useful in this
 regard. The main work that this step needs to perform is to create the
 \key{main} function and the standard instructions for its prelude
 and conclusion, as shown in Figure~\ref{fig:p1-x86} of
-Section~\ref{sec:x86-64}. You need to know the number of
+Section~\ref{sec:x86}. You need to know the number of
 stack-allocated variables, for which it is suggest that you compute in
 the \key{assign-homes} pass (Section~\ref{sec:assign-s0}) and store in
 the $\itm{info}$ field of the \key{program} node.
@@ -1835,7 +1837,7 @@ passes described in this Chapter.
 \chapter{Register Allocation}
 \label{ch:register-allocation}
 
-In Chapter~\ref{ch:int-exp} we simplified the generation of x86-64
+In Chapter~\ref{ch:int-exp} we simplified the generation of x86
 assembly by placing all variables on the stack. We can improve the
 performance of the generated code considerably if we instead try to
 place as many variables as possible into registers.  The CPU can
@@ -1844,7 +1846,7 @@ take from several cycles (to go to cache) to hundreds of cycles (to go
 to main memory).  Figure~\ref{fig:reg-eg} shows a program with four
 variables that serves as a running example. We show the source program
 and also the output of instruction selection. At that point the
-program is almost x86-64 assembly but not quite; it still contains
+program is almost x86 assembly but not quite; it still contains
 variables instead of stack locations or registers.
 
 \begin{figure}
@@ -2419,7 +2421,7 @@ $\Rightarrow$
 \end{lstlisting}
 \end{minipage}
 
-The resulting program is almost an x86-64 program. The remaining step
+The resulting program is almost an x86 program. The remaining step
 is to apply the patch instructions pass. In this example, the trivial
 move of \code{-16(\%rbp)} to itself is deleted and the addition of
 \code{-8(\%rbp)} to \key{-16(\%rbp)} is fixed by going through
@@ -2478,6 +2480,48 @@ Once you have obtained the mapping from \code{allocate-homes}, you can
 use the \code{assign-homes} function from Section~\ref{sec:assign-s0}
 to replace the variables with their homes.
 \end{exercise}
+
+
+\section{Print x86 and Conventions for Registers}
+\label{sec:print-x86-reg-alloc}
+
+Recall the the \code{print-x86} pass generates the prelude and
+conclusion instructions for the \code{main} function.  The prelude
+saved the values in \code{rbp} and \code{rsp} and the conclusion
+returned those values to \code{rbp} and \code{rsp}. The reason for
+this is that there are agreed-upon conventions for how different
+functions share the same fixed set of registers. There is a function
+inside the operating system (OS) that calls our \code{main} function,
+and that OS function uses the same registers that we use in
+\code{main}. The convention for x86 is that the caller is responsible
+for freeing up some registers, the \emph{caller save registers}, prior
+to the function call, and the callee is responsible for saving and
+restoring some other registers, the \emph{callee save registers},
+before and after using them. The caller save registers are
+\begin{lstlisting}
+  rax rdx rcx rsi rdi r8 r9 r10 r11
+\end{lstlisting}
+while the callee save registers are 
+\begin{lstlisting}
+  rsp rbp rbx r12 r13 r14 r15
+\end{lstlisting}
+Another way to think about this caller/callee convention is the
+following. The caller should assume that all the caller save registers
+get overwritten with arbitrary values by the callee.  On the other
+hand, the caller can safely assume that all the callee save registers
+contain the same values after the call that they did before the call.
+The callee can freely use any of the caller save registers.  However,
+if the callee wants to use a callee save register, the callee must
+arrange to put the original value back in the register prior to
+returning to the caller, which is usually accomplished by saving and
+restoring the value from the stack.
+
+The upshot of these conventions is that the \code{main} function needs
+to save (in the prelude) and restore (in the conclusion) any callee
+save registers that get used during register allocation. The simplest
+approach is to save and restore all the callee save registers. The
+more efficient approach is to keep track of which callee save
+registers were used and only save and restore them.
 
 
 \section{Challenge: Move Biasing$^{*}$}
@@ -2756,10 +2800,10 @@ comparing two integers and for comparing two Booleans.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-  \Exp &::=& \ldots \mid \key{\#t} \mid \key{\#f} \mid
-      (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp) \mid\\
-      &&(\key{eq?}\;\Exp\;\Exp) \mid  
-       \IF{\Exp}{\Exp}{\Exp} \\
+  \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)}  \\
+     &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp}} \mid \key{\#t} \mid \key{\#f} \mid
+      (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp) \\
+      &\mid& (\key{eq?}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp} \\
   R_2 &::=& (\key{program} \; \Exp)
 \end{array}
 \]
@@ -2910,9 +2954,11 @@ arguments unconditionally.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-\Arg &::=& \ldots \mid \key{\#t} \mid \key{\#f} \\
-\Exp &::= & \ldots \mid (\key{not}\;\Arg) \mid (\key{eq?}\;\Arg\;\Arg) \\
-\Stmt &::=& \ldots \mid \IF{\Arg}{\Stmt^{*}}{\Stmt^{*}} \\
+\Arg &::=& \gray{\Int \mid \Var} \mid \key{\#t} \mid \key{\#f} \\
+\Exp &::= & \gray{\Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)}
+      \mid (\key{not}\;\Arg) \mid (\key{eq?}\;\Arg\;\Arg) \\
+\Stmt &::=& \gray{\ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg}} \\
+      &\mid& \IF{(\key{eq?}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} \\
 C_1 & ::= & (\key{program}\;(\Var^{*})\;\Stmt^{+})
 \end{array}
 \]
@@ -2943,7 +2989,7 @@ $\Rightarrow$
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
 (program (if.1)
-  (if #f
+  (if (eq? #t #f)
     ((assign if.1 0))
     ((assign if.1 42)))
   (return if.1))
@@ -2981,19 +3027,16 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program (t.1 t.2 if.1 t.3 
-           t.4 if.2 t.5)
+(program (t.1 if.1 t.2 if.2 t.3)
   (assign t.1 (read))
-  (assign t.2 (eq? t.1 0))
-  (if t.2
+  (if (eq? t.1 0)
     ((assign if.1 777))
-    ((assign t.3 (read))
-     (assign t.4 (eq? t.3 0))
-     (if t.4
+    ((assign t.2 (read))
+     (if (eq? t.2 0)
        ((assign if.2 40))
        ((assign if.2 444)))
-     (assign t.5 (+ 2 if.2))
-     (assign if.1 t.5)))
+     (assign t.3 (+ 2 if.2))
+     (assign if.1 t.3)))
   (return if.1))
 \end{lstlisting}
 \end{minipage}
@@ -3008,6 +3051,10 @@ $C_1$ does not perform short circuiting, but evaluates both arguments
 unconditionally. We recommend using an \key{if} statement in the code
 you generate for \key{and}.
 
+The \code{flatten} clause for \key{if} requires some ingenuity because
+the condition of the \key{if} can be an arbitrary expression in $R_2$
+but in $C_1$ the condition must be an equality predicate.
+
 \begin{exercise}\normalfont
 Expand your \code{flatten} pass to handle $R_2$, that is, handle the
 Boolean literals, the new logic and comparison operations, and the
@@ -3018,13 +3065,13 @@ running the output programs with \code{interp-C}
 \end{exercise}
 
 
-\section{More x86-64}
+\section{More x86}
 \label{sec:x86-1}
 
 To implement the new logical operations, the comparison \key{eq?}, and
-the \key{if} statement, we need to delve further into the x86-64
+the \key{if} statement, we need to delve further into the x86
 language. Figure~\ref{fig:x86-ast-b} defines the abstract syntax for a
-larger subset of x86-64 that includes instructions for logical
+larger subset of x86 that includes instructions for logical
 operations, comparisons, and jumps.  The logical instruction
 \key{notq} is quite similar to the arithmetic instructions, so we
 focus on the comparison and jump instructions.
@@ -3035,7 +3082,7 @@ focus on the comparison and jump instructions.
 \[
 \begin{array}{lcl}
 \Arg &::=&  \ldots \mid (\key{byte-reg}\; \itm{register}) \\ 
-\Instr &::=& \ldots \mid (\key{andq} \; \Arg\; \Arg) \mid (\key{notq} \; \Arg)\\
+\Instr &::=& \ldots \mid (\key{notq} \; \Arg)\\
        &\mid& (\key{cmpq} \; \Arg\; \Arg) \mid (\key{sete} \; \Arg) 
               \mid (\key{movzbq}\;\Arg\;\Arg) \\
       &\mid&  (\key{jmp} \; \itm{label}) \mid (\key{je} \; \itm{label}) \mid
@@ -3045,7 +3092,7 @@ x86_1 &::= & (\key{program} \;\itm{info} \; \Instr^{+})
 \]
 \end{minipage}
 }
-\caption{The x86$_1$ language (extends x86$^{*}_0$ of Figure~\ref{fig:x86-ast-a}).}
+\caption{The x86$_1$ language (extends x86$_0$ of Figure~\ref{fig:x86-ast-a}).}
 \label{fig:x86-ast-b}
 \end{figure}
 
@@ -3160,7 +3207,7 @@ We need the live-after sets for all the instructions in both branches
 of the \key{if} when we build the interference graph, so I recommend
 storing that data in the \key{if} statement AST as follows:
 \begin{lstlisting}
-   (if |$\itm{cnd}$| |$\itm{thns}$| |$\itm{thn{-}lives}$| |$\itm{elss}$| |$\itm{els{-}lives}$|)
+   (if (eq? |$\itm{arg}$| |$\itm{arg}$|) |$\itm{thns}$| |$\itm{thn{-}lives}$| |$\itm{elss}$| |$\itm{els{-}lives}$|)
 \end{lstlisting}
 
 If you wrote helper functions for computing the variables in an
@@ -3258,9 +3305,9 @@ your previously created programs on the \code{interp-x86} interpreter
 
 
 Figure~\ref{fig:if-example-x86} shows a simple example program in
-$R_2$ translated to x86-64, showing the results of \code{flatten},
+$R_2$ translated to x86, showing the results of \code{flatten},
 \code{select-instructions}, \code{allocate-registers}, and the final
-x86-64 assembly.
+x86 assembly.
 
 \begin{figure}[tbp]
 \begin{tabular}{lll}
@@ -3271,23 +3318,19 @@ x86-64 assembly.
 \end{lstlisting}
 $\Downarrow$
 \begin{lstlisting}
-(program (t.1 t.2 if.1)
+(program (t.1 if.1)
   (assign t.1 (read))
-  (assign t.2 (eq? t.1 1))
-  (if t.2
+  (if (eq? t.1 1)
     ((assign if.1 42))
     ((assign if.1 0)))
   (return if.1))
 \end{lstlisting}
 $\Downarrow$
 \begin{lstlisting}
-(program (t.1 t.2 if.1)
-  (callq _read_int)
+(program (t.1 if.1)
+  (callq read_int)
   (movq (reg rax) (var t.1))
-  (cmpq (int 1) (var t.1))
-  (sete (byte-reg al))
-  (movzbq (byte-reg al) (var t.2))
-  (if (var t.2)
+  (if (eq? (var t.1) (int 1))
     ((movq (int 42) (var if.1)))
     ((movq (int 0) (var if.1))))
   (movq (var if.1) (reg rax)))
@@ -3297,15 +3340,12 @@ $\Downarrow$
 \begin{minipage}{0.4\textwidth}
 $\Downarrow$
 \begin{lstlisting}
-(program 16
-  (callq _read_int)
+(program
+  16
+  (callq read_int)
   (movq (reg rax) (reg rcx))
-  (cmpq (int 1) (reg rcx))
-  (sete (byte-reg al))
-  (movzbq (byte-reg al) (reg rcx))
-  (if (reg rcx)
-    ((movq (int 42)
-     (reg rbx)))
+  (if (eq? (reg rcx) (int 1))
+    ((movq (int 42) (reg rbx)))
     ((movq (int 0) (reg rbx))))
   (movq (reg rbx) (reg rax)))
 \end{lstlisting}
@@ -3319,23 +3359,22 @@ _main:
 	callq	_read_int
 	movq	%rax, %rcx
 	cmpq	$1, %rcx
-	sete	%al
-	movzbq	%al, %rcx
-	cmpq	$0, %rcx
-	je else1326
-	movq	$42, %rbx
-	jmp if_end1327
-else1326:
+	je then21117
 	movq	$0, %rbx
-if_end1327:
+	jmp if_end21118
+then21117:
+	movq	$42, %rbx
+if_end21118:
 	movq	%rbx, %rax
+	movq	%rax, %rdi
+	callq	_print_int
 	addq	$16, %rsp
 	popq	%rbp
 	retq
 \end{lstlisting}
 \end{minipage}
 \end{tabular} 
-\caption{Example compilation of an \key{if} expression to x86-64.}
+\caption{Example compilation of an \key{if} expression to x86.}
 \label{fig:if-example-x86}
 \end{figure}
 
@@ -3590,7 +3629,7 @@ address of the \code{add1} label into the \code{rbx} register.
    leaq add1(%rip), %rbx
 \end{lstlisting}
 
-In Sections~\ref{sec:x86-64} and \ref{sec:select-s0} we saw the use of
+In Sections~\ref{sec:x86} and \ref{sec:select-s0} we saw the use of
 the \code{callq} instruction for jumping to a function as specified by
 a label. The use of the instruction changes slightly if the function
 is specified by an address in a register, that is, an \emph{indirect
@@ -3611,40 +3650,13 @@ stack, which we call \emph{stack arguments}, which we discuss in later
 paragraphs. The register \code{rax} is for the return value of the
 function.
 
-Each function may need to use all the registers for storing local
-variables, frame base pointers, etc. so when we make a function call,
-we need to figure out how the two functions can share the same
-register set without getting in each others way. The convention for
-x86-64 is that the caller is responsible freeing up some registers,
-the \emph{caller save registers}, prior to the function call, and the
-callee is responsible for saving and restoring some other registers,
-the \emph{callee save registers}, before and after using them. The
-caller save registers are
-\begin{lstlisting}
-  rax rdx rcx rsi rdi r8 r9 r10 r11
-\end{lstlisting}
-while the callee save registers are 
-\begin{lstlisting}
-  rsp rbp rbx r12 r13 r14 r15
-\end{lstlisting}
-Another way to think about this caller/callee convention is the
-following. The caller should assume that all the caller save registers
-get overwritten with arbitrary values by the callee.  On the other
-hand, the caller can safely assume that all the callee save registers
-contain the same values after the call that they did before the call.
-The callee can freely use any of the caller save registers.  However,
-if the callee wants to use a callee save register, the callee must
-arrange to put the original value back in the register prior to
-returning to the caller, which is usually accomplished by saving and
-restoring the value from the stack.
-
-Recall from Section~\ref{sec:x86-64} that the stack is also used for
+Recall from Section~\ref{sec:x86} that the stack is also used for
 local variables, and that at the beginning of a function we move the
 stack pointer \code{rsp} down to make room for them.  To make
 additional room for passing arguments, we shall move the stack pointer
 even further down. We count how many stack arguments are needed for
 each function call that occurs inside the body of the function and
-take their max. Adding this number to the number of local variables
+find their maximum. Adding this number to the number of local variables
 gives us how much the \code{rsp} should be moved at the beginning of
 the function. In preparation for a function call, we offset from
 \code{rsp} to set up the stack arguments. We put the first stack
@@ -3658,6 +3670,18 @@ the layout of the caller and callee frames. Notice how important it is
 that we correctly compute the maximum number of arguments needed for
 function calls; if that number is too small then the arguments and
 local variables will smash into each other!
+
+As discussed in Section~\ref{sec:print-x86-reg-alloc}, an x86 function
+is responsible for following conventions regarding the use of
+registers: the caller should assume that all the caller save registers
+get overwritten with arbitrary values by the callee. Thus, the caller
+should either 1) not put values that are live across a call in caller
+save registers, or 2) save and restore values that are live across
+calls. We shall recommend option 1).  On the flip side, if the callee
+wants to use a callee save register, the callee must arrange to put
+the original value back in the register prior to returning to the
+caller.
+
 
 \begin{figure}[tbp]
 \centering
@@ -3687,7 +3711,7 @@ $8n-8$\key{(\%rsp)} & $8n+8$(\key{\%rbp})& argument $n$ \\
 \section{The compilation of functions}
 
 Now that we have a good understanding of functions as they appear in
-$R_4$ and the support for functions in x86-64, we need to plan the
+$R_4$ and the support for functions in x86, we need to plan the
 changes to our compiler, that is, do we need any new passes and/or do
 we need to change any existing passes? Also, do we need to add new
 kinds of AST nodes to any of the intermediate languages?
@@ -3810,7 +3834,7 @@ haven't already done that.
 \section{An Example Translation}
 
 Figure~\ref{fig:add-fun} shows an example translation of a simple
-function in $R_4$ to x86-64. The figure includes the results of the
+function in $R_4$ to x86. The figure includes the results of the
 \code{flatten} and \code{select-instructions} passes.  Can you see any
 obvious ways to improve the translation?
 
@@ -3898,7 +3922,7 @@ _main:
 \end{lstlisting}
 \end{minipage}
 \end{tabular} 
-\caption{Example compilation of a simple function to x86-64.}
+\caption{Example compilation of a simple function to x86.}
 \label{fig:add-fun}
 \end{figure}
 
@@ -3964,7 +3988,7 @@ languages considered in this book ($R_1, R_2, \ldots$) and interprets
 the program, returning the result value.  The \key{interp-C} function
 interprets an AST for a program in one of the C-like languages ($C_0,
 C_1, \ldots$), and the \code{interp-x86} function interprets an AST
-for an x86-64 program.
+for an x86 program.
 
 \section{Utility Functions}
 \label{appendix:utilities}
@@ -4012,7 +4036,7 @@ provides the input for the Scheme program.
 The compiler-tests function takes a compiler name (a string) a
 description of the passes (see the comment for \key{interp-tests}) a
 test family name (a string), and a list of test numbers (see the
-comment for interp-tests), and runs the compiler to generate x86-64 (a
+comment for interp-tests), and runs the compiler to generate x86 (a
 \key{.s} file) and then runs gcc to generate machine code.  It runs
 the machine code and checks that the output is 42.
 \begin{lstlisting}
@@ -4046,7 +4070,7 @@ as the program file name but with \key{.scm} replaced with \key{.s}.
 %%  LocalWords:  runtime Liveness liveness undirected Balakrishnan je
 %%  LocalWords:  Rosen DSATUR SDO Gebremedhin Omari morekeywords cnd
 %%  LocalWords:  fullflexible vertices Booleans Listof Pairof thn els
-%%  LocalWords:  boolean typecheck andq notq cmpq sete movzbq jmp al
+%%  LocalWords:  boolean typecheck notq cmpq sete movzbq jmp al
 %%  LocalWords:  EFLAGS thns elss elselabel endlabel Tuples tuples os
 %%  LocalWords:  tuple args lexically leaq Polymorphism msg bool nums
 %%  LocalWords:  macosx unix Cormen vec callee xs maxStack numParams
