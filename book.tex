@@ -3073,9 +3073,15 @@ To implement the new logical operations, the comparison \key{eq?}, and
 the \key{if} statement, we need to delve further into the x86
 language. Figure~\ref{fig:x86-ast-b} defines the abstract syntax for a
 larger subset of x86 that includes instructions for logical
-operations, comparisons, and jumps.  The logical instruction
-\key{notq} is quite similar to the arithmetic instructions, so we
-focus on the comparison and jump instructions.
+operations, comparisons, and jumps. 
+
+In addition to its arithmetic operations, x86 provides bitwise operators
+that perform a logical operation on every bit of their arguments. We will
+use these to implement Boolean operations like \code{not}. In particular,
+the \key{xorq} instruction takes two arguments, performs a pairwise
+exclusive-or (XOR) operation on the bits of
+its arguments, and writes the result into its second argument (similar
+to arithmetic instructions like \key{addq}). 
 
 \begin{figure}[tbp]
 \fbox{
@@ -3083,7 +3089,7 @@ focus on the comparison and jump instructions.
 \[
 \begin{array}{lcl}
 \Arg &::=&  \ldots \mid (\key{byte-reg}\; \itm{register}) \\ 
-\Instr &::=& \ldots \mid (\key{notq} \; \Arg)\\
+\Instr &::=& \ldots \mid (\key{xorq} \; \Arg\;\Arg) \\
        &\mid& (\key{cmpq} \; \Arg\; \Arg) \mid (\key{sete} \; \Arg) 
               \mid (\key{movzbq}\;\Arg\;\Arg) \\
       &\mid&  (\key{jmp} \; \itm{label}) \mid (\key{je} \; \itm{label}) \mid
@@ -3150,10 +3156,32 @@ $\Rightarrow$
 \end{lstlisting}
 \end{minipage}
 \end{tabular}  \\
-One further caveat is that the arguments of the \key{cmpq} instruction
-may not both be immediate values. In that case you must insert another
-\key{movq} instruction to put one of the immediate values in
+One further caveat is that the second argument of the \key{cmpq} instruction
+cannot be an immediate value. If you are comparing two immediates, you must insert another \key{movq} instruction to put the second argument in
 \key{rax}.
+
+There is no unary x86 instruction that we can translate \code{(not x)} into.
+However, we can achieve the same results using the bitwise \key{xor} instruction.
+
+% The translation of the \code{not} operator is not quite as simple
+% as it seems. Recall that \key{notq} is a bitwise operator, not a boolean 
+% one. For example, the following program performs bitwise negation on
+% the integer 1:
+% 
+% \begin{tabular}{lll}
+% \begin{minipage}{0.4\textwidth}
+% \begin{lstlisting}
+%  (movq (int 1) (reg rax))
+%  (notq (reg rax))
+% \end{lstlisting}
+% \end{minipage}
+% \end{tabular}
+% 
+% After the program is run, \key{rax} does not contain 0, as you might 
+% hope -- it contains the binary value $111\ldots10$, which is the 
+% two's complement representation of $-2$. We recommend implementing boolean
+% not by using \key{notq} and then masking the upper bits of the result with
+% the \key{andq} instruction.
 
 Regarding \key{if} statements, we recommend that you not lower them in
 \code{select-instructions} but instead lower them in
