@@ -2944,11 +2944,12 @@ The $R_2$ language adds Booleans and conditional expressions to $R_1$.
 As with $R_1$, we shall compile to a C-like intermediate language, but
 we need to grow that intermediate language to handle the new features
 in $R_2$. Figure~\ref{fig:c1-syntax} shows the new features of $C_1$;
-we add the new logic and comparison operators to the $\Op$
-non-terminal, the literals \key{\#t} and \key{\#f} to the $\Arg$
-non-terminal, and we add an \key{if} statement. Unlike $R_2$, the
-\key{and} operation is not short-circuiting; it evaluates both
-arguments unconditionally.
+we add logic and comparison operators to the $\Exp$ non-terminal, the
+literals \key{\#t} and \key{\#f} to the $\Arg$ non-terminal, and we
+add an \key{if} statement. The \key{if} statement of $C_1$ includes an
+\key{eq?} test, which is needed for improving code generation in
+Section~\ref{sec:opt-if}.  We do not include \key{and} in $C_1$
+because it is not needed in the translation of the \key{and} of $R_2$.
 
 \begin{figure}[tbp]
 \fbox{
@@ -3028,16 +3029,19 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program (t.1 if.1 t.2 if.2 t.3)
+(program (t.1 t.2 if.1 t.3 t.4 
+           if.2 t.5)
   (assign t.1 (read))
-  (if (eq? t.1 0)
+  (assign t.2 (eq? t.1 0))
+  (if (eq? #t t.2)
     ((assign if.1 777))
-    ((assign t.2 (read))
-     (if (eq? t.2 0)
+    ((assign t.3 (read))
+     (assign t.4 (eq? t.3 0))
+     (if (eq? #t t.4)
        ((assign if.2 40))
        ((assign if.2 444)))
-     (assign t.3 (+ 2 if.2))
-     (assign if.1 t.3)))
+     (assign t.5 (+ 2 if.2))
+     (assign if.1 t.5)))
   (return if.1))
 \end{lstlisting}
 \end{minipage}
@@ -3052,9 +3056,11 @@ $C_1$ does not perform short circuiting, but evaluates both arguments
 unconditionally. We recommend using an \key{if} statement in the code
 you generate for \key{and}.
 
-The \code{flatten} clause for \key{if} requires some ingenuity because
-the condition of the \key{if} can be an arbitrary expression in $R_2$
-but in $C_1$ the condition must be an equality predicate.
+The \code{flatten} clause for \key{if} requires some care because the
+condition of the \key{if} can be an arbitrary expression in $R_2$ but
+in $C_1$ the condition must be an equality predicate. We recommend
+flattening the condition into an $\Arg$ and then comparing it with
+\code{\#t}.
 
 \begin{exercise}\normalfont
 Expand your \code{flatten} pass to handle $R_2$, that is, handle the
@@ -3075,13 +3081,20 @@ language. Figure~\ref{fig:x86-ast-b} defines the abstract syntax for a
 larger subset of x86 that includes instructions for logical
 operations, comparisons, and jumps. 
 
-In addition to its arithmetic operations, x86 provides bitwise operators
-that perform a logical operation on every bit of their arguments. We will
-use these to implement Boolean operations like \code{not}. In particular,
-the \key{xorq} instruction takes two arguments, performs a pairwise
-exclusive-or (XOR) operation on the bits of
-its arguments, and writes the result into its second argument (similar
-to arithmetic instructions like \key{addq}). 
+In addition to its arithmetic operations, x86 provides bitwise
+operators that perform an operation on every bit of their
+arguments. For example, the \key{xorq} instruction takes two
+arguments, performs a pairwise exclusive-or (XOR) operation on the
+bits of its arguments, and writes the result into its second argument.
+Recall the truth table for XOR: 
+\begin{center}
+\begin{tabular}{l|cc}
+   & 0 & 1 \\ \hline
+0  & 0 & 1 \\
+1  & 1 & 0
+\end{tabular}
+\end{center}
+So $0011 \mathrel{\mathrm{XOR}} 0101 = 0110$.
 
 \begin{figure}[tbp]
 \fbox{
@@ -3127,13 +3140,19 @@ EFLAGS is not equal.
 
 The \code{select-instructions} pass needs to lower from $C_1$ to an
 intermediate representation suitable for conducting register
-allocation, i.e., close to x86$_1$. We can take the usual approach of
-encoding Booleans as integers, with true as 1 and false as 0.
+allocation, i.e., close to x86$_1$. 
+
+We can take the usual approach of encoding Booleans as integers, with
+true as 1 and false as 0.
 \[
 \key{\#t} \Rightarrow \key{1}
 \qquad
 \key{\#f} \Rightarrow \key{0}
 \]
+The \code{not} operation can be implemented in terms of \code{xorq}.
+Can you think of a bit pattern that, when XOR'd with the bit
+representation of 0 produces 1, and when XOR'd with the bit
+representation of 1 produces 0?
 
 Translating the \code{eq?} operation to x86 is slightly involved due
 to the unusual nature of the \key{cmpq} instruction discussed above.
@@ -3213,7 +3232,7 @@ liveness analysis. Recall that liveness analysis works backwards
 through the program, for each instruction computing the variables that
 are live before the instruction based on which variables are live
 after the instruction. Now consider the situation for \code{(\key{if}
-  $\itm{cnd}$ $\itm{thns}$ $\itm{elss}$)}, where we know the
+  (\key{eq?} $e_1$ $e_2$) $\itm{thns}$ $\itm{elss}$)}, where we know the
 $L_{\mathsf{after}}$ set and need to produce the $L_{\mathsf{before}}$
 set.  We can recursively perform liveness analysis on the $\itm{thns}$
 and $\itm{elss}$ branches, using $L_{\mathsf{after}}$ as the starting
@@ -3230,7 +3249,8 @@ variables from the two branches to be the live set for the whole
 variables that are read in the $\itm{cnd}$ argument.
 \[
   L_{\mathsf{before}} = L^{\mathsf{thns}}_{\mathsf{before}} \cup 
-  L^{\mathsf{elss}}_{\mathsf{before}} \cup \mathit{Vars}(\itm{cnd})
+  L^{\mathsf{elss}}_{\mathsf{before}} \cup
+  \mathit{Vars}(e_1) \cup \mathit{Vars}(e_2)
 \]
 We need the live-after sets for all the instructions in both branches
 of the \key{if} when we build the interference graph, so I recommend
@@ -3274,17 +3294,6 @@ created programs on the \code{interp-x86} interpreter
 \end{exercise}
 
 
-\section{Patch Instructions}
-
-The necessary changes to patch instructions are straightforward.
-
-\begin{exercise}\normalfont
-Update \code{patch-instructions} to handle the new x86 instructions
-and \code{if} statement.  Test your compiler using your previously
-created programs on the \code{interp-x86} interpreter
-(Appendix~\ref{appendix:interp}).
-\end{exercise}
-
 \section{Lower Conditionals (New Pass)}
 \label{sec:lower-conditionals}
 
@@ -3292,19 +3301,19 @@ In the \code{select-instructions} pass we decided to procrastinate in
 the lowering of the \key{if} statement (thereby making liveness
 analysis easier). Now we need to make up for that and turn the
 \key{if} statement into the appropriate instruction sequence.  The
-following translation gives the general idea. If the condition
-$\itm{cnd}$ is false then we need to execute the $\itm{elss}$
-branch. So we compare $\itm{cnd}$ with $0$ and do a conditional jump
-to the $\itm{elselabel}$ (which we can generate with \code{gensym}).
-Otherwise we fall through to the $\itm{thns}$ branch. At the end of
-the $\itm{thns}$ branch we need to take care to not fall through to
-the $\itm{elss}$ branch. So we jump to the $\itm{endlabel}$ (also
-generated with \code{gensym}).
+following translation gives the general idea. If $e_1$ and $e_2$ are
+equal we need to execute the $\itm{thns}$ branch and otherwise we need
+to execute the $\itm{elss}$ branch. So use \key{cmpq} and do a
+conditional jump to the $\itm{thenlabel}$ (which we can generate with
+\code{gensym}).  Otherwise we fall through to the $\itm{elss}$
+branch. At the end of the $\itm{elss}$ branch we need to take care to
+not fall through to the $\itm{thns}$ branch. So we jump to the
+$\itm{endlabel}$ (also generated with \code{gensym}).
 
 \begin{tabular}{lll}
-\begin{minipage}{0.3\textwidth}
+\begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
- (if |$\itm{cnd}$| |$\itm{thns}$| |$\itm{elss}$|)
+ (if (eq? |$e_1$| |$e_2$|) |$\itm{thns}$| |$\itm{elss}$|)
 \end{lstlisting}
 \end{minipage}
 &
@@ -3312,12 +3321,12 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
- (cmpq (int 0) |$\itm{cnd}$|)
- (je |$\itm{elselabel}$|)
- |$\itm{thns}$|
- (jmp |$\itm{endlabel}$|)
- (label |$\itm{elselabel}$|)
+ (cmpq |$e_1$| |$e_2$|)
+ (je |$\itm{thenlabel}$|)
  |$\itm{elss}$|
+ (jmp |$\itm{endlabel}$|)
+ (label |$\itm{thenlabel}$|)
+ |$\itm{thns}$|
  (label |$\itm{endlabel}$|)
 \end{lstlisting}
 \end{minipage}
@@ -3329,14 +3338,26 @@ your previously created programs on the \code{interp-x86} interpreter
 (Appendix~\ref{appendix:interp}).
 \end{exercise}
 
+\section{Patch Instructions}
+
+There are no special restrictions on the instructions \key{je},
+\key{jmp}, and \key{label}, but there is an unusual restriction on
+\key{cmpq}. The second argument is not allowed to be an immediate
+value (such as a literal integer).
+
+\begin{exercise}\normalfont
+Update \code{patch-instructions} to handle the new x86 instructions.
+Test your compiler using your previously created programs on the
+\code{interp-x86} interpreter (Appendix~\ref{appendix:interp}).
+\end{exercise}
+
 
 \section{An Example Translation}
 
 
 Figure~\ref{fig:if-example-x86} shows a simple example program in
 $R_2$ translated to x86, showing the results of \code{flatten},
-\code{select-instructions}, \code{allocate-registers}, and the final
-x86 assembly.
+\code{select-instructions}, and the final x86 assembly.
 
 \begin{figure}[tbp]
 \begin{tabular}{lll}
@@ -3347,57 +3368,64 @@ x86 assembly.
 \end{lstlisting}
 $\Downarrow$
 \begin{lstlisting}
-(program (t.1 if.1)
+(program (t.1 t.2 if.1)
   (assign t.1 (read))
-  (if (eq? t.1 1)
+  (assign t.2 (eq? t.1 1))
+  (if (eq? #t t.2)
     ((assign if.1 42))
     ((assign if.1 0)))
   (return if.1))
 \end{lstlisting}
 $\Downarrow$
 \begin{lstlisting}
-(program (t.1 if.1)
+(program (t.1 t.2 if.1)
   (callq read_int)
   (movq (reg rax) (var t.1))
-  (if (eq? (var t.1) (int 1))
+  (cmpq (int 1) (var t.1))
+  (sete (byte-reg al))
+  (movzbq (byte-reg al) (var t.2))
+  (if (eq? (int 1) (var t.2))
     ((movq (int 42) (var if.1)))
     ((movq (int 0) (var if.1))))
   (movq (var if.1) (reg rax)))
 \end{lstlisting}
 \end{minipage}
 &
+$\Rightarrow$
 \begin{minipage}{0.4\textwidth}
-$\Downarrow$
-\begin{lstlisting}
-(program
-  16
-  (callq read_int)
-  (movq (reg rax) (reg rcx))
-  (if (eq? (reg rcx) (int 1))
-    ((movq (int 42) (reg rbx)))
-    ((movq (int 0) (reg rbx))))
-  (movq (reg rbx) (reg rax)))
-\end{lstlisting}
-$\Downarrow$
 \begin{lstlisting}
 	.globl _main
 _main:
 	pushq	%rbp
 	movq	%rsp, %rbp
-	subq	$16, %rsp
+	pushq	%r15
+	pushq	%r14
+	pushq	%r13
+	pushq	%r12
+	pushq	%rbx
+	subq	$8, %rsp
 	callq	_read_int
 	movq	%rax, %rcx
 	cmpq	$1, %rcx
-	je then21117
+	sete	%al
+	movzbq	%al, %rcx
+	cmpq	$1, %rcx
+	je then21288
 	movq	$0, %rbx
-	jmp if_end21118
-then21117:
+	jmp if_end21289
+then21288:
 	movq	$42, %rbx
-if_end21118:
+if_end21289:
 	movq	%rbx, %rax
 	movq	%rax, %rdi
 	callq	_print_int
-	addq	$16, %rsp
+	movq	$0, %rax
+	addq	$8, %rsp
+	popq	%rbx
+	popq	%r12
+	popq	%r13
+	popq	%r14
+	popq	%r15
 	popq	%rbp
 	retq
 \end{lstlisting}
@@ -3431,8 +3459,8 @@ if_end21118:
 \path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize uncover-live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build-inter.} (x86-2-2);
 \path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate-reg.} (x86-3);
-\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize lower-cond.} (x86-5);
+\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize lower-cond.} (x86-4);
+\path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-5);
 \path[->,bend right=15] (x86-5) edge [left] node {\ttfamily\footnotesize print-x86} (x86-6);
 \end{tikzpicture}
 \caption{Diagram of the passes for compiling $R_2$, including the
@@ -3444,7 +3472,123 @@ Figure~\ref{fig:R2-passes} gives an overview of all the passes needed
 for the compilation of $R_2$.
 
 
-\marginpar{\scriptsize To do: create a challenge section. \\ --Jeremy}
+\section{Challenge: Optimizing Conditions$^{*}$}
+\label{sec:opt-if}
+
+A close inspection of the x86 code generated in
+Figure~\ref{fig:R2-passes} reveals some redundant computation
+regarding the condition of the \key{if}. We compare \key{rcx} to $1$
+twice using \key{cmpq} as follows.
+\begin{lstlisting}
+	cmpq	$1, %rcx
+	sete	%al
+	movzbq	%al, %rcx
+	cmpq	$1, %rcx
+	je then21288
+\end{lstlisting}
+
+
+The reason for this non-optimal code has to do with the \code{flatten}
+pass earlier in this Chapter. We recommended flattening the condition
+to an $\Arg$ and then comparing with \code{\#t}. But if the condition
+is already an \code{eq?} test, then we would like to use that
+directly. In fact, for many of the expressions of Boolean type, we can
+generate more optimized code. For example, if the condition is
+\code{\#t} or \code{\#f}, we do not need to generate an \code{if} at
+all. If the condition is a \code{let}, we can optimize based on the
+form of its body. If the condition is a \code{not}, then we can flip
+the two branches. 
+%
+\marginpar{\tiny We could do even better by converting to basic
+  blocks.\\ --Jeremy}
+%
+On the other hand, if the condition is a \code{and}
+or another \code{if}, we should flatten them into an $\Arg$ to avoid
+code duplication.
+
+Figure~\ref{fig:opt-if} shows an example program and the result of
+applying the above suggested optimizations.
+
+\begin{exercise}\normalfont
+  Change the \code{flatten} pass to improve the code that gets
+  generated for \code{if} expressions. We recommend writing a helper
+  function that recursively traverses the condition of the \code{if}.
+\end{exercise}
+
+\begin{figure}[tbp]
+\begin{tabular}{lll}
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}
+(program
+  (if (let ([x 1])
+        (not (eq? 2 x)))
+    42
+    777))
+\end{lstlisting}
+$\Downarrow$
+\begin{lstlisting}
+(program (x.1 t.1 if.1)
+  (assign x.1 1)
+  (assign t.1 (read))
+  (if (eq? x.1 t.1)
+    ((assign if.1 42))
+    ((assign if.1 777)))
+  (return if.1))
+\end{lstlisting}
+$\Downarrow$
+\begin{lstlisting}
+(program (x.1 t.1 if.1)
+  (movq (int 1) (var x.1))
+  (callq read_int)
+  (movq (reg rax) (var t.1))
+  (if (eq? (var x.1) (var t.1))
+    ((movq (int 42) (var if.1)))
+    ((movq (int 777) (var if.1))))
+  (movq (var if.1) (reg rax)))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+	.globl _main
+_main:
+	pushq	%rbp
+	movq	%rsp, %rbp
+	pushq	%r15
+	pushq	%r14
+	pushq	%r13
+	pushq	%r12
+	pushq	%rbx
+	subq	$8, %rsp
+	movq	$1, %rbx
+	callq	_read_int
+	movq	%rax, %rcx
+	cmpq	%rbx, %rcx
+	je then21288
+	movq	$777, %r12
+	jmp if_end21289
+then21288:
+	movq	$42, %r12
+if_end21289:
+	movq	%r12, %rax
+	movq	%rax, %rdi
+	callq	_print_int
+	movq	$0, %rax
+	addq	$8, %rsp
+	popq	%rbx
+	popq	%r12
+	popq	%r13
+	popq	%r14
+	popq	%r15
+	popq	%rbp
+	retq
+\end{lstlisting}
+\end{minipage}
+\end{tabular} 
+\caption{Example program with optimized conditionals.}
+\label{fig:opt-if}
+\end{figure}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
