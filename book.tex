@@ -1865,17 +1865,20 @@ Source program:
 \begin{minipage}{0.45\textwidth}
 After instruction selection:
 \begin{lstlisting}
-  (program (v w x y z)
-    (movq (int 1) (var v))
-    (movq (int 46) (var w))
-    (movq (var v) (var x))
-    (addq (int 7) (var x))
-    (movq (var x) (var y))
-    (addq (int 4) (var y))
-    (movq (var x) (var z))
-    (addq (var w) (var z))
-    (movq (var z) (reg rax))
-    (subq (var y) (reg rax)))
+(program (v w x y z t.1 t.2)
+  (movq (int 1) (var v))
+  (movq (int 46) (var w))
+  (movq (var v) (var x))
+  (addq (int 7) (var x))
+  (movq (var x) (var y))
+  (addq (int 4) (var y))
+  (movq (var x) (var z))
+  (addq (var w) (var z))
+  (movq (var y) (var t.1))
+  (negq (var t.1))
+  (movq (var z) (var t.2))
+  (addq (var t.1) (var t.2))
+  (movq (var t.2) (reg rax)))
 \end{lstlisting}
 \end{minipage}
 \caption{Running example for this chapter.}
@@ -1949,7 +1952,7 @@ $L_{\mathtt{after}}$ set to make the figure easy to read.
 \hspace{20pt}
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}[numbers=left]
-  (program (v w x y z)
+  (program (v w x y z t.1 t.2)
     (movq (int 1) (var v))
     (movq (int 46) (var w))
     (movq (var v) (var x))
@@ -1958,8 +1961,11 @@ $L_{\mathtt{after}}$ set to make the figure easy to read.
     (addq (int 4) (var y))
     (movq (var x) (var z))
     (addq (var w) (var z))
-    (movq (var z) (reg rax))
-    (subq (var y) (reg rax)))
+    (movq (var y) (var t.1))
+    (negq (var t.1))
+    (movq (var z) (var t.2))
+    (addq (var t.1) (var t.2))
+    (movq (var t.2) (reg rax)))
 \end{lstlisting}
 \end{minipage}
 \vrule\hspace{10pt}
@@ -1974,7 +1980,10 @@ $L_{\mathtt{after}}$ set to make the figure easy to read.
 |$\{ w, x, y \}$|
 |$\{ w, y, z \}$|
 |$\{ y, z \}$|
-|$\{ y, \key{rax} \}$|
+|$\{ t.1, z \}$|
+|$\{ t.1, z \}$|
+|$\{t.1,t.2\}$|
+|$\{t.2\}$|
 |$\{\}$|
 \end{lstlisting}
 \end{minipage}
@@ -2056,8 +2065,11 @@ Line 6: $y$ interferes with $w$,\\
 Line 7: $y$ interferes with $w$ and $x$,\\
 Line 8: $z$ interferes with $w$ and $y$,\\
 Line 9: $z$ interferes with $y$, \\
-Line 10: \key{rax} interferes with $y$, \\
-Line 11: no interference. 
+Line 10: $t.1$ interferes with $z$, \\
+Line 11: $t.1$ interferes with $z$, \\
+Line 12: $t.2$ interferes with $t.1$, \\
+Line 13: no interference. \\
+Line 14: no interference. 
 \end{quote}
 The resulting interference graph is shown in
 Figure~\ref{fig:interfere}. 
@@ -2069,9 +2081,10 @@ Figure~\ref{fig:interfere}.
 \node (v) at (0,0)   {$v$};
 \node (w) at (2,0)   {$w$};
 \node (x) at (4,0)   {$x$};
+\node (t1) at (6,0)   {$t.1$};
 \node (y) at (2,-2)  {$y$};
 \node (z) at (4,-2)  {$z$};
-\node (rax) at (0,-2) {\key{rax}};
+\node (t2) at (6,-2) {$t.2$};
 
 \draw (v) to (w);
 \foreach \i in {w,x,y} 
@@ -2083,7 +2096,8 @@ Figure~\ref{fig:interfere}.
 }
 \draw (z) to (w);
 \draw (z) to (y);
-\draw (rax) to (y);
+\draw (t1) to (z);
+\draw (t2) to (t1);
 \end{tikzpicture}
 \]
 \caption{Interference graph for the running example.}
@@ -3708,6 +3722,10 @@ short-circuiting behavior in the order of evaluation of its arguments.
 \caption{Interpreter for the $R_3$ language.}
 \label{fig:interp-R3}
 \end{figure}
+
+
+
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
