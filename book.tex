@@ -3706,12 +3706,11 @@ The element at index $1$ of \code{t} is \code{\#t}, so the ``then''
 branch is taken.  The element at index $0$ of \code{t} is $40$, to
 which we add the $2$, the element at index $0$ of the 1-tuple.
 \begin{lstlisting}
-(program
   (let ([t (vector 40 #t (vector 2))])
     (if (vector-ref t 1)
         (+ (vector-ref t 0)
            (vector-ref (vector-ref t 2) 0))
-        44)))
+        44))
 \end{lstlisting}
 
 Figure~\ref{fig:interp-R3} shows the interpreter for the $R_3$
@@ -3811,8 +3810,56 @@ short-circuiting behavior in the order of evaluation of its arguments.
 \label{fig:interp-R3}
 \end{figure}
 
+Tuples are our first encounter with heap-allocated data, which raises
+several interesting issues. First, variable binding performs a
+shallow-copy when dealing with tuples, which means that different
+variables can refer to the same tuple, i.e., the variables can be
+\emph{aliases} for the same thing. Consider the following example in
+which both \code{t1} and \code{t2} refer to the same tuple.  Thus, the
+mutation through \code{t2} is visible when referencing the tuple from
+\code{t1} and the result of the program is therefore \code{42}.
+\begin{lstlisting}
+(let ([t1 (vector 3 7)])
+  (let ([t2 t1])
+    (let ([_ (vector-set! t2 0 42)])
+      (vector-ref t1 0))))
+\end{lstlisting}
+
+The next issue concerns the lifetime of tuples. Of course, they are
+created by the \code{vector} form, but when does their lifetime end?
+Notice that the grammar in Figure~\ref{fig:r3-syntax} does not include
+an operation for deallocating tuples. Furthermore, the lifetime of a
+tuple is not tied to any notion of static scoping. For example, the
+following program returns \code{3} even though the variable \code{t}
+goes out of scope prior to the reference.
+\begin{lstlisting}
+(vector-ref
+  (let ([t (vector 3 7)])
+    t)
+  0)
+\end{lstlisting}
+From the perspective of programmer-oberservable behavior, tuples live
+forever. Of course, if they really lived forever, then many programs
+would run out of memory.\footnote{The $R_3$ language does not have
+  looping or recursive function, so it is nie impossible to write a
+  program in $R_3$ that will run out of memory. However, we add
+  recursive functions in the next Chapter!} A Racket implementation
+must therefore perform automatic garbage collection.
+
+\section{Garbage Collection}
+\label{sec:GC}
 
 
+\begin{figure}[tbp]
+\includegraphics[width=0.5\textwidth]{CopyingCollector}
+\includegraphics[width=0.5\textwidth]{CopyCollector2}
+\caption{A copying collector in action.}
+\label{fig:copying-collector}
+\end{figure}
+
+
+\section{Integrating Garbage Collection}
+\label{sec:integratng-GC}
 
 
 
