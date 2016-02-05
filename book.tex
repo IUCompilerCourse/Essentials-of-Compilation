@@ -3890,8 +3890,56 @@ and second element is a 2-tuple.
 \label{fig:copying-collector}
 \end{figure}
 
+\subsection{Graph Copying}
+
+Let us take a closer look at how the copy works. The allocated objects
+and pointers essentially form a graph and we need to copy the part of
+the graph that is reachable from the root set. To make sure we copy
+all of the reachable nodes, we need an exhaustive traversal algorithm,
+such as depth-first search or breadth-first
+search~\citep{Moore:1959aa,Cormen:2001uq}. Recall that such algorithms
+take into account the possibility of cycles by marking which objects
+have already been visited by the algorithm, so as to ensure
+termination of the algorithm. These search algorithms also use a data
+structure such as a stack or queue as a to-do list to keep track of
+the objects that need to be visited. Here we shall use breadth-first
+search and a trick due to Cheney~\citep{Cheney:1970aa} for
+simultaneously representing the queue and compacting the objects as
+they are copied into the ToSpace.
+
+Figure~\ref{fig:cheney} shows several snapshots of the ToSpace as the
+copy progresses. The queue is represented by a chunk of continguous
+memory in the ToSpace, using two pointers to track the front and the
+back of the queue. The algorithm starts by copying all objects that
+are immediately reachable into the ToSpace to form the initial queue.
+When we copy the object, we also mark the old object to indicate that
+it has been visited. (We discuss the marking in
+Section~\ref{sec:data-rep-gc}.) Note that the pointers inside the
+copied objects in the queue still point back to the FromSpace. The
+algorithm pops the object at the front of the queue and copies all the
+objects that are directly reachable from it to the ToSpace, at the
+back of the queue. The pointers are then updated to the copied
+objects. So in this step we copy the tuple whose second element is $4$
+to the back of the queue. The other pointer goes to a tuple that has
+already been copied, so we do not need to copy it again, but we do
+need to update the pointer to the new location. This can be
+accomplished by storing a \emph{forwarding} pointer to the new
+location in the old object, back when we copied the object into the
+ToSpace. This completes one step of the algorithm. The algorithm
+continues in this way until the front of the queue is empty, that is,
+until the front catches up with the back.
 
 
+\begin{figure}[tbp]
+\centering \includegraphics[width=0.9\textwidth]{cheney}
+\caption{Depiction of the ToSpace as the Cheney algorithm copies and
+  compacts the live objects.}
+\label{fig:cheney}
+\end{figure}
+
+
+\section{Detailed Data Representation}
+\label{sec:data-rep-gc}
 
 
 \section{Compiler Integration}
