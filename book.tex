@@ -3277,9 +3277,6 @@ $\Rightarrow$
 \end{lstlisting}
 \end{minipage}
 \end{tabular}  \\
-One further caveat is that the second argument of the \key{cmpq} instruction
-cannot be an immediate value. If you are comparing two immediates, you must insert another \key{movq} instruction to put the second argument in
-\key{rax}.
 
 
 % The translation of the \code{not} operator is not quite as simple
@@ -3443,7 +3440,9 @@ your previously created programs on the \code{interp-x86} interpreter
 There are no special restrictions on the instructions \key{je},
 \key{jmp}, and \key{label}, but there is an unusual restriction on
 \key{cmpq}. The second argument is not allowed to be an immediate
-value (such as a literal integer).
+value (such as a literal integer). If you are comparing two
+immediates, you must insert another \key{movq} instruction to put the
+second argument in \key{rax}.
 
 \begin{exercise}\normalfont
 Update \code{patch-instructions} to handle the new x86 instructions.
@@ -3850,8 +3849,8 @@ must therefore perform automatic garbage collection.
 \label{sec:GC}
 
 Here we study a relatively simple algorithm for garbage collection
-that is the basis of the state-of-the-art generational garbage
-collectors~\citep{Lieberman:1983aa,Ungar:1984aa,Jones:1996aa,Detlefs:2004aa,Dybvig:2006aa}. In
+that is the basis of state-of-the-art generational garbage
+collectors~\citep{Lieberman:1983aa,Ungar:1984aa,Jones:1996aa,Detlefs:2004aa,Dybvig:2006aa,Tene:2011kx}. In
 particular, we describe a two-space copying
 collector~\citep{Wilson:1992fk} that uses Cheney's algorithm to
 perform the
@@ -3860,9 +3859,9 @@ coarse-grained depiction of what happens in a two-space collector,
 showing two time steps, prior to garbage collection on the top and
 after garbage collection on the bottom. In a two-space collector, the
 heap is segmented into two parts, the FromSpace and the
-ToSpace. Initial, all allocations go to the FromSpace. As you can see,
-prior to garbage collection all of the allocated objects are in the
-FromSpace.
+ToSpace. Initially, all allocations go to the FromSpace until there is
+not enough room for the next allocation request. At that point, the
+garbage collector goes to work to make more room.
 
 A running program has direct access to registers and the procedure
 call stack, and those may contain pointers into the heap. Those
@@ -3899,35 +3898,36 @@ all of the reachable nodes, we need an exhaustive traversal algorithm,
 such as depth-first search or breadth-first
 search~\citep{Moore:1959aa,Cormen:2001uq}. Recall that such algorithms
 take into account the possibility of cycles by marking which objects
-have already been visited by the algorithm, so as to ensure
-termination of the algorithm. These search algorithms also use a data
-structure such as a stack or queue as a to-do list to keep track of
-the objects that need to be visited. Here we shall use breadth-first
-search and a trick due to Cheney~\citep{Cheney:1970aa} for
-simultaneously representing the queue and compacting the objects as
-they are copied into the ToSpace.
+have already been visited, so as to ensure termination of the
+algorithm. These search algorithms also use a data structure such as a
+stack or queue as a to-do list to keep track of the objects that need
+to be visited. Here we shall use breadth-first search and a trick due
+to Cheney~\citep{Cheney:1970aa} for simultaneously representing the
+queue and compacting the objects as they are copied into the ToSpace.
 
 Figure~\ref{fig:cheney} shows several snapshots of the ToSpace as the
 copy progresses. The queue is represented by a chunk of continguous
-memory in the ToSpace, using two pointers to track the front and the
-back of the queue. The algorithm starts by copying all objects that
-are immediately reachable into the ToSpace to form the initial queue.
-When we copy the object, we also mark the old object to indicate that
-it has been visited. (We discuss the marking in
-Section~\ref{sec:data-rep-gc}.) Note that the pointers inside the
-copied objects in the queue still point back to the FromSpace. The
-algorithm pops the object at the front of the queue and copies all the
-objects that are directly reachable from it to the ToSpace, at the
-back of the queue. The pointers are then updated to the copied
-objects. So in this step we copy the tuple whose second element is $4$
-to the back of the queue. The other pointer goes to a tuple that has
-already been copied, so we do not need to copy it again, but we do
-need to update the pointer to the new location. This can be
-accomplished by storing a \emph{forwarding} pointer to the new
-location in the old object, back when we copied the object into the
-ToSpace. This completes one step of the algorithm. The algorithm
-continues in this way until the front of the queue is empty, that is,
-until the front catches up with the back.
+memory at the beginning of the ToSpace, using two pointers to track
+the front and the back of the queue. The algorithm starts by copying
+all objects that are immediately reachable from the root set into the
+ToSpace to form the initial queue.  When we copy an object, we mark
+the old object to indicate that it has been visited. (We discuss the
+marking in Section~\ref{sec:data-rep-gc}.) Note that any pointers
+inside the copied objects in the queue still point back to the
+FromSpace. The algorithm then pops the object at the front of the
+queue and copies all the objects that are directly reachable from it
+to the ToSpace, at the back of the queue. The algorithm then updates
+the pointers in the popped object so they point to the newly copied
+objects. So getting back to Figure~\ref{fig:cheney}, in the first step
+we copy the tuple whose second element is $42$ to the back of the
+queue. The other pointer goes to a tuple that has already been copied,
+so we do not need to copy it again, but we do need to update the
+pointer to the new location. This can be accomplished by storing a
+\emph{forwarding} pointer to the new location in the old object, back
+when we initially copied the object into the ToSpace. This completes
+one step of the algorithm. The algorithm continues in this way until
+the front of the queue is empty, that is, until the front catches up
+with the back.
 
 
 \begin{figure}[tbp]
@@ -3938,13 +3938,86 @@ until the front catches up with the back.
 \end{figure}
 
 
-\section{Detailed Data Representation}
+\section{Data Representation}
 \label{sec:data-rep-gc}
 
+The garbage collector places some requirements on the data
+representations used by our compiler. First, the garbage collector
+needs to distinguish between pointers and other kinds of data. There
+are several ways to accomplish this.
+\begin{enumerate}
+\item Attached a tag to each object that says what kind of object it
+  is~\citep{Jones:1996aa}.
+\item Store different kinds of objects in different regions of
+  memory~\citep{Jr.:1977aa}.
+\item Use type information from the program to either generate
+  type-specific code for collecting or to generate tables that can
+  guide the
+  collector~\citep{Appel:1989aa,Goldberg:1991aa,Diwan:1992aa}.
+\end{enumerate}
+Dynamically typed languages, such as Lisp, need to tag objects
+anyways, so option 1 is a natural choice for those languages.
+However, $R_3$ is a statically typed language, so it would be
+unfortunate to require tags on every object, especially small and
+pervasive objects like integers and Booleans.  Option 3 is the
+best-performing choice for statically typed languages, but comes with
+a relatively high implementation complexity. To keep this chapter to a
+2-week time budget, we recommend a combination of options 1 and 2,
+with separate strategies used for the stack and the heap.
 
-\section{Compiler Integration}
-\label{sec:compiler-integration}
+Regarding the stack, we recommend using a separate stack for
+pointers~\citep{Siebert:2001aa,Henderson:2002aa,Baker:2009aa} (i.e., a
+``shadow stack''). That is, when a local variable needs to be spilled
+and is of type \code{(Vector $\Type_1 \ldots \Type_n$)}, then we put
+it on the shadow stack instead of the normal procedure call stack.
+Figure~\ref{fig:shadow-stack} reproduces the example from
+Figure~\ref{fig:copying-collector} and contrasts it with the data
+layout using a shadow stack. The shadow stack contains both pointers
+from the regular stack and also contains a copy of the pointer that
+was a in the second register. We shall implement the garbage collector
+in a separate function that will need to use registers, so prior to
+invoking the garbage collector (or any function call for that matter)
+we recommend pushing all pointers in registers to the shadow stack.
+After the call, the pointers have to be popped back into their
+original registers because the locations of the objects may have
+changed.
 
+\begin{figure}[tbp]
+\centering \includegraphics[width=0.7\textwidth]{shadow-stack}
+\caption{Changing from just a normal stack to use a shadow stack
+   for pointers to fascilitate garbage collection.}
+\label{fig:shadow-stack}
+\end{figure}
+
+The problem of distinguishing between pointers and other kinds of data
+also arises inside of each tuple. We solve this problem by attaching a
+tag, an extra 64-bits, to each tuple. Figure~\ref{fig:tuple-rep} zooms
+in on the tags for two of the tuples in the example from
+Figure~\ref{fig:copying-collector}. Part of each tag is dedicated to
+specifying which elements of the tuple are pointers, the part labeled
+``pointer mask''. Within the pointer mask, a 1 bit indicates there is
+a pointer and a 0 bit indicates some other kind of data. The pointer
+mask starts at bit 7. We have limited tuples to a maximum size of 50
+elements, so we just need 50 bits for the pointer mask. The tag also
+contains two other pieces of information. The length of the tuple
+(number of elements) is stored in bits 1 through 6. Finally, bit 0
+indicates whether the tuple has already been copied to the FromSpace.
+If it has, the value of bit 0 will be 1 and the rest of the tag will
+contain the forwarding pointer. To obtain the forwarding pointer,
+simply change the value of bit 0 to 0. (Our objects are 8-byte
+aligned, so the bottom 3 bits of a pointer are always 0.)
+
+\begin{figure}[tbp]
+\centering \includegraphics[width=0.9\textwidth]{tuple-rep}
+\caption{Representation for tuples in the heap.}
+\label{fig:tuple-rep}
+\end{figure}
+
+
+\section{Impact on Code Generation}
+\label{sec:code-generation-gc}
+
+UNDER CONSTRUCTION
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
