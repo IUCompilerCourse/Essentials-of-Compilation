@@ -4013,6 +4013,48 @@ aligned, so the bottom 3 bits of a pointer are always 0.)
 \label{fig:tuple-rep}
 \end{figure}
 
+\section{Implementation of the Garbage Collector}
+\label{sec:organize-gz}
+
+The implementation of the garbage collector needs to do a lot of
+bit-level data manipulation and we will need to link it with our
+compiler-generated x86 code. Thus, we recommend implementing the
+garbage collector in C~\citep{Kernighan:1988nx} and putting the code
+in the \code{runtime.c} file. Figure~\ref{fig:gc-header} shows the
+interface to the garbage collector. We define a type \code{ptr} for
+64-bit pointers. The function \code{initialize} should create the
+FromSpace, ToSpace, and shadow stack. The \code{initialize} function
+is meant to be called near the beginning of \code{main}, before the
+body of the program exectutes.  The \code{initialize} function should
+put the address of the beginning of the FromStack into the global
+variable \code{free\_ptr}. The global \code{fromspace\_end} should
+point to the address that is 1-past the end of the FromSpace.  The
+\code{rootstack\_begin} global should point to the beginning of the
+shadow stack.
+
+As long as there is room left in the FromStack, your generated code
+can allocate tuples simply by moving the \code{free\_ptr} forward.
+The amount of room left in FromSpace is the difference between the
+\code{fromspace\_end} and the \code{free\_ptr}.  The \code{collect}
+function should be called when there is not enough room left in the
+FromSpace for the next allocation.  The \code{collect} function takes
+a pointer to the current top of the shadow stack (one past the last
+item that was pushed) and the number of bytes that need to be
+allocated. The \code{collect} should perform the copying collection
+and then return the address of the newly allocated chunk of memory.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+typedef long int* ptr;
+void initialize();
+ptr collect(ptr rootstack_ptr, long int bytes_requested);
+ptr free_ptr;
+ptr fromspace_end;
+ptr rootstack_begin;
+\end{lstlisting}
+\caption{Interface to the garbage collector.}
+\label{fig:gc-header}
+\end{figure}
 
 \section{Impact on Code Generation}
 \label{sec:code-generation-gc}
