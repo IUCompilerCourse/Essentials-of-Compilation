@@ -3724,39 +3724,6 @@ not use \code{interp-op} for the \code{and} operation because of the
 short-circuiting behavior in the order of evaluation of its arguments.
 
 \begin{figure}[tbp]
-\begin{lstlisting}
-   (define (interp-op op)
-     (match op
-       ['+ fx+]
-       ['- (lambda (n) (fx- 0 n))]
-       ['read read-fixnum]
-       ['not (lambda (v) (match v [#t #f] [#f #t]))]
-       ['eq? (lambda (v1 v2)
-               (cond [(or (and (fixnum? v1) (fixnum? v2)) 
-                           (and (boolean? v1) (boolean? v2))
-                           (and (vector? v1) (vector? v2)))
-                      (eq? v1 v2)]))]
-       ['vector vector]
-       ['vector-ref vector-ref]
-       ['vector-set! vector-set!]
-       [else (error "in interp-op S0, unmatched" op)]))
-
-   (define (interp-R3 env e)
-     (match e
-       ...
-       [`(,op ,args ...)
-        (apply (interp-op op)
-                (map (lambda (e) (interp-R3 env e)) args))]
-       ))
-\end{lstlisting}
-\caption{Interpreter for the $R_3$ language. We combine the code for
-  most of the primitive operations, including the new vector
-  operations, into the one match clause and factor their differences
-  into the \code{interp-op} function. }
-\label{fig:interp-R3}
-\end{figure}
-
-\begin{figure}[tbp]
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
@@ -4056,10 +4023,160 @@ ptr rootstack_begin;
 \label{fig:gc-header}
 \end{figure}
 
-\section{Impact on Code Generation}
+\section{Impact on the Compiler Passes}
 \label{sec:code-generation-gc}
 
+The introduction of garbage collection has a non-trivial impact on our
+compiler passes. We introduce 3 new compiler passes and make
+non-trivial changes to \code{flatten} and \code{select-instructions}.
+The following program will serve as our running example.  It creates
+two tuples, one nested inside the other. Both tuples have length
+one. The example then accesses the element in the inner tuple tuple
+via two vector references.
+\begin{lstlisting}
+(vector-ref (vector-ref (vector (vector 42)) 0) 0))
+\end{lstlisting}
+
+
+\subsection{Flatten}
+
+The impact on \code{flatten} is straightforward. We add several $\Exp$
+forms for vectors. Here is the definition of $C_2$, for the output of
+\code{flatten}.
+\[
+\begin{array}{lcl}
+\Exp &::=& \ldots \mid (\key{vector}\, \Exp^{+}) \\
+   &\mid & (\key{vector-ref}\, \Arg\, \Int) \mid (\key{vector-set!}\,\Arg\,\Int\,\Arg)
+\end{array}
+\]
+
+The \code{flatten} pass should treat the new forms much like the other
+kinds of expressions. Here is the output on our running example.
+\begin{lstlisting}
+(program (tmp1453 tmp1454 tmp1455 tmp1456)
+  (assign tmp1453 (vector 42))
+  (assign tmp1454 (vector tmp1453))
+  (assign tmp1455 (vector-ref tmp1454 0))
+  (assign tmp1456 (vector-ref tmp1455 0))
+  (return tmp1456))
+\end{lstlisting}
+
+
+\subsection{Expose Allocation (New)}
+\label{sec:expose-allocation}
+
+The pass \code{expose-allocation} lowers the vector creation form into
+a conditional call to the collector followed by the allocation.  In
+the following, we show the transformation for the \code{vector} form.
+The $\itm{len}$ is the length of the vector and $\itm{bytes}$ is how
+many total bytes need to be allocated for the vector, which is 8 (for
+the tag) plus $\itm{len}$ times 8.
+\begin{lstlisting}
+  (assign |$\itm{lhs}$| (vector |$e_0 \ldots e_n$|))
+|$\Longrightarrow$|
+  (if (collection-needed? |$\itm{bytes}$|)
+      ((collect |$\itm{bytes}$|)) 
+      ())
+  (assign |$\itm{lhs}$| (allocate |$\itm{len}\;\itm{type}$|))
+\end{lstlisting}
+
+The \code{expose-allocation} inserts an \code{initialize} statement at
+the beginning of the program which will instruct the garbage collector
+to set up the FromSpace, ToSpace, and all the global variables.
+\marginpar{\tiny We should say more about how to compute the types.\\--Jeremy}
+Finally, the \code{expose-allocation} annotates all of the local
+variables in the \code{program} form with their type.
+
+For the output of this pass, we add the following forms to $C_2$ and
+remove the \key{vector} form.
+\[
+\begin{array}{lcl}
+\Exp  &::=& \ldots \mid (\key{collection-needed?}\, \Int) 
+      \mid (\key{allocate}\, \Int \, \Type) \\
+\Stmt &::=& \ldots \mid (\key{initialize}\,\Int\,\Int) 
+    \mid (\key{collect}\, \Int)  \\
+C_2 & ::= & (\key{program}\, ((\Var . \Type)^{*}) \,\Stmt^{+})
+\end{array}
+\]
+
+Figure~\ref{fig:expose-alloc-output} shows the output of the
+\code{expose-allocation} pass on our running example.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+(program ((tmp1453 . (Vector Integer))
+           (tmp1454 . (Vector (Vector Integer)))
+           (tmp1455 . (Vector Integer))
+           (tmp1456 . Integer)
+           (void1457 . Void)
+           (void1458 . Void))
+  (initialize 10000 10000)
+  (if (collection-needed? 16)
+      ((collect 16))
+      ())
+  (assign tmp1453 (allocate 1 (Vector Integer)))
+  (assign void1457 (vector-set! tmp1453 0 42))
+  (if (collection-needed? 16)
+      ((collect 16))
+      ())
+  (assign tmp1454 (allocate 1 (Vector (Vector Integer))))
+  (assign void1458 (vector-set! tmp1454 0 tmp1453))
+  (assign tmp1455 (vector-ref tmp1454 0))
+  (assign tmp1456 (vector-ref tmp1455 0))
+  (return tmp1456))
+\end{lstlisting}
+\caption{Output of the \code{expose-allocation} pass.}
+\label{fig:expose-alloc-output}
+\end{figure}
+
+\subsection{Uncover Call-Live Roots (New)}
+\label{sec:call-live-roots}
+
 UNDER CONSTRUCTION
+
+We extend $C_2$ again, adding a new statement form for recording the
+variables that are roots (they are tuples) and are live across a call
+to the collector.
+\[
+\begin{array}{lcl}
+\Stmt &::=& \ldots \mid (\key{call-live-roots}\, (\Var^{*}) \, \Stmt^{*})
+\end{array}
+\]
+
+
+\subsection{Introduce Shadow Stack (New)}
+\label{sec:shadow-stack}
+
+UNDER CONSTRUCTION
+
+We extend $C_2$ yet again witha form for refering to global variables
+and with a form for invoking the garbage collector.  The
+\key{call-live-roots} form is not needed in the output of this pass.
+\[
+\begin{array}{lcl}
+\Exp  &::=& \ldots \mid (\key{global-value}\, \itm{name}) \\
+\Stmt &::=& \ldots \mid (\key{collect}\, \Arg \,\Int) 
+\end{array}
+\]
+
+
+\subsection{Select Instructions}
+\label{sec:select-instructions-gc}
+
+UNDER CONSTRUCTION
+
+The $x86_2$ language differs from $x86_1$ just in the addition of the
+form for global variables and a form for adding an offset to an
+address.
+\[
+\begin{array}{lcl}
+\Arg &::=&  \ldots \mid (\key{global-value}\; \itm{name}) 
+   \mid (\key{offset}\,\Arg\,\Int) \\
+\Instr &::= & \ldots \\
+x86_2 &::= & (\key{program} \;\itm{info} \; \Instr^{+})
+\end{array}
+\]
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
