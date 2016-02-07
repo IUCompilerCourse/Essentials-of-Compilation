@@ -4027,7 +4027,7 @@ and then return the address of the newly allocated chunk of memory.
 \label{sec:code-generation-gc}
 
 The introduction of garbage collection has a non-trivial impact on our
-compiler passes. We introduce 3 new compiler passes and make
+compiler passes. We introduce two new compiler passes and make
 non-trivial changes to \code{flatten} and \code{select-instructions}.
 The following program will serve as our running example.  It creates
 two tuples, one nested inside the other. Both tuples have length
@@ -4046,11 +4046,11 @@ forms for vectors. Here is the definition of $C_2$, for the output of
 \[
 \begin{array}{lcl}
 \Exp &::=& \ldots \mid (\key{vector}\, \Exp^{+}) \\
-   &\mid & (\key{vector-ref}\, \Arg\, \Int) \mid (\key{vector-set!}\,\Arg\,\Int\,\Arg)
+   &\mid & (\key{vector-ref}\, \Arg\, \Int) \\
+   &\mid & (\key{vector-set!}\,\Arg\,\Int\,\Arg)
 \end{array}
 \]
-
-The \code{flatten} pass should treat the new forms much like the other
+The \code{flatten} pass should treat these new forms much like the other
 kinds of expressions. The output on our running example is shown in
 Figure~\ref{fig:flatten-gc}.
 
@@ -4105,12 +4105,14 @@ their type.
 
 For the output of this pass, we add the following forms to $C_2$ and
 remove the \key{vector} form.
+\marginpar{\tiny I don't like the collection-needed form.
+  Would it make sense to instead expose the free-ptr here?\\--Jeremy}
 \[
 \begin{array}{lcl}
-\Exp  &::=& \ldots \mid (\key{collection-needed?}\, \Int) 
-      \mid (\key{allocate}\, \Int \, \Type) \\
-\Stmt &::=& \ldots \mid (\key{initialize}\,\Int\,\Int) 
-    \mid (\key{collect}\, \Int)  \\
+\Exp  &::=& \ldots \mid (\key{allocate}\, \Int \, \Type) \\
+\Stmt &::=& \ldots \mid (\key{initialize}\,\Int\,\Int) \\
+    &\mid& (\key{collect}\, \Int)  \\
+    &\mid & (\key{if}\;(\key{collection-needed?}\, \Int)\;\Stmt^{*}\,\Stmt^{*}) \\
 C_2 & ::= & (\key{program}\, ((\Var . \Type)^{*}) \,\Stmt^{+})
 \end{array}
 \]
@@ -4195,84 +4197,132 @@ a root and it is live at that point.
 \end{figure}
 
 
-\subsection{Introduce Root Stack (New)}
-\label{sec:shadow-stack}
+\subsection{Select Instructions}
+\label{sec:select-instructions-gc}
 
-The goal of this pass is to generate the code for explicitly
-manipulating the root stack. 
+In this pass we generate the code for explicitly manipulating the root
+stack, lower the forms needed for garbage collection, and also lower
+the \code{vector-ref} and \code{vector-set!} forms.
+We shall thread a pointer to the top of root stack through the program
+in local variables whose names all begin with \code{rootstack}.  
 %
 \marginpar{\tiny I would have prefered that we use a dedicated
-  register for the top of the root stack\\--Jeremy}
+  register for the top of the root stack. (to do: next year) \\--Jeremy}
 %
-We shall thread a pointer to the top of root stack through the program
-in local variables whose names all begin with \code{rootstack}.  We
-shall obtain the top of the root stack to begin with from the global
-variable \code{rootstack\_begin}.
+We shall obtain the top of the root stack to begin with from the
+global variable \code{rootstack\_begin}.
 
-Most of the action in this pass occurs in the case for
-\code{call-live-roots}.
-
+The translation of the \code{call-live-roots} introduces the code that
+manipulates the root stack.  We push all of the call-live roots onto
+the root stack prior to the call to \code{collect} and we move them
+back afterwards.
+%
+\marginpar{\tiny I would prefer to instead have roots live solely
+on the root stack and in registers, not on the normal stack. Then
+we would only need to push the ones in registers, decreasing
+memory traffic. (to do: next year)\\ --Jeremy}
 \begin{lstlisting}
    (call-live-roots (|$x_0 \ldots x_{n-1}$|) (collect |$\itm{bytes}$|))
    |$\Longrightarrow$|
    (movq (var |$x_0$|) (offset (var rootstack.|$\itm{prev}$|) |$0$|))
    |$\ldots$|
    (movq (var |$x_{n-1}$|) (offset (var rootstack.|$\itm{prev}$|) |$8(n-1)$|))
-   (assign rootstack.|$\itm{new}$| (+ rootstack.|$\itm{prev}$| |$n$|))
-   (collect rootstack.|$\itm{new}$| |$\itm{bytes}$|)
+   (movq rootstack.|$\itm{prev}$| rootstack.|$\itm{new}$|)
+   (addq rootstack.|$\itm{new}$| |$n$|)
+   (movq (var rootstack.|$\itm{new}$|) (reg rdi))
+   (movq (int |$\itm{bytes}$|) (reg rsi))
+   (callq collect)
    (movq (offset (var rootstack.|$\itm{prev}$|) |$0$|) (var |$x_0$|))
    |$\ldots$|
    (movq (offset (var rootstack.|$\itm{prev}$|) |$8(n-1)$|) (var |$x_{n-1}$|))
 \end{lstlisting}
 
-We extend $C_2$ yet again with form for refering to global variables
-and we change the \code{collect} form for invoking the garbage
-collector, adding a parameter for the top of the root stack.  The
-\key{call-live-roots} form is no longer needed in the output of this
-pass.
-\[
-\begin{array}{lcl}
-\Exp  &::=& \ldots \mid (\key{global-value}\, \itm{name}) \\
-\Stmt &::=& \ldots \mid (\key{collect}\, \Arg \,\Int) 
-\end{array}
-\]
+%% We extend $C_2$ yet again with form for refering to global variables
+%% and we change the \code{collect} form for invoking the garbage
+%% collector, adding a parameter for the top of the root stack.  The
+%% \key{call-live-roots} form is no longer needed in the output of this
+%% pass.
+%% \[
+%% \begin{array}{lcl}
+%% \Exp  &::=& \ldots \mid (\key{global-value}\, \itm{name}) \\
+%% \Stmt &::=& \ldots \mid (\key{collect}\, \Arg \,\Int) 
+%% \end{array}
+%% \]
 
-Figure~\ref{fig:introduce-rootstack-output} shows the output of the
-\code{introduce-rootstack} pass on the running example.
+%% Figure~\ref{fig:introduce-rootstack-output} shows the output of the
+%% \code{introduce-rootstack} pass on the running example.
 
-\begin{figure}[tbp]
+%% \begin{figure}[tbp]
+%% \begin{lstlisting}
+%%    (program (t.1 t.2 t.3 t.4 void.1 void.2
+%%               rootstack.1 rootstack.2 rootstack.3)
+%%      (initialize 10000 10000)
+%%      ~(assign rootstack.3 (global-value rootstack_begin))~
+%%      (if (collection-needed? 16)
+%%        (~(assign rootstack.2 (+ rootstack.3 0))
+%%         (collect rootstack.2 16)~)
+%%        ())
+%%      (assign t.1 (allocate 1 (Vector Integer)))
+%%      (assign void.1 (vector-set! t.1 0 42))
+%%      (if (collection-needed? 16)
+%%        (~(movq (var t.1) (offset (var rootstack.3) 0))
+%%         (assign rootstack.1 (+ rootstack.3 8))
+%%         (collect rootstack.1 16)
+%%         (movq (offset (var rootstack.3) 0) (var t.1))~)
+%%        ())
+%%      (assign t.2 (allocate 1 (Vector (Vector Integer))))
+%%      (assign void.2 (vector-set! t.2 0 t.1))
+%%      (assign t.3 (vector-ref t.2 0))
+%%      (assign t.4 (vector-ref t.3 0))
+%%      (return t.4))
+%% \end{lstlisting}
+%% \caption{Output of the \code{introduce-rootstack} pass.}
+%% \label{fig:introduce-rootstack-output}
+%% \end{figure}
+
+\noindent We simply translate \code{initialize} into a call to the
+function in \code{runtime.c}.
 \begin{lstlisting}
-   (program (t.1 t.2 t.3 t.4 void.1 void.2
-             rootstack.1 rootstack.2 rootstack.3)
-     (initialize 10000 10000)
-     ~(assign rootstack.3 (global-value rootstack_begin))~
-     (if (collection-needed? 16)
-       (~(assign rootstack.2 (+ rootstack.3 0))
-        (collect rootstack.2 16)~)
-       ())
-     (assign t.1 (allocate 1 (Vector Integer)))
-     (assign void.1 (vector-set! t.1 0 42))
-     (if (collection-needed? 16)
-       (~(movq (var t.1) (offset (var rootstack.3) 0))
-        (assign rootstack.1 (+ rootstack.3 8))
-        (collect rootstack.1 16)
-        (movq (offset (var rootstack.3) 0) (var t.1))~)
-       ())
-     (assign t.2 (allocate 1 (Vector (Vector Integer))))
-     (assign void.2 (vector-set! t.2 0 t.1))
-     (assign t.3 (vector-ref t.2 0))
-     (assign t.4 (vector-ref t.3 0))
-     (return t.4))
+   (initialize |$\itm{rootlen}\;\itm{heaplen}$|)
+   |$\Longrightarrow$|
+   (movq (int |$\itm{rootlen}$|) (reg rdi))
+   (movq (int |$\itm{heaplen}$|) (reg rsi))
+   (callq initialize)
 \end{lstlisting}
-\caption{Output of the \code{introduce-rootstack} pass.}
-\label{fig:introduce-rootstack-output}
-\end{figure}
+%
+We translate the special \code{collection-needed?} predicate into code
+that compares the \code{free\_ptr} to the \code{fromspace\_end}.
+%
+\marginpar{\tiny To improve the code generation here, we should
+ extend the 'if' form to all the relational operators.
+(to do: this week)\\--Jeremy}
+%
+\begin{lstlisting}
+   (if (collection-needed? |$\itm{bytes}$|) |$\itm{thn}$| |$\itm{els}$|)
+   |$\Longrightarrow$|
+   (movq (global-value free_ptr) (var end-data.1))
+   (addq (int |$\itm{bytes}$|) (var end-data.1))
+   (cmpq (var end-data.1) (global-value fromspace_end))
+   (setl (byte-reg al))
+   (movzbq (byte-reg al) (var lt.1))
+   (if (eq? (int 0) (var lt.1))
+       |$\itm{els}$|
+       |$\itm{thn}$|)
+\end{lstlisting}
 
+The \code{vector-ref} and \code{vector-set!} forms translate into
+\code{movq} instructions with the appropriate \code{offset}.
+\begin{lstlisting}
+(assign |$\itm{lhs}$| (vector-ref |$\itm{vec}$| |$n$|))
+|$\Longrightarrow$|
+(movq (offset |$\itm{vec}'$| |$n$|) |$\itm{lhs}$|)
 
-\subsection{Select Instructions}
-\label{sec:select-instructions-gc}
-
-UNDER CONSTRUCTION
+(assign |$\itm{lhs}$| (vector-set! |$\itm{vec}$| |$n$| |$\itm{arg}$|))
+|$\Longrightarrow$|
+(movq |$\itm{arg}'$| (offset |$\itm{vec}'$| |$n$|))
+\end{lstlisting}
+The $\itm{vec}'$ and $\itm{arg}'$ are obtained by recursively
+processing $\itm{vec}$ and $\itm{arg}$.
 
 The $x86_2$ language differs from $x86_1$ just in the addition of the
 form for global variables and a form for adding an offset to an
@@ -4285,55 +4335,59 @@ address.
 x86_2 &::= & (\key{program} \;\itm{info} \; \Instr^{+})
 \end{array}
 \]
-
-
-Figure~\ref{fig:select-instr-output-gc}
+Figure~\ref{fig:select-instr-output-gc} shows the output of the
+\code{select-instructions} pass on the running example.
 
 \begin{figure}[tbp]
-\begin{lstlisting}
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
    (program (t.1 t.2 t.3 t.4 void.1 void.2
-             rootstack.1 rootstack.2 rootstack.3 lt1465
-             end-data1464 lt1463 end-data1462)
-     (movq (int 10000) (reg rdi))
+              rootstack.1 rootstack.2 rootstack.3 lt1465
+              end-data1464 lt.1 end-data.1)
+     ~(movq (int 10000) (reg rdi))
      (movq (int 10000) (reg rsi))
-     (callq initialize)
+     (callq initialize)~
      (movq (global-value rootstack_begin) (var rootstack.3))
-     (movq (global-value free_ptr) (var end-data1462))
-     (addq (int 16) (var end-data1462))
-     (cmpq (var end-data1462) (global-value fromspace_end))
+     ~(movq (global-value free_ptr) (var end-data.1))
+     (addq (int 16) (var end-data.1))
+     (cmpq (var end-data.1) (global-value fromspace_end))
      (setl (byte-reg al))
-     (movzbq (byte-reg al) (var lt1463))
-     (if (eq? (int 0) (var lt1463))
+     (movzbq (byte-reg al) (var lt.1))~
+     (if ~(eq? (int 0) (var lt.1))~
        ()
        ((movq (var rootstack.3) (var rootstack.2))
         (addq (int 0) (var rootstack.2))
-        (movq (var rootstack.2) (reg rdi))
+        ~(movq (var rootstack.2) (reg rdi))
         (movq (int 16) (reg rsi))
-        (callq collect)))
-     (movq (global-value free_ptr) (var t.1))
+        (callq collect)~))
+
+     ~(movq (global-value free_ptr) (var t.1))
      (addq (int 16) (global-value free_ptr))
-     (movq (int 32) (offset (var t.1) 0))
-     (movq (int 42) (offset (var t.1) 8))
-     (movq (global-value free_ptr) (var end-data1464))
+     (movq (int 32) (offset (var t.1) 0))~
+
+     ~(movq (int 42) (offset (var t.1) 8))~
+
+     ~(movq (global-value free_ptr) (var end-data1464))
      (addq (int 16) (var end-data1464))
      (cmpq (var end-data1464) (global-value fromspace_end))
      (setl (byte-reg al))
-     (movzbq (byte-reg al) (var lt1465))
-     (if (eq? (int 0) (var lt1465))
+     (movzbq (byte-reg al) (var lt1465))~
+     (if ~(eq? (int 0) (var lt1465))~
        ()
        ((movq (var t.1) (offset (var rootstack.3) 0))
         (movq (var rootstack.3) (var rootstack.1))
         (addq (int 8) (var rootstack.1))
-        (movq (var rootstack.1) (reg rdi))
+        ~(movq (var rootstack.1) (reg rdi))
         (movq (int 16) (reg rsi))
-        (callq collect)
+        (callq collect)~
         (movq (offset (var rootstack.3) 0) (var t.1))))
-     (movq (global-value free_ptr) (var t.2))
+     ~(movq (global-value free_ptr) (var t.2))
      (addq (int 16) (global-value free_ptr))
-     (movq (int 160) (offset (var t.2) 0))
-     (movq (var t.1) (offset (var t.2) 8))
+     (movq (int 160) (offset (var t.2) 0))~
+
+     ~(movq (var t.1) (offset (var t.2) 8))
      (movq (offset (var t.2) 8) (var t.3))
-     (movq (offset (var t.3) 8) (var t.4))
+     (movq (offset (var t.3) 8) (var t.4))~
+
      (movq (var t.4) (reg rax)))
 \end{lstlisting}
 \caption{Output of the \code{select-instructions} pass.}
