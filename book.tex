@@ -33,7 +33,8 @@
 language=Lisp,
 basicstyle=\ttfamily\small,
 escapechar=|,
-columns=flexible
+columns=flexible,
+moredelim=[is][\color{red}]{~}{~}
 }
 
 \newtheorem{theorem}{Theorem}
@@ -3934,22 +3935,23 @@ with separate strategies used for the stack and the heap.
 
 Regarding the stack, we recommend using a separate stack for
 pointers~\citep{Siebert:2001aa,Henderson:2002aa,Baker:2009aa} (i.e., a
-``shadow stack''). That is, when a local variable needs to be spilled
-and is of type \code{(Vector $\Type_1 \ldots \Type_n$)}, then we put
-it on the shadow stack instead of the normal procedure call stack.
+``shadow stack''), which we call a \emph{root stack}. That is, when a
+local variable needs to be spilled and is of type \code{(Vector
+  $\Type_1 \ldots \Type_n$)}, then we put it on the root stack
+instead of the normal procedure call stack.
 Figure~\ref{fig:shadow-stack} reproduces the example from
 Figure~\ref{fig:copying-collector} and contrasts it with the data
-layout using a shadow stack. The shadow stack contains the two
+layout using a root stack. The root stack contains the two
 pointers from the regular stack and also the pointer in the second
 register. Prior to invoking the garbage collector, we shall push all
 pointers in local variables (resident in registers or spilled to the
-stack) onto the shadow stack.  After the collection, the pointers must
+stack) onto the root stack.  After the collection, the pointers must
 be popped back into the local variables because the locations of the
 pointed-to objects will have changed.
 
 \begin{figure}[tbp]
 \centering \includegraphics[width=0.7\textwidth]{shadow-stack}
-\caption{Changing from just a normal stack to use a shadow stack
+\caption{Changing from just a normal stack to use a root stack
    for pointers to fascilitate garbage collection.}
 \label{fig:shadow-stack}
 \end{figure}
@@ -3988,14 +3990,14 @@ garbage collector in C~\citep{Kernighan:1988nx} and putting the code
 in the \code{runtime.c} file. Figure~\ref{fig:gc-header} shows the
 interface to the garbage collector. We define a type \code{ptr} for
 64-bit pointers. The function \code{initialize} should create the
-FromSpace, ToSpace, and shadow stack. The \code{initialize} function
+FromSpace, ToSpace, and root stack. The \code{initialize} function
 is meant to be called near the beginning of \code{main}, before the
 body of the program exectutes.  The \code{initialize} function should
 put the address of the beginning of the FromStack into the global
 variable \code{free\_ptr}. The global \code{fromspace\_end} should
 point to the address that is 1-past the end of the FromSpace.  The
 \code{rootstack\_begin} global should point to the beginning of the
-shadow stack.
+root stack.
 
 As long as there is room left in the FromStack, your generated code
 can allocate tuples simply by moving the \code{free\_ptr} forward.
@@ -4003,19 +4005,19 @@ The amount of room left in FromSpace is the difference between the
 \code{fromspace\_end} and the \code{free\_ptr}.  The \code{collect}
 function should be called when there is not enough room left in the
 FromSpace for the next allocation.  The \code{collect} function takes
-a pointer to the current top of the shadow stack (one past the last
+a pointer to the current top of the root stack (one past the last
 item that was pushed) and the number of bytes that need to be
 allocated. The \code{collect} should perform the copying collection
 and then return the address of the newly allocated chunk of memory.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-typedef long int* ptr;
-void initialize();
-ptr collect(ptr rootstack_ptr, long int bytes_requested);
-ptr free_ptr;
-ptr fromspace_end;
-ptr rootstack_begin;
+   typedef long int* ptr;
+   void initialize(long int rootstack_size, long int heap_size);
+   void collect(ptr rootstack_ptr, long int bytes_requested);
+   ptr free_ptr;
+   ptr fromspace_end;
+   ptr rootstack_begin;
 \end{lstlisting}
 \caption{Interface to the garbage collector.}
 \label{fig:gc-header}
@@ -4032,7 +4034,7 @@ two tuples, one nested inside the other. Both tuples have length
 one. The example then accesses the element in the inner tuple tuple
 via two vector references.
 \begin{lstlisting}
-(vector-ref (vector-ref (vector (vector 42)) 0) 0))
+   (vector-ref (vector-ref (vector (vector 42)) 0) 0))
 \end{lstlisting}
 
 
@@ -4049,16 +4051,21 @@ forms for vectors. Here is the definition of $C_2$, for the output of
 \]
 
 The \code{flatten} pass should treat the new forms much like the other
-kinds of expressions. Here is the output on our running example.
-\begin{lstlisting}
-(program (tmp1453 tmp1454 tmp1455 tmp1456)
-  (assign tmp1453 (vector 42))
-  (assign tmp1454 (vector tmp1453))
-  (assign tmp1455 (vector-ref tmp1454 0))
-  (assign tmp1456 (vector-ref tmp1455 0))
-  (return tmp1456))
-\end{lstlisting}
+kinds of expressions. The output on our running example is shown in
+Figure~\ref{fig:flatten-gc}.
 
+\begin{figure}[tbp]
+\begin{lstlisting}
+   (program (t.1 t.2 t.3 t.4)
+     (assign t.1 (vector 42))
+     (assign t.2 (vector t.1))
+     (assign t.3 (vector-ref t.2 0))
+     (assign t.4 (vector-ref t.3 0))
+     (return t.4))
+\end{lstlisting}
+\caption{Output of \code{flatten} for the running example.}
+\label{fig:flatten-gc}
+\end{figure}
 
 \subsection{Expose Allocation (New)}
 \label{sec:expose-allocation}
@@ -4070,20 +4077,31 @@ The $\itm{len}$ is the length of the vector and $\itm{bytes}$ is how
 many total bytes need to be allocated for the vector, which is 8 (for
 the tag) plus $\itm{len}$ times 8.
 \begin{lstlisting}
-  (assign |$\itm{lhs}$| (vector |$e_0 \ldots e_n$|))
+  (assign |$\itm{lhs}$| (vector |$e_0 \ldots e_{n-1}$|))
 |$\Longrightarrow$|
   (if (collection-needed? |$\itm{bytes}$|)
       ((collect |$\itm{bytes}$|)) 
       ())
   (assign |$\itm{lhs}$| (allocate |$\itm{len}\;\itm{type}$|))
+  (vector-set! |$\itm{lhs}$| |$0$| |$e_0$|)
+  |$\ldots$|
+  (vector-set! |$\itm{lhs}$| |$n{-}1$| |$e_{n-1}$|)
 \end{lstlisting}
 
 The \code{expose-allocation} inserts an \code{initialize} statement at
 the beginning of the program which will instruct the garbage collector
-to set up the FromSpace, ToSpace, and all the global variables.
-\marginpar{\tiny We should say more about how to compute the types.\\--Jeremy}
-Finally, the \code{expose-allocation} annotates all of the local
-variables in the \code{program} form with their type.
+to set up the FromSpace, ToSpace, and all the global variables.  The
+two arguments of \code{initialize} specify the initial allocated space
+for the root stack and for the heap.
+%
+\marginpar{\tiny We should say more about how to compute the types.
+  Perhaps give out the code for it. In the long run we should consider
+  having the type checker annotate the AST so we don't need to recover
+  the types. \\--Jeremy}
+%
+Finally, the \code{expose-allocation} pass
+annotates all of the local variables in the \code{program} form with
+their type.
 
 For the output of this pass, we add the following forms to $C_2$ and
 remove the \key{vector} form.
@@ -4098,30 +4116,35 @@ C_2 & ::= & (\key{program}\, ((\Var . \Type)^{*}) \,\Stmt^{+})
 \]
 
 Figure~\ref{fig:expose-alloc-output} shows the output of the
-\code{expose-allocation} pass on our running example.
+\code{expose-allocation} pass on our running example.  We highlight in
+red the parts of the program that were changed by the pass.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(program ((tmp1453 . (Vector Integer))
-           (tmp1454 . (Vector (Vector Integer)))
-           (tmp1455 . (Vector Integer))
-           (tmp1456 . Integer)
-           (void1457 . Void)
-           (void1458 . Void))
-  (initialize 10000 10000)
-  (if (collection-needed? 16)
+(program (~(t.1 . (Vector Integer))
+           (t.2 . (Vector (Vector Integer)))
+           (t.3 . (Vector Integer))
+           (t.4 . Integer)
+           (void.1 . Void)
+           (void.2 . Void)~)
+
+  ~(initialize 10000 10000)~
+
+  ~(if (collection-needed? 16)
       ((collect 16))
       ())
-  (assign tmp1453 (allocate 1 (Vector Integer)))
-  (assign void1457 (vector-set! tmp1453 0 42))
-  (if (collection-needed? 16)
+  (assign t.1 (allocate 1 (Vector Integer)))
+  (assign void.1 (vector-set! t.1 0 42))~
+
+  ~(if (collection-needed? 16)
       ((collect 16))
       ())
-  (assign tmp1454 (allocate 1 (Vector (Vector Integer))))
-  (assign void1458 (vector-set! tmp1454 0 tmp1453))
-  (assign tmp1455 (vector-ref tmp1454 0))
-  (assign tmp1456 (vector-ref tmp1455 0))
-  (return tmp1456))
+  (assign t.2 (allocate 1 (Vector (Vector Integer))))
+  (assign void.2 (vector-set! t.2 0 t.1))~
+
+  (assign t.3 (vector-ref t.2 0))
+  (assign t.4 (vector-ref t.3 0))
+  (return t.4))
 \end{lstlisting}
 \caption{Output of the \code{expose-allocation} pass.}
 \label{fig:expose-alloc-output}
@@ -4130,32 +4153,120 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
 \subsection{Uncover Call-Live Roots (New)}
 \label{sec:call-live-roots}
 
-UNDER CONSTRUCTION
-
-We extend $C_2$ again, adding a new statement form for recording the
-variables that are roots (they are tuples) and are live across a call
-to the collector.
+The goal of this pass is to discover which roots (variables of type
+\code{Vector}) are live during calls to the collector.  We recommend
+using an algorithm similar to the liveness analysis used in the
+register allocator.  In the next pass we shall copy these roots to and
+from the root stack. We extend $C_2$ again, adding a new statement
+form for recording the live variables that are roots.
 \[
 \begin{array}{lcl}
 \Stmt &::=& \ldots \mid (\key{call-live-roots}\, (\Var^{*}) \, \Stmt^{*})
 \end{array}
 \]
 
+Figure~\ref{fig:call-live-roots-output} shows the output of
+\code{uncover-call-live-roots} on the running example.  The only
+changes to the program are wrapping the two \code{collect} forms with
+the \code{call-live-roots}. For the first \code{collect} there are no
+live roots. For the second \code{collect}, the variable \code{t.1} is
+a root and it is live at that point.
 
-\subsection{Introduce Shadow Stack (New)}
+\begin{figure}[tbp]
+\begin{lstlisting}
+   (program (t.1 t.2 t.3 t.4 void.1 void.2)
+     (initialize 10000 10000)
+     (if (collection-needed? 16)
+         (~(call-live-roots () (collect 16))~) 
+         ())
+     (assign t.1 (allocate 1 (Vector Integer)))
+     (assign void.1 (vector-set! t.1 0 42))
+     (if (collection-needed? 16)
+         (~(call-live-roots (t.1) (collect 16))~)
+         ())
+     (assign t.2 (allocate 1 (Vector (Vector Integer))))
+     (assign void.2 (vector-set! t.2 0 t.1))
+     (assign t.3 (vector-ref t.2 0))
+     (assign t.4 (vector-ref t.3 0))
+     (return t.4))
+\end{lstlisting}
+\caption{Output of the \code{uncover-call-live-roots} pass.}
+\label{fig:call-live-roots-output}
+\end{figure}
+
+
+\subsection{Introduce Root Stack (New)}
 \label{sec:shadow-stack}
 
-UNDER CONSTRUCTION
+The goal of this pass is to generate the code for explicitly
+manipulating the root stack. 
+%
+\marginpar{\tiny I would have prefered that we use a dedicated
+  register for the top of the root stack\\--Jeremy}
+%
+We shall thread a pointer to the top of root stack through the program
+in local variables whose names all begin with \code{rootstack}.  We
+shall obtain the top of the root stack to begin with from the global
+variable \code{rootstack\_begin}.
 
-We extend $C_2$ yet again witha form for refering to global variables
-and with a form for invoking the garbage collector.  The
-\key{call-live-roots} form is not needed in the output of this pass.
+Most of the action in this pass occurs in the case for
+\code{call-live-roots}.
+
+\begin{lstlisting}
+   (call-live-roots (|$x_0 \ldots x_{n-1}$|) (collect |$\itm{bytes}$|))
+   |$\Longrightarrow$|
+   (movq (var |$x_0$|) (offset (var rootstack.|$\itm{prev}$|) |$0$|))
+   |$\ldots$|
+   (movq (var |$x_{n-1}$|) (offset (var rootstack.|$\itm{prev}$|) |$8(n-1)$|))
+   (assign rootstack.|$\itm{new}$| (+ rootstack.|$\itm{prev}$| |$n$|))
+   (collect rootstack.|$\itm{new}$| |$\itm{bytes}$|)
+   (movq (offset (var rootstack.|$\itm{prev}$|) |$0$|) (var |$x_0$|))
+   |$\ldots$|
+   (movq (offset (var rootstack.|$\itm{prev}$|) |$8(n-1)$|) (var |$x_{n-1}$|))
+\end{lstlisting}
+
+We extend $C_2$ yet again with form for refering to global variables
+and we change the \code{collect} form for invoking the garbage
+collector, adding a parameter for the top of the root stack.  The
+\key{call-live-roots} form is no longer needed in the output of this
+pass.
 \[
 \begin{array}{lcl}
 \Exp  &::=& \ldots \mid (\key{global-value}\, \itm{name}) \\
 \Stmt &::=& \ldots \mid (\key{collect}\, \Arg \,\Int) 
 \end{array}
 \]
+
+Figure~\ref{fig:introduce-rootstack-output} shows the output of the
+\code{introduce-rootstack} pass on the running example.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+   (program (t.1 t.2 t.3 t.4 void.1 void.2
+             rootstack.1 rootstack.2 rootstack.3)
+     (initialize 10000 10000)
+     ~(assign rootstack.3 (global-value rootstack_begin))~
+     (if (collection-needed? 16)
+       (~(assign rootstack.2 (+ rootstack.3 0))
+        (collect rootstack.2 16)~)
+       ())
+     (assign t.1 (allocate 1 (Vector Integer)))
+     (assign void.1 (vector-set! t.1 0 42))
+     (if (collection-needed? 16)
+       (~(movq (var t.1) (offset (var rootstack.3) 0))
+        (assign rootstack.1 (+ rootstack.3 8))
+        (collect rootstack.1 16)
+        (movq (offset (var rootstack.3) 0) (var t.1))~)
+       ())
+     (assign t.2 (allocate 1 (Vector (Vector Integer))))
+     (assign void.2 (vector-set! t.2 0 t.1))
+     (assign t.3 (vector-ref t.2 0))
+     (assign t.4 (vector-ref t.3 0))
+     (return t.4))
+\end{lstlisting}
+\caption{Output of the \code{introduce-rootstack} pass.}
+\label{fig:introduce-rootstack-output}
+\end{figure}
 
 
 \subsection{Select Instructions}
@@ -4174,6 +4285,60 @@ address.
 x86_2 &::= & (\key{program} \;\itm{info} \; \Instr^{+})
 \end{array}
 \]
+
+
+Figure~\ref{fig:select-instr-output-gc}
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+   (program (t.1 t.2 t.3 t.4 void.1 void.2
+             rootstack.1 rootstack.2 rootstack.3 lt1465
+             end-data1464 lt1463 end-data1462)
+     (movq (int 10000) (reg rdi))
+     (movq (int 10000) (reg rsi))
+     (callq initialize)
+     (movq (global-value rootstack_begin) (var rootstack.3))
+     (movq (global-value free_ptr) (var end-data1462))
+     (addq (int 16) (var end-data1462))
+     (cmpq (var end-data1462) (global-value fromspace_end))
+     (setl (byte-reg al))
+     (movzbq (byte-reg al) (var lt1463))
+     (if (eq? (int 0) (var lt1463))
+       ()
+       ((movq (var rootstack.3) (var rootstack.2))
+        (addq (int 0) (var rootstack.2))
+        (movq (var rootstack.2) (reg rdi))
+        (movq (int 16) (reg rsi))
+        (callq collect)))
+     (movq (global-value free_ptr) (var t.1))
+     (addq (int 16) (global-value free_ptr))
+     (movq (int 32) (offset (var t.1) 0))
+     (movq (int 42) (offset (var t.1) 8))
+     (movq (global-value free_ptr) (var end-data1464))
+     (addq (int 16) (var end-data1464))
+     (cmpq (var end-data1464) (global-value fromspace_end))
+     (setl (byte-reg al))
+     (movzbq (byte-reg al) (var lt1465))
+     (if (eq? (int 0) (var lt1465))
+       ()
+       ((movq (var t.1) (offset (var rootstack.3) 0))
+        (movq (var rootstack.3) (var rootstack.1))
+        (addq (int 8) (var rootstack.1))
+        (movq (var rootstack.1) (reg rdi))
+        (movq (int 16) (reg rsi))
+        (callq collect)
+        (movq (offset (var rootstack.3) 0) (var t.1))))
+     (movq (global-value free_ptr) (var t.2))
+     (addq (int 16) (global-value free_ptr))
+     (movq (int 160) (offset (var t.2) 0))
+     (movq (var t.1) (offset (var t.2) 8))
+     (movq (offset (var t.2) 8) (var t.3))
+     (movq (offset (var t.3) 8) (var t.4))
+     (movq (var t.4) (reg rax)))
+\end{lstlisting}
+\caption{Output of the \code{select-instructions} pass.}
+\label{fig:select-instr-output-gc}
+\end{figure}
 
 
 
