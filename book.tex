@@ -3817,8 +3817,13 @@ must therefore perform automatic garbage collection.
 \section{Garbage Collection}
 \label{sec:GC}
 
+\marginpar{\tiny Need to add comment somewhere about the goodness
+ of copying collection, especially that it doesn't touch
+ the garbage, so its time complexity only depends on the
+ amount of live data.\\ --Jeremy}
+%
 Here we study a relatively simple algorithm for garbage collection
-that is the basis of state-of-the-art generational garbage
+that is the basis of state-of-the-art garbage
 collectors~\citep{Lieberman:1983aa,Ungar:1984aa,Jones:1996aa,Detlefs:2004aa,Dybvig:2006aa,Tene:2011kx}. In
 particular, we describe a two-space copying
 collector~\citep{Wilson:1992fk} that uses Cheney's algorithm to
@@ -3836,7 +3841,13 @@ A running program has direct access to registers and the procedure
 call stack, and those may contain pointers into the heap. Those
 pointers are called the \emph{root set}. In
 Figure~\ref{fig:copying-collector} there are three pointers in the
-root set, one in a register and two on the stack. The goal of the
+root set, one in a register and two on the stack. 
+%
+\marginpar{\tiny We can't actually write a program that produces
+the heap structure in the Figure because there is no recursion. Once we
+have the dynamic type, we will be able to.\\ --Jeremy}
+%
+The goal of the
 garbage collector is to 1) preserve all objects that are reachable
 from the root set via a path of pointers, i.e., the \emph{live}
 objects and 2) reclaim the storage of everything else, i.e., the
@@ -3965,15 +3976,15 @@ Figure~\ref{fig:copying-collector}. Part of each tag is dedicated to
 specifying which elements of the tuple are pointers, the part labeled
 ``pointer mask''. Within the pointer mask, a 1 bit indicates there is
 a pointer and a 0 bit indicates some other kind of data. The pointer
-mask starts at bit 7. We have limited tuples to a maximum size of 50
-elements, so we just need 50 bits for the pointer mask. The tag also
-contains two other pieces of information. The length of the tuple
-(number of elements) is stored in bits 1 through 6. Finally, bit 0
-indicates whether the tuple has already been copied to the FromSpace.
-If it has, the value of bit 0 will be 1 and the rest of the tag will
-contain the forwarding pointer. To obtain the forwarding pointer,
-simply change the value of bit 0 to 0. (Our objects are 8-byte
-aligned, so the bottom 3 bits of a pointer are always 0.)
+mask starts at bit location 7. We have limited tuples to a maximum
+size of 50 elements, so we just need 50 bits for the pointer mask. The
+tag also contains two other pieces of information. The length of the
+tuple (number of elements) is stored in bits location 1 through
+6. Finally, the bit at location 0 indicates whether the tuple has yet
+to be copied to the FromSpace.  If the bit has value 1, then this
+tuple has not yet been copied.  If the bit has value 0 then the entire
+tag is in fact a forwarding pointer. (The lower 3 bits of an pointer
+are always zero anyways because our tuples are 8-byte aligned.)
 
 \begin{figure}[tbp]
 \centering \includegraphics[width=0.8\textwidth]{tuple-rep}
@@ -3989,16 +4000,16 @@ bit-level data manipulation and we will need to link it with our
 compiler-generated x86 code. Thus, we recommend implementing the
 garbage collector in C~\citep{Kernighan:1988nx} and putting the code
 in the \code{runtime.c} file. Figure~\ref{fig:gc-header} shows the
-interface to the garbage collector. We define a type \code{ptr} for
-64-bit pointers. The function \code{initialize} should create the
-FromSpace, ToSpace, and root stack. The \code{initialize} function
-is meant to be called near the beginning of \code{main}, before the
-body of the program executes.  The \code{initialize} function should
-put the address of the beginning of the FromSpace into the global
-variable \code{free\_ptr}. The global \code{fromspace\_end} should
-point to the address that is 1-past the end of the FromSpace.  The
-\code{rootstack\_begin} global should point to the beginning of the
-root stack.
+interface to the garbage collector. The function \code{initialize}
+should create the FromSpace, ToSpace, and root stack. The
+\code{initialize} function is meant to be called near the beginning of
+\code{main}, before the body of the program executes.  The
+\code{initialize} function should put the address of the beginning of
+the FromSpace into the global variable \code{free\_ptr}. The global
+\code{fromspace\_end} should point to the address that is 1-past the
+last element of the FromSpace. (We use half-open intervals to
+represent chunks of memory.)  The \code{rootstack\_begin} global
+should point to the first element of the root stack.
 
 As long as there is room left in the FromSpace, your generated code
 can allocate tuples simply by moving the \code{free\_ptr} forward.
@@ -4006,19 +4017,19 @@ The amount of room left in FromSpace is the difference between the
 \code{fromspace\_end} and the \code{free\_ptr}.  The \code{collect}
 function should be called when there is not enough room left in the
 FromSpace for the next allocation.  The \code{collect} function takes
-a pointer to the current top of the root stack (one past the last
-item that was pushed) and the number of bytes that need to be
+a pointer to the current top of the root stack (one past the last item
+that was pushed) and the number of bytes that need to be
 allocated. The \code{collect} should perform the copying collection
-and then return the address of the newly allocated chunk of memory.
+and leave the heap in a state such that the next allocation will
+succeed.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-   typedef long int* ptr;
    void initialize(long int rootstack_size, long int heap_size);
-   void collect(ptr rootstack_ptr, long int bytes_requested);
-   ptr free_ptr;
-   ptr fromspace_end;
-   ptr rootstack_begin;
+   void collect(int64_t** rootstack_ptr, long int bytes_requested);
+   int64_t* free_ptr;
+   int64_t* fromspace_end;
+   int64_t** rootstack_begin;
 \end{lstlisting}
 \caption{Interface to the garbage collector.}
 \label{fig:gc-header}
@@ -4197,6 +4208,8 @@ a root and it is live at that point.
 \label{fig:call-live-roots-output}
 \end{figure}
 
+\marginpar{\tiny mention that we discard type information
+  for the local variables.\\--Jeremy}
 
 \subsection{Select Instructions}
 \label{sec:select-instructions-gc}
@@ -4210,7 +4223,11 @@ passing the current name of the root stack variable as a parameter to
 the \code{select-instructions} function.
 %
 \marginpar{\tiny I would have preferred that we use a dedicated
-  register for the top of the root stack. (to do: next year) \\--Jeremy}
+  register for the top of the root stack. One might also consider
+  using a global (i.e., \code{global-value}, but once we add functions
+  in the next assignment, we'll have to push and pop the live roots
+  around every function call, so the register approach is faster.
+  (to do: next year) \\--Jeremy}
 %
 We shall obtain the top of the root stack to begin with from the
 global variable \code{rootstack\_begin}.
@@ -4220,10 +4237,13 @@ manipulates the root stack.  We push all of the call-live roots onto
 the root stack prior to the call to \code{collect} and we move them
 back afterwards.
 %
-\marginpar{\tiny I would prefer to instead have roots live solely
-on the root stack and in registers, not on the normal stack. Then
-we would only need to push the ones in registers, decreasing
-memory traffic. (to do: next year)\\ --Jeremy}
+\marginpar{\tiny I would prefer to instead have roots live solely on
+  the root stack and in registers, not on the normal stack. Then we
+  would only need to push the roots in registers, decreasing memory
+  traffic for function calls. (to do: next year)\\ --Jeremy}
+\marginpar{\tiny Do we really need rootstack.new or can we just
+   use rdi directly? \\ --Jeremy}
+%
 \begin{lstlisting}
    (call-live-roots (|$x_0 \ldots x_{n-1}$|) (collect |$\itm{bytes}$|))
    |$\Longrightarrow$|
@@ -4231,7 +4251,7 @@ memory traffic. (to do: next year)\\ --Jeremy}
    |$\ldots$|
    (movq (var |$x_{n-1}$|) (offset (var rootstack.|$\itm{prev}$|) |$8(n-1)$|))
    (movq rootstack.|$\itm{prev}$| rootstack.|$\itm{new}$|)
-   (addq rootstack.|$\itm{new}$| |$n$|)
+   (addq |$n$| rootstack.|$\itm{new}$|)
    (movq (var rootstack.|$\itm{new}$|) (reg rdi))
    (movq (int |$\itm{bytes}$|) (reg rsi))
    (callq collect)
@@ -4291,6 +4311,7 @@ function in \code{runtime.c}.
    (movq (int |$\itm{rootlen}$|) (reg rdi))
    (movq (int |$\itm{heaplen}$|) (reg rsi))
    (callq initialize)
+   (movq (global-value rootstack_begin) (var rootstack))
 \end{lstlisting}
 %
 We translate the special \code{collection-needed?} predicate into code
@@ -4314,15 +4335,17 @@ that compares the \code{free\_ptr} to the \code{fromspace\_end}.
 \end{lstlisting}
 
 The \code{vector-ref} and \code{vector-set!} forms translate into
-\code{movq} instructions with the appropriate \code{offset}.
+\code{movq} instructions with the appropriate \code{offset}.  (The
+plus one is to get past the tag at the beginning of the tuple
+representation.)
 \begin{lstlisting}
 (assign |$\itm{lhs}$| (vector-ref |$\itm{vec}$| |$n$|))
 |$\Longrightarrow$|
-(movq (offset |$\itm{vec}'$| |$n$|) |$\itm{lhs}$|)
+(movq (offset |$\itm{vec}'$| |$8(n+1)$|) |$\itm{lhs}$|)
 
 (assign |$\itm{lhs}$| (vector-set! |$\itm{vec}$| |$n$| |$\itm{arg}$|))
 |$\Longrightarrow$|
-(movq |$\itm{arg}'$| (offset |$\itm{vec}'$| |$n$|))
+(movq |$\itm{arg}'$| (offset |$\itm{vec}'$| |$8(n+1)$|))
 \end{lstlisting}
 The $\itm{vec}'$ and $\itm{arg}'$ are obtained by recursively
 processing $\itm{vec}$ and $\itm{arg}$.
@@ -4348,8 +4371,9 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
               end-data1464 lt.1 end-data.1)
      ~(movq (int 10000) (reg rdi))
      (movq (int 10000) (reg rsi))
-     (callq initialize)~
-     (movq (global-value rootstack_begin) (var rootstack.3))
+     (callq initialize)
+     (movq (global-value rootstack_begin) (var rootstack.3))~
+
      ~(movq (global-value free_ptr) (var end-data.1))
      (addq (int 16) (var end-data.1))
      (cmpq (var end-data.1) (global-value fromspace_end))
@@ -4397,6 +4421,9 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
 \label{fig:select-instr-output-gc}
 \end{figure}
 
+
+\marginpar{\tiny Need to show translation to x86 and what to
+  do about global-value and offset. (to do: this week) \\ --Jeremy}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
