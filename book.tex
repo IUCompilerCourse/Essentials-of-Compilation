@@ -3731,10 +3731,11 @@ short-circuiting behavior in the order of evaluation of its arguments.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-  \Type &::=& \ldots \mid (\key{Vector}\;\Type^{+}) \\
+  \Type &::=& \ldots \mid (\key{Vector}\;\Type^{+}) \mid \key{Void}\\
   \Exp &::=& \ldots \mid (\key{vector}\;\Exp^{+}) \mid 
     (\key{vector-ref}\;\Exp\;\Int) \\
   &\mid& (\key{vector-set!}\;\Exp\;\Int\;\Exp)\\
+  &\mid& (\key{void}) \\
   R_3 &::=& (\key{program} \; \Exp)
 \end{array}
 \]
@@ -4035,7 +4036,7 @@ succeed.
 \label{fig:gc-header}
 \end{figure}
 
-\section{Impact on the Compiler Passes}
+\section{Compiler Passes}
 \label{sec:code-generation-gc}
 
 The introduction of garbage collection has a non-trivial impact on our
@@ -4068,7 +4069,7 @@ Figure~\ref{fig:flatten-gc}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-   (program (t.1 t.2 t.3 t.4)
+   (program (t.1 t.2 t.3 t.4) (type Integer)
      (assign t.1 (vector 42))
      (assign t.2 (vector t.1))
      (assign t.3 (vector-ref t.2 0))
@@ -4140,7 +4141,7 @@ red the parts of the program that were changed by the pass.
            (t.3 . (Vector Integer))
            (t.4 . Integer)
            (void.1 . Void)
-           (void.2 . Void)~)
+           (void.2 . Void)~) (type Integer)
 
   ~(initialize 10000 10000)~
 
@@ -4188,7 +4189,7 @@ a root and it is live at that point.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-   (program (t.1 t.2 t.3 t.4 void.1 void.2)
+   (program (t.1 t.2 t.3 t.4 void.1 void.2) (type Integer)
      (initialize 10000 10000)
      (if (collection-needed? 16)
          (~(call-live-roots () (collect 16))~) 
@@ -4368,7 +4369,7 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
    (program (t.1 t.2 t.3 t.4 void.1 void.2
               rootstack.1 rootstack.2 rootstack.3 lt1465
-              end-data1464 lt.1 end-data.1)
+              end-data1464 lt.1 end-data.1) (type Integer)
      ~(movq (int 10000) (reg rdi))
      (movq (int 10000) (reg rsi))
      (callq initialize)
@@ -4389,7 +4390,7 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
 
      ~(movq (global-value free_ptr) (var t.1))
      (addq (int 16) (global-value free_ptr))
-     (movq (int 32) (offset (var t.1) 0))~
+     (movq (int 3) (offset (var t.1) 0))~
 
      ~(movq (int 42) (offset (var t.1) 8))~
 
@@ -4409,7 +4410,7 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
         (movq (offset (var rootstack.3) 0) (var t.1))))
      ~(movq (global-value free_ptr) (var t.2))
      (addq (int 16) (global-value free_ptr))
-     (movq (int 160) (offset (var t.2) 0))~
+     (movq (int 131) (offset (var t.2) 0))~
 
      ~(movq (var t.1) (offset (var t.2) 8))
      (movq (offset (var t.2) 8) (var t.3))
@@ -4422,8 +4423,93 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
 \end{figure}
 
 
+\subsection{Print x86}
+\label{sec:print-x86-gc}
+
+
 \marginpar{\tiny Need to show translation to x86 and what to
   do about global-value and offset. (to do: this week) \\ --Jeremy}
+
+\begin{figure}[tbp]
+\begin{minipage}[t]{0.5\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+	.globl _main
+_main:
+	pushq	%rbp
+	movq	%rsp, %rbp
+	pushq	%r15
+	pushq	%r14
+	pushq	%r13
+	pushq	%r12
+	pushq	%rbx
+	subq	$8, %rsp
+
+	movq	$8192, %rdi
+	movq	$65536, %rsi
+	callq	_initialize
+	movq	~_rootstack_begin(%rip)~, %rbx
+	movq	~_free_ptr(%rip)~, %rcx
+	addq	$16, %rcx
+	cmpq	%rcx, ~_fromspace_end(%rip)~
+	setl	%al
+	movzbq	%al, %rcx
+	cmpq	$0, %rcx
+	je then1504
+	movq	%rbx, %rdi
+	movq	$16, %rsi
+	callq	_collect
+	jmp if_end1505
+then1504:
+if_end1505:
+	movq	~_free_ptr(%rip)~, %rcx
+	addq	$16, ~_free_ptr(%rip)~
+	movq	$3, ~0(%rcx)~
+	movq	$42, ~8(%rcx)~
+	movq	~_free_ptr(%rip)~, %rdx
+	addq	$16, %rdx
+	cmpq	%rdx, ~_fromspace_end(%rip)~
+	setl	%al
+	movzbq	%al, %rdx
+	cmpq	$0, %rdx
+	je then1506
+	movq	%rcx, ~0(%rbx)~
+	movq	%rbx, %rcx
+	addq	$8, %rcx
+	movq	%rcx, %rdi
+	movq	$16, %rsi
+	callq	_collect
+	movq	~0(%rbx)~, %rcx
+	jmp if_end1507
+\end{lstlisting}
+\end{minipage}
+\begin{minipage}[t]{0.45\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+then1506:
+if_end1507:
+	movq	~_free_ptr(%rip)~, %rbx
+	addq	$16, ~_free_ptr(%rip)~
+	movq	$131, ~0(%rbx)~
+	movq	%rcx, ~8(%rbx)~
+	movq	~8(%rbx)~, %rbx
+	movq	~8(%rbx)~, %rbx
+	movq	%rbx, %rax
+
+	movq	%rax, %rdi
+	callq	_print_int
+	movq	$0, %rax
+	addq	$8, %rsp
+	popq	%rbx
+	popq	%r12
+	popq	%r13
+	popq	%r14
+	popq	%r15
+	popq	%rbp
+	retq
+\end{lstlisting}
+\end{minipage}
+\caption{Output of the \code{print-x86} pass.}
+\label{fig:print-x86-output-gc}
+\end{figure}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
