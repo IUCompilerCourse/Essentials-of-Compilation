@@ -4126,7 +4126,7 @@ remove the \key{vector} form.
 \Stmt &::=& \ldots \mid (\key{initialize}\,\Int\,\Int) \\
     &\mid& (\key{collect}\, \Int)  \\
     &\mid & (\key{if}\;(\key{collection-needed?}\, \Int)\;\Stmt^{*}\,\Stmt^{*}) \\
-C_2 & ::= & (\key{program}\, ((\Var . \Type)^{*}) \,\Stmt^{+})
+C_2 & ::= & (\key{program}\, ((\Var\, . \,\Type)^{*}) \,(\key{type}\,\Type)\, \Stmt^{+})
 \end{array}
 \]
 
@@ -4331,9 +4331,31 @@ that compares the \code{free\_ptr} to the \code{fromspace\_end}.
    (setl (byte-reg al))
    (movzbq (byte-reg al) (var lt.1))
    (if (eq? (int 0) (var lt.1))
-       |$\itm{els}$|
-       |$\itm{thn}$|)
+       |$\itm{els}'$|
+       |$\itm{thn}'$|)
 \end{lstlisting}
+
+
+The \code{allocate} form translates to operations on the
+\code{free\_ptr}, as shown below. The address in the \code{free\_ptr}
+is the next free address in the FromSpace, so we move it into the
+\itm{lhs} and then move it forward by enough space for the vector
+being allocated, which is $8(\itm{len}+1)$ bytes because each element
+is 8 bytes (64 bits) and we use 8 bytes for the tag. Last but not
+least, we need to initialize the \itm{tag}. Refer to
+Figure~\ref{fig:tuple-rep} to see how the tag is organized. We
+recommend using the Racket operations \code{bitwise-ior} and
+\code{arithmetic-shift} to compute the tag.  The \itm{types} in the
+type annotation in the \code{allocate} form can be used to determine
+the pointer mask region of the tag.
+\begin{lstlisting}
+   (assign |$\itm{lhs}$| (allocate |$\itm{len}$| (Vector |$\itm{types}$|)))
+   |$\Longrightarrow$|
+   (movq (global-value free_ptr) |$\itm{lhs}'$|)
+   (addq (int |$8(\itm{len}+1)$|) (global-value free_ptr))
+   (movq (int |$\itm{tag}$|) (offset |$\itm{lhs}'$| 0))
+\end{lstlisting}
+
 
 The \code{vector-ref} and \code{vector-set!} forms translate into
 \code{movq} instructions with the appropriate \code{offset}.  (The
