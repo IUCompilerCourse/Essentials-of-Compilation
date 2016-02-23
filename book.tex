@@ -3019,13 +3019,27 @@ use of a variable, it can lookup its type in the association list.
           [else (error 'typecheck-R2 "'not' expects a Boolean" e)])]
        ...
        [`(program ,body)
-         (typecheck-R2 '() body)
-         `(program ,body)]
+         (let ([ty (typecheck-R2 '() body)])
+           `(program (type ,ty) ,body))]
        ))
 \end{lstlisting}
 \caption{Skeleton of a type checker for the $R_2$ language.}
 \label{fig:type-check-R2}
 \end{figure}
+
+In order to print the resulting value correctly, the overall type of the program
+has to be threaded through the remainder of the passes. We can store the type
+within the \key{program} form as a new node. This is shown in Figure \ref{fig:type-check-R2}. The syntax for post-typechecking $R_2$ programs is below:
+
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{lcl}
+  R_2 &::=& (\key{program}\;(\key{type}\;\textt{type})\; \Exp)
+\end{array}
+\]
+\end{minipage}
+}
 
 \begin{exercise}\normalfont
 Complete the implementation of \code{typecheck-R2} and test it on 10
@@ -3067,7 +3081,7 @@ because it is not needed in the translation of the \key{and} of $R_2$.
       \mid (\key{not}\;\Arg) \mid (\key{eq?}\;\Arg\;\Arg) \\
 \Stmt &::=& \gray{\ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg}} \\
       &\mid& \IF{(\key{eq?}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} \\
-C_1 & ::= & (\key{program}\;(\Var^{*})\;\Stmt^{+})
+C_1 & ::= & (\key{program}\;(\Var^{*})\;(\key{type}\;\textit{type})\;\Stmt^{+})
 \end{array}
 \]
 \end{minipage}
@@ -3211,7 +3225,7 @@ So $0011 \mathrel{\mathrm{XOR}} 0101 = 0110$.
               \mid (\key{movzbq}\;\Arg\;\Arg) \\
       &\mid&  (\key{jmp} \; \itm{label}) \mid (\key{je} \; \itm{label}) \mid
              (\key{label} \; \itm{label}) \\
-x86_1 &::= & (\key{program} \;\itm{info} \; \Instr^{+})
+x86_1 &::= & (\key{program} \;\itm{info} \;(\key{type}\;\itm{type})\; \Instr^{+})
 \end{array}
 \]
 \end{minipage}
@@ -3736,7 +3750,7 @@ short-circuiting behavior in the order of evaluation of its arguments.
     (\key{vector-ref}\;\Exp\;\Int) \\
   &\mid& (\key{vector-set!}\;\Exp\;\Int\;\Exp)\\
   &\mid& (\key{void}) \\
-  R_3 &::=& (\key{program} \; \Exp)
+  R_3 &::=& (\key{program} \;(\key{type}\;\itm{type})\; \Exp)
 \end{array}
 \]
 \end{minipage}
@@ -4727,7 +4741,7 @@ function references from just a symbol $f$ to \code{(function-ref
 good idea, because it will make sure that there are no local variables
 and functions that share the same name. On the other hand,
 \code{reveal-functions} needs to come before the \code{flatten} pass
-because \code{flatten} will help us compiler \code{function-ref}.
+because \code{flatten} will help us compile \code{function-ref}.
 
 Because each \code{function-ref} needs to eventually become an
 \code{leaq} instruction, it first needs to become an assignment
