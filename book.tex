@@ -4385,6 +4385,7 @@ representation.)
 (assign |$\itm{lhs}$| (vector-set! |$\itm{vec}$| |$n$| |$\itm{arg}$|))
 |$\Longrightarrow$|
 (movq |$\itm{arg}'$| (offset |$\itm{vec}'$| |$8(n+1)$|))
+(mvoq (int 0) |$\itm{lhs}$|)
 \end{lstlisting}
 The $\itm{vec}'$ and $\itm{arg}'$ are obtained by recursively
 processing $\itm{vec}$ and $\itm{arg}$.
@@ -4964,7 +4965,7 @@ defined using the \key{lambda} form.
 \begin{lstlisting}
    (define (f [x : Integer]) : (Integer -> Integer)
       (let ([y 4])
-         (lambda ([z : Integer]) : Integer
+         (lambda: ([z : Integer]) : Integer
             (+ x (+ y z)))))
 
    (let ([g (f 5)])
@@ -4987,6 +4988,8 @@ by the same \code{lambda}, they are really different functions because
 they use different values for \code{x}. Finally, we apply \code{g} to
 \code{11} (producing \code{20}) and apply \code{h} to \code{15}
 (producing \code{22}) so the result of this program is \code{42}.
+
+\section{The $R_5$ Language}
 
 The syntax for this language with lexical scoping, $R_5$, is defined
 in Figure~\ref{fig:r5-syntax}. It adds the \key{lambda} form to the
@@ -5029,11 +5032,11 @@ free with respect to the expression \code{(+ x (+ y z))}.  On the
 other hand, only \code{x} and \code{y} are free with respect to the
 following expression becuase \code{z} is bound by the \code{lambda}.
 \begin{lstlisting}
-   (lambda ([z : Integer]) : Integer
+   (lambda: ([z : Integer]) : Integer
       (+ x (+ y z)))
 \end{lstlisting}
 
-Once we have identified the free variables of a \code{lamda}, we need
+Once we have identified the free variables of a \code{lambda}, we need
 to arrange for some way to transport, at runtime, the values of those
 variables from the point where the \code{lambda} was created to the
 point where the \code{lambda} is applied. Referring again to
@@ -5047,17 +5050,131 @@ already have the appropriate ingredients to make closures,
 Chapter~\ref{ch:tuples} gave us tuples and Chapter~\ref{ch:functions}
 gave us function pointers. The function pointer shall reside at index
 $0$ and the values for free variables will fill in the rest of the
-tuple.
-
+tuple. Figure~\ref{fig:closures} depicts the two closures created by
+the two calls to \code{f} in Figure~\ref{fig:lexical-scoping}.
+Because the two closures came from the same \key{lambda}, they share
+the same code but differ in the values for free variable \code{x}.
 
 \begin{figure}[tbp]
-\centering \includegraphics[width=0.8\textwidth]{closures}
+\centering \includegraphics[width=0.7\textwidth]{closures}
 \caption{Example closure representation for the \key{lambda}'s
   in Figure~\ref{fig:lexical-scoping}.}
-\label{fig:tuple-rep}
+\label{fig:closures}
 \end{figure}
 
 
+\section{Interpreting $R_5$}
+
+Figure~\ref{fig:interp-R5} shows the definitional interpreter for
+$R_5$. There are several things to worth noting. First, and most
+importantly, the match clause for \key{lambda} saves the current
+environment inside the returned \key{lambda}. Then the clause for
+\key{app} uses the environment from the \key{lambda}, the
+\code{lam-env}, when interpreting the body of the \key{lambda}.  Of
+course, the \code{lam-env} environment is extending with the mapping
+parameters to argument values. To enable mutual recursion and allow a
+unified handling of functions created with \key{lambda} and with
+\key{define}, the match clause for \key{program} includes a second
+pass over the top-level functions to set their environments to be the
+top-level environment.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+(define (interp-R5 env)
+  (lambda (ast)
+    (match ast
+       [`(lambda: ([,xs : ,Ts] ...) : ,rT ,body)
+        `(lambda ,xs ,body ,env)]
+       [`(app ,fun ,args ...)
+        (define arg-vals (map (interp-R5 env) args))
+        (define fun-val ((interp-R5 env) fun))
+        (match fun-val
+           [`(lambda (,xs ...) ,body ,lam-env)
+            (define new-env (append (map cons xs arg-vals) lam-env))
+            ((interp-R5 new-env) body)]
+           [else (error "interp-R5, expected function, not" fun-val)])]
+       [`(define (,f [,xs : ,ps] ...) : ,rt ,body)
+        (mcons f `(lambda ,xs ,body))]
+       [`(program ,defs ... ,body)
+        (let ([top-level (map (interp-R5 '()) defs)])
+          (for/list ([b top-level])
+                    (set-mcdr! b (match (mcdr b)
+                                   [`(lambda ,xs ,body)
+                                    `(lambda ,xs ,body ,top-level)])))
+          ((interp-R5 top-level) body))]
+       ...)))
+\end{lstlisting}
+\caption{Definitional interpreter for $R_5$.}
+\label{fig:interp-R5}
+\end{figure}
+
+\section{Type Checking $R_5$}
+
+Figure~\ref{fig:typecheck-R5} shows how to type check the new
+\key{lambda} form. The body of the \key{lambda} is checked in an
+environment that includes the current environment (because it is
+lexically scoped) and also includes the \key{lambda}'s parameters.  We
+require the body's type to match the declared return type.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+(define (typecheck-R5 env)
+  (lambda (e)
+    (match e
+      [`(lambda: ([,xs : ,Ts] ...) : ,rT ,body)
+       (define new-env (append (map cons xs Ts) env))
+       (define bodyT ((typecheck-R5 new-env) body))
+       (cond [(equal? rT bodyT)
+              `(,@Ts -> ,rT)]
+             [else
+              (error "mismatch in return type" bodyT rT)])]
+      ...
+      )))
+\end{lstlisting}
+\caption{Type checking the \key{lambda}'s in $R_5$.}
+\label{fig:typecheck-R5}
+\end{figure}
+
+
+\section{Closure Conversion}
+
+The compiling of lexically-scoped functions into $R_4$-style functions
+is accomplished in the pass \code{convert-to-closures} that comes
+after \code{reveal-functions} and before flatten. This pass needs to
+treat regular function calls differently from applying primitive
+operators, and \code{reveal-functions} differentiates those two cases
+for us.
+
+As usual, we shall implement the pass as a recursive function over the
+AST. All of the action is in the clauses for \key{lambda} and
+\key{app} (function application). We transform a \key{lambda}
+expression into an expression that creates a closure, that is, creates
+a vector whose first element is the function pointer and the rest of
+the elements are the values of the free variables.
+
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(lambda: (|\itm{ps}| ...) : |\itm{rt}| |\itm{body}|)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(vector |\itm{name}| |\itm{fvs}| ...)
+\end{lstlisting}
+\end{minipage}
+\end{tabular}  \\
+
+\begin{lstlisting}
+(define (|\itm{name}| [clos : _] |\itm{ps}| ...)
+   (let ([|$\itm{fvs}_1$| (vector-ref clos 1)])
+     ...
+     (let ([|$\itm{fvs}_n$| (vector-ref clos $n$)])
+       |\itm{body'}|)...))
+\end{lstlisting}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
