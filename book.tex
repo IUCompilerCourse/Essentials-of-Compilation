@@ -4042,8 +4042,8 @@ succeed.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-   void initialize(long int rootstack_size, long int heap_size);
-   void collect(int64_t** rootstack_ptr, long int bytes_requested);
+   void initialize(uint64_t rootstack_size, uint64_t heap_size);
+   void collect(int64_t** rootstack_ptr, uint64_t bytes_requested);
    int64_t* free_ptr;
    int64_t* fromspace_end;
    int64_t** rootstack_begin;
@@ -4343,12 +4343,12 @@ that compares the \code{free\_ptr} to the \code{fromspace\_end}.
    |$\Longrightarrow$|
    (movq (global-value free_ptr) (var end-data.1))
    (addq (int |$\itm{bytes}$|) (var end-data.1))
-   (cmpq (var end-data.1) (global-value fromspace_end))
+   (cmpq (global-value fromspace_end) (var end-data.1))
    (setl (byte-reg al))
    (movzbq (byte-reg al) (var lt.1))
    (if (eq? (int 0) (var lt.1))
-       |$\itm{els}'$|
-       |$\itm{thn}'$|)
+        |$\itm{thn}'$|
+        |$\itm{els}'$|)
 \end{lstlisting}
 
 
@@ -4363,29 +4363,34 @@ Figure~\ref{fig:tuple-rep} to see how the tag is organized. We
 recommend using the Racket operations \code{bitwise-ior} and
 \code{arithmetic-shift} to compute the tag.  The \itm{types} in the
 type annotation in the \code{allocate} form can be used to determine
-the pointer mask region of the tag.
+the pointer mask region of the tag. The move of $ \itm{lhs}^\prime $ to
+register \code{r11}, before the move to the offset of \code{r11}
+ensures that if $ \itm{lhs}^\prime $ offsets are only performed with
+register operands.
 \begin{lstlisting}
    (assign |$\itm{lhs}$| (allocate |$\itm{len}$| (Vector |$\itm{types}$|)))
    |$\Longrightarrow$|
    (movq (global-value free_ptr) |$\itm{lhs}'$|)
    (addq (int |$8(\itm{len}+1)$|) (global-value free_ptr))
-   (movq (int |$\itm{tag}$|) (offset |$\itm{lhs}'$| 0))
+   (movq |$\itm{lhs}'$| (reg r11))
+   (movq (int |$\itm{tag}$|) (offset (reg r11) 0))
 \end{lstlisting}
-
 
 The \code{vector-ref} and \code{vector-set!} forms translate into
 \code{movq} instructions with the appropriate \code{offset}.  (The
 plus one is to get past the tag at the beginning of the tuple
-representation.)
+representation.) 
 \begin{lstlisting}
 (assign |$\itm{lhs}$| (vector-ref |$\itm{vec}$| |$n$|))
-|$\Longrightarrow$|
-(movq (offset |$\itm{vec}'$| |$8(n+1)$|) |$\itm{lhs}$|)
+  |$\Longrightarrow$|
+(movq |$\itm{vec}'$| (reg r11))
+(movq (offset (reg r11) |$8(n+1)$|) |$\itm{lhs}$|)
 
 (assign |$\itm{lhs}$| (vector-set! |$\itm{vec}$| |$n$| |$\itm{arg}$|))
 |$\Longrightarrow$|
-(movq |$\itm{arg}'$| (offset |$\itm{vec}'$| |$8(n+1)$|))
-(mvoq (int 0) |$\itm{lhs}$|)
+(movq |$\itm{vec}'$| (reg r11))
+(movq |$\itm{arg}'$| (offset (reg r11) |$8(n+1)$|))
+(movq (int 0) |$\itm{lhs}$|)
 \end{lstlisting}
 The $\itm{vec}'$ and $\itm{arg}'$ are obtained by recursively
 processing $\itm{vec}$ and $\itm{arg}$.
@@ -4406,56 +4411,63 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
 
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-   (program (t.1 t.2 t.3 t.4 void.1 void.2
-              rootstack.1 rootstack.2 rootstack.3 lt1465
-              end-data1464 lt.1 end-data.1) (type Integer)
-     ~(movq (int 10000) (reg rdi))
-     (movq (int 10000) (reg rsi))
-     (callq initialize)
-     (movq (global-value rootstack_begin) (var rootstack.3))~
+  (program (rootstack28650 lt28655 end-data28654 rootstack28653
+            lt28652 end-data28651 tmp28644 tmp28645 tmp28646
+            tmp28647 void28649 void28648)
+           (type Integer)
+    (movq (int 16384) (reg rdi))
+    (movq (int 16) (reg rsi))
+    (callq initialize)
+    (movq (global-value rootstack_begin) (var rootstack28650))
 
-     ~(movq (global-value free_ptr) (var end-data.1))
-     (addq (int 16) (var end-data.1))
-     (cmpq (var end-data.1) (global-value fromspace_end))
-     (setl (byte-reg al))
-     (movzbq (byte-reg al) (var lt.1))~
-     (if ~(eq? (int 0) (var lt.1))~
-       ()
-       ((movq (var rootstack.3) (var rootstack.2))
-        (addq (int 0) (var rootstack.2))
-        ~(movq (var rootstack.2) (reg rdi))
-        (movq (int 16) (reg rsi))
-        (callq collect)~))
+    (movq (global-value free_ptr) (var end-data28651))
+    (addq (int 16) (var end-data28651))
+    (cmpq (global-value fromspace_end) (var end-data28651))
+    (setl (byte-reg al))
+    (movzbq (byte-reg al) (var lt28652))
+    (if (eq? (int 0) (var lt28652))
+      ((movq (var rootstack28650) (reg rdi))
+       (movq (int 16) (reg rsi))
+       (callq collect))
+      ())
 
-     ~(movq (global-value free_ptr) (var t.1))
-     (addq (int 16) (global-value free_ptr))
-     (movq (int 3) (offset (var t.1) 0))~
+    (movq (global-value free_ptr) (var tmp28644))
+    (addq (int 16) (global-value free_ptr))
+    (movq (var tmp28644) (reg r11))
+    (movq (int 3) (offset (reg r11) 0))
+    (movq (var tmp28644) (reg r11))
+    (movq (int 42) (offset (reg r11) 8))
 
-     ~(movq (int 42) (offset (var t.1) 8))~
+    (movq (global-value free_ptr) (var end-data28654))
+    (addq (int 16) (var end-data28654))
+    (cmpq (global-value fromspace_end) (var end-data28654))
+    (setl (byte-reg al))
+    (movzbq (byte-reg al) (var lt28655))
+    (if (eq? (int 0) (var lt28655))
+      ((movq (var tmp28644) (offset (var rootstack28650) 0))
+       (movq (var rootstack28650) (var rootstack28653))
+       (addq (int 8) (var rootstack28653))
+       (movq (var rootstack28653) (reg rdi))
+       (movq (int 16) (reg rsi))
+       (callq collect)
+       (movq (offset (var rootstack28650) 0) (var tmp28644)))
+      ())
 
-     ~(movq (global-value free_ptr) (var end-data1464))
-     (addq (int 16) (var end-data1464))
-     (cmpq (var end-data1464) (global-value fromspace_end))
-     (setl (byte-reg al))
-     (movzbq (byte-reg al) (var lt1465))~
-     (if ~(eq? (int 0) (var lt1465))~
-       ()
-       ((movq (var t.1) (offset (var rootstack.3) 0))
-        (movq (var rootstack.3) (var rootstack.1))
-        (addq (int 8) (var rootstack.1))
-        ~(movq (var rootstack.1) (reg rdi))
-        (movq (int 16) (reg rsi))
-        (callq collect)~
-        (movq (offset (var rootstack.3) 0) (var t.1))))
-     ~(movq (global-value free_ptr) (var t.2))
-     (addq (int 16) (global-value free_ptr))
-     (movq (int 131) (offset (var t.2) 0))~
+    (movq (global-value free_ptr) (var tmp28645))
+    (addq (int 16) (global-value free_ptr))
+    (movq (var tmp28645) (reg r11))
+    (movq (int 131) (offset (reg r11) 0))
+    (movq (var tmp28645) (reg r11))
+    (movq (var tmp28644) (offset (reg r11) 8))
 
-     ~(movq (var t.1) (offset (var t.2) 8))
-     (movq (offset (var t.2) 8) (var t.3))
-     (movq (offset (var t.3) 8) (var t.4))~
+    (movq (var tmp28645) (reg r11))
+    (movq (offset (reg r11) 8) (var tmp28646))
 
-     (movq (var t.4) (reg rax)))
+    (movq (var tmp28646) (reg r11))
+    (movq (offset (reg r11) 8) (var tmp28647))
+
+    (movq (var tmp28647) (reg rax)))
+
 \end{lstlisting}
 \caption{Output of the \code{select-instructions} pass.}
 \label{fig:select-instr-output-gc}
@@ -4483,54 +4495,60 @@ _main:
 	pushq	%rbx
 	subq	$8, %rsp
 
-	movq	$8192, %rdi
-	movq	$65536, %rsi
+	movq	$16384, %rdi
+	movq	$16, %rsi
 	callq	_initialize
-	movq	~_rootstack_begin(%rip)~, %rbx
-	movq	~_free_ptr(%rip)~, %rcx
+	movq	_rootstack_begin(%rip), %rbx
+	movq	_free_ptr(%rip), %rcx
 	addq	$16, %rcx
-	cmpq	%rcx, ~_fromspace_end(%rip)~
+	cmpq	_fromspace_end(%rip), %rcx
 	setl	%al
 	movzbq	%al, %rcx
 	cmpq	$0, %rcx
-	je then1504
+	je then28672
+	jmp if_end28673
+then28672:
 	movq	%rbx, %rdi
 	movq	$16, %rsi
 	callq	_collect
-	jmp if_end1505
-then1504:
-if_end1505:
-	movq	~_free_ptr(%rip)~, %rcx
-	addq	$16, ~_free_ptr(%rip)~
-	movq	$3, ~0(%rcx)~
-	movq	$42, ~8(%rcx)~
-	movq	~_free_ptr(%rip)~, %rdx
+if_end28673:
+	movq	_free_ptr(%rip), %rcx
+	addq	$16, _free_ptr(%rip)
+	movq	%rcx, %r11
+	movq	$3, 0(%r11)
+	movq	%rcx, %r11
+	movq	$42, 8(%r11)
+        movq	_free_ptr(%rip), %rdx
 	addq	$16, %rdx
-	cmpq	%rdx, ~_fromspace_end(%rip)~
+	cmpq	_fromspace_end(%rip), %rdx
 	setl	%al
 	movzbq	%al, %rdx
 	cmpq	$0, %rdx
-	je then1506
-	movq	%rcx, ~0(%rbx)~
+	je then28674
+	jmp if_end28675
+then28674:
+	movq	%rcx, 0(%rbx)
 	movq	%rbx, %rcx
 	addq	$8, %rcx
 	movq	%rcx, %rdi
 	movq	$16, %rsi
 	callq	_collect
-	movq	~0(%rbx)~, %rcx
-	jmp if_end1507
+	movq	0(%rbx), %rcx
 \end{lstlisting}
 \end{minipage}
 \begin{minipage}[t]{0.45\textwidth}
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-then1506:
-if_end1507:
-	movq	~_free_ptr(%rip)~, %rbx
-	addq	$16, ~_free_ptr(%rip)~
-	movq	$131, ~0(%rbx)~
-	movq	%rcx, ~8(%rbx)~
-	movq	~8(%rbx)~, %rbx
-	movq	~8(%rbx)~, %rbx
+if_end28675:
+	movq	_free_ptr(%rip), %rbx
+	addq	$16, _free_ptr(%rip)
+	movq	%rbx, %r11
+	movq	$131, 0(%r11)
+	movq	%rbx, %r11
+	movq	%rcx, 8(%r11)
+	movq	%rbx, %r11
+	movq	8(%r11), %rbx
+	movq	%rbx, %r11
+	movq	8(%r11), %rbx
 	movq	%rbx, %rax
 
 	movq	%rax, %rdi
@@ -4813,7 +4831,7 @@ appropriate stack locations, as discussed in
 Section~\ref{sec:fun-x86}. You might want to introduce a new kind of
 AST node for stack arguments, \code{(stack-arg $i$)} where $i$ is the
 index of this argument with respect to the other stack arguments. As
-you're generate this code for parameter passing, take note of how many
+you're generating this code for parameter passing, take note of how many
 stack arguments are needed for purposes of computing the
 \itm{maxStack} discussed above.
 
