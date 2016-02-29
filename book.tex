@@ -4828,7 +4828,7 @@ appropriate stack locations, as discussed in
 Section~\ref{sec:fun-x86}. You might want to introduce a new kind of
 AST node for stack arguments, \code{(stack-arg $i$)} where $i$ is the
 index of this argument with respect to the other stack arguments. As
-you're generate this code for parameter passing, take note of how many
+you're generating this code for parameter passing, take note of how many
 stack arguments are needed for purposes of computing the
 \itm{maxStack} discussed above.
 
@@ -5156,19 +5156,19 @@ require the body's type to match the declared return type.
 
 \section{Closure Conversion}
 
-The compiling of lexically-scoped functions into $R_4$-style functions
-is accomplished in the pass \code{convert-to-closures} that comes
-after \code{reveal-functions} and before flatten. This pass needs to
-treat regular function calls differently from applying primitive
-operators, and \code{reveal-functions} differentiates those two cases
-for us.
+The compiling of lexically-scoped functions into C-style functions is
+accomplished in the pass \code{convert-to-closures} that comes after
+\code{reveal-functions} and before flatten. This pass needs to treat
+regular function calls differently from applying primitive operators,
+and \code{reveal-functions} differentiates those two cases for us.
 
 As usual, we shall implement the pass as a recursive function over the
 AST. All of the action is in the clauses for \key{lambda} and
 \key{app} (function application). We transform a \key{lambda}
 expression into an expression that creates a closure, that is, creates
-a vector whose first element is the function pointer and the rest of
-the elements are the values of the free variables.
+a vector whose first element is a function pointer and the rest of the
+elements are the free variables of the \key{lambda}.  The \itm{name}
+is a unique symbol generated to identify the function.
 
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
@@ -5185,19 +5185,71 @@ $\Rightarrow$
 \end{lstlisting}
 \end{minipage}
 \end{tabular}  \\
-
+%
+In addition to transforming each \key{lambda} into a \key{vector}, we
+must create a top-level function definition for each \key{lambda}, as
+shown below.
 \begin{lstlisting}
-(define (|\itm{name}| [clos : _] |\itm{ps}| ...)
-   (let ([|$\itm{fvs}_1$| (vector-ref clos 1)])
-     ...
-     (let ([|$\itm{fvs}_n$| (vector-ref clos $n$)])
-       |\itm{body'}|)...))
+   (define (|\itm{name}| [clos : _] |\itm{ps}| ...)
+      (let ([|$\itm{fvs}_1$| (vector-ref clos 1)])
+        ...
+        (let ([|$\itm{fvs}_n$| (vector-ref clos |$n$|)])
+          |\itm{body'}|)...))
 \end{lstlisting}
+The \code{clos} parameter refers to the closure whereas $\itm{ps}$ are
+the normal parameters of the \key{lambda}. The sequence of \key{let}
+forms being the free variables to their values obtained from the
+closure.
 
+We transform function application into code that retreives the
+function pointer from the closure and then calls the function, passing
+in the closure as the first argument. We bind $e'$ to a temporary
+variable to avoid code duplication.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%\chapter{Mutable Data}
-%\label{ch:mutable-data}
+\begin{tabular}{lll}
+\begin{minipage}{0.3\textwidth}
+\begin{lstlisting}
+(app |$e$| |\itm{es}| ...)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}
+(let ([|\itm{tmp}| |$e'$|])
+  (app (vector-ref |\itm{tmp}| 0) |\itm{tmp}| |\itm{es'}|))
+\end{lstlisting}
+\end{minipage}
+\end{tabular}  \\
+
+There is also the question of what to do with top-level function
+definitions. To maintain a uniform translation of function
+application, we turn function references into closures.
+
+\begin{tabular}{lll}
+\begin{minipage}{0.3\textwidth}
+\begin{lstlisting}
+(function-ref |$f$|)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}
+(vector (function-ref |$f$|))
+\end{lstlisting}
+\end{minipage}
+\end{tabular}  \\
+%
+The top-level function definitions need to be updated as well to take
+an extra closure parameter.
+
+\section{An Example Translation}
+
+UNDER CONSTRUCTION
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Dynamic Typing}
