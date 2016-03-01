@@ -3712,8 +3712,19 @@ if_end21289:
 \chapter{Tuples and Garbage Collection}
 \label{ch:tuples}
 
-In this chapter we study the compilation of mutable tuples (called
-``vectors'' in Racket). Figure~\ref{fig:r3-syntax} defines the syntax
+In this chapter we study the implementation of mutable tuples (called
+``vectors'' in Racket). This language feature is the first to require
+use of the ``heap'' because the lifetime of a Racket tuple is
+indefinite, that is, the lifetime of a tuple does not follow a stack
+(FIFO) discipline but they instead live forever from the programmer's
+viewpoint. Of course, from an implementor's viewpoint, it is important
+to recycle the space associated with tuples that will no longer be
+used by the program, which is why we also study \emph{garbage
+  collection} techniques in this chapter.
+
+\section{The $R_3$ Language}
+
+Figure~\ref{fig:r3-syntax} defines the syntax
 for $R_3$, which includes three new forms for creating a tuple,
 reading an element of a tuple, and writing an element into a
 tuple. The following program shows the usage of tuples in Racket. We
@@ -3886,7 +3897,7 @@ and second element is a 2-tuple.
 \label{fig:copying-collector}
 \end{figure}
 
-\subsection{Graph Copying}
+\subsection{Graph Copying via Cheney's Algorithm}
 
 Let us take a closer look at how the copy works. The allocated objects
 and pointers essentially form a graph and we need to copy the part of
@@ -4410,7 +4421,7 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
 \code{select-instructions} pass on the running example.
 
 \begin{figure}[tbp]
-\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
   (program (rootstack28650 lt28655 end-data28654 rootstack28653
             lt28652 end-data28651 tmp28644 tmp28645 tmp28646
             tmp28647 void28649 void28648)
@@ -4574,13 +4585,20 @@ if_end28675:
 \label{ch:functions}
 
 This chapter studies the compilation of functions (aka. procedures) at
-the level of abstraction of the C language. The syntax for function
-definitions and function application (aka. function call) is shown in
-Figure~\ref{fig:r4-syntax}, where we define the $R_4$ language.
-Programs in $R_4$ start with zero or more function definitions.  The
-function names from these definitions are in-scope for the entire
-program, including all other function definitions (so the ordering of
-function definitions does not matter).
+the level of abstraction of the C language. This corresponds to a
+subset of Typed Racket in which only top-level function definitions
+are allowed. This abstraction level is an important stepping stone to
+implementing lexically-scoped functions in the form of \key{lambda}
+abstractions (Chapter~\ref{ch:lambdas}).
+
+\section{The $R_4$ Language}
+
+The syntax for function definitions and function application
+(aka. function call) is shown in Figure~\ref{fig:r4-syntax}, where we
+define the $R_4$ language.  Programs in $R_4$ start with zero or more
+function definitions.  The function names from these definitions are
+in-scope for the entire program, including all other function
+definitions (so the ordering of function definitions does not matter).
 
 Functions are first-class in the sense that a function pointer is data
 and can be stored in memory or passed as a parameter to another
@@ -4899,16 +4917,26 @@ $\Downarrow$
 \end{lstlisting}
 $\Downarrow$
 \begin{lstlisting}
-(program ((t.1 t.2) 0)
-  ((define (add.1) 2 ((x.1 y.1 t.3) 0)
-     (movq (reg rdi) (var x.1))
-     (movq (reg rsi) (var y.1))
-     (movq (var x.1) (var t.3))
-     (addq (var y.1) (var t.3))
-     (movq (var t.3) (reg rax))))
-  (leaq (function-ref add.1) (var t.1))
-  (movq (int 40) (reg rdi))
-  (movq (int 2) (reg rsi))
+(program ((rs.1 t.1 t.2) 0)
+  (type Integer)
+  (defines
+   (define (add28545) 3
+            ((rs.2 x.2 y.3 t.4) 0)
+     (movq (reg rdi) (var rs.2))
+     (movq (reg rsi) (var x.2))
+     (movq (reg rdx) (var y.3))
+     (movq (var x.2) (var t.4))
+     (addq (var y.3) (var t.4))
+     (movq (var t.4) (reg rax))))
+  (movq (int 16384) (reg rdi))
+  (movq (int 16) (reg rsi))
+  (callq initialize)
+  (movq (global-value rootstack_begin)
+         (var rs.1))
+  (leaq (function-ref add28545) (var t.1))
+  (movq (var rs.1) (reg rdi))
+  (movq (int 40) (reg rsi))
+  (movq (int 2) (reg rdx))
   (indirect-callq (var t.1))
   (movq (reg rax) (var t.2))
   (movq (var t.2) (reg rax)))
@@ -4917,9 +4945,9 @@ $\Downarrow$
 &
 \begin{minipage}{0.4\textwidth}
 $\Downarrow$
-\begin{lstlisting}
-	.globl add_1
-add_1:
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+	.globl add28545
+add28545:
 	pushq	%rbp
 	movq	%rsp, %rbp
 	pushq	%r15
@@ -4927,12 +4955,13 @@ add_1:
 	pushq	%r13
 	pushq	%r12
 	pushq	%rbx
-	subq	$16, %rsp
+	subq	$8, %rsp
 	movq	%rdi, %rbx
-	movq	%rsi, %rcx
+	movq	%rsi, %rbx
+	movq	%rdx, %rcx
 	addq	%rcx, %rbx
 	movq	%rbx, %rax
-	addq	$16, %rsp
+	addq	$8, %rsp
 	popq	%rbx
 	popq	%r12
 	popq	%r13
@@ -4945,14 +4974,32 @@ add_1:
 _main:
 	pushq	%rbp
 	movq	%rsp, %rbp
-	subq	$16, %rsp
-	leaq	add_1(%rip), %rbx
-	movq	$40, %rdi
-	movq	$2, %rsi
+	pushq	%r15
+	pushq	%r14
+	pushq	%r13
+	pushq	%r12
+	pushq	%rbx
+	subq	$8, %rsp
+	movq	$16384, %rdi
+	movq	$16, %rsi
+	callq	_initialize
+	movq	_rootstack_begin(%rip), %rcx
+	leaq	add28545(%rip), %rbx
+	movq	%rcx, %rdi
+	movq	$40, %rsi
+	movq	$2, %rdx
 	callq	*%rbx
 	movq	%rax, %rbx
 	movq	%rbx, %rax
-	addq	$16, %rsp
+	movq	%rax, %rdi
+	callq	_print_int
+	movq	$0, %rax
+	addq	$8, %rsp
+	popq	%rbx
+	popq	%r12
+	popq	%r13
+	popq	%r14
+	popq	%r15
 	popq	%rbp
 	retq
 \end{lstlisting}
@@ -5252,8 +5299,59 @@ The top-level function definitions need to be updated as well to take
 an extra closure parameter.
 
 \section{An Example Translation}
+\label{sec:example-lambda}
 
-UNDER CONSTRUCTION
+Figure~\ref{fig:lexical-functions-example} shows the result of closure
+conversion for the example program demonstrating lexical scoping that
+we discussed at the beginning of this chapter.
+
+
+\begin{figure}[h]
+\begin{minipage}{0.8\textwidth}
+\begin{lstlisting}%[basicstyle=\ttfamily\footnotesize]
+(program
+ (define (f [x : Integer]) : (Integer -> Integer)
+    (let ([y 4])
+       (lambda: ([z : Integer]) : Integer
+          (+ x (+ y z)))))
+ (let ([g (f 5)])
+   (let ([h (f 3)])
+     (+ (g 11) (h 15)))))
+\end{lstlisting}
+$\Downarrow$
+\begin{lstlisting}%[basicstyle=\ttfamily\footnotesize]
+(program (type Integer)
+  (define (f (x : Integer)) : (Integer -> Integer)
+    (let ((y 4))
+       (lambda: ((z : Integer)) : Integer
+         (+ x (+ y z)))))
+   (let ((g (app (function-ref f) 5)))
+      (let ((h (app (function-ref f) 3)))
+         (+ (app g 11) (app h 15)))))
+\end{lstlisting}
+$\Downarrow$
+\begin{lstlisting}%[basicstyle=\ttfamily\footnotesize]
+(program (type Integer)
+  (define (f (clos.1 : _) (x : Integer)) : (Integer -> Integer)
+     (let ((y  4))
+        (vector (function-ref lam.1) x y)))
+  (define (lam.1 (clos.2 : _) (z : Integer)) : Integer
+     (let ((x (vector-ref clos.2 1)))
+        (let ((y (vector-ref clos.2 2)))
+           (+ x (+ y z)))))
+   (let ((g (let ((t.1 (vector (function-ref f))))
+              (app (vector-ref t.1 0) t.1 5))))
+      (let ((h (let ((t.2 (vector  (function-ref f))))
+                 (app (vector-ref t.2 0) t.2 3))))
+         (+ (let ((t.3  g)) (app (vector-ref t.3 0) t.3 11))
+            (let ((t.4  h)) (app (vector-ref t.4 0) t.4 15))))))
+\end{lstlisting}
+\end{minipage}
+
+\caption{Example showing the result of \code{reveal-functions}
+  and \code{convert-to-closures}.}
+\label{fig:lexical-functions-example}
+\end{figure}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
