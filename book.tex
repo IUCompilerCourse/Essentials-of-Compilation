@@ -3192,7 +3192,7 @@ running the output programs with \code{interp-C}
 \end{exercise}
 
 
-\section{More x86}
+\section{XOR, Comparisons, and Control Flow in x86}
 \label{sec:x86-1}
 
 To implement the new logical operations, the comparison \key{eq?}, and
@@ -3712,6 +3712,9 @@ if_end21289:
 \chapter{Tuples and Garbage Collection}
 \label{ch:tuples}
 
+\marginpar{\scriptsize Mine Andre's code comments for extra
+  things to discuss in this chapter. \\ --Jeremy}
+
 In this chapter we study the implementation of mutable tuples (called
 ``vectors'' in Racket). This language feature is the first to require
 use of the ``heap'' because the lifetime of a Racket tuple is
@@ -3758,8 +3761,14 @@ short-circuiting behavior in the order of evaluation of its arguments.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-  \Type &::=& \ldots \mid (\key{Vector}\;\Type^{+}) \mid \key{Void}\\
-  \Exp &::=& \ldots \mid (\key{vector}\;\Exp^{+}) \mid 
+  \Type &::=& \gray{\key{Integer} \mid \key{Boolean}} 
+         \mid (\key{Vector}\;\Type^{+}) \mid \key{Void}\\
+  \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)}  \\
+     &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp} 
+       \mid \key{\#t} \mid \key{\#f} \mid 
+      (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp) }\\
+      &\mid& \gray{(\key{eq?}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
+  &\mid& (\key{vector}\;\Exp^{+}) \mid 
     (\key{vector-ref}\;\Exp\;\Int) \\
   &\mid& (\key{vector-set!}\;\Exp\;\Int\;\Exp)\\
   &\mid& (\key{void}) \\
@@ -4580,6 +4589,12 @@ if_end28675:
 \end{figure}
 
 
+\marginpar{\scriptsize Suggest an implementation strategy
+  in which the students first do the code gen and test that
+  without GC (just use a big heap), then after that is debugged,
+  implement the GC. \\ --Jeremy}
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Functions}
 \label{ch:functions}
@@ -4621,7 +4636,11 @@ inside each other; they can only be defined at the top level.
 \[
 \begin{array}{lcl}
   \Type &::=& \ldots \mid (\Type^{*} \; \key{->}\; \Type) \\
-  \Exp &::=& \ldots \mid (\Exp \; \Exp^{*}) \\
+  \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)}  \\
+     &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp}} \mid \key{\#t} \mid \key{\#f} \mid
+      (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp) \\
+      &\mid& (\key{eq?}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp} \\
+      &\mid& (\Exp \; \Exp^{*}) \\
   \Def &::=& (\key{define}\; (\Var \; [\Var \key{:} \Type]^{*}) \key{:} \Type \; \Exp) \\
   R_4 &::=& (\key{program} \; \Def^{*} \; \Exp)
 \end{array}
@@ -5074,7 +5093,7 @@ compiling lexically-scoped functions into a combination of functions
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-  \Exp &::=& \ldots \mid (\key{lambda:}\; ([\Var \key{:} \Type]^{*} \key{:} \Type \; \Exp)) \\
+  \Exp &::=& \ldots \mid (\key{lambda:}\; ([\Var \key{:} \Type]^{*}) \key{:} \Type \; \Exp) \\
   R_5 &::=& (\key{program} \; \Def^{*} \; \Exp)
 \end{array}
 \]
@@ -5358,6 +5377,72 @@ $\Downarrow$
 \chapter{Dynamic Typing}
 \label{ch:type-dynamic}
 
+In this chapter we discuss the compilation of a dynamically typed
+language, named $R_7$, that is a subset of the Racket language. (In
+the previous chapters we have studied subsets of the \emph{Typed}
+Racket language.) In dynamically typed languages, an expression may
+produce values of differing type. Consider the following example with
+a conditional expression that may return a Boolean or an integer
+depending on the input to the program.
+\begin{lstlisting}
+   (not (if (eq? (read) 1) #f 0))
+\end{lstlisting}
+Languages that allow expressions to produce different kinds of values
+are called \emph{polymorphic}, and there are many kinds of
+polymorphism, such as subtype polymorphism~\citep{Cardelli:1985kx} and
+parametric polymorphism (Chapter~\ref{ch:parametric-polymorphism}).
+
+Another characteristic of dynamically typed languages is that
+primitive operations, such as \code{not}, are often defined to operate
+on many different types of values. In fact, in Racket, the \code{not}
+operator produces a result for any kind of value: given \code{\#f} it
+returns \code{\#t} and given anything else it returns \code{\#f}.
+Furthermore, even when primitive operations restrict their inputs to
+values of a certain type, this restriction is enforced at runtime
+instead of during compilation. For example, the following vector
+reference results in a run-time contract violation.
+\begin{lstlisting}
+   (vector-ref (vector 42) #t)
+\end{lstlisting}
+
+Let us consider how we might compile untyped Racket to x86, thinking
+about the first example above. Our bit-level representation of the
+Boolean \code{\#f} is zero and similarly for the integer \code{0}.
+However, \code{(not \#f)} should produce \code{\#t} whereas \code{(not
+  0)} should produce \code{\#f}. Furthermore, the behavior of
+\code{not}, in general, cannot be determined at compile time, but
+depends on the runtime type of its input, as in the example above that
+depends on the result of \code{(read)}.
+
+The way around this problem is to include information about a value's
+runtime type in the value itself, so that this information can be
+inspected by operators such as \code{not}.  In particular, we shall
+steal the 2 right-most bits from our 64-bit values to encode the
+runtime type.  We shall use $00$ to identify integers, $01$ for
+Booleans, $10$ for vectors, and $11$ for procedures. We shall refer to
+these two bits as the \emph{tag}. This stealing of bits comes at some
+price: our integers are reduced to ranging from $-2^{61}$ to
+$2^{61}$. The stealing does not adversely affect vectors and
+procedures because those values are addresses, and our addresses are
+8-byte aligned so the rightmost 3 bits are unused, they are always
+$000$. Thus, we do not lose information by overwriting the rightmost 2
+bits with the tag and we can simply zero-out the tag to recover the
+original address.
+
+In some sense, these tagged values are a new kind of value.  Indeed,
+we can extend our \emph{typed} language with tagged values by adding a
+new type to classify them, called \key{Any}, and with operations for
+creating and using tagged values, creating the $R_6$ language defined
+in Section~\ref{sec:r6-lang}. Thus, $R_6$ provides the fundamental
+support for polymorphism and runtime types that we need to support
+dynamic typing.
+
+We shall implement our untyped language $R_7$ by compiling it to
+$R_6$. We define $R_7$ in Section~\ref{sec:r7-lang} and describe the
+compilation of $R_6$ and $R_7$ in the remainder of this chapter.
+
+\section{The $R_6$ Language: Typed Racket $+$ \key{Any}}
+\label{sec:r6-lang}
 
 \begin{figure}[tbp]
 \centering
@@ -5366,7 +5451,10 @@ $\Downarrow$
 \[
 \begin{array}{lcl}
   \Type &::=& \ldots \mid \key{Any} \\
-  \Exp &::=& \ldots \mid (\key{inject}\; \Exp \; \Type) \mid (\key{project}\;\Exp\;\Type)\\
+  \Exp &::=& \ldots \\
+  & \mid & (\key{inject}\; \Exp \; \Type) \mid (\key{project}\;\Exp\;\Type) \\
+  & \mid & (\key{boolean?}\;\Exp) \mid (\key{integer?}\;\Exp)\\
+  & \mid & (\key{vector?}\;\Exp) \mid (\key{procedure?}\;\Exp) \\
   \Def &::=& \ldots \\
   R_4 &::=& (\key{program} \; \Def^{*} \; \Exp)
 \end{array}
@@ -5379,6 +5467,42 @@ $\Downarrow$
 \end{figure}
 
 Figure~\ref{fig:r6-syntax}
+
+Also, \key{eq?} is extended to operate on values of type \key{Any}.
+
+to do: type checking
+
+to do: interpreter
+
+\section{The $R_7$ Language: Untyped Racket}
+
+\begin{figure}[btp]
+\centering
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{rcl}
+\Exp &::=& \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)  \\
+     &\mid&  \Var \mid \LET{\Var}{\Exp}{\Exp} \\
+     &\mid& \key{\#t} \mid \key{\#f} \mid
+      (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp) \\
+     &\mid& (\key{eq?}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp} \\
+     &\mid& (\key{vector}\;\Exp^{+}) \mid 
+      (\key{vector-ref}\;\Exp\;\Int) \\
+  &\mid& (\key{vector-set!}\;\Exp\;\Int\;\Exp)\\
+  &\mid& (\key{void}) \\
+  &\mid& (\key{lambda}\; (\Var^{*}) \; \Exp) \\
+  \Def &::=& (\key{define}\; (\Var \; \Var^{*}) \; \Exp) \\
+R_1  &::=& (\key{program} \; \Def^{*}\; \Exp)
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The syntax of the $R_7$ language.}
+\label{fig:r7-syntax}
+\end{figure}
+
+Figure~\ref{fig:r7-syntax}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Parametric Polymorphism}
