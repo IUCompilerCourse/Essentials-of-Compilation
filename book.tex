@@ -3712,7 +3712,7 @@ if_end21289:
 \chapter{Tuples and Garbage Collection}
 \label{ch:tuples}
 
-\marginpar{\scriptsize Mine Andre's code comments for extra
+\marginpar{\scriptsize To do: look through Andre's code comments for extra
   things to discuss in this chapter. \\ --Jeremy}
 
 In this chapter we study the implementation of mutable tuples (called
@@ -4082,6 +4082,7 @@ The following program will serve as our running example.  It creates
 two tuples, one nested inside the other. Both tuples have length
 one. The example then accesses the element in the inner tuple tuple
 via two vector references.
+% tests/s2_17.rkt
 \begin{lstlisting}
    (vector-ref (vector-ref (vector (vector 42)) 0) 0))
 \end{lstlisting}
@@ -4253,18 +4254,11 @@ a root and it is live at that point.
 
 In this pass we generate the code for explicitly manipulating the root
 stack, lower the forms needed for garbage collection, and also lower
-the \code{vector-ref} and \code{vector-set!} forms.  We shall thread a
-pointer to the top of root stack through the program in local
-variables whose names all begin with \code{rootstack}.  We recommend
-passing the current name of the root stack variable as a parameter to
-the \code{select-instructions} function.
-%
-\marginpar{\tiny I would have preferred that we use a dedicated
-  register for the top of the root stack. One might also consider
-  using a global (i.e., \code{global-value}, but once we add functions
-  in the next assignment, we'll have to push and pop the live roots
-  around every function call, so the register approach is faster.
-  (to do: next year) \\--Jeremy}
+the \code{vector-ref} and \code{vector-set!} forms.  We shall use a
+register, \code{r15}, to store the pointer to the top of the root
+stack. (So \code{r15} is no longer available for use by the register
+allocator.) For readability, we shall refer to this register as the
+\emph{rootstack}.
 %
 We shall obtain the top of the root stack to begin with from the
 global variable \code{rootstack\_begin}.
@@ -4278,77 +4272,32 @@ back afterwards.
   the root stack and in registers, not on the normal stack. Then we
   would only need to push the roots in registers, decreasing memory
   traffic for function calls. (to do: next year)\\ --Jeremy}
-\marginpar{\tiny Do we really need rootstack.new or can we just
-   use rdi directly? \\ --Jeremy}
 %
 \begin{lstlisting}
    (call-live-roots (|$x_0 \ldots x_{n-1}$|) (collect |$\itm{bytes}$|))
    |$\Longrightarrow$|
-   (movq (var |$x_0$|) (offset (var rootstack.|$\itm{prev}$|) |$0$|))
+   (movq (var |$x_0$|) (offset (reg |$\itm{rootstack}$|) |$0$|))
    |$\ldots$|
-   (movq (var |$x_{n-1}$|) (offset (var rootstack.|$\itm{prev}$|) |$8(n-1)$|))
-   (movq rootstack.|$\itm{prev}$| rootstack.|$\itm{new}$|)
-   (addq |$n$| rootstack.|$\itm{new}$|)
-   (movq (var rootstack.|$\itm{new}$|) (reg rdi))
+   (movq (var |$x_{n-1}$|) (offset (reg |$\itm{rootstack}$|) |$8(n-1)$|))
+   (addq |$n$| (reg |$\itm{rootstack}$|))
+   (movq (reg |$\itm{rootstack}$|) (reg rdi))
    (movq (int |$\itm{bytes}$|) (reg rsi))
    (callq collect)
-   (movq (offset (var rootstack.|$\itm{prev}$|) |$0$|) (var |$x_0$|))
+   (subq |$n$| (reg |$\itm{rootstack}$|))
+   (movq (offset (reg |$\itm{rootstack}$|) |$0$|) (var |$x_0$|))
    |$\ldots$|
-   (movq (offset (var rootstack.|$\itm{prev}$|) |$8(n-1)$|) (var |$x_{n-1}$|))
+   (movq (offset (reg |$\itm{rootstack}$|) |$8(n-1)$|) (var |$x_{n-1}$|))
 \end{lstlisting}
-
-%% We extend $C_2$ yet again with form for refering to global variables
-%% and we change the \code{collect} form for invoking the garbage
-%% collector, adding a parameter for the top of the root stack.  The
-%% \key{call-live-roots} form is no longer needed in the output of this
-%% pass.
-%% \[
-%% \begin{array}{lcl}
-%% \Exp  &::=& \ldots \mid (\key{global-value}\, \itm{name}) \\
-%% \Stmt &::=& \ldots \mid (\key{collect}\, \Arg \,\Int) 
-%% \end{array}
-%% \]
-
-%% Figure~\ref{fig:introduce-rootstack-output} shows the output of the
-%% \code{introduce-rootstack} pass on the running example.
-
-%% \begin{figure}[tbp]
-%% \begin{lstlisting}
-%%    (program (t.1 t.2 t.3 t.4 void.1 void.2
-%%               rootstack.1 rootstack.2 rootstack.3)
-%%      (initialize 10000 10000)
-%%      ~(assign rootstack.3 (global-value rootstack_begin))~
-%%      (if (collection-needed? 16)
-%%        (~(assign rootstack.2 (+ rootstack.3 0))
-%%         (collect rootstack.2 16)~)
-%%        ())
-%%      (assign t.1 (allocate 1 (Vector Integer)))
-%%      (assign void.1 (vector-set! t.1 0 42))
-%%      (if (collection-needed? 16)
-%%        (~(movq (var t.1) (offset (var rootstack.3) 0))
-%%         (assign rootstack.1 (+ rootstack.3 8))
-%%         (collect rootstack.1 16)
-%%         (movq (offset (var rootstack.3) 0) (var t.1))~)
-%%        ())
-%%      (assign t.2 (allocate 1 (Vector (Vector Integer))))
-%%      (assign void.2 (vector-set! t.2 0 t.1))
-%%      (assign t.3 (vector-ref t.2 0))
-%%      (assign t.4 (vector-ref t.3 0))
-%%      (return t.4))
-%% \end{lstlisting}
-%% \caption{Output of the \code{introduce-rootstack} pass.}
-%% \label{fig:introduce-rootstack-output}
-%% \end{figure}
 
 \noindent We simply translate \code{initialize} into a call to the
 function in \code{runtime.c}.
 \begin{lstlisting}
    (initialize |$\itm{rootlen}\;\itm{heaplen}$|)
    |$\Longrightarrow$|
-   (movq (int |$\itm{rootlen}$|) (reg rdi))
-   (movq (int |$\itm{heaplen}$|) (reg rsi))
+   (movq (int |\itm{rootlen}|) (reg rdi))
+   (movq (int |\itm{heaplen}|) (reg rsi))
    (callq initialize)
-   (movq (global-value rootstack_begin) (var rootstack))
+   (movq (global-value rootstack_begin) (reg |\itm{rootstack}|))
 \end{lstlisting}
 %
 We translate the special \code{collection-needed?} predicate into code
@@ -4431,14 +4380,13 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
 
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-  (program (rootstack28650 lt28655 end-data28654 rootstack28653
-            lt28652 end-data28651 tmp28644 tmp28645 tmp28646
-            tmp28647 void28649 void28648)
+  (program (lt28655 end-data28654 lt28652 end-data28651 tmp28644
+            tmp28645 tmp28646 tmp28647 void28649 void28648)
            (type Integer)
     (movq (int 16384) (reg rdi))
     (movq (int 16) (reg rsi))
     (callq initialize)
-    (movq (global-value rootstack_begin) (var rootstack28650))
+    (movq (global-value rootstack_begin) (reg r15))
 
     (movq (global-value free_ptr) (var end-data28651))
     (addq (int 16) (var end-data28651))
@@ -4446,7 +4394,7 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
     (setl (byte-reg al))
     (movzbq (byte-reg al) (var lt28652))
     (if (eq? (int 0) (var lt28652))
-      ((movq (var rootstack28650) (reg rdi))
+      ((movq (reg r15) (reg rdi))
        (movq (int 16) (reg rsi))
        (callq collect))
       ())
@@ -4464,13 +4412,13 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
     (setl (byte-reg al))
     (movzbq (byte-reg al) (var lt28655))
     (if (eq? (int 0) (var lt28655))
-      ((movq (var tmp28644) (offset (var rootstack28650) 0))
-       (movq (var rootstack28650) (var rootstack28653))
-       (addq (int 8) (var rootstack28653))
-       (movq (var rootstack28653) (reg rdi))
+      ((movq (var tmp28644) (offset (reg r15) 0))
+       (addq (int 8) (reg r15))
+       (movq (reg r15) (reg rdi))
        (movq (int 16) (reg rsi))
        (callq collect)
-       (movq (offset (var rootstack28650) 0) (var tmp28644)))
+       (subq (int 8) (reg r15))
+       (movq (offset (reg r15) 0) (var tmp28644)))
       ())
 
     (movq (global-value free_ptr) (var tmp28645))
@@ -4508,64 +4456,63 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
 _main:
 	pushq	%rbp
 	movq	%rsp, %rbp
-	pushq	%r15
 	pushq	%r14
 	pushq	%r13
 	pushq	%r12
 	pushq	%rbx
-	subq	$8, %rsp
+	subq	$0, %rsp
 
 	movq	$16384, %rdi
 	movq	$16, %rsi
 	callq	_initialize
-	movq	_rootstack_begin(%rip), %rbx
+	movq	_rootstack_begin(%rip), %r15
+	movq	_free_ptr(%rip), %rbx
+	addq	$16, %rbx
+	cmpq	_fromspace_end(%rip), %rbx
+	setl	%al
+	movzbq	%al, %rbx
+	cmpq	$0, %rbx
+	je then30964
+	jmp if_end30965
+then30964:
+	movq	%r15, %rdi
+	movq	$16, %rsi
+	callq	_collect
+if_end30965:
+	movq	_free_ptr(%rip), %rbx
+	addq	$16, _free_ptr(%rip)
+	movq	%rbx, %r11
+	movq	$3, 0(%r11)
+	movq	%rbx, %r11
+	movq	$42, 8(%r11)
 	movq	_free_ptr(%rip), %rcx
 	addq	$16, %rcx
 	cmpq	_fromspace_end(%rip), %rcx
 	setl	%al
 	movzbq	%al, %rcx
 	cmpq	$0, %rcx
-	je then28672
-	jmp if_end28673
-then28672:
-	movq	%rbx, %rdi
-	movq	$16, %rsi
-	callq	_collect
-if_end28673:
-	movq	_free_ptr(%rip), %rcx
-	addq	$16, _free_ptr(%rip)
-	movq	%rcx, %r11
-	movq	$3, 0(%r11)
-	movq	%rcx, %r11
-	movq	$42, 8(%r11)
-        movq	_free_ptr(%rip), %rdx
-	addq	$16, %rdx
-	cmpq	_fromspace_end(%rip), %rdx
-	setl	%al
-	movzbq	%al, %rdx
-	cmpq	$0, %rdx
-	je then28674
-	jmp if_end28675
-then28674:
-	movq	%rcx, 0(%rbx)
-	movq	%rbx, %rcx
-	addq	$8, %rcx
-	movq	%rcx, %rdi
-	movq	$16, %rsi
-	callq	_collect
-	movq	0(%rbx), %rcx
+	je then30966
+	jmp if_end30967
 \end{lstlisting}
 \end{minipage}
 \begin{minipage}[t]{0.45\textwidth}
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-if_end28675:
-	movq	_free_ptr(%rip), %rbx
+then30966:
+	movq	%rbx, 0(%r15)
+	addq	$8, %r15
+	movq	%r15, %rdi
+	movq	$16, %rsi
+	callq	_collect
+	subq	$8, %r15
+	movq	0(%r15), %rbx
+if_end30967:
+	movq	_free_ptr(%rip), %rcx
 	addq	$16, _free_ptr(%rip)
-	movq	%rbx, %r11
+	movq	%rcx, %r11
 	movq	$131, 0(%r11)
-	movq	%rbx, %r11
-	movq	%rcx, 8(%r11)
-	movq	%rbx, %r11
+	movq	%rcx, %r11
+	movq	%rbx, 8(%r11)
+	movq	%rcx, %r11
 	movq	8(%r11), %rbx
 	movq	%rbx, %r11
 	movq	8(%r11), %rbx
@@ -4574,12 +4521,11 @@ if_end28675:
 	movq	%rax, %rdi
 	callq	_print_int
 	movq	$0, %rax
-	addq	$8, %rsp
+	addq	$0, %rsp
 	popq	%rbx
 	popq	%r12
 	popq	%r13
 	popq	%r14
-	popq	%r15
 	popq	%rbp
 	retq
 \end{lstlisting}
