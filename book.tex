@@ -4379,6 +4379,8 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
 \code{select-instructions} pass on the running example.
 
 \begin{figure}[tbp]
+\centering
+\begin{minipage}{0.75\textwidth}
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
   (program (lt28655 end-data28654 lt28652 end-data28651 tmp28644
             tmp28645 tmp28646 tmp28647 void28649 void28648)
@@ -4435,8 +4437,8 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
     (movq (offset (reg r11) 8) (var tmp28647))
 
     (movq (var tmp28647) (reg rax)))
-
 \end{lstlisting}
+\end{minipage}
 \caption{Output of the \code{select-instructions} pass.}
 \label{fig:select-instr-output-gc}
 \end{figure}
@@ -4446,8 +4448,8 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
 \label{sec:print-x86-gc}
 
 
-\marginpar{\tiny Need to show translation to x86 and what to
-  do about global-value and offset. (to do: this week) \\ --Jeremy}
+\marginpar{\scriptsize We need to show the translation to x86 and what
+  to do about global-value and offset. (to do: this week) \\ --Jeremy}
 
 \begin{figure}[tbp]
 \begin{minipage}[t]{0.5\textwidth}
@@ -4581,11 +4583,16 @@ inside each other; they can only be defined at the top level.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-  \Type &::=& \ldots \mid (\Type^{*} \; \key{->}\; \Type) \\
+  \Type &::=& \gray{\key{Integer} \mid \key{Boolean}
+         \mid (\key{Vector}\;\Type^{+}) \mid \key{Void}} \mid (\Type^{*} \; \key{->}\; \Type) \\
   \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)}  \\
-     &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp}} \mid \key{\#t} \mid \key{\#f} \mid
-      (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp) \\
-      &\mid& (\key{eq?}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp} \\
+     &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp} 
+      \mid \key{\#t} \mid \key{\#f} \mid
+      (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp)} \\
+      &\mid& \gray{(\key{eq?}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
+  &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid 
+    (\key{vector-ref}\;\Exp\;\Int)} \\
+  &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})} \\
       &\mid& (\Exp \; \Exp^{*}) \\
   \Def &::=& (\key{define}\; (\Var \; [\Var \key{:} \Type]^{*}) \key{:} \Type \; \Exp) \\
   R_4 &::=& (\key{program} \; \Def^{*} \; \Exp)
@@ -5039,8 +5046,22 @@ compiling lexically-scoped functions into a combination of functions
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-  \Exp &::=& \ldots \mid (\key{lambda:}\; ([\Var \key{:} \Type]^{*}) \key{:} \Type \; \Exp) \\
-  R_5 &::=& (\key{program} \; \Def^{*} \; \Exp)
+  \Type &::=& \gray{\key{Integer} \mid \key{Boolean}
+     \mid (\key{Vector}\;\Type^{+}) \mid \key{Void} 
+     \mid (\Type^{*} \; \key{->}\; \Type)} \\
+  \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp) 
+     \mid (\key{+} \; \Exp\;\Exp)}  \\
+    &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp} 
+     \mid \key{\#t} \mid \key{\#f} \mid
+           (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp)} \\
+    &\mid& \gray{(\key{eq?}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
+    &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid 
+          (\key{vector-ref}\;\Exp\;\Int)} \\
+    &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})} \\
+    &\mid& \gray{(\Exp \; \Exp^{*})} \\
+    &\mid& (\key{lambda:}\; ([\Var \key{:} \Type]^{*}) \key{:} \Type \; \Exp) \\
+  \Def &::=& \gray{(\key{define}\; (\Var \; [\Var \key{:} \Type]^{*}) \key{:} \Type \; \Exp)} \\
+  R_5 &::=& \gray{(\key{program} \; \Def^{*} \; \Exp)}
 \end{array}
 \]
 \end{minipage}
@@ -5396,13 +5417,26 @@ compilation of $R_6$ and $R_7$ in the remainder of this chapter.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-  \Type &::=& \ldots \mid \key{Any} \\
-  \Exp &::=& \ldots \\
+  \Type &::=& \gray{\key{Integer} \mid \key{Boolean}
+     \mid (\key{Vector}\;\Type^{+}) \mid \key{Void} 
+     \mid (\Type^{*} \; \key{->}\; \Type)} \\
+    &\mid& \key{Any} \\
+  \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp) 
+     \mid (\key{+} \; \Exp\;\Exp)}  \\
+    &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp}} \\
+    &\mid& \gray{\key{\#t} \mid \key{\#f} \mid
+           (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp)} \\
+    &\mid& \gray{(\key{eq?}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
+    &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid 
+          (\key{vector-ref}\;\Exp\;\Int)} \\
+    &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})} \\
+    &\mid& \gray{(\Exp \; \Exp^{*})
+    \mid (\key{lambda:}\; ([\Var \key{:} \Type]^{*}) \key{:} \Type \; \Exp)} \\
   & \mid & (\key{inject}\; \Exp \; \Type) \mid (\key{project}\;\Exp\;\Type) \\
   & \mid & (\key{boolean?}\;\Exp) \mid (\key{integer?}\;\Exp)\\
   & \mid & (\key{vector?}\;\Exp) \mid (\key{procedure?}\;\Exp) \\
-  \Def &::=& \ldots \\
-  R_4 &::=& (\key{program} \; \Def^{*} \; \Exp)
+  \Def &::=& \gray{(\key{define}\; (\Var \; [\Var \key{:} \Type]^{*}) \key{:} \Type \; \Exp)} \\
+  R_6 &::=& \gray{(\key{program} \; \Def^{*} \; \Exp)}
 \end{array}
 \]
 \end{minipage}
@@ -5412,7 +5446,9 @@ compilation of $R_6$ and $R_7$ in the remainder of this chapter.
 \label{fig:r6-syntax}
 \end{figure}
 
-Figure~\ref{fig:r6-syntax}
+The syntax of $R_6$ is defined in Figure~\ref{fig:r6-syntax}.
+
+
 
 Also, \key{eq?} is extended to operate on values of type \key{Any}.
 
@@ -5434,12 +5470,11 @@ to do: interpreter
       (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp) \\
      &\mid& (\key{eq?}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp} \\
      &\mid& (\key{vector}\;\Exp^{+}) \mid 
-      (\key{vector-ref}\;\Exp\;\Int) \\
-  &\mid& (\key{vector-set!}\;\Exp\;\Int\;\Exp)\\
-  &\mid& (\key{void}) \\
-  &\mid& (\key{lambda}\; (\Var^{*}) \; \Exp) \\
+      (\key{vector-ref}\;\Exp\;\Exp) \\
+  &\mid& (\key{vector-set!}\;\Exp\;\Exp\;\Exp) \mid (\key{void}) \\
+  &\mid& (\Exp \; \Exp^{*}) \mid (\key{lambda}\; (\Var^{*}) \; \Exp) \\
   \Def &::=& (\key{define}\; (\Var \; \Var^{*}) \; \Exp) \\
-R_1  &::=& (\key{program} \; \Def^{*}\; \Exp)
+R_7  &::=& (\key{program} \; \Def^{*}\; \Exp)
 \end{array}
 \]
 \end{minipage}
