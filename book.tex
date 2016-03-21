@@ -5422,6 +5422,8 @@ compilation of $R_6$ and $R_7$ in the remainder of this chapter.
   \Type &::=& \gray{\key{Integer} \mid \key{Boolean}
      \mid (\key{Vector}\;\Type^{+}) \mid (\key{Vectorof}\;\Type) \mid \key{Void}} \\
     &\mid& \gray{(\Type^{*} \; \key{->}\; \Type)} \mid \key{Any} \\
+  \FType &::=& \key{Integer} \mid \key{Boolean} \mid (\key{Vectorof}\;\key{Any})
+     \mid (\key{Any}^{*} \; \key{->}\; \key{Any})\\
   \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp) 
      \mid (\key{+} \; \Exp\;\Exp)}  \\
     &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp}} \\
@@ -5433,7 +5435,7 @@ compilation of $R_6$ and $R_7$ in the remainder of this chapter.
     &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})} \\
     &\mid& \gray{(\Exp \; \Exp^{*})
     \mid (\key{lambda:}\; ([\Var \key{:} \Type]^{*}) \key{:} \Type \; \Exp)} \\
-  & \mid & (\key{inject}\; \Exp \; \Type) \mid (\key{project}\;\Exp\;\Type) \\
+  & \mid & (\key{inject}\; \Exp \; \FType) \mid (\key{project}\;\Exp\;\FType) \\
   & \mid & (\key{boolean?}\;\Exp) \mid (\key{integer?}\;\Exp)\\
   & \mid & (\key{vector?}\;\Exp) \mid (\key{procedure?}\;\Exp) \\
   \Def &::=& \gray{(\key{define}\; (\Var \; [\Var \key{:} \Type]^{*}) \key{:} \Type \; \Exp)} \\
@@ -5442,20 +5444,100 @@ compilation of $R_6$ and $R_7$ in the remainder of this chapter.
 \]
 \end{minipage}
 }
-\caption{The syntax of hte $R_6$ language, an extension of $R_5$
+\caption{The syntax of the $R_6$ language, an extension of $R_5$
   (Figure~\ref{fig:r5-syntax}).}
 \label{fig:r6-syntax}
 \end{figure}
 
-The syntax of $R_6$ is defined in Figure~\ref{fig:r6-syntax}.
+The syntax of $R_6$ is defined in Figure~\ref{fig:r6-syntax}.  The
+$(\key{inject}\; e\; T)$ form converts the value produced by
+expression $e$ of type $T$ into a tagged value.  The
+$(\key{project}\;e\;T)$ form converts the tagged value produced by
+expression $e$ into a value of type $T$ or else halts the program if
+the type tag does not match $T$. Note that in both \key{inject} and
+\key{project}, the type $T$ is restricted to the flat types $\FType$,
+which simplifies the implementation and corresponds with what is
+needed for compiling untyped Racket. The type predicates,
+$(\key{boolean?}\,e)$ etc., expect a tagged value and return \key{\#t}
+if the tag corresponds to the predicate, and return \key{\#t}
+otherwise.
+%
+The type checker for $R_6$ is given in Figure~\ref{fig:typecheck-R6}.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+(define type-predicates (set 'boolean? 'integer? 'vector? 'procedure?))
+
+(define (typecheck-R6 env)
+  (lambda (e)
+    (match e
+       [`(inject ,e ,ty)
+        (define-values (new-e e-ty) ((typecheck-R6 env) e))
+        (cond
+         [(equal? e-ty ty)
+          (values `(has-type (inject ,new-e ,ty) Any) 'Any)]
+         [else
+          (error "inject expected ~a to have type ~a" e ty)])]
+       [`(project ,e ,ty)
+        (define-values (new-e e-ty) ((typecheck-R6 env) e))
+        (cond
+         [(equal? e-ty 'Any)
+          (values `(has-type (project ,new-e ,ty) ,ty) ty)]
+         [else
+          (error "project expected ~a to have type Any" e)])]
+       [`(,pred ,e) #:when (set-member? type-predicates pred)
+        (define-values (new-e e-ty) ((typecheck-R6 env) e))
+        (cond
+         [(equal? e-ty 'Any)
+          (values `(has-type (,pred ,new-e) Boolean) 'Boolean)]
+         [else
+          (error "~a expected arg. of type Any, not ~a" pred e-ty)])]
+        ...
+      )))
+\end{lstlisting}
+\caption{Type checker for the $R_6$ language.}
+\label{fig:typecheck-R6}
+\end{figure}
 
 
+%Also, \key{eq?} is extended to operate on values of type \key{Any}.
 
-Also, \key{eq?} is extended to operate on values of type \key{Any}.
+Figure~\ref{fig:interp-R6} shows the definitional interpreter
+for $R_6$.
 
-to do: type checking
+\begin{figure}[tbp]
+\begin{lstlisting}
+(define primitives (set 'boolean? ...))
 
-to do: interpreter
+(define (interp-op op)
+  (match op
+     ['boolean? (lambda (v)
+                  (match v
+                     [`(tagged ,v1 Boolean) #t]
+                     [else #f]))]
+     ...))
+
+(define (interp-R6 env)
+  (lambda (ast)
+    (match ast
+       [`(inject ,e ,t)
+        `(tagged ,((interp-R6 env) e) ,t)]
+       [`(project ,e ,t2)
+        (define v ((interp-R6 env) e))
+        (match v
+           [`(tagged ,v1 ,t1)
+            (cond [(equal? t1 t2)
+                   v1]
+                  [else
+                   (error "in project, type mismatch" t1 t2)])]
+           [else
+            (error "in project, expected tagged value" v)])]
+       ...)))
+\end{lstlisting}
+\caption{Definitional interpreter for $R_6$.}
+\label{fig:interp-R6}
+\end{figure}
+
 
 \section{The $R_7$ Language: Untyped Racket}
 \label{sec:r7-lang}
@@ -5490,6 +5572,8 @@ Figure~\ref{fig:r7-syntax}
 
 \section{Compiling $R_6$}
 \label{sec:compile-r6}
+
+to do: discuss instruction selection for $R_6$
 
 
 \section{Compiling $R_7$ to $R_6$}
