@@ -5389,7 +5389,15 @@ inspected by operators such as \code{not}.  In particular, we shall
 steal the 2 right-most bits from our 64-bit values to encode the
 runtime type.  We shall use $00$ to identify integers, $01$ for
 Booleans, $10$ for vectors, and $11$ for procedures. We shall refer to
-these two bits as the \emph{tag}. This stealing of bits comes at some
+these two bits as the \emph{tag} and we define the following
+auxilliary function. 
+\begin{align*}
+\itm{tagof}(\key{Integer}) &= 00 \\
+\itm{tagof}(\key{Boolean}) &= 01 \\
+\itm{tagof}((\key{Vector} \ldots)) &= 10 \\
+\itm{tagof}((\ldots \key{->} \ldots)) &= 11 
+\end{align*}
+This stealing of 2 bits comes at some
 price: our integers are reduced to ranging from $-2^{61}$ to
 $2^{61}$. The stealing does not adversely affect vectors and
 procedures because those values are addresses, and our addresses are
@@ -5569,11 +5577,105 @@ R_7  &::=& (\key{program} \; \Def^{*}\; \Exp)
 
 Figure~\ref{fig:r7-syntax}
 
+UNDER CONSTRUCTION
+
 
 \section{Compiling $R_6$}
 \label{sec:compile-r6}
 
-to do: discuss instruction selection for $R_6$
+Most of the compiler passes only require obvious changes.  The
+interesting part is in instruction selection.
+
+\paragraph{Inject}
+
+We recommend compiling an \key{inject} as follows if the type is
+\key{Integer} or \key{Boolean}.  The \key{salq} instruction shifts the
+destination to the left by the number of bits specified by the source
+($2$) and it preserves the sign of the integer. We use the \key{orq}
+instruction to combine the tag and the value to form the tagged value.
+\\
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(assign |\itm{lhs}| (inject |$e$| |$T$|))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}
+(movq |$e'$| |\itm{lhs}'|)
+(salq (int 2) |\itm{lhs}'|)
+(orq (int |$\itm{tagof}(T)$|) |\itm{lhs}'|)
+\end{lstlisting}
+\end{minipage}
+\end{tabular}  \\
+The instruction selection for vectors and procedures is different
+because their is no need to shift them to the left. The rightmost 3
+bits are already zeros as described above. So we combine the value and
+the tag using
+\key{orq}.  \\
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(assign |\itm{lhs}| (inject |$e$| |$T$|))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}
+(movq |$e'$| |\itm{lhs}'|)
+(orq (int |$\itm{tagof}(T)$|) |\itm{lhs}'|)
+\end{lstlisting}
+\end{minipage}
+\end{tabular}  \\
+
+\paragraph{Project}
+
+The instruction selection for \key{project} is a bit more involved. We
+first check to see if the tag on the tagged value matches the tag of
+the target type $T$. If not, we halt the program by calling the
+\code{exit} function. If we have a match, we need to produce an
+untagged value and have two separate code paths depending on whether
+we're dealing a pointer (to a vector or procedure) or not.  If it's a
+pointer, then we need to zero-out the rightmost 2 bits, which we
+accomplish using \key{andq} and the value $1\ldots 100$.  If the
+tagged value is not a pointer (a Boolean or integer), then we turn it
+into a untagged value by shifting it to the right by 2 bits. \\
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(assign |\itm{lhs}| (project |$e$| |$T$|))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}
+(movq |$e'$| |\itm{lhs}'|)
+(andq (int 3) |\itm{lhs}'|)
+(if (eq? |\itm{lhs}'| (int |$\itm{tagof}(T)$|))
+    ((andq (int 2) |\itm{lhs}'|)
+     (if (eq? |\itm{lhs}'| (int 2))
+         ((movq (int 3) |\itm{lhs}'|)
+          (notq |\itm{lhs}'|)
+          (andq |$e'$| |\itm{lhs}'|))
+         ((movq |$e'$| |\itm{lhs}'|)
+          (sarq (int 2) |\itm{lhs}'|))))
+    ((callq exit)))
+\end{lstlisting}
+\end{minipage}
+\end{tabular}  \\
+
+\paragraph{Type Predicates} We leave it to the reader to
+devise a sequence of instructions to implement the type predicates
+\key{boolean?}, \key{integer?}, \key{vector?}, and \key{procedure?}.
+
+
 
 
 \section{Compiling $R_7$ to $R_6$}
