@@ -1,0 +1,258 @@
+
+
+Liveness Analysis as a Dataflow Analysis
+----------------------------------------
+
+  References:
+    * Principles of Program Analysis by Nielson, Nielson, and Hankin
+    * Ch. 9 of Compilers: Principles, Techniques, & Tools 
+      by Aho, Lam, Sethi, Ullman
+    * Ch. 17 of Modern Compiler Implemenation in ML by Appel
+
+  Running example:
+    S* = 
+        [y := 1]^1
+        while [x>0]^2
+          [w := y]^3
+          [x := x - 1]^4
+        [z := w]^5
+
+  We're going to work on the control flow graph of the program,
+  where each superscript corresponds to a node in the graph
+  and the edges represent control flow possibilities.
+
+  Recall that a variable is *live* if it might get used later.
+  Used for register allocation and dead code elimination.
+
+  A backward analysis.
+
+  gen([x:=e]) = FV(e)
+  gen([skip]) = {}
+  gen([e]) = FV(e)
+
+  kill([x:=e]) = {x}
+  kill([skip]) = {}
+  kill([e]) = {}
+
+  Let P[l] be the statement number l in program P.
+
+  LV_before(l) = (LV_after(l) - kill(P[l])) U gen(P[l])          (1)
+  LV_after(l)  = Union{ LV_before(l') | l --> l' in CFG(P) }     (2)
+
+  We'd like to find a solution to these equations.
+  It's useful to combine all these equations into a single
+  equation by putting all the LV's into two vectors:
+
+  LV_before = [LV_before(1), LV_before(2), ... ]
+  LV_after = [LV_after(1), LV_after(2), ... ]
+  
+  And then encode the equations (1) and (2) for all the statements 
+  into two vector-valued functions F_before and F_after.
+
+  F_before(l)(LV_after) = (LV_after[l] - kill(P[l])) U gen(P[l])
+  F_after(l)(LV_before) = Union{ LV_before[l'] | l --> l' in CFG(P) }
+
+  We could even squish these two vectors (before/after) and two
+  functions into a single vector LV and function F. Then a solution
+  looks like:
+
+  LV = F(LV)
+
+  That is, we'd like to find a fixed point of F.
+
+  There's a branch of mathematics that studies fixed points
+  in the context of lattices.
+
+  The sets of variables ordered by subseteq form a lattice,
+  with {} as the bottom element and the set of all variables V
+  as the top element.
+
+  Vectors of sets ordered pointwise forms a lattice, with
+  [{},{},{},...] as the bottom element and 
+  [V,V,V,...] as the top element.
+
+  One of the classic fixpoint theorems is:
+
+  Suppose F is an order-preserving function. If the set L
+  has no infinitely ascending chains and a least element bot,
+  then there is a fixed point of F.
+
+  Proof.
+    bot <= F(bot)       because bot is the least element of L
+    F(bot) <= F(F(bot)) because F is order preserving.
+    and so on, so in general we have
+    F^i(bot) <= F^i+1(bot)
+    but this can't go on forever, so at some point
+    F^n(bot) = F^n+1(bot)
+    and therefore, F^n(bot) is a fixed point of F.
+
+  But is our F for liveness order-preserving? (skip this)
+   Suppose V <= V'. 
+   Let l be any statement number.
+   If l is even: (LV_before)
+     We have V[l] <= V'[l].
+     then V[l] - kill(P[l]) <= V[l]' - kill(P[l])
+     and  (V[l] - kill(P[l])) U gen(P[l]) <= (V[l]' - kill(P[l])) U gen(P[l]).
+     Therefore F_l(V) <= F_l(V').
+   If l is odd: (LV_after)
+     We have V[i] <= V'[i] for any i.
+     Thus,
+     Union{ V[l'] | l --> l' in CFG(P) }
+     <= Union{ V'[l'] | l --> l' in CFG(P) }
+     Therefore F_l(V) <= F_l(V')
+   So F(V) <= F(V).
+
+  Do we have a least element? Yes:
+  [{}, {}, ...]      
+  Are there infinite ascending chains? No, because there are
+  a finite number of variables in the program.
+
+  Worklist algorithm (applied to Liveness)
+
+  W is a list of control-flow edges
+
+  1. Initialization
+     W = []
+     for (l,l') in CFG
+        W = [(l,l')] + W
+     for l in CFG do
+        Analysis[l] = {}
+
+  2. Iteration
+     while W != []:
+       (l,l') = W[0]
+       W = W[1:]
+       if F_l(Analysis[l]) not <= Analysis[l']:
+          Analysis[l'] := Analysis[l'] |_| F_l(Analysis[l])
+          for l'' in in_edges(CFG, l'):
+             W = [(l'',l')] + W
+  3. Recording the result
+     LV_after(l) := Analysis[l]
+     LV_before(l) := F_l(Analysis[l])
+
+  Example
+
+    S* = 
+        [y := 1]^1
+        while [x>0]^2
+          [w := y]^3
+          [x := x - 1]^4
+        [z := w]^5
+
+    flow^R(S*) = (2,1),(3,2),(4,3),(2,4),(5,2)
+
+    F_before_1(X) = X - {y}
+    F_before_2(X) = X U {x}
+    F_before_3(X) = (X - {w}) U {y}
+    F_before_4(X) = X U {x}
+    F_before_5(X) = (X - {z}) U {w}
+
+            Analysis                            W
+  step  1       2       3       4       5       
+    1   {}      {}      {}      {}      {}      (2,1),(3,2),(4,3),(2,4),(5,2)
+    2   {x}     {}      {}      {}      {}      (3,2),(4,3),(2,4),(5,2)
+    3   {x}     {y}     {}      {}      {}      (2,1),(2,4),(4,3),(2,4),(5,2)
+    4   {x,y}   {y}     {}      {}      {}      (2,4),(4,3),(2,4),(5,2)
+    5   {x,y}   {y}     {}      {x,y}   {}      (4,3),(4,3),(2,4),(5,2)
+    6   {x,y}   {y}     {x,y}   {x,y}   {}      (3,2),(4,3),(2,4),(5,2)
+    7   {x,y}   {x,y}   {x,y}   {x,y}   {}      (2,1),(2,4),(4,3),(2,4),(5,2)
+    8   {x,y}   {x,y}   {x,y}   {x,y}   {}      (2,4),(4,3),(2,4),(5,2)
+    9   {x,y}   {x,y}   {x,y}   {x,y}   {}      (4,3),(2,4),(5,2)
+    10  {x,y}   {x,y}   {x,y}   {x,y}   {}      (2,4),(5,2)
+    11  {x,y}   {x,y}   {x,y}   {x,y}   {}      (5,2)
+    12  {x,y}   {x,y,w} {x,y}   {x,y}   {}      (2,1),(2,4)
+    13  {x,y,w} {x,y,w} {x,y}   {x,y}   {}      (2,4)
+    14  {x,y,w} {x,y,w} {x,y}   {x,y,w} {}      (4,3)
+    15  {x,y,w} {x,y,w} {x,y,w} {x,y,w} {}      (3,2)
+    16  {x,y,w} {x,y,w} {x,y,w} {x,y,w} {}      
+
+  Constant Propagation and Folding
+
+  z = 3
+  x = 1
+  while x > 0:
+    if x == 1:
+      y = 7
+    else:
+      y = z + 4
+    x = 3
+    print y
+
+  ===>
+
+  z = 3
+  x = 1
+  while x > 0:
+    if x == 1:
+      y = 7
+    else:
+      y = 3 + 4      ***
+    x = 3
+    print y
+
+  ===>
+
+  z = 3
+  x = 1
+  while x > 0:
+    if x == 1:
+      y = 7
+    else:
+      y = 7      ***
+    x = 3
+    print y
+
+  ===>
+
+  z = 3
+  x = 1
+  while x > 0:
+    if x == 1:
+      y = 7
+    else:
+      y = 7
+    x = 3
+    print 7     ***
+
+  Lattice for one program variable:
+    
+         NAC (not a constant)
+
+  1   2    3    4  ...  (definitely a constant)
+
+        UNDEF (don't know anything about the variable)
+
+  The after/before's are mappings from variables to values
+  in the above lattice.
+
+  THE FOLLOWING NEEDS TO BE REVISED -Jeremy
+
+  Constant propagation is a forward analysis
+
+   kill([x:=e]^l) = {(x,c) | for any c}
+   kill([skip]^l) = {}
+   kill([e]^l) = {}
+
+   gen([x:=e}^l) = { (x,eval(e,l)) }
+   gen([skip]^l) = {}
+   gen([e]^l) = {}
+
+   eval(n,l) = n
+   eval(x,l) = c   if  (x, c) in CP_before(l)
+   eval(e1 + e2,l) =
+		       eval(e1,l)
+       eval(e2,l)  bot  1   2  ...  uninit top
+	  bot      bot  bot bot     bot    bot
+	   1       bot  2   3       bot    top
+	   2       bot  3   4       bot    top
+	   ...
+	   uninit  bot  bot bot     bot    bot
+	   top     bot  top top            top
+      
+   CP_before(l) = 
+       if l = init(S*) then
+          {(x,uninit),(y,uninit),...}
+       else
+          |_| { CP_after(l') | (l',l) in flow(S*) }
+
+   CP_after(l) = (CP_before(l) - kill(P[l])) |_| gen(P[l])
