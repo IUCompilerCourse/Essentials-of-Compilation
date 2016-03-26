@@ -1118,10 +1118,6 @@ node is number of bytes of stack space needed for variables in the
 program. (Some of the intermediate languages will store other
 information in that location for the purposes of communicating
 auxiliary data from one step of the compiler to the next. )
-%% \marginpar{Consider mentioning PseudoX86, since I think that's what
-%%   you actually are referring to.}
-%% Not here. PseudoX86 is the language with variables and
-%% instructions that don't obey the x86 rules. -Jeremy
 
 \begin{figure}[tp]
 \fbox{
@@ -1129,7 +1125,7 @@ auxiliary data from one step of the compiler to the next. )
 \[
 \begin{array}{lcl}
 \Arg &::=&  \INT{\Int} \mid \REG{\itm{register}}
-    \mid \STACKLOC{\Int} \\ 
+    \mid (\key{deref}\,\itm{register}\,\Int) \\ 
 \Instr &::=& (\key{addq} \; \Arg\; \Arg) \mid 
              (\key{subq} \; \Arg\; \Arg) \mid 
              (\key{negq} \; \Arg) \mid (\key{movq} \; \Arg\; \Arg) \\
@@ -3227,7 +3223,7 @@ So $0011 \mathrel{\mathrm{XOR}} 0101 = 0110$.
 \[
 \begin{array}{lcl}
 \Arg &::=&  \gray{\INT{\Int} \mid \REG{\itm{register}}
-    \mid \STACKLOC{\Int}} \mid (\key{byte-reg}\; \itm{register}) \\ 
+    \mid (\key{deref}\,\itm{register}\,\Int)} \mid (\key{byte-reg}\; \itm{register}) \\ 
 \itm{cc} & ::= & \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge} \\
 \Instr &::=& \gray{(\key{addq} \; \Arg\; \Arg) \mid 
              (\key{subq} \; \Arg\; \Arg) \mid 
@@ -4305,17 +4301,17 @@ back afterwards.
 \begin{lstlisting}
    (call-live-roots (|$x_0 \ldots x_{n-1}$|) (collect |$\itm{bytes}$|))
    |$\Longrightarrow$|
-   (movq (var |$x_0$|) (offset (reg |$\itm{rootstack}$|) |$0$|))
+   (movq (var |$x_0$|) (deref |$\itm{rootstack}$| |$0$|))
    |$\ldots$|
-   (movq (var |$x_{n-1}$|) (offset (reg |$\itm{rootstack}$|) |$8(n-1)$|))
+   (movq (var |$x_{n-1}$|) (deref |$\itm{rootstack}$| |$8(n-1)$|))
    (addq |$n$| (reg |$\itm{rootstack}$|))
    (movq (reg |$\itm{rootstack}$|) (reg rdi))
    (movq (int |$\itm{bytes}$|) (reg rsi))
    (callq collect)
    (subq |$n$| (reg |$\itm{rootstack}$|))
-   (movq (offset (reg |$\itm{rootstack}$|) |$0$|) (var |$x_0$|))
+   (movq (deref |$\itm{rootstack}$| |$0$|) (var |$x_0$|))
    |$\ldots$|
-   (movq (offset (reg |$\itm{rootstack}$|) |$8(n-1)$|) (var |$x_{n-1}$|))
+   (movq (deref |$\itm{rootstack}$| |$8(n-1)$|) (var |$x_{n-1}$|))
 \end{lstlisting}
 
 \noindent We simply translate \code{initialize} into a call to the
@@ -4367,28 +4363,27 @@ register operands.
    (movq (global-value free_ptr) |$\itm{lhs}'$|)
    (addq (int |$8(\itm{len}+1)$|) (global-value free_ptr))
    (movq |$\itm{lhs}'$| (reg r11))
-   (movq (int |$\itm{tag}$|) (offset (reg r11) 0))
+   (movq (int |$\itm{tag}$|) (deref r11 0))
 \end{lstlisting}
 
 The \code{vector-ref} and \code{vector-set!} forms translate into
-\code{movq} instructions with the appropriate \code{offset}.  (The
+\code{movq} instructions with the appropriate \key{deref}.  (The
 plus one is to get past the tag at the beginning of the tuple
 representation.) 
 \begin{lstlisting}
 (assign |$\itm{lhs}$| (vector-ref |$\itm{vec}$| |$n$|))
   |$\Longrightarrow$|
 (movq |$\itm{vec}'$| (reg r11))
-(movq (offset (reg r11) |$8(n+1)$|) |$\itm{lhs}$|)
+(movq (deref r11 |$8(n+1)$|) |$\itm{lhs}$|)
 
 (assign |$\itm{lhs}$| (vector-set! |$\itm{vec}$| |$n$| |$\itm{arg}$|))
 |$\Longrightarrow$|
 (movq |$\itm{vec}'$| (reg r11))
-(movq |$\itm{arg}'$| (offset (reg r11) |$8(n+1)$|))
+(movq |$\itm{arg}'$| (deref r11 |$8(n+1)$|))
 (movq (int 0) |$\itm{lhs}$|)
 \end{lstlisting}
 The $\itm{vec}'$ and $\itm{arg}'$ are obtained by recursively
 processing $\itm{vec}$ and $\itm{arg}$.
-
 
 
 \begin{figure}[tp]
@@ -4397,9 +4392,8 @@ processing $\itm{vec}$ and $\itm{arg}$.
 \[
 \begin{array}{lcl}
 \Arg &::=&  \gray{  \INT{\Int} \mid \REG{\itm{register}}
-    \mid \STACKLOC{\Int} \mid (\key{byte-reg}\; \itm{register})  } \\ 
-   &\mid& (\key{global-value}\; \itm{name}) 
-   \mid (\key{offset}\,\Arg\,\Int) \\
+    \mid (\key{deref}\,\itm{register}\,\Int) \mid (\key{byte-reg}\; \itm{register})  } \\ 
+   &\mid& (\key{global-value}\; \itm{name}) \\
 \itm{cc} & ::= & \gray{  \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge}  } \\
 \Instr &::=& \gray{(\key{addq} \; \Arg\; \Arg) \mid 
              (\key{subq} \; \Arg\; \Arg) \mid 
@@ -4414,7 +4408,7 @@ processing $\itm{vec}$ and $\itm{arg}$.
        \mid  (\key{jmp} \; \itm{label}) 
        \mid (\key{j}\itm{cc} \; \itm{label})
        \mid (\key{label} \; \itm{label})  } \\
-x86_1 &::= & \gray{  (\key{program} \;\itm{info} \;(\key{type}\;\itm{type})\; \Instr^{+})  }
+x86_2 &::= & \gray{  (\key{program} \;\itm{info} \;(\key{type}\;\itm{type})\; \Instr^{+})  }
 \end{array}
 \]
 \end{minipage}
@@ -4425,8 +4419,7 @@ x86_1 &::= & \gray{  (\key{program} \;\itm{info} \;(\key{type}\;\itm{type})\; \I
 
 The syntax of the $x86_2$ language is defined in
 Figure~\ref{fig:x86-2}.  It differs from $x86_1$ just in the addition
-of the form for global variables and a form for dereferencing an
-address at a given offset.
+of the form for global variables.
 
 Figure~\ref{fig:select-instr-output-gc} shows the output of the
 \code{select-instructions} pass on the running example.
@@ -4457,9 +4450,9 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
     (movq (global-value free_ptr) (var tmp28644))
     (addq (int 16) (global-value free_ptr))
     (movq (var tmp28644) (reg r11))
-    (movq (int 3) (offset (reg r11) 0))
+    (movq (int 3) (deref r11 0))
     (movq (var tmp28644) (reg r11))
-    (movq (int 42) (offset (reg r11) 8))
+    (movq (int 42) (deref r11 8))
 
     (movq (global-value free_ptr) (var end-data28654))
     (addq (int 16) (var end-data28654))
@@ -4467,27 +4460,27 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
     (setl (byte-reg al))
     (movzbq (byte-reg al) (var lt28655))
     (if (eq? (int 0) (var lt28655))
-      ((movq (var tmp28644) (offset (reg r15) 0))
+      ((movq (var tmp28644) (deref r15 0))
        (addq (int 8) (reg r15))
        (movq (reg r15) (reg rdi))
        (movq (int 16) (reg rsi))
        (callq collect)
        (subq (int 8) (reg r15))
-       (movq (offset (reg r15) 0) (var tmp28644)))
+       (movq (deref r15 0) (var tmp28644)))
       ())
 
     (movq (global-value free_ptr) (var tmp28645))
     (addq (int 16) (global-value free_ptr))
     (movq (var tmp28645) (reg r11))
-    (movq (int 131) (offset (reg r11) 0))
+    (movq (int 131) (deref r11 0))
     (movq (var tmp28645) (reg r11))
-    (movq (var tmp28644) (offset (reg r11) 8))
+    (movq (var tmp28644) (deref r11 8))
 
     (movq (var tmp28645) (reg r11))
-    (movq (offset (reg r11) 8) (var tmp28646))
+    (movq (deref r11 8) (var tmp28646))
 
     (movq (var tmp28646) (reg r11))
-    (movq (offset (reg r11) 8) (var tmp28647))
+    (movq (deref r11 8) (var tmp28647))
 
     (movq (var tmp28647) (reg rax)))
 \end{lstlisting}
@@ -4502,7 +4495,7 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
 
 
 \marginpar{\scriptsize We need to show the translation to x86 and what
-  to do about global-value and offset. (to do: this week) \\ --Jeremy}
+  to do about global-value. \\ --Jeremy}
 
 \begin{figure}[tbp]
 \begin{minipage}[t]{0.5\textwidth}
@@ -4636,13 +4629,13 @@ inside each other; they can only be defined at the top level.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-  \Type &::=& \gray{\key{Integer} \mid \key{Boolean}
-         \mid (\key{Vector}\;\Type^{+}) \mid \key{Void}} \mid (\Type^{*} \; \key{->}\; \Type) \\
-  \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)}  \\
-     &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp} 
-      \mid \key{\#t} \mid \key{\#f} \mid
+  \Type &::=& \gray{ \key{Integer} \mid \key{Boolean}
+         \mid (\key{Vector}\;\Type^{+}) \mid \key{Void}  } \mid (\Type^{*} \; \key{->}\; \Type) \\
+  \Exp &::=& \gray{ \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)}  \\
+     &\mid&  \gray{ \Var \mid \LET{\Var}{\Exp}{\Exp} }\\
+    &\mid& \gray{ \key{\#t} \mid \key{\#f} \mid
       (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp)} \\
-      &\mid& \gray{(\key{eq?}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
+      &\mid& \gray{(\itm{relop}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
   &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid 
     (\key{vector-ref}\;\Exp\;\Int)} \\
   &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})} \\
@@ -4799,6 +4792,36 @@ changes to our compiler, that is, do we need any new passes and/or do
 we need to change any existing passes? Also, do we need to add new
 kinds of AST nodes to any of the intermediate languages?
 
+\begin{figure}[tp]
+\centering
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{lcl}
+  \Type &::=& \gray{ \key{Integer} \mid \key{Boolean}
+         \mid (\key{Vector}\;\Type^{+}) \mid \key{Void}  } \mid (\Type^{*} \; \key{->}\; \Type) \\
+  \Exp &::=& \gray{ \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)}  \\
+     &\mid&  (\key{function-ref}\, \itm{label}) 
+     \mid \gray{ \Var \mid \LET{\Var}{\Exp}{\Exp} }\\
+  &\mid& \gray{ \key{\#t} \mid \key{\#f} \mid
+      (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp)} \\
+      &\mid& \gray{(\itm{relop}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
+  &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid 
+    (\key{vector-ref}\;\Exp\;\Int)} \\
+  &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})} \\
+      &\mid& (app\, \Exp \; \Exp^{*}) \\
+  \Def &::=& (\key{define}\; (\itm{label} \; [\Var \key{:} \Type]^{*}) \key{:} \Type \; \Exp) \\
+  F_1 &::=& (\key{program} \; \Def^{*} \; \Exp)
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The $F_1$ language, an extension of $R_3$
+  (Figure~\ref{fig:r3-syntax}).}
+\label{fig:f1-syntax}
+\end{figure}
+
+
 To begin with, the syntax of $R_4$ is inconvenient for purposes of
 compilation because it conflates the use of function names and local
 variables and it conflates the application of primitive operations and
@@ -4812,11 +4835,48 @@ function references from just a symbol $f$ to \code{(function-ref
   $f$)} and that changes function application from \code{($e_0$ $e_1$
   $\ldots$ $e_n$)} to the explicitly tagged AST \code{(app $e_0$ $e_1$
   $\ldots$ $e_n$)}. A good name for this pass is
-\code{reveal-functions}. Placing this pass after \code{uniquify} is a
-good idea, because it will make sure that there are no local variables
-and functions that share the same name. On the other hand,
+\code{reveal-functions} and the output language, $F_1$, is defined in
+Figure~\ref{fig:f1-syntax}. Placing this pass after \code{uniquify} is
+a good idea, because it will make sure that there are no local
+variables and functions that share the same name. On the other hand,
 \code{reveal-functions} needs to come before the \code{flatten} pass
 because \code{flatten} will help us compile \code{function-ref}.
+Figure~\ref{fig:c3-syntax} defines the syntax for $C_3$, the output of
+\key{flatten}. 
+
+
+\begin{figure}[tp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{lcl}
+\Arg &::=& \gray{ \Int \mid \Var \mid \key{\#t} \mid \key{\#f} }
+  \mid (\key{function-ref}\,\itm{label})\\
+\itm{relop} &::= & \gray{  \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=}  } \\
+\Exp &::= & \gray{ \Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)
+      \mid (\key{not}\;\Arg) \mid (\itm{relop}\;\Arg\;\Arg)  } \\
+   &\mid& \gray{  (\key{vector}\, \Arg^{+}) 
+   \mid (\key{vector-ref}\, \Arg\, \Int)  } \\
+   &\mid& \gray{  (\key{vector-set!}\,\Arg\,\Int\,\Arg)  } \\
+   &\mid& (app \,\Arg\,\Arg^{*}) \\
+\Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg} } \\
+      &\mid& \gray{ \IF{(\itm{relop}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} } \\
+      &\mid& \gray{ (\key{initialize}\,\itm{int}\,\itm{int}) }\\
+      &\mid& \gray{ \IF{(\key{collection-needed?}\,\itm{int})}{\Stmt^{*}}{\Stmt^{*}} } \\
+      &\mid& \gray{ (\key{collect} \,\itm{int}) }
+       \mid \gray{ (\key{allocate} \,\itm{int}) }\\
+      &\mid& \gray{ (\key{call-live-roots}\,(\Var^{*}) \,\Stmt^{*}) } \\
+  \Def &::=& (\key{define}\; (\itm{label} \; [\Var \key{:} \Type]^{*}) \key{:} \Type \; \Stmt^{+}) \\
+C_3 & ::= & (\key{program}\;(\Var^{*})\;(\key{type}\;\textit{type})\;(\key{defines}\,\Def^{*})\;\Stmt^{+}) 
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The $C_3$ intermediate language, an extension of $C_2$
+  (Figure~\ref{fig:c2-syntax}).}
+\label{fig:c3-syntax}
+\end{figure}
+
 
 Because each \code{function-ref} needs to eventually become an
 \code{leaq} instruction, it first needs to become an assignment
@@ -4839,7 +4899,48 @@ $\Rightarrow$
 (leaq (function-ref |$f$|) |$\itm{lhs}$|)
 \end{lstlisting}
 \end{minipage}
-\end{tabular} 
+\end{tabular} \\
+%
+The output of select instructions is a program in the x86$_3$
+language, whose syntax is defined in Figure~\ref{fig:x86-3}.
+
+
+\begin{figure}[tp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{lcl}
+\Arg &::=&  \gray{  \INT{\Int} \mid \REG{\itm{register}}
+    \mid (\key{deref}\,\itm{register}\,\Int) \mid (\key{byte-reg}\; \itm{register})  } \\ 
+   &\mid& \gray{  (\key{global-value}\; \itm{name})  } \\
+\itm{cc} & ::= & \gray{  \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge}  } \\
+\Instr &::=& \gray{  (\key{addq} \; \Arg\; \Arg) \mid 
+             (\key{subq} \; \Arg\; \Arg) \mid 
+             (\key{negq} \; \Arg) \mid (\key{movq} \; \Arg\; \Arg)  } \\
+      &\mid& \gray{  (\key{callq} \; \mathit{label}) \mid
+             (\key{pushq}\;\Arg) \mid 
+             (\key{popq}\;\Arg) \mid 
+             (\key{retq})  } \\
+       &\mid& \gray{  (\key{xorq} \; \Arg\;\Arg) 
+       \mid (\key{cmpq} \; \Arg\; \Arg) \mid (\key{set}\itm{cc} \; \Arg)  } \\
+       &\mid& \gray{  (\key{movzbq}\;\Arg\;\Arg) 
+       \mid  (\key{jmp} \; \itm{label}) 
+       \mid (\key{j}\itm{cc} \; \itm{label})
+       \mid (\key{label} \; \itm{label})  } \\
+     &\mid& (\key{indirect-callq}\;\Arg ) \mid (\key{leaq}\;\Arg\;\Arg)\\
+\Def &::= & (\key{define} \; (\itm{label}) \;\itm{int} \;\itm{info}\; \Stmt^{+})\\
+x86_3 &::= & (\key{program} \;\itm{info} \;(\key{type}\;\itm{type})\;
+               (\key{defines}\,\Def^{*}) \; \Instr^{+})
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The x86$_3$ language (extends x86$_2$ of Figure~\ref{fig:x86-2}).}
+\label{fig:x86-3}
+\end{figure}
+
+
+
 
 Next we consider compiling function definitions.  The \code{flatten}
 pass should handle function definitions a lot like a \code{program}
