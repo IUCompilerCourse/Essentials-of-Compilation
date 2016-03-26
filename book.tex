@@ -396,7 +396,7 @@ for gathering several rules, as shown in
 Figure~\ref{fig:r0-syntax}. Each clause between a vertical bar is
 called an {\em alternative}.
 
-\begin{figure}[tbp]
+\begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \[
@@ -924,7 +924,7 @@ values. Figure~\ref{fig:x86-a} defines the syntax for the subset of
 the x86 assembly language needed for this chapter.  (We use the
 AT\&T syntax expected by the GNU assembler inside \key{gcc}.)
 
-\begin{figure}[tbp]
+\begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \[
@@ -1123,7 +1123,7 @@ auxiliary data from one step of the compiler to the next. )
 %% Not here. PseudoX86 is the language with variables and
 %% instructions that don't obey the x86 rules. -Jeremy
 
-\begin{figure}[tbp]
+\begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \[
@@ -1132,7 +1132,6 @@ auxiliary data from one step of the compiler to the next. )
     \mid \STACKLOC{\Int} \\ 
 \Instr &::=& (\key{addq} \; \Arg\; \Arg) \mid 
              (\key{subq} \; \Arg\; \Arg) \mid 
-%             (\key{imulq} \; \Arg\;\Arg) \mid 
              (\key{negq} \; \Arg) \mid (\key{movq} \; \Arg\; \Arg) \\
       &\mid& (\key{callq} \; \mathit{label}) \mid
              (\key{pushq}\;\Arg) \mid 
@@ -1146,9 +1145,8 @@ x86_0 &::= & (\key{program} \;\Int \; \Instr^{+})
 \caption{Abstract syntax for x86 assembly.}
 \label{fig:x86-ast-a}
 \end{figure}
-%% \marginpar{I think this is PseudoX86, not x86.}
 
-\section{Planning the trip from $R_1$ to x86}
+\section{Planning the trip to x86 via the $C_0$ language}
 \label{sec:plan-s0-x86}
 
 To compile one language to another it helps to focus on the
@@ -1248,7 +1246,7 @@ of the program, these variables are uninitialized (they contain garbage)
 and each variable becomes initialized on its first assignment. All of
 the variables used in the program must be present in this list.
 
-\begin{figure}[tbp]
+\begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \[
@@ -2847,6 +2845,10 @@ programs to make sure that your move biasing is working properly.
 \chapter{Booleans, Control Flow, and Type Checking}
 \label{ch:bool-types}
 
+\marginpar{\scriptsize To do: add all the relational operators,
+  <, <=, >, and >=, because we're going to need some of them
+  later. \\ --Jeremy }
+
 Up until now the input languages have only included a single kind of
 value, the integers. In this Chapter we add a second kind of value,
 the Booleans (true and false), together with some new operations
@@ -2901,16 +2903,18 @@ expression. The operators are expanded to include the \key{and} and
 \key{not} operations on Booleans and the \key{eq?} operation for
 comparing two integers and for comparing two Booleans.
 
-\begin{figure}[tbp]
+\begin{figure}[tp]
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
+  \itm{relop} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
   \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)}  \\
-     &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp}} \mid \key{\#t} \mid \key{\#f} \mid
+     &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp}} \\
+     &\mid& \key{\#t} \mid \key{\#f} \mid
       (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp) \\
-      &\mid& (\key{eq?}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp} \\
+      &\mid& (\itm{relop}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp} \\
   R_2 &::=& (\key{program} \; \Exp)
 \end{array}
 \]
@@ -3073,16 +3077,17 @@ add an \key{if} statement. The \key{if} statement of $C_1$ includes an
 Section~\ref{sec:opt-if}.  We do not include \key{and} in $C_1$
 because it is not needed in the translation of the \key{and} of $R_2$.
 
-\begin{figure}[tbp]
+\begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
 \Arg &::=& \gray{\Int \mid \Var} \mid \key{\#t} \mid \key{\#f} \\
+\itm{relop} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
 \Exp &::= & \gray{\Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)}
-      \mid (\key{not}\;\Arg) \mid (\key{eq?}\;\Arg\;\Arg) \\
+      \mid (\key{not}\;\Arg) \mid (\itm{relop}\;\Arg\;\Arg) \\
 \Stmt &::=& \gray{\ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg}} \\
-      &\mid& \IF{(\key{eq?}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} \\
+      &\mid& \IF{(\itm{relop}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} \\
 C_1 & ::= & (\key{program}\;(\Var^{*})\;(\key{type}\;\textit{type})\;\Stmt^{+})
 \end{array}
 \]
@@ -3197,7 +3202,7 @@ running the output programs with \code{interp-C}
 
 To implement the new logical operations, the comparison \key{eq?}, and
 the \key{if} statement, we need to delve further into the x86
-language. Figure~\ref{fig:x86-ast-b} defines the abstract syntax for a
+language. Figure~\ref{fig:x86-2} defines the abstract syntax for a
 larger subset of x86 that includes instructions for logical
 operations, comparisons, and jumps. 
 
@@ -3216,24 +3221,34 @@ Recall the truth table for XOR:
 \end{center}
 So $0011 \mathrel{\mathrm{XOR}} 0101 = 0110$.
 
-\begin{figure}[tbp]
+\begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-\Arg &::=&  \ldots \mid (\key{byte-reg}\; \itm{register}) \\ 
-\Instr &::=& \ldots \mid (\key{xorq} \; \Arg\;\Arg) \\
-       &\mid& (\key{cmpq} \; \Arg\; \Arg) \mid (\key{sete} \; \Arg) 
-              \mid (\key{movzbq}\;\Arg\;\Arg) \\
-      &\mid&  (\key{jmp} \; \itm{label}) \mid (\key{je} \; \itm{label}) \mid
-             (\key{label} \; \itm{label}) \\
+\Arg &::=&  \gray{\INT{\Int} \mid \REG{\itm{register}}
+    \mid \STACKLOC{\Int}} \mid (\key{byte-reg}\; \itm{register}) \\ 
+\itm{cc} & ::= & \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge} \\
+\Instr &::=& \gray{(\key{addq} \; \Arg\; \Arg) \mid 
+             (\key{subq} \; \Arg\; \Arg) \mid 
+             (\key{negq} \; \Arg) \mid (\key{movq} \; \Arg\; \Arg)} \\
+      &\mid& \gray{(\key{callq} \; \mathit{label}) \mid
+             (\key{pushq}\;\Arg) \mid 
+             (\key{popq}\;\Arg) \mid 
+             (\key{retq})} \\
+       &\mid& (\key{xorq} \; \Arg\;\Arg) 
+       \mid (\key{cmpq} \; \Arg\; \Arg) \mid (\key{set}\itm{cc} \; \Arg) \\
+       &\mid& (\key{movzbq}\;\Arg\;\Arg) 
+       \mid  (\key{jmp} \; \itm{label}) 
+       \mid (\key{j}\itm{cc} \; \itm{label})
+       \mid (\key{label} \; \itm{label}) \\
 x86_1 &::= & (\key{program} \;\itm{info} \;(\key{type}\;\itm{type})\; \Instr^{+})
 \end{array}
 \]
 \end{minipage}
 }
 \caption{The x86$_1$ language (extends x86$_0$ of Figure~\ref{fig:x86-ast-a}).}
-\label{fig:x86-ast-b}
+\label{fig:x86-1}
 \end{figure}
 
 The \key{cmpq} instruction is somewhat unusual in that its arguments
@@ -3757,19 +3772,20 @@ come last because it matches \emph{any} compound S-expression.  We do
 not use \code{interp-op} for the \code{and} operation because of the
 short-circuiting behavior in the order of evaluation of its arguments.
 
-\begin{figure}[tbp]
+\begin{figure}[tp]
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
   \Type &::=& \gray{\key{Integer} \mid \key{Boolean}} 
-         \mid (\key{Vector}\;\Type^{+}) \mid \key{Void}\\
-  \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)}  \\
-     &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp} 
-       \mid \key{\#t} \mid \key{\#f} \mid 
-      (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp) }\\
-      &\mid& \gray{(\key{eq?}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
+  \mid (\key{Vector}\;\Type^{+}) \mid \key{Void}\\
+  \itm{relop} &::= & \gray{  \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=}  } \\
+  \Exp &::=& \gray{  \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)  }  \\
+  &\mid&  \gray{  \Var \mid \LET{\Var}{\Exp}{\Exp}  }\\
+  &\mid& \gray{  \key{\#t} \mid \key{\#f} 
+    \mid (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp)  }\\
+  &\mid& \gray{  (\itm{relop}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}  } \\
   &\mid& (\key{vector}\;\Exp^{+}) \mid 
     (\key{vector-ref}\;\Exp\;\Int) \\
   &\mid& (\key{vector-set!}\;\Exp\;\Int\;\Exp)\\
@@ -4094,17 +4110,44 @@ via two vector references.
 
 \subsection{Flatten}
 
-The impact on \code{flatten} is straightforward. We add several $\Exp$
-forms for vectors. Here is the definition of $C_2$, for the output of
-\code{flatten}.
+\begin{figure}[tp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-\Exp &::=& \ldots \mid (\key{vector}\, \Arg^{+}) \\
-   &\mid & (\key{vector-ref}\, \Arg\, \Int) \\
-   &\mid & (\key{vector-set!}\,\Arg\,\Int\,\Arg)
+\Arg &::=& \gray{ \Int \mid \Var \mid \key{\#t} \mid \key{\#f} }\\
+\itm{relop} &::= & \gray{  \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=}  } \\
+\Exp &::= & \gray{ \Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)
+      \mid (\key{not}\;\Arg) \mid (\itm{relop}\;\Arg\;\Arg)  } \\
+   &\mid& (\key{vector}\, \Arg^{+}) 
+   \mid (\key{vector-ref}\, \Arg\, \Int)  \\
+   &\mid& (\key{vector-set!}\,\Arg\,\Int\,\Arg) \\
+\Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg} } \\
+      &\mid& \gray{ \IF{(\itm{relop}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} } \\
+      &\mid& (\key{initialize}\,\itm{int}\,\itm{int}) \\
+      &\mid& \IF{(\key{collection-needed?}\,\itm{int})}{\Stmt^{*}}{\Stmt^{*}} \\
+      &\mid& (\key{collect} \,\itm{int}) \\
+      &\mid& (\key{allocate} \,\itm{int}) \\
+      &\mid& (\key{call-live-roots}\,(\Var^{*}) \,\Stmt^{*}) \\
+C_2 & ::= & \gray{ (\key{program}\;(\Var^{*})\;(\key{type}\;\textit{type})\;\Stmt^{+}) }
 \end{array}
 \]
-The \code{flatten} pass should treat these new forms much like the other
+\end{minipage}
+}
+\caption{The $C_2$ intermediate language, an extension of $C_1$
+  (Figure~\ref{fig:c1-syntax}).}
+\label{fig:c2-syntax}
+\end{figure}
+
+\marginpar{\tiny I don't like the collection-needed form.
+  Would it make sense to instead expose the free-ptr here?\\--Jeremy}
+
+The impact on \code{flatten} is straightforward. We add several $\Exp$
+forms for vectors. The output of \code{flatten} is a program in the
+intermediate language $C_2$, whose syntax is defined in
+Figure~\ref{fig:c2-syntax}.  Some of the forms in $C_2$ do not get
+used in \code{flatten}, but get used in upcoming passes.  The
+\code{flatten} pass should treat the new forms much like the other
 kinds of expressions. The output on our running example is shown in
 Figure~\ref{fig:flatten-gc}.
 
@@ -4136,7 +4179,7 @@ the tag) plus $\itm{len}$ times 8.
   (if (collection-needed? |$\itm{bytes}$|)
       ((collect |$\itm{bytes}$|)) 
       ())
-  (assign |$\itm{lhs}$| (allocate |$\itm{len}\;\itm{type}$|))
+  (assign |$\itm{lhs}$| (allocate |$\itm{len}$|))
   (vector-set! |$\itm{lhs}$| |$0$| |$e_0$|)
   |$\ldots$|
   (vector-set! |$\itm{lhs}$| |$n{-}1$| |$e_{n-1}$|)
@@ -4148,28 +4191,10 @@ to set up the FromSpace, ToSpace, and all the global variables.  The
 two arguments of \code{initialize} specify the initial allocated space
 for the root stack and for the heap.
 %
-\marginpar{\tiny We should say more about how to compute the types.
-  Perhaps give out the code for it. In the long run we should consider
-  having the type checker annotate the AST so we don't need to recover
-  the types. \\--Jeremy}
-%
 Finally, the \code{expose-allocation} pass
 annotates all of the local variables in the \code{program} form with
 their type.
 
-For the output of this pass, we add the following forms to $C_2$ and
-remove the \key{vector} form.
-\marginpar{\tiny I don't like the collection-needed form.
-  Would it make sense to instead expose the free-ptr here?\\--Jeremy}
-\[
-\begin{array}{lcl}
-\Exp  &::=& \ldots \mid (\key{allocate}\, \Int \, \Type) \\
-\Stmt &::=& \ldots \mid (\key{initialize}\,\Int\,\Int) \\
-    &\mid& (\key{collect}\, \Int)  \\
-    &\mid & (\key{if}\;(\key{collection-needed?}\, \Int)\;\Stmt^{*}\,\Stmt^{*}) \\
-C_2 & ::= & (\key{program}\, ((\Var\, . \,\Type)^{*}) \,(\key{type}\,\Type)\, \Stmt^{+})
-\end{array}
-\]
 
 Figure~\ref{fig:expose-alloc-output} shows the output of the
 \code{expose-allocation} pass on our running example.  We highlight in
@@ -4308,18 +4333,14 @@ We translate the special \code{collection-needed?} predicate into code
 that compares the \code{free\_ptr} to the \code{fromspace\_end}.
 %
 \marginpar{\tiny To improve the code generation here, we should
- extend the 'if' form to all the relational operators.
-(to do: this week)\\--Jeremy}
+ extend the 'if' form to all the relational operators.\\--Jeremy}
 %
 \begin{lstlisting}
    (if (collection-needed? |$\itm{bytes}$|) |$\itm{thn}$| |$\itm{els}$|)
    |$\Longrightarrow$|
    (movq (global-value free_ptr) (var end-data.1))
    (addq (int |$\itm{bytes}$|) (var end-data.1))
-   (cmpq (global-value fromspace_end) (var end-data.1))
-   (setl (byte-reg al))
-   (movzbq (byte-reg al) (var lt.1))
-   (if (eq? (int 0) (var lt.1))
+   (if (< (var end-data.1) (global-value fromspace_end))
         |$\itm{thn}'$|
         |$\itm{els}'$|)
 \end{lstlisting}
@@ -4368,17 +4389,45 @@ representation.)
 The $\itm{vec}'$ and $\itm{arg}'$ are obtained by recursively
 processing $\itm{vec}$ and $\itm{arg}$.
 
-The $x86_2$ language differs from $x86_1$ just in the addition of the
-form for global variables and a form for adding an offset to an
-address.
+
+
+\begin{figure}[tp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-\Arg &::=&  \ldots \mid (\key{global-value}\; \itm{name}) 
+\Arg &::=&  \gray{  \INT{\Int} \mid \REG{\itm{register}}
+    \mid \STACKLOC{\Int} \mid (\key{byte-reg}\; \itm{register})  } \\ 
+   &\mid& (\key{global-value}\; \itm{name}) 
    \mid (\key{offset}\,\Arg\,\Int) \\
-\Instr &::= & \ldots \\
-x86_2 &::= & (\key{program} \;\itm{info} \; \Instr^{+})
+\itm{cc} & ::= & \gray{  \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge}  } \\
+\Instr &::=& \gray{(\key{addq} \; \Arg\; \Arg) \mid 
+             (\key{subq} \; \Arg\; \Arg) \mid 
+             (\key{negq} \; \Arg) \mid (\key{movq} \; \Arg\; \Arg)} \\
+      &\mid& \gray{(\key{callq} \; \mathit{label}) \mid
+             (\key{pushq}\;\Arg) \mid 
+             (\key{popq}\;\Arg) \mid 
+             (\key{retq})} \\
+       &\mid& \gray{  (\key{xorq} \; \Arg\;\Arg) 
+       \mid (\key{cmpq} \; \Arg\; \Arg) \mid (\key{set}\itm{cc} \; \Arg)  } \\
+       &\mid& \gray{  (\key{movzbq}\;\Arg\;\Arg) 
+       \mid  (\key{jmp} \; \itm{label}) 
+       \mid (\key{j}\itm{cc} \; \itm{label})
+       \mid (\key{label} \; \itm{label})  } \\
+x86_1 &::= & \gray{  (\key{program} \;\itm{info} \;(\key{type}\;\itm{type})\; \Instr^{+})  }
 \end{array}
 \]
+\end{minipage}
+}
+\caption{The x86$_2$ language (extends x86$_1$ of Figure~\ref{fig:x86-1}).}
+\label{fig:x86-2}
+\end{figure}
+
+The syntax of the $x86_2$ language is defined in
+Figure~\ref{fig:x86-2}.  It differs from $x86_1$ just in the addition
+of the form for global variables and a form for dereferencing an
+address at a given offset.
+
 Figure~\ref{fig:select-instr-output-gc} shows the output of the
 \code{select-instructions} pass on the running example.
 
@@ -4581,7 +4630,7 @@ referenced from inside a function body are other globally-defined
 functions. The syntax of $R_4$ prevents functions from being nested
 inside each other; they can only be defined at the top level.
 
-\begin{figure}[tbp]
+\begin{figure}[tp]
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
@@ -5048,7 +5097,7 @@ In this chapter we shall descibe how to compile $R_5$ back into $R_4$,
 compiling lexically-scoped functions into a combination of functions
 (as in $R_4$) and tuples (as in $R_3$).
 
-\begin{figure}[tbp]
+\begin{figure}[tp]
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
@@ -5428,7 +5477,7 @@ compilation of $R_6$ and $R_7$ in the remainder of this chapter.
 \section{The $R_6$ Language: Typed Racket $+$ \key{Any}}
 \label{sec:r6-lang}
 
-\begin{figure}[tbp]
+\begin{figure}[tp]
 \centering
 \fbox{
 \begin{minipage}{0.97\textwidth}
@@ -5979,6 +6028,11 @@ as the program file name but with \key{.scm} replaced with \key{.s}.
 (define (compile-file passes)
   (lambda (prog-file-name) ...))
 \end{lstlisting}
+
+\section{x86 Instruction Set Quick-Reference}
+\label{sec:x86-quick-reference}
+
+UNDER CONSTRUCTION
 
 \bibliographystyle{plainnat}
 \bibliography{all}
