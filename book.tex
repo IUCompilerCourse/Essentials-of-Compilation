@@ -5401,6 +5401,7 @@ auxilliary function.
 \itm{tagof}(\key{Integer}) &= 00 \\
 \itm{tagof}(\key{Boolean}) &= 01 \\
 \itm{tagof}((\key{Vector} \ldots)) &= 10 \\
+\itm{tagof}((\key{Vectorof} \ldots)) &= 10 \\
 \itm{tagof}((\ldots \key{->} \ldots)) &= 11 
 \end{align*}
 This stealing of 2 bits comes at some
@@ -5642,19 +5643,16 @@ $\Rightarrow$
 \paragraph{Project}
 
 
-\marginpar{\scriptsize To do: the inner 'if' is unnecessary because
- we know T at compile time. Also, we need to check function arity. \\ --Jeremy}
-
-The instruction selection for \key{project} is a bit more involved. We
-first check to see if the tag on the tagged value matches the tag of
-the target type $T$. If not, we halt the program by calling the
-\code{exit} function. If we have a match, we need to produce an
-untagged value and have two separate code paths depending on whether
-we're dealing a pointer (to a vector or procedure) or not.  If it's a
-pointer, then we need to zero-out the rightmost 2 bits, which we
-accomplish using \key{andq} and the value $1\ldots 100$.  If the
-tagged value is not a pointer (a Boolean or integer), then we turn it
-into a untagged value by shifting it to the right by 2 bits. \\
+The instruction selection for \key{project} is a bit more involved.
+Like \key{inject}, the instructions are different depending on whether
+the type $T$ is a pointer (vector or procedure) or not (Integer or
+Boolean). The following shows the instruction selection for Integer
+and Boolean.  We first check to see if the tag on the tagged value
+matches the tag of the target type $T$. If not, we halt the program by
+calling the \code{exit} function. If we have a match, we need to
+produce an untagged value by shifting it to the right by 2 bits.
+%
+\\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -5669,13 +5667,39 @@ $\Rightarrow$
 (movq |$e'$| |\itm{lhs}'|)
 (andq (int 3) |\itm{lhs}'|)
 (if (eq? |\itm{lhs}'| (int |$\itm{tagof}(T)$|))
-    ((andq (int 2) |\itm{lhs}'|)
-     (if (eq? |\itm{lhs}'| (int 2))
-         ((movq (int 3) |\itm{lhs}'|)
-          (notq |\itm{lhs}'|)
-          (andq |$e'$| |\itm{lhs}'|))
-         ((movq |$e'$| |\itm{lhs}'|)
-          (sarq (int 2) |\itm{lhs}'|))))
+    ((movq |$e'$| |\itm{lhs}'|)
+     (sarq (int 2) |\itm{lhs}'|))
+    ((callq exit)))
+\end{lstlisting}
+\end{minipage}
+\end{tabular}  \\
+%
+The case for vectors and procedures begins in a similar way, checking
+that the runtime tag matches the target type $T$ and exiting if there
+is a mismatch. However, the way in which we convert the tagged value
+to a value is different, as there is no need to shift. Instead we need
+to zero-out the rightmost 2 bits. We accomplish this by creating the
+bit pattern $\ldots 0011$, applying \code{notq} to obtain $\ldots
+1100$, and then applying \code{andq} with the tagged value get the
+desired result. \\
+%
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(assign |\itm{lhs}| (project |$e$| |$T$|))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}
+(movq |$e'$| |\itm{lhs}'|)
+(andq (int 3) |\itm{lhs}'|)
+(if (eq? |\itm{lhs}'| (int |$\itm{tagof}(T)$|))
+    ((movq (int 3) |\itm{lhs}'|)
+     (notq |\itm{lhs}'|)
+     (andq |$e'$| |\itm{lhs}'|))
     ((callq exit)))
 \end{lstlisting}
 \end{minipage}
@@ -5685,13 +5709,165 @@ $\Rightarrow$
 devise a sequence of instructions to implement the type predicates
 \key{boolean?}, \key{integer?}, \key{vector?}, and \key{procedure?}.
 
-
-
-
 \section{Compiling $R_7$ to $R_6$}
 \label{sec:compile-r7}
 
+Figure~\ref{fig:compile-r7-r6} shows the compilation of many of the
+$R_7$ forms into $R_6$. An important invariant of this pass is that
+given a subexpression $e$ of $R_7$, the pass will produce an
+expression $e'$ of $R_6$ that has type \key{Any}. For example, the
+first row in Figure~\ref{fig:compile-r7-r6} shows the compilation of
+the Boolean \code{\#t}, which must be injected to produce an
+expression of type \key{Any}.
+%
+The second row of Figure~\ref{fig:compile-r7-r6}, the compilation of
+addition, is representative of compilation for many operations: the
+arguments have type \key{Any} and must be projected to \key{Integer}
+before the addition can be performed.
+%
+The compilation of \key{lambda} (third row of
+Figure~\ref{fig:compile-r7-r6}) shows what happens when we need to
+produce type annotations, we simply use \key{Any}.
+%
+The compilation of \code{if}, \code{eq?}, and \code{and} all
+demonstrate how this pass has to account for some differences in
+behavior between $R_7$ and $R_6$. The $R_7$ language is more
+permissive than $R_6$ regarding what kind of values can be used in
+various places. For example, the condition of an \key{if} does not
+have to be a Boolean. Similarly, the arguments of \key{and} do not
+need to be Boolean. For \key{eq?}, the arguments need not be of the
+same type.
 
+\begin{figure}[tbp]
+\centering
+\begin{tabular}{|lll|} \hline
+\begin{minipage}{0.25\textwidth}
+\begin{lstlisting}
+#t
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.6\textwidth}
+\begin{lstlisting}
+(inject #t Boolean)
+\end{lstlisting}
+\end{minipage}
+\\[2ex]\hline
+\begin{minipage}{0.25\textwidth}
+\begin{lstlisting}
+(+ |$e_1$| |$e_2$|)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.6\textwidth}
+\begin{lstlisting}
+(inject 
+   (+ (project |$e'_1$| Integer)
+      (project |$e'_2$| Integer))
+   Integer)
+\end{lstlisting}
+\end{minipage}
+\\[2ex]\hline
+\begin{minipage}{0.25\textwidth}
+\begin{lstlisting}
+(lambda (|$x_1 \ldots$|) |$e$|)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.6\textwidth}
+\begin{lstlisting}
+(lambda: ([|$x_1$|:Any]|$\ldots$|):Any |$e'$|)
+\end{lstlisting}
+\end{minipage}
+\\[2ex]\hline
+\begin{minipage}{0.25\textwidth}
+\begin{lstlisting}
+(app |$e_0$| |$e_1 \ldots e_n$|)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.6\textwidth}
+\begin{lstlisting}
+(app (project |$e'_0$| (Any|$\ldots$|Any -> Any))
+   |$e'_1 \ldots e'_n$|)
+\end{lstlisting}
+\end{minipage}
+\\[2ex]\hline
+\begin{minipage}{0.25\textwidth}
+\begin{lstlisting}
+(vector-ref |$e_1$| |$e_2$|)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.6\textwidth}
+\begin{lstlisting}
+(let ([tmp1 (project |$e'_1$| (Vectorof Any))])
+  (let ([tmp2 (project |$e'_2$| Integer)])
+     (vector-ref tmp1 tmp2)))
+\end{lstlisting}
+\end{minipage}
+\\[2ex]\hline
+\begin{minipage}{0.25\textwidth}
+\begin{lstlisting}
+(if |$e_1$| |$e_2$| |$e_3$|)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.6\textwidth}
+\begin{lstlisting}
+(if (eq? |$e'_1$| (inject #f Boolean))
+   |$e'_2$|
+   |$e'_3$|)
+\end{lstlisting}
+\end{minipage}
+\\[2ex]\hline
+\begin{minipage}{0.25\textwidth}
+\begin{lstlisting}
+(eq? |$e_1$| |$e_2$|)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.6\textwidth}
+\begin{lstlisting}
+(eq? |$e'_1$| |$e'_2$|)
+\end{lstlisting}
+\end{minipage}
+\\[2ex]\hline
+\begin{minipage}{0.25\textwidth}
+\begin{lstlisting}
+(and |$e_1$| |$e_2$|)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.6\textwidth}
+\begin{lstlisting}
+(let ([tmp |$e'_1$|])
+   (if (eq? t (inject #f Boolean))
+      tmp
+      |$e'_2$|))
+\end{lstlisting}
+\end{minipage} \\\hline
+\end{tabular}  \\
+
+\caption{Compiling $R_7$ (Untyped Racket) to $R_6$.}
+\label{fig:compile-r7-r6}
+\end{figure}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Gradual Typing}
