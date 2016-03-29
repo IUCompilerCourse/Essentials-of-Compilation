@@ -2841,10 +2841,6 @@ programs to make sure that your move biasing is working properly.
 \chapter{Booleans, Control Flow, and Type Checking}
 \label{ch:bool-types}
 
-\marginpar{\scriptsize To do: add all the relational operators,
-  <, <=, >, and >=, because we're going to need some of them
-  later. \\ --Jeremy }
-
 Up until now the input languages have only included a single kind of
 value, the integers. In this Chapter we add a second kind of value,
 the Booleans (true and false), together with some new operations
@@ -2905,12 +2901,12 @@ comparing two integers and for comparing two Booleans.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-  \itm{relop} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
+  \itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
   \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)}  \\
      &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp}} \\
      &\mid& \key{\#t} \mid \key{\#f} \mid
       (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp) \\
-      &\mid& (\itm{relop}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp} \\
+      &\mid& (\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp} \\
   R_2 &::=& (\key{program} \; \Exp)
 \end{array}
 \]
@@ -3079,11 +3075,11 @@ because it is not needed in the translation of the \key{and} of $R_2$.
 \[
 \begin{array}{lcl}
 \Arg &::=& \gray{\Int \mid \Var} \mid \key{\#t} \mid \key{\#f} \\
-\itm{relop} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
+\itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
 \Exp &::= & \gray{\Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)}
-      \mid (\key{not}\;\Arg) \mid (\itm{relop}\;\Arg\;\Arg) \\
+      \mid (\key{not}\;\Arg) \mid (\itm{cmp}\;\Arg\;\Arg) \\
 \Stmt &::=& \gray{\ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg}} \\
-      &\mid& \IF{(\itm{relop}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} \\
+      &\mid& \IF{(\itm{cmp}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} \\
 C_1 & ::= & (\key{program}\;(\Var^{*})\;(\key{type}\;\textit{type})\;\Stmt^{+})
 \end{array}
 \]
@@ -3196,11 +3192,11 @@ running the output programs with \code{interp-C}
 \section{XOR, Comparisons, and Control Flow in x86}
 \label{sec:x86-1}
 
-To implement the new logical operations, the comparison \key{eq?}, and
-the \key{if} statement, we need to delve further into the x86
+To implement the new logical operations, the comparison operations,
+and the \key{if} statement, we need to delve further into the x86
 language. Figure~\ref{fig:x86-2} defines the abstract syntax for a
 larger subset of x86 that includes instructions for logical
-operations, comparisons, and jumps. 
+operations, comparisons, and jumps.
 
 In addition to its arithmetic operations, x86 provides bitwise
 operators that perform an operation on every bit of their
@@ -3223,7 +3219,8 @@ So $0011 \mathrel{\mathrm{XOR}} 0101 = 0110$.
 \[
 \begin{array}{lcl}
 \Arg &::=&  \gray{\INT{\Int} \mid \REG{\itm{register}}
-    \mid (\key{deref}\,\itm{register}\,\Int)} \mid (\key{byte-reg}\; \itm{register}) \\ 
+    \mid (\key{deref}\,\itm{register}\,\Int)} \\
+     &\mid& (\key{byte-reg}\; \itm{register}) \\ 
 \itm{cc} & ::= & \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge} \\
 \Instr &::=& \gray{(\key{addq} \; \Arg\; \Arg) \mid 
              (\key{subq} \; \Arg\; \Arg) \mid 
@@ -3233,10 +3230,10 @@ So $0011 \mathrel{\mathrm{XOR}} 0101 = 0110$.
              (\key{popq}\;\Arg) \mid 
              (\key{retq})} \\
        &\mid& (\key{xorq} \; \Arg\;\Arg) 
-       \mid (\key{cmpq} \; \Arg\; \Arg) \mid (\key{set}\itm{cc} \; \Arg) \\
+       \mid (\key{cmpq} \; \Arg\; \Arg) \mid (\key{set}\;\itm{cc} \; \Arg) \\
        &\mid& (\key{movzbq}\;\Arg\;\Arg) 
        \mid  (\key{jmp} \; \itm{label}) 
-       \mid (\key{j}\itm{cc} \; \itm{label})
+       \mid (\key{jmp-if}\; \itm{cc} \; \itm{label})
        \mid (\key{label} \; \itm{label}) \\
 x86_1 &::= & (\key{program} \;\itm{info} \;(\key{type}\;\itm{type})\; \Instr^{+})
 \end{array}
@@ -3251,20 +3248,22 @@ The \key{cmpq} instruction is somewhat unusual in that its arguments
 are the two things to be compared and the result (less than, greater
 than, equal, not equal, etc.) is placed in the special EFLAGS
 register. This register cannot be accessed directly but it can be
-queried by a number of instructions, including the \key{sete}
-instruction. The \key{sete} instruction puts a \key{1} or \key{0} into
-its destination depending on whether the comparison came out as equal
-or not, respectively. The \key{sete} instruction has an annoying quirk
-in that its destination argument must be single byte register, such as
-\code{al}, which is part of the \code{rax} register.  Thankfully, the
-\key{movzbq} instruction can then be used to move from a single byte
-register to a normal 64-bit register.
+queried by a number of instructions, including the \key{set}
+instruction. The \key{set} instruction puts a \key{1} or \key{0} into
+its destination depending on whether the comparison came out according
+to the condition code \itm{cc} ('e' for equal, 'l' for less, 'le' for
+less-or-equal, 'g' for greater, 'ge' for greater-or-equal). The
+\key{set} instruction has an annoying quirk in that its destination
+argument must be single byte register, such as \code{al}, which is
+part of the \code{rax} register.  Thankfully, the \key{movzbq}
+instruction can then be used to move from a single byte register to a
+normal 64-bit register.
 
 The \key{jmp} instruction jumps to the instruction after the indicated
-label.  The \key{je} instruction jumps to the instruction after the
-indicated label if the result in the EFLAGS register is equal, whereas
-the \key{je} instruction falls through to the next instruction if
-EFLAGS is not equal.
+label.  The \key{jmp-if} instruction jumps to the instruction after
+the indicated label depending whether the result in the EFLAGS
+register matches the condition code \itm{cc}, otherwise the
+\key{jmp-if} instruction falls through to the next instruction.
 
 \section{Select Instructions}
 \label{sec:select-r2}
@@ -3301,7 +3300,7 @@ $\Rightarrow$
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
 (cmpq |$\Arg_1$| |$\Arg_2$|)
-(sete (byte-reg al))
+(set e (byte-reg al))
 (movzbq (byte-reg al) |$\itm{lhs}$|)
 \end{lstlisting}
 \end{minipage}
@@ -3448,7 +3447,7 @@ $\Rightarrow$
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
  (cmpq |$e_1$| |$e_2$|)
- (je |$\itm{thenlabel}$|)
+ (jmp-if e |$\itm{thenlabel}$|)
  |$\itm{elss}$|
  (jmp |$\itm{endlabel}$|)
  (label |$\itm{thenlabel}$|)
@@ -3466,7 +3465,7 @@ your previously created programs on the \code{interp-x86} interpreter
 
 \section{Patch Instructions}
 
-There are no special restrictions on the instructions \key{je},
+There are no special restrictions on the instructions \key{jmp-if},
 \key{jmp}, and \key{label}, but there is an unusual restriction on
 \key{cmpq}. The second argument is not allowed to be an immediate
 value (such as a literal integer). If you are comparing two
@@ -3510,7 +3509,7 @@ $\Downarrow$
   (callq read_int)
   (movq (reg rax) (var t.1))
   (cmpq (int 1) (var t.1))
-  (sete (byte-reg al))
+  (set e (byte-reg al))
   (movzbq (byte-reg al) (var t.2))
   (if (eq? (int 1) (var t.2))
     ((movq (int 42) (var if.1)))
@@ -3776,12 +3775,12 @@ short-circuiting behavior in the order of evaluation of its arguments.
 \begin{array}{lcl}
   \Type &::=& \gray{\key{Integer} \mid \key{Boolean}} 
   \mid (\key{Vector}\;\Type^{+}) \mid \key{Void}\\
-  \itm{relop} &::= & \gray{  \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=}  } \\
+  \itm{cmp} &::= & \gray{  \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=}  } \\
   \Exp &::=& \gray{  \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)  }  \\
   &\mid&  \gray{  \Var \mid \LET{\Var}{\Exp}{\Exp}  }\\
   &\mid& \gray{  \key{\#t} \mid \key{\#f} 
     \mid (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp)  }\\
-  &\mid& \gray{  (\itm{relop}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}  } \\
+  &\mid& \gray{  (\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}  } \\
   &\mid& (\key{vector}\;\Exp^{+}) \mid 
     (\key{vector-ref}\;\Exp\;\Int) \\
   &\mid& (\key{vector-set!}\;\Exp\;\Int\;\Exp)\\
@@ -4112,14 +4111,14 @@ via two vector references.
 \[
 \begin{array}{lcl}
 \Arg &::=& \gray{ \Int \mid \Var \mid \key{\#t} \mid \key{\#f} }\\
-\itm{relop} &::= & \gray{  \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=}  } \\
+\itm{cmp} &::= & \gray{  \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=}  } \\
 \Exp &::= & \gray{ \Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)
-      \mid (\key{not}\;\Arg) \mid (\itm{relop}\;\Arg\;\Arg)  } \\
+      \mid (\key{not}\;\Arg) \mid (\itm{cmp}\;\Arg\;\Arg)  } \\
    &\mid& (\key{vector}\, \Arg^{+}) 
    \mid (\key{vector-ref}\, \Arg\, \Int)  \\
    &\mid& (\key{vector-set!}\,\Arg\,\Int\,\Arg) \\
 \Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg} } \\
-      &\mid& \gray{ \IF{(\itm{relop}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} } \\
+      &\mid& \gray{ \IF{(\itm{cmp}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} } \\
       &\mid& (\key{initialize}\,\itm{int}\,\itm{int}) \\
       &\mid& \IF{(\key{collection-needed?}\,\itm{int})}{\Stmt^{*}}{\Stmt^{*}} \\
       &\mid& (\key{collect} \,\itm{int}) \\
@@ -4439,7 +4438,7 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
     (movq (global-value free_ptr) (var end-data28651))
     (addq (int 16) (var end-data28651))
     (cmpq (global-value fromspace_end) (var end-data28651))
-    (setl (byte-reg al))
+    (set l (byte-reg al))
     (movzbq (byte-reg al) (var lt28652))
     (if (eq? (int 0) (var lt28652))
       ((movq (reg r15) (reg rdi))
@@ -4457,7 +4456,7 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
     (movq (global-value free_ptr) (var end-data28654))
     (addq (int 16) (var end-data28654))
     (cmpq (global-value fromspace_end) (var end-data28654))
-    (setl (byte-reg al))
+    (set l (byte-reg al))
     (movzbq (byte-reg al) (var lt28655))
     (if (eq? (int 0) (var lt28655))
       ((movq (var tmp28644) (deref r15 0))
@@ -4635,7 +4634,7 @@ inside each other; they can only be defined at the top level.
      &\mid&  \gray{ \Var \mid \LET{\Var}{\Exp}{\Exp} }\\
     &\mid& \gray{ \key{\#t} \mid \key{\#f} \mid
       (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp)} \\
-      &\mid& \gray{(\itm{relop}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
+      &\mid& \gray{(\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
   &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid 
     (\key{vector-ref}\;\Exp\;\Int)} \\
   &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})} \\
@@ -4805,7 +4804,7 @@ kinds of AST nodes to any of the intermediate languages?
      \mid \gray{ \Var \mid \LET{\Var}{\Exp}{\Exp} }\\
   &\mid& \gray{ \key{\#t} \mid \key{\#f} \mid
       (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp)} \\
-      &\mid& \gray{(\itm{relop}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
+      &\mid& \gray{(\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
   &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid 
     (\key{vector-ref}\;\Exp\;\Int)} \\
   &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})} \\
@@ -4852,15 +4851,15 @@ Figure~\ref{fig:c3-syntax} defines the syntax for $C_3$, the output of
 \begin{array}{lcl}
 \Arg &::=& \gray{ \Int \mid \Var \mid \key{\#t} \mid \key{\#f} }
   \mid (\key{function-ref}\,\itm{label})\\
-\itm{relop} &::= & \gray{  \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=}  } \\
+\itm{cmp} &::= & \gray{  \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=}  } \\
 \Exp &::= & \gray{ \Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)
-      \mid (\key{not}\;\Arg) \mid (\itm{relop}\;\Arg\;\Arg)  } \\
+      \mid (\key{not}\;\Arg) \mid (\itm{cmp}\;\Arg\;\Arg)  } \\
    &\mid& \gray{  (\key{vector}\, \Arg^{+}) 
    \mid (\key{vector-ref}\, \Arg\, \Int)  } \\
    &\mid& \gray{  (\key{vector-set!}\,\Arg\,\Int\,\Arg)  } \\
    &\mid& (app \,\Arg\,\Arg^{*}) \\
 \Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg} } \\
-      &\mid& \gray{ \IF{(\itm{relop}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} } \\
+      &\mid& \gray{ \IF{(\itm{cmp}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} } \\
       &\mid& \gray{ (\key{initialize}\,\itm{int}\,\itm{int}) }\\
       &\mid& \gray{ \IF{(\key{collection-needed?}\,\itm{int})}{\Stmt^{*}}{\Stmt^{*}} } \\
       &\mid& \gray{ (\key{collect} \,\itm{int}) }
