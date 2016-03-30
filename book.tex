@@ -3795,8 +3795,12 @@ which we add the $2$, the element at index $0$ of the 1-tuple.
         44))
 \end{lstlisting}
 
-Figure~\ref{fig:interp-R3} shows the interpreter for the $R_3$
-language. 
+\marginpar{\tiny to do: propagate the use of 'app' to earlier in the book
+  and explain it. \\ --Jeremy}
+
+Figure~\ref{fig:interp-R3} shows the definitional interpreter for the
+$R_3$ language and Figure~\ref{fig:typecheck-R3} shows the type
+checker.
 
 \begin{figure}[tp]
 \centering
@@ -3821,7 +3825,7 @@ language.
 \]
 \end{minipage}
 }
-\caption{The $R_3$ language, an extension of $R_2$
+\caption{Syntax of the $R_3$ language, an extension of $R_2$
   (Figure~\ref{fig:r2-syntax}).}
 \label{fig:r3-syntax}
 \end{figure}
@@ -3845,8 +3849,56 @@ language.
          [else (error 'interp-R3 "unrecognized expression")]
          )))
 \end{lstlisting}
-\caption{Interpreter for the $R_3$ language.}
+\caption{Definitional interpreter for the $R_3$ language.}
 \label{fig:interp-R3}
+\end{figure}
+
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+(define (typecheck-R3 env)
+  (lambda (e)
+    (match e
+      ...
+      ['(void) (values '(has-type (void) Void) 'Void)]
+      [`(vector ,(app (type-check env) e* t*) ...)
+       (let ([t `(Vector ,@t*)])
+         (values `(has-type (vector ,@e*) ,t) t))]
+      [`(vector-ref ,(app (type-check env) e t) ,i)
+       (match t
+         [`(Vector ,ts ...)
+          (unless (and (exact-nonnegative-integer? i)
+                       (i . < . (length ts)))
+                  (error 'type-check "invalid index ~a" i))
+          (let ([t (list-ref ts i)])
+            (values `(has-type (vector-ref ,e (has-type ,i Integer)) ,t) 
+                    t))]
+         [else (error "expected a vector in vector-ref, not" t)])]
+      [`(vector-set! ,(app (type-check env) e-vec^ t-vec) ,i 
+                     ,(app (type-check env) e-arg^ t-arg)) 
+       (match t-vec
+         [`(Vector ,ts ...)
+          (unless (and (exact-nonnegative-integer? i)
+                       (i . < . (length ts)))
+            (error 'type-check "invalid index ~a" i))
+          (unless (equal? (list-ref ts i) t-arg)
+            (error 'type-check "type mismatch in vector-set! ~a ~a" 
+                   (list-ref ts i) t-arg))
+          (values `(has-type (vector-set! ,e-vec^
+                                          (has-type ,i Integer)
+                                          ,e-arg^) Void) 'Void)]
+         [else (error 'type-check
+                      "expected a vector in vector-set!, not ~a" t-vec)])]
+      [`(eq? ,(app (type-check env) e1 t1) 
+              ,(app (type-check env) e2 t2))
+       (match* (t1 t2)
+         [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))
+          (values `(has-type (eq? ,e1 ,e2) Boolean) 'Boolean)]
+         [(other wise) ((super type-check env) e)])]
+      )))
+\end{lstlisting}
+\caption{Type checker for the $R_3$ language.}
+\label{fig:typecheck-R3}
 \end{figure}
 
 Tuples are our first encounter with heap-allocated data, which raises
@@ -5593,24 +5645,26 @@ depends on the result of \code{(read)}.
 The way around this problem is to include information about a value's
 runtime type in the value itself, so that this information can be
 inspected by operators such as \code{not}.  In particular, we shall
-steal the 2 right-most bits from our 64-bit values to encode the
-runtime type.  We shall use $00$ to identify integers, $01$ for
-Booleans, $10$ for vectors, and $11$ for procedures. We shall refer to
-these two bits as the \emph{tag} and we define the following
-auxilliary function. 
+steal the 3 right-most bits from our 64-bit values to encode the
+runtime type.  We shall use $000$ to identify integers, $001$ for
+Booleans, $010$ for vectors, $011$ for procedures, and $100$ for the
+void value. We shall refer to these 3 bits as the \emph{tag} and we
+define the following auxilliary function.
 \begin{align*}
-\itm{tagof}(\key{Integer}) &= 00 \\
-\itm{tagof}(\key{Boolean}) &= 01 \\
-\itm{tagof}((\key{Vector} \ldots)) &= 10 \\
-\itm{tagof}((\key{Vectorof} \ldots)) &= 10 \\
-\itm{tagof}((\ldots \key{->} \ldots)) &= 11 
+\itm{tagof}(\key{Integer}) &= 000 \\
+\itm{tagof}(\key{Boolean}) &= 001 \\
+\itm{tagof}((\key{Vector} \ldots)) &= 010 \\
+\itm{tagof}((\key{Vectorof} \ldots)) &= 010 \\
+\itm{tagof}((\ldots \key{->} \ldots)) &= 011 \\
+\itm{tagof}(\key{Void}) &= 100 
 \end{align*}
-This stealing of 2 bits comes at some
-price: our integers are reduced to ranging from $-2^{61}$ to
-$2^{61}$. The stealing does not adversely affect vectors and
+(We shall say more about the new \key{Vectorof} type shortly.)
+This stealing of 3 bits comes at some
+price: our integers are reduced to ranging from $-2^{60}$ to
+$2^{60}$. The stealing does not adversely affect vectors and
 procedures because those values are addresses, and our addresses are
 8-byte aligned so the rightmost 3 bits are unused, they are always
-$000$. Thus, we do not lose information by overwriting the rightmost 2
+$000$. Thus, we do not lose information by overwriting the rightmost 3
 bits with the tag and we can simply zero-out the tag to recover the
 original address.
 
@@ -5715,6 +5769,8 @@ The type checker for $R_6$ is given in Figure~\ref{fig:typecheck-R6}.
 \caption{Type checker for the $R_6$ language.}
 \label{fig:typecheck-R6}
 \end{figure}
+
+% to do: add rules for vector-ref, etc. for Vectorof
 
 
 %Also, \key{eq?} is extended to operate on values of type \key{Any}.
