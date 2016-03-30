@@ -2929,8 +2929,46 @@ the \code{and} operation is short-circuiting. That is, the second
 expression \code{e2} is not evaluated if \code{e1} evaluates to
 \code{\#f}.
 
+With the addition of the comparison operations, there are quite a few
+primitive operations and the interpreter code for them is somewhat
+repetitive. In Figure~\ref{fig:interp-R2} we factor out the different
+parts into the \code{interp-op} function and the similar parts into
+the one match clause shown in Figure~\ref{fig:interp-R2}. It is
+important for that match clause to come last because it matches
+\emph{any} compound S-expression.  We do not use \code{interp-op} for
+the \code{and} operation because of the short-circuiting behavior in
+the order of evaluation of its arguments.
+
+
 \begin{figure}[tbp]
 \begin{lstlisting}
+    (define primitives (set '+ '- 'eq? '< '<= '> '>= 'not 'read))
+
+    (define (interp-op op)
+      (match op
+         ['+ fx+]
+         ['- (lambda (n) (fx- 0 n))]
+         ['not (lambda (v) (match v [#t #f] [#f #t]))]
+	 ['read read-fixnum]
+         ['eq? (lambda (v1 v2)
+                 (cond [(or (and (fixnum? v1) (fixnum? v2))
+                            (and (boolean? v1) (boolean? v2))
+                            (and (vector? v1) (vector? v2)))
+                        (eq? v1 v2)]))]
+         ['< (lambda (v1 v2)
+                 (cond [(and (fixnum? v1) (fixnum? v2))
+                        (< v1 v2)]))]
+         ['<= (lambda (v1 v2)
+                 (cond [(and (fixnum? v1) (fixnum? v2))
+                        (<= v1 v2)]))]
+         ['> (lambda (v1 v2)
+                 (cond [(and (fixnum? v1) (fixnum? v2))
+                        (<= v1 v2)]))]
+         ['>= (lambda (v1 v2)
+                 (cond [(and (fixnum? v1) (fixnum? v2))
+                        (<= v1 v2)]))]
+	 [else (error 'interp-op "unknown operator")]))
+
    (define (interp-R2 env e)
      (match e
        ...
@@ -2945,10 +2983,8 @@ expression \code{e2} is not evaluated if \code{e1} evaluates to
          (match (interp-R2 env e1)
            [#t (match (interp-R2 env e2) [#t #t] [#f #f])]
            [#f #f])]
-       [`(eq? ,e1 ,e2)
-         (let ([v1 (interp-R2 env e1)] [v2 (interp-R2 env e2)])
-           (cond [(and (fixnum? v1) (fixnum? v2)) (eq? v1 v2)]
-                 [(and (boolean? v1) (boolean? v2)) (eq? v1 v2)]))]
+       [`(,op ,args ...) #:when (set-member? primitives op)
+         (apply (interp-op op) (map (interp-R2 env) args))]
        ))
 \end{lstlisting}
 \caption{Interpreter for the $R_2$ language.}
@@ -3233,8 +3269,8 @@ So $0011 \mathrel{\mathrm{XOR}} 0101 = 0110$.
        \mid (\key{cmpq} \; \Arg\; \Arg) \mid (\key{set}\;\itm{cc} \; \Arg) \\
        &\mid& (\key{movzbq}\;\Arg\;\Arg) 
        \mid  (\key{jmp} \; \itm{label}) 
-       \mid (\key{jmp-if}\; \itm{cc} \; \itm{label})
-       \mid (\key{label} \; \itm{label}) \\
+       \mid (\key{jmp-if}\; \itm{cc} \; \itm{label}) \\
+       &\mid& (\key{label} \; \itm{label}) \\
 x86_1 &::= & (\key{program} \;\itm{info} \;(\key{type}\;\itm{type})\; \Instr^{+})
 \end{array}
 \]
@@ -3726,6 +3762,9 @@ if_end21289:
   things to discuss in this chapter. \\ --Jeremy}
 \marginpar{\scriptsize To do: Flesh out this chapter, e.g., make sure
   all the IR grammars are spelled out! \\ --Jeremy}
+\marginpar{\scriptsize Introduce has-type, but after flatten, remove it,
+  but keep type annotations on vector creation and local variables, function
+  parameters, etc. \\ --Jeremy}
 
 In this chapter we study the implementation of mutable tuples (called
 ``vectors'' in Racket). This language feature is the first to require
@@ -3757,15 +3796,7 @@ which we add the $2$, the element at index $0$ of the 1-tuple.
 \end{lstlisting}
 
 Figure~\ref{fig:interp-R3} shows the interpreter for the $R_3$
-language. With the addition of the vector operations, there are quite
-a few primitive operations and the interpreter code for them is
-somewhat repetitive. In Figure~\ref{fig:interp-R3} we factor out the
-different parts into the \code{interp-op} function and the similar
-parts into the one match clause shown in
-Figure~\ref{fig:interp-R3}. It is important for that match clause to
-come last because it matches \emph{any} compound S-expression.  We do
-not use \code{interp-op} for the \code{and} operation because of the
-short-circuiting behavior in the order of evaluation of its arguments.
+language. 
 
 \begin{figure}[tp]
 \centering
@@ -3797,21 +3828,13 @@ short-circuiting behavior in the order of evaluation of its arguments.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-    (define primitives (set '+ '- 'eq? 'not 'read 
-                         'vector 'vector-ref 'vector-set!))
+    (define primitives (set ... 'vector 'vector-ref 'vector-set!))
 
     (define (interp-op op)
       (match op
-         ['+ fx+]
-         ['- (lambda (n) (fx- 0 n))]
-         ['eq? (lambda (v1 v2)
-                 (cond [(or (and (fixnum? v1) (fixnum? v2))
-                            (and (boolean? v1) (boolean? v2))
-                            (and (vector? v1) (vector? v2)))
-                        (eq? v1 v2)]))]
-         ['not (lambda (v) (match v [#t #f] [#f #t]))]
-	 ['read read-fixnum]
-         ['vector vector] ['vector-ref vector-ref]
+         ...
+         ['vector vector]
+         ['vector-ref vector-ref]
 	 ['vector-set! vector-set!]
 	 [else (error 'interp-op "unknown operator")]))
 
@@ -3819,8 +3842,6 @@ short-circuiting behavior in the order of evaluation of its arguments.
      (lambda (e)
        (match e
          ...
-         [`(,op ,args ...) #:when (set-member? primitives op)
-           (apply (interp-op op) (map (interp-R3 env) args))]
          [else (error 'interp-R3 "unrecognized expression")]
          )))
 \end{lstlisting}
@@ -4101,7 +4122,7 @@ via two vector references.
 \end{lstlisting}
 
 
-\subsection{Flatten}
+\subsection{Flatten and the $C_2$ intermediate language}
 
 \begin{figure}[tp]
 \fbox{
@@ -4325,9 +4346,6 @@ function in \code{runtime.c}.
 We translate the special \code{collection-needed?} predicate into code
 that compares the \code{free\_ptr} to the \code{fromspace\_end}.
 %
-\marginpar{\tiny To improve the code generation here, we should
- extend the 'if' form to all the relational operators.\\--Jeremy}
-%
 \begin{lstlisting}
    (if (collection-needed? |$\itm{bytes}$|) |$\itm{thn}$| |$\itm{els}$|)
    |$\Longrightarrow$|
@@ -4349,13 +4367,13 @@ least, we need to initialize the \itm{tag}. Refer to
 Figure~\ref{fig:tuple-rep} to see how the tag is organized. We
 recommend using the Racket operations \code{bitwise-ior} and
 \code{arithmetic-shift} to compute the tag.  The \itm{types} in the
-type annotation in the \code{allocate} form can be used to determine
+\code{has-type } annotation can be used to determine
 the pointer mask region of the tag. The move of $ \itm{lhs}^\prime $ to
 register \code{r11}, before the move to the offset of \code{r11}
 ensures that if $ \itm{lhs}^\prime $ offsets are only performed with
 register operands.
 \begin{lstlisting}
-   (assign |$\itm{lhs}$| (allocate |$\itm{len}$| (Vector |$\itm{types}$|)))
+   (assign |$\itm{lhs}$| (hash-type (allocate |$\itm{len}$|) (Vector |$\itm{types}$|)))
    |$\Longrightarrow$|
    (movq (global-value free_ptr) |$\itm{lhs}'$|)
    (addq (int |$8(\itm{len}+1)$|) (global-value free_ptr))
@@ -4389,8 +4407,9 @@ processing $\itm{vec}$ and $\itm{arg}$.
 \[
 \begin{array}{lcl}
 \Arg &::=&  \gray{  \INT{\Int} \mid \REG{\itm{register}}
-    \mid (\key{deref}\,\itm{register}\,\Int) \mid (\key{byte-reg}\; \itm{register})  } \\ 
-   &\mid& (\key{global-value}\; \itm{name}) \\
+    \mid (\key{deref}\,\itm{register}\,\Int) } \\
+   &\mid& \gray{ (\key{byte-reg}\; \itm{register})  } 
+   \mid (\key{global-value}\; \itm{name}) \\
 \itm{cc} & ::= & \gray{  \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge}  } \\
 \Instr &::=& \gray{(\key{addq} \; \Arg\; \Arg) \mid 
              (\key{subq} \; \Arg\; \Arg) \mid 
@@ -4628,6 +4647,7 @@ inside each other; they can only be defined at the top level.
 \begin{array}{lcl}
   \Type &::=& \gray{ \key{Integer} \mid \key{Boolean}
          \mid (\key{Vector}\;\Type^{+}) \mid \key{Void}  } \mid (\Type^{*} \; \key{->}\; \Type) \\
+\itm{cmp} &::= & \gray{  \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=}  } \\
   \Exp &::=& \gray{ \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)}  \\
      &\mid&  \gray{ \Var \mid \LET{\Var}{\Exp}{\Exp} }\\
     &\mid& \gray{ \key{\#t} \mid \key{\#f} \mid
@@ -4673,8 +4693,36 @@ that does what its name suggests. The program then applies
 \label{fig:r4-function-example}
 \end{figure}
 
+The definitional interpreter for $R_4$ is in
+Figure~\ref{fig:interp-R4}.
 
-\marginpar{\scriptsize to do: interpreter for $R_4$. \\ --Jeremy}
+
+\begin{figure}[tp]
+\begin{lstlisting}
+   (define (interp-R4 env)
+     (lambda (e)
+       (match e
+          ....
+          [`(define (,f [,xs : ,ps] ...) : ,rt ,body)
+           (cons f `(lambda ,xs ,body))]
+          [`(program ,ds ... ,body)
+           (let ([top-level (map  (interp-R4 '()) ds)])
+	      ((interp-R4 top-level) body))]
+          [`(,fun ,args ...)
+	    (define arg-vals (map (interp-R4 env) args))
+            (define fun-val ((interp-R4 env) fun))
+            (match fun-val
+               [`(lambda (,xs ...) ,body)
+                 (define new-env (append (map cons xs arg-vals) env))
+ 		 ((interp-R4 new-env) body)]
+               [else (error "interp-R4, expected function, not" fun-val)]))]
+         [else (error 'interp-R4 "unrecognized expression")]
+         )))
+\end{lstlisting}
+\caption{Interpreter for the $R_4$ language.}
+\label{fig:interp-R4}
+\end{figure}
+
 
 \section{Functions in x86}
 \label{sec:fun-x86}
@@ -4806,7 +4854,7 @@ kinds of AST nodes to any of the intermediate languages?
   &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid 
     (\key{vector-ref}\;\Exp\;\Int)} \\
   &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})} \\
-      &\mid& (app\, \Exp \; \Exp^{*}) \\
+      &\mid& (\key{app}\, \Exp \; \Exp^{*}) \\
   \Def &::=& (\key{define}\; (\itm{label} \; [\Var \key{:} \Type]^{*}) \key{:} \Type \; \Exp) \\
   F_1 &::=& (\key{program} \; \Def^{*} \; \Exp)
 \end{array}
@@ -4855,7 +4903,7 @@ Figure~\ref{fig:c3-syntax} defines the syntax for $C_3$, the output of
    &\mid& \gray{  (\key{vector}\, \Arg^{+}) 
    \mid (\key{vector-ref}\, \Arg\, \Int)  } \\
    &\mid& \gray{  (\key{vector-set!}\,\Arg\,\Int\,\Arg)  } \\
-   &\mid& (app \,\Arg\,\Arg^{*}) \\
+   &\mid& (\key{app} \,\Arg\,\Arg^{*}) \\
 \Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg} } \\
       &\mid& \gray{ \IF{(\itm{cmp}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} } \\
       &\mid& \gray{ (\key{initialize}\,\itm{int}\,\itm{int}) }\\
@@ -5294,9 +5342,19 @@ top-level environment.
 (define (interp-R5 env)
   (lambda (ast)
     (match ast
+       ...
        [`(lambda: ([,xs : ,Ts] ...) : ,rT ,body)
         `(lambda ,xs ,body ,env)]
-       [`(app ,fun ,args ...)
+       [`(define (,f [,xs : ,ps] ...) : ,rt ,body)
+        (mcons f `(lambda ,xs ,body))]
+       [`(program ,defs ... ,body)
+        (let ([top-level (map (interp-R5 '()) defs)])
+          (for/list ([b top-level])
+                    (set-mcdr! b (match (mcdr b)
+                                    [`(lambda ,xs ,body)
+                                     `(lambda ,xs ,body ,top-level)])))
+          ((interp-R5 top-level) body))]
+       [`(,fun ,args ...)
         (define arg-vals (map (interp-R5 env) args))
         (define fun-val ((interp-R5 env) fun))
         (match fun-val
@@ -5304,16 +5362,7 @@ top-level environment.
             (define new-env (append (map cons xs arg-vals) lam-env))
             ((interp-R5 new-env) body)]
            [else (error "interp-R5, expected function, not" fun-val)])]
-       [`(define (,f [,xs : ,ps] ...) : ,rt ,body)
-        (mcons f `(lambda ,xs ,body))]
-       [`(program ,defs ... ,body)
-        (let ([top-level (map (interp-R5 '()) defs)])
-          (for/list ([b top-level])
-                    (set-mcdr! b (match (mcdr b)
-                                   [`(lambda ,xs ,body)
-                                    `(lambda ,xs ,body ,top-level)])))
-          ((interp-R5 top-level) body))]
-       ...)))
+       )))
 \end{lstlisting}
 \caption{Definitional interpreter for $R_5$.}
 \label{fig:interp-R5}
@@ -5586,12 +5635,13 @@ compilation of $R_6$ and $R_7$ in the remainder of this chapter.
     &\mid& \gray{(\Type^{*} \; \key{->}\; \Type)} \mid \key{Any} \\
   \FType &::=& \key{Integer} \mid \key{Boolean} \mid (\key{Vectorof}\;\key{Any})
      \mid (\key{Any}^{*} \; \key{->}\; \key{Any})\\
+  \itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
   \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp) 
      \mid (\key{+} \; \Exp\;\Exp)}  \\
     &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp}} \\
     &\mid& \gray{\key{\#t} \mid \key{\#f} \mid
            (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp)} \\
-    &\mid& \gray{(\key{eq?}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
+    &\mid& \gray{(\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
     &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid 
           (\key{vector-ref}\;\Exp\;\Int)} \\
     &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})} \\
@@ -5710,11 +5760,12 @@ for $R_6$.
 \begin{minipage}{0.97\textwidth}
 \[
 \begin{array}{rcl}
+  \itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
 \Exp &::=& \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)  \\
      &\mid&  \Var \mid \LET{\Var}{\Exp}{\Exp} \\
      &\mid& \key{\#t} \mid \key{\#f} \mid
       (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp) \\
-     &\mid& (\key{eq?}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp} \\
+     &\mid& (\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp} \\
      &\mid& (\key{vector}\;\Exp^{+}) \mid 
       (\key{vector-ref}\;\Exp\;\Exp) \\
   &\mid& (\key{vector-set!}\;\Exp\;\Exp\;\Exp) \mid (\key{void}) \\
@@ -6021,15 +6072,25 @@ $\Rightarrow$
 \chapter{Gradual Typing}
 \label{ch:gradual-typing}
 
+This chapter will be based on the ideas of \citet{Siek:2006bh}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Parametric Polymorphism}
 \label{ch:parametric-polymorphism}
 
+This chapter may be based on ideas from \citet{Cardelli:1984aa},
+\citet{Leroy:1992qb}, \citet{Shao:1997uj}, or \citet{Harper:1995um}.
+
+
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{High-level Optimization}
 \label{ch:high-level-optimization}
+
+This chapter will present a procedure inlining pass based on the
+algorithm of \citet{Waddell:1997fk}.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
