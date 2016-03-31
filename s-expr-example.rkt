@@ -41,21 +41,21 @@
 (arith? `(+ 50 (- 8)))
 (arith? `(- 50 (+ 8)))
 
-(define (interp-arith e)
+(define (interp-R0 e)
   (match e
     [(? fixnum?) e]
     [`(read)
      (let ([r (read)])
        (cond [(fixnum? r) r]
-             [else (error 'interp-arith "input was not an integer" r)]))]
-    [`(- ,e)
-     (fx- 0 (interp-arith e))]
-    [`(+ ,e1 ,e2)
-     (fx+ (interp-arith e1) (interp-arith e2))]
+              [else (error 'interp-R0 "input was not an integer" r)]))]
+    [`(- ,(app interp-R0 v))
+     (fx- 0 v)]
+    [`(+ ,(app interp-R0 v1) ,(app interp-R0 v2))
+     (fx+ v1 v2)]
     ))
 
-(interp-arith ast1.1)
-;(interp-arith `(+ (read) (- 8)))
+(interp-R0 ast1.1)
+;(interp-R0 `(+ (read) (- 8)))
 
 (define (pe-neg r)
   (match r
@@ -131,13 +131,16 @@
 
 
 (define (test-pe pe p)
-  (assert "testing pe-arith" (equal? (interp-arith p)
-                                     (interp-arith (pe p)))))
-
-(test-pe pe-arith `(+ (read) (- (+ 5 3))))
-(test-pe pe-arith `(+ 1 (+ (read) 1)))
-(test-pe pe-arith `(- (+ (read) (- 5))))
-
-(test-pe pe-arith2 `(+ (read) (- (+ 5 3))))
-(test-pe pe-arith2 `(+ 1 (+ (read) 1)))
-(test-pe pe-arith2 `(- (+ (read) (- 5))))
+  (assert "testing pe-arith" (equal? (interp-R0 p)
+                                     (interp-R0 (pe p)))))
+(if #f 
+    (begin
+      (test-pe pe-arith `(+ (read) (- (+ 5 3))))
+      (test-pe pe-arith `(+ 1 (+ (read) 1)))
+      (test-pe pe-arith `(- (+ (read) (- 5))))
+      
+      (test-pe pe-arith2 `(+ (read) (- (+ 5 3))))
+      (test-pe pe-arith2 `(+ 1 (+ (read) 1)))
+      (test-pe pe-arith2 `(- (+ (read) (- 5))))
+      )
+    (void))
