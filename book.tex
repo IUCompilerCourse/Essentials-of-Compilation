@@ -5870,7 +5870,7 @@ The definitional interpreter for $R_7$ is given in
 Figure~\ref{fig:interp-R7}.
 
 \begin{figure}[tbp]
-\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define (interp-r7 env)
   (lambda (ast)
     (define recur (interp-r7 env))
@@ -5892,42 +5892,32 @@ Figure~\ref{fig:interp-R7}.
                            `(inject (lambda ,xs ,body ,top-level) 
                                     (,@(map (lambda (x) 'Any) xs) -> Any))])))
          ((interp-r7 top-level) body))]
-      [`(vector ,es ...)
-       (let* ([elts (map recur es)]
-              [tys (map get-injected-type elts)])
-         `(inject ,(apply vector (map recur es)) (Vector ,@tys)))]
-      [`(vector-set! ,e1 ,n ,e2)
-       (let ([e1^ (recur e1)]
-             [e2^ (recur e2)])
-         (match e1^ 
-           [`(inject ,vec ,ty) 
-            (vector-set! vec n e2^)
-            `(inject (void) Void)]))]
-      [`(vector-ref ,e ,n)
-       (let ([e^ (recur e)])
-         (match e^ 
-           [`(inject ,vec ,ty) 
-            (vector-ref vec n)]))]
-      [`(let ([,x ,e]) ,body)
-       (let ([v (recur e)])
-         ((interp-r7 (cons (cons x v) env)) body))]
+      [`(vector ,(app recur elts) ...)
+       (define tys (map get-injected-type elts))
+       `(inject ,(apply vector elts) (Vector ,@tys))]
+      [`(vector-set! ,(app recur v1) ,n ,(app recur v2))
+         (match v1
+           [`(inject ,vec ,ty)
+             (vector-set! vec n v2)
+            `(inject (void) Void)])]
+      [`(vector-ref ,(app recur v) ,n)
+       (match v [`(inject ,vec ,ty) (vector-ref vec n)])]
+      [`(let ([,x ,(app recur v)]) ,body)
+       ((interp-r7 (cons (cons x v) env)) body)]
       [`(,op ,es ...) #:when (valid-op? op)
        (interp-r7-op op (map recur es))]
-      [`(eq? ,l ,r)
-       `(inject ,(equal? (recur l) (recur r)) Boolean)]
-      [`(if ,q ,t ,f)
-       (match (recur q)
-         [`(inject #f Boolean)
-          (recur f)]
+      [`(eq? ,(app recur l) ,(app recur r))
+       `(inject ,(equal? l r) Boolean)]
+      [`(if ,(app recur q) ,t ,f)
+       (match q
+         [`(inject #f Boolean) (recur f)]
          [else (recur t)])]
-      [`(,f ,es ...)
-       (define new-args (map recur es))
-       (let ([f-val (recur f)])
-         (match f-val 
-           [`(inject (lambda (,xs ...) ,body ,lam-env) ,ty)
-            (define new-env (append (map cons xs new-args) lam-env))
-            ((interp-r7 new-env) body)]
-           [else (error "interp-r7, expected function, not" f-val)]))])))
+      [`(,(app recur f-val) ,(app recur vs) ...)
+       (match f-val 
+         [`(inject (lambda (,xs ...) ,body ,lam-env) ,ty)
+          (define new-env (append (map cons xs vs) lam-env))
+          ((interp-r7 new-env) body)]
+         [else (error "interp-r7, expected function, not" f-val)])])))
 \end{lstlisting}
 \caption{Interpreter for the $R_7$ language.}
 \label{fig:interp-R7}
