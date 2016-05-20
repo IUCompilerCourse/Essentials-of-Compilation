@@ -672,7 +672,7 @@ In the next section we see our first example of a compiler, which is
 another example of structural recursion.
 
 
-\section{Partial Evaluation}
+\section{Example Compiler: a Partial Evaluator}
 \label{sec:partial-evaluation}
 
 In this section we consider a compiler that translates $R_0$
@@ -932,6 +932,9 @@ values. Figure~\ref{fig:x86-a} defines the syntax for the subset of
 the x86 assembly language needed for this chapter.  (We use the
 AT\&T syntax expected by the GNU assembler inside \key{gcc}.)
 
+% to do: finish treatment of imulq
+% it's needed for vector's in R6/R7
+
 \begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
@@ -945,7 +948,7 @@ AT\&T syntax expected by the GNU assembler inside \key{gcc}.)
 \Arg &::=&  \key{\$}\Int \mid \key{\%}\Reg \mid \Int(\key{\%}\Reg) \\ 
 \Instr &::=& \key{addq} \; \Arg, \Arg \mid 
       \key{subq} \; \Arg, \Arg \mid 
-%      \key{imulq} \; \Arg,\Arg \mid 
+      \key{imulq} \; \Arg,\Arg \mid 
       \key{negq} \; \Arg \mid \key{movq} \; \Arg, \Arg \mid \\
   &&  \key{callq} \; \mathit{label} \mid
       \key{pushq}\;\Arg \mid \key{popq}\;\Arg \mid \key{retq} \\
@@ -2525,9 +2528,9 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \path[->,bend left=15] (R1) edge [above] node {\ttfamily\footnotesize uniquify} (R1-2);
 \path[->,bend left=15] (R1-2) edge [right] node {\ttfamily\footnotesize flatten} (C0-1);
 \path[->,bend right=15] (C0-1) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
-\path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize uncover-live} (x86-2-1);
-\path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build-inter.} (x86-2-2);
-\path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate-reg.} (x86-3);
+\path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize\color{red} uncover-live} (x86-2-1);
+\path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize\color{red} build-inter.} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize\color{red} allocate-reg.} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-4);
 \path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize print-x86} (x86-5);
 \end{tikzpicture}
@@ -3610,7 +3613,7 @@ if_end21289:
 \node (R1) at (0,2)  {\large $R_1$};
 \node (R1-2) at (3,2)  {\large $R_1$};
 \node (R1-3) at (6,2)  {\large $R_1$};
-\node (C0-1) at (3,0)  {\large $C_0$};
+\node (C1-1) at (3,0)  {\large $C_1$};
 
 \node (x86-2) at (3,-2)  {\large $\text{x86}^{*}$};
 \node (x86-3) at (6,-2)  {\large $\text{x86}^{*}$};
@@ -3621,18 +3624,18 @@ if_end21289:
 \node (x86-2-1) at (3,-4)  {\large $\text{x86}^{*}$};
 \node (x86-2-2) at (6,-4)  {\large $\text{x86}^{*}$};
 
-\path[->,bend left=15] (R1) edge [above] node {\ttfamily\footnotesize typecheck} (R1-2);
+\path[->,bend left=15] (R1) edge [above] node {\ttfamily\footnotesize\color{red} typecheck} (R1-2);
 \path[->,bend left=15] (R1-2) edge [above] node {\ttfamily\footnotesize uniquify} (R1-3);
-\path[->,bend left=15] (R1-3) edge [right] node {\ttfamily\footnotesize flatten} (C0-1);
-\path[->,bend right=15] (C0-1) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
-\path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize uncover-live} (x86-2-1);
+\path[->,bend left=15] (R1-3) edge [right] node {\ttfamily\footnotesize\color{red} flatten} (C1-1);
+\path[->,bend right=15] (C1-1) edge [left] node {\ttfamily\footnotesize\color{red} select-instr.} (x86-2);
+\path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize\color{red} uncover-live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build-inter.} (x86-2-2);
 \path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate-reg.} (x86-3);
-\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize lower-cond.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-5);
+\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize\color{red} lower-cond.} (x86-4);
+\path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize\color{red} patch-instr.} (x86-5);
 \path[->,bend right=15] (x86-5) edge [left] node {\ttfamily\footnotesize print-x86} (x86-6);
 \end{tikzpicture}
-\caption{Diagram of the passes for $R_2$.}
+\caption{Diagram of the passes for $R_2$, a language with conditionals.}
 \label{fig:R2-passes}
 \end{figure}
 
@@ -3773,7 +3776,7 @@ if_end21289:
 
 In this chapter we study the implementation of mutable tuples (called
 ``vectors'' in Racket). This language feature is the first to require
-use of the ``heap'' because the lifetime of a Racket tuple is
+use the of the ``heap'' because the lifetime of a Racket tuple is
 indefinite, that is, the lifetime of a tuple does not follow a stack
 (FIFO) discipline but they instead live forever from the programmer's
 viewpoint. Of course, from an implementor's viewpoint, it is important
@@ -3909,7 +3912,7 @@ variables can refer to the same tuple, i.e., the variables can be
 \emph{aliases} for the same thing. Consider the following example in
 which both \code{t1} and \code{t2} refer to the same tuple.  Thus, the
 mutation through \code{t2} is visible when referencing the tuple from
-\code{t1} and the result of the program is therefore \code{42}.
+\code{t1}, so the result of the program is \code{42}.
 \begin{lstlisting}
 (let ([t1 (vector 3 7)])
   (let ([t2 t1])
@@ -3920,10 +3923,10 @@ mutation through \code{t2} is visible when referencing the tuple from
 The next issue concerns the lifetime of tuples. Of course, they are
 created by the \code{vector} form, but when does their lifetime end?
 Notice that the grammar in Figure~\ref{fig:r3-syntax} does not include
-an operation for deallocating tuples. Furthermore, the lifetime of a
-tuple is not tied to any notion of static scoping. For example, the
+an operation for deleting tuples. Furthermore, the lifetime of a tuple
+is not tied to any notion of static scoping. For example, the
 following program returns \code{3} even though the variable \code{t}
-goes out of scope prior to the reference.
+goes out of scope prior to accessing the vector.
 \begin{lstlisting}
 (vector-ref
   (let ([t (vector 3 7)])
@@ -3963,14 +3966,16 @@ not enough room for the next allocation request. At that point, the
 garbage collector goes to work to make more room.
 
 A running program has direct access to registers and the procedure
-call stack, and those may contain pointers into the heap. Those
+call stack, and they may contain pointers into the heap. Those
 pointers are called the \emph{root set}. In
 Figure~\ref{fig:copying-collector} there are three pointers in the
-root set, one in a register and two on the stack. 
+root set, one in a register and two on the stack.
 %
-\marginpar{\tiny We can't actually write a program that produces
-the heap structure in the Figure because there is no recursion. Once we
-have the dynamic type, we will be able to.\\ --Jeremy}
+\footnote{The sitation in Figure~\ref{fig:copying-collector}, with a
+  cycle, cannot be created by a well-typed program in $R_3$. However,
+  creating cycles will be possible once we get to $R_6$.
+  We design the garbage collector to deal with cycles 
+  to begin with, so we will not need to revisit this issue.}
 %
 The goal of the
 garbage collector is to 1) preserve all objects that are reachable
@@ -3999,16 +4004,16 @@ and second element is a 2-tuple.
 Let us take a closer look at how the copy works. The allocated objects
 and pointers essentially form a graph and we need to copy the part of
 the graph that is reachable from the root set. To make sure we copy
-all of the reachable nodes, we need an exhaustive traversal algorithm,
-such as depth-first search or breadth-first
+all of the reachable nodes, we need an exhaustive graph traversal
+algorithm, such as depth-first search or breadth-first
 search~\citep{Moore:1959aa,Cormen:2001uq}. Recall that such algorithms
 take into account the possibility of cycles by marking which objects
 have already been visited, so as to ensure termination of the
 algorithm. These search algorithms also use a data structure such as a
 stack or queue as a to-do list to keep track of the objects that need
-to be visited. Here we shall use breadth-first search and a trick due
-to Cheney~\citep{Cheney:1970aa} for simultaneously representing the
-queue and compacting the objects as they are copied into the ToSpace.
+to be visited. We shall use breadth-first search and a trick due to
+Cheney~\citep{Cheney:1970aa} for simultaneously representing the queue
+and copying the objects into the ToSpace.
 
 Figure~\ref{fig:cheney} shows several snapshots of the ToSpace as the
 copy progresses. The queue is represented by a chunk of contiguous
@@ -4019,20 +4024,22 @@ ToSpace to form the initial queue.  When we copy an object, we mark
 the old object to indicate that it has been visited. (We discuss the
 marking in Section~\ref{sec:data-rep-gc}.) Note that any pointers
 inside the copied objects in the queue still point back to the
-FromSpace. The algorithm then pops the object at the front of the
-queue and copies all the objects that are directly reachable from it
-to the ToSpace, at the back of the queue. The algorithm then updates
-the pointers in the popped object so they point to the newly copied
-objects. So getting back to Figure~\ref{fig:cheney}, in the first step
-we copy the tuple whose second element is $42$ to the back of the
-queue. The other pointer goes to a tuple that has already been copied,
-so we do not need to copy it again, but we do need to update the
-pointer to the new location. This can be accomplished by storing a
-\emph{forwarding} pointer to the new location in the old object, back
-when we initially copied the object into the ToSpace. This completes
-one step of the algorithm. The algorithm continues in this way until
-the front of the queue is empty, that is, until the front catches up
-with the back.
+FromSpace. Once the initial queue has been created, the algorithm
+enters a loop in which it repeatedly processes the object at the front
+of the queue and pops it off the queue.  To process an object, the
+algorithm copies all the objects that are directly reachable from it
+to the ToSpace, placing them at the back of the queue. The algorithm
+then updates the pointers in the popped object so they point to the
+newly copied objects. So getting back to Figure~\ref{fig:cheney}, in
+the first step we copy the tuple whose second element is $42$ to the
+back of the queue. The other pointer goes to a tuple that has already
+been copied, so we do not need to copy it again, but we do need to
+update the pointer to the new location. This can be accomplished by
+storing a \emph{forwarding} pointer to the new location in the old
+object, back when we initially copied the object into the
+ToSpace. This completes one step of the algorithm. The algorithm
+continues in this way until the front of the queue is empty, that is,
+until the front catches up with the back.
 
 
 \begin{figure}[tbp]
@@ -4043,7 +4050,7 @@ with the back.
 \end{figure}
 
 
-\section{Data Representation}
+\subsection{Data Representation}
 \label{sec:data-rep-gc}
 
 The garbage collector places some requirements on the data
@@ -4054,7 +4061,7 @@ are several ways to accomplish this.
 \item Attached a tag to each object that says what kind of object it
   is~\citep{Jones:1996aa}.
 \item Store different kinds of objects in different regions of
-  memory~\citep{Jr.:1977aa}.
+  memory~\citep{Steele:1977ab}.
 \item Use type information from the program to either generate
   type-specific code for collecting or to generate tables that can
   guide the
@@ -4071,20 +4078,19 @@ a relatively high implementation complexity. To keep this chapter to a
 with separate strategies used for the stack and the heap.
 
 Regarding the stack, we recommend using a separate stack for
-pointers~\citep{Siebert:2001aa,Henderson:2002aa,Baker:2009aa} (i.e., a
-``shadow stack''), which we call a \emph{root stack}. That is, when a
-local variable needs to be spilled and is of type \code{(Vector
-  $\Type_1 \ldots \Type_n$)}, then we put it on the root stack
-instead of the normal procedure call stack.
-Figure~\ref{fig:shadow-stack} reproduces the example from
-Figure~\ref{fig:copying-collector} and contrasts it with the data
-layout using a root stack. The root stack contains the two
-pointers from the regular stack and also the pointer in the second
-register. Prior to invoking the garbage collector, we shall push all
-pointers in local variables (resident in registers or spilled to the
-stack) onto the root stack.  After the collection, the pointers must
-be popped back into the local variables because the locations of the
-pointed-to objects will have changed.
+pointers~\citep{Siebert:2001aa,Henderson:2002aa,Baker:2009aa} , which
+we call a \emph{root stack} (a.k.a a ``shadow stack''). That is, when
+a local variable needs to be spilled and is of type \code{(Vector
+  $\Type_1 \ldots \Type_n$)}, then we put it on the root stack instead
+of the normal procedure call stack.  Figure~\ref{fig:shadow-stack}
+reproduces the example from Figure~\ref{fig:copying-collector} and
+contrasts it with the data layout using a root stack. The root stack
+contains the two pointers from the regular stack and also the pointer
+in the second register. Prior to invoking the garbage collector, we
+shall push all pointers in local variables (resident in registers or
+spilled to the stack) onto the root stack.  After the collection, the
+pointers must be popped back into the local variables because the
+locations of the pointed-to objects will have changed.
 
 \begin{figure}[tbp]
 \centering \includegraphics[width=0.7\textwidth]{root-stack}
@@ -4116,7 +4122,7 @@ are always zero anyways because our tuples are 8-byte aligned.)
 \label{fig:tuple-rep}
 \end{figure}
 
-\section{Implementation of the Garbage Collector}
+\subsection{Implementation of the Garbage Collector}
 \label{sec:organize-gz}
 
 The implementation of the garbage collector needs to do a lot of
@@ -4124,27 +4130,31 @@ bit-level data manipulation and we will need to link it with our
 compiler-generated x86 code. Thus, we recommend implementing the
 garbage collector in C~\citep{Kernighan:1988nx} and putting the code
 in the \code{runtime.c} file. Figure~\ref{fig:gc-header} shows the
-interface to the garbage collector. The function \code{initialize}
-should create the FromSpace, ToSpace, and root stack. The
-\code{initialize} function is meant to be called near the beginning of
-\code{main}, before the body of the program executes.  The
-\code{initialize} function should put the address of the beginning of
-the FromSpace into the global variable \code{free\_ptr}. The global
-\code{fromspace\_end} should point to the address that is 1-past the
-last element of the FromSpace. (We use half-open intervals to
-represent chunks of memory.)  The \code{rootstack\_begin} global
+interface to the garbage collector. The \code{initialize} function
+creates the FromSpace, ToSpace, and root stack. The \code{initialize}
+function is meant to be called near the beginning of \code{main},
+before the body of the program executes.  The \code{initialize}
+function puts the address of the beginning of the FromSpace into the
+global variable \code{free\_ptr}. The global \code{fromspace\_end}
+points to the address that is 1-past the last element of the
+FromSpace. (We use half-open intervals to represent chunks of
+memory~\citep{Dijkstra:1982aa}.)  The \code{rootstack\_begin} global
 should point to the first element of the root stack.
 
 As long as there is room left in the FromSpace, your generated code
 can allocate tuples simply by moving the \code{free\_ptr} forward.
+%
+\marginpar{\tiny Should we dedicate a register to the free pointer? \\
+--Jeremy}
+%
 The amount of room left in FromSpace is the difference between the
 \code{fromspace\_end} and the \code{free\_ptr}.  The \code{collect}
 function should be called when there is not enough room left in the
 FromSpace for the next allocation.  The \code{collect} function takes
 a pointer to the current top of the root stack (one past the last item
 that was pushed) and the number of bytes that need to be
-allocated. The \code{collect} should perform the copying collection
-and leave the heap in a state such that the next allocation will
+allocated. The \code{collect} function performs the copying collection
+and leaves the heap in a state such that the next allocation will
 succeed.
 
 \begin{figure}[tbp]
@@ -4152,12 +4162,48 @@ succeed.
    void initialize(uint64_t rootstack_size, uint64_t heap_size);
    void collect(int64_t** rootstack_ptr, uint64_t bytes_requested);
    int64_t* free_ptr;
+   int64_t* fromspace_begin;
    int64_t* fromspace_end;
    int64_t** rootstack_begin;
 \end{lstlisting}
-\caption{Interface to the garbage collector.}
+\caption{The compiler's interface to the garbage collector.}
 \label{fig:gc-header}
 \end{figure}
+
+\begin{exercise}
+  In the file \code{runtime.c} you will find the implementation of
+  \code{initialize} and a partial implementation of \code{collect}.
+  The \code{collect} function calls another function, \code{cheney},
+  to perform the actual copy, and that function is left to the reader
+  to implement. The following is the prototype for \code{cheney}.
+\begin{lstlisting}  
+   static void cheney(int64_t** rootstack_ptr);
+\end{lstlisting}
+  The parameter \code{rootstack\_ptr} is a pointer to the top of the
+  rootstack (which is array of pointers).  The \code{cheney} function
+  also communicates with \code{collect} through several global
+  variables, the \code{framespace\_begin} and \code{framespace\_end}
+  mentioned in Figure~\ref{fig:gc-header} as well as the pointers for
+  the ToSpace:
+\begin{lstlisting}
+   static int64_t* tospace_begin;
+   static int64_t* tospace_end;
+\end{lstlisting}
+  The job of the \code{cheney} function is to copy all the live
+  objects (reachable from the root stack) into the ToSpace, update
+  \code{free\_ptr} to point to the next unused spot in the ToSpace,
+  update the root stack so that it points to the objects in the
+  ToSpace, and finally to swap the global pointers for the FromSpace
+  and ToSpace.
+
+  [to do: talk about the \code{copy\_vector} auxilliary
+    function. --Jeremy]
+
+\end{exercise}
+
+
+
+
 
 \section{Compiler Passes}
 \label{sec:code-generation-gc}
@@ -4660,6 +4706,45 @@ if_end30967:
   implement the GC. \\ --Jeremy}
 
 
+\begin{figure}[p]
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (R1) at (0,2)  {\large $R_1$};
+\node (R1-2) at (3,2)  {\large $R_1$};
+\node (R1-3) at (6,2)  {\large $R_1$};
+\node (C1-1) at (9,0)  {\large $C_1$};
+\node (C1-2) at (6,0)  {\large $C_1$};
+\node (C1-3) at (3,0)  {\large $C_1$};
+
+\node (x86-2) at (3,-2)  {\large $\text{x86}^{*}$};
+\node (x86-3) at (6,-2)  {\large $\text{x86}^{*}$};
+\node (x86-4) at (9,-2) {\large $\text{x86}^{*}$};
+\node (x86-5) at (12,-2) {\large $\text{x86}$};
+\node (x86-6) at (12,-4) {\large $\text{x86}^{\dagger}$};
+
+\node (x86-2-1) at (3,-4)  {\large $\text{x86}^{*}$};
+\node (x86-2-2) at (6,-4)  {\large $\text{x86}^{*}$};
+
+\path[->,bend left=15] (R1) edge [above] node {\ttfamily\footnotesize typecheck} (R1-2);
+\path[->,bend left=15] (R1-2) edge [above] node {\ttfamily\footnotesize uniquify} (R1-3);
+\path[->,bend left=15] (R1-3) edge [right] node {\ttfamily\footnotesize flatten} (C1-1);
+\path[->,bend left=15] (C1-1) edge [below] node {\ttfamily\footnotesize\color{red} expose-alloc.} (C1-2);
+\path[->,bend left=15] (C1-2) edge [below] node {\ttfamily\footnotesize\color{red} uncover...roots} (C1-3);
+\path[->,bend right=15] (C1-3) edge [left] node {\ttfamily\footnotesize\color{red} select-instr.} (x86-2);
+\path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize uncover-live} (x86-2-1);
+\path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build-inter.} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate-reg.} (x86-3);
+\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize lower-cond.} (x86-4);
+\path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-5);
+\path[->,bend right=15] (x86-5) edge [left] node {\ttfamily\footnotesize print-x86} (x86-6);
+\end{tikzpicture}
+\caption{Diagram of the passes for $R_3$, a language with tuples.}
+\label{fig:R3-passes}
+\end{figure}
+
+Figure~\ref{fig:R3-passes} gives an overview of all the passes needed
+for the compilation of $R_3$.
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Functions}
 \label{ch:functions}
@@ -4780,6 +4865,12 @@ Figure~\ref{fig:interp-R4}.
 
 \section{Functions in x86}
 \label{sec:fun-x86}
+
+\marginpar{\tiny Make sure callee save registers are discussed
+   in enough depth, especially updating Fig 6.4 \\ --Jeremy }
+
+\marginpar{\tiny Talk about the return address on the
+   stack and what callq  and retq does.\\ --Jeremy }
 
 The x86 architecture provides a few features to support the
 implementation of functions. We have already seen that x86 provides
@@ -5707,7 +5798,7 @@ compilation of $R_6$ and $R_7$ in the remainder of this chapter.
     \mid (\key{lambda:}\; ([\Var \key{:} \Type]^{*}) \key{:} \Type \; \Exp)} \\
   & \mid & (\key{inject}\; \Exp \; \FType) \mid (\key{project}\;\Exp\;\FType) \\
   & \mid & (\key{boolean?}\;\Exp) \mid (\key{integer?}\;\Exp)\\
-  & \mid & (\key{vector?}\;\Exp) \mid (\key{procedure?}\;\Exp) \\
+  & \mid & (\key{vector?}\;\Exp) \mid (\key{procedure?}\;\Exp) \mid (\key{void?}\;\Exp) \\
   \Def &::=& \gray{(\key{define}\; (\Var \; [\Var \key{:} \Type]^{*}) \key{:} \Type \; \Exp)} \\
   R_6 &::=& \gray{(\key{program} \; \Def^{*} \; \Exp)}
 \end{array}
