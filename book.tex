@@ -125,19 +125,18 @@ Scheme~\citep{Dybvig:2006aa}, a production-quality and efficient
 compiler for Scheme. After completing his Ph.D. at the University of
 North Carolina, Kent returned to teach at Indiana University.
 Throughout the 1990's and early 2000's, Kent continued development of
-Chez Scheme and rotated with Dan in teaching the compiler course.
+Chez Scheme and taught the compiler course.
 
-Thanks to this collaboration between Dan and Kent, the compiler course
-evolved to incorporate novel pedagogical ideas while also including
-elements of effective real-world compilers.  One of Dan's ideas was to
-split the compiler into many small passes over the input program and
-subsequent intermediate representations, so that the code for each
-pass would be easy to understood in isolation.  (In contrast, most
-compilers of the time were organized into only a few monolithic passes
-for reasons of compile-time efficiency.)  Kent and his students,
-Dipanwita Sarkar and Andrew Keep, developed infrastructure to support
-this approach and evolved the course, first to use micro-sized passes
-and then into even smaller nano
+The compiler course evolved to incorporate novel pedagogical ideas
+while also including elements of effective real-world compilers.  One
+of Dan's ideas was to split the compiler into many small passes over
+the input program and subsequent intermediate representations, so that
+the code for each pass would be easy to understood in isolation.  (In
+contrast, most compilers of the time were organized into only a few
+monolithic passes for reasons of compile-time efficiency.)  Kent and
+his students, Dipanwita Sarkar and Andrew Keep, developed
+infrastructure to support this approach and evolved the course, first
+to use micro-sized passes and then into even smaller nano
 passes~\citep{Sarkar:2004fk,Keep:2012aa}. I took this compiler course
 in the early 2000's, as part of my Ph.D. studies at Indiana
 University. Needless to say, I enjoyed the course immensely.
@@ -161,33 +160,32 @@ on the surface but there is a large overlap in the compiler techniques
 required for the two languages. Thus, I was able to teach much of the
 same content from the Indiana compiler course. I very much enjoyed
 teaching the course organized in this way, and even better, many of
-the students learned a lot and got excited about compilers.  (No, I
-didn't do a quantitative study to support this claim.)
+the students learned a lot and got excited about compilers.
 
 It is now 2016 and I too have returned to teach at Indiana University.
 In my absence the compiler course had switched from the front-to-back
 organization to a back-to-front organization. Seeing how well the
-incremental approach worked at Colorado, I found this unsatisfactory
-and have reorganized the course, porting and adapting the structure of
-the Colorado course back into the land of Scheme. In the meantime
-Scheme has been superseded by Racket (at least in Indiana), so the
-course is now about compiling a subset of Racket to the x86 assembly
-language and the compiler is implemented in Racket~\citep{plt-tr}.
+incremental approach worked at Colorado, I started porting and
+adapting the structure of the Colorado course back into the land of
+Scheme. In the meantime Indiana had moved on from Scheme to Racket, so
+the course is now about compiling a subset of Racket to the x86
+assembly language and the compiler is implemented in
+Racket~\citep{plt-tr}.
 
 This is the textbook for the incremental version of the compiler
 course at Indiana University (Spring 2016) and it is the first
 textbook for an Indiana compiler course.  With this book I hope to
 make the Indiana compiler course available to people that have not had
-the chance to study here in person.  Many of the compiler design
-decisions in this book are drawn from the assignment descriptions of
-\cite{Dybvig:2010aa}. I have captured what I think are the most
-important topics from \cite{Dybvig:2010aa} but have omitted topics
-that I think are less interesting conceptually and I have made
+the chance to study in Bloomington in person.  Many of the compiler
+design decisions in this book are drawn from the assignment
+descriptions of \cite{Dybvig:2010aa}. I have captured what I think are
+the most important topics from \cite{Dybvig:2010aa} but I have omitted
+topics that I think are less interesting conceptually and I have made
 simplifications to reduce complexity.  In this way, this book leans
-more towards pedagogy than towards absolute efficiency. Also, the book
-differs in places where I saw the opportunity to make the topics more
-fun, such as in relating register allocation to Sudoku
-(Chapter~\ref{ch:register-allocation}).
+more towards pedagogy than towards the absolute efficiency of the
+generated code. Also, the book differs in places where I saw the
+opportunity to make the topics more fun, such as in relating register
+allocation to Sudoku (Chapter~\ref{ch:register-allocation}).
 
 \section*{Prerequisites}
 
@@ -948,7 +946,6 @@ AT\&T syntax expected by the GNU assembler inside \key{gcc}.)
 \Arg &::=&  \key{\$}\Int \mid \key{\%}\Reg \mid \Int(\key{\%}\Reg) \\ 
 \Instr &::=& \key{addq} \; \Arg, \Arg \mid 
       \key{subq} \; \Arg, \Arg \mid 
-      \key{imulq} \; \Arg,\Arg \mid 
       \key{negq} \; \Arg \mid \key{movq} \; \Arg, \Arg \mid \\
   &&  \key{callq} \; \mathit{label} \mid
       \key{pushq}\;\Arg \mid \key{popq}\;\Arg \mid \key{retq} \\
@@ -1136,7 +1133,7 @@ auxiliary data from one step of the compiler to the next. )
 \[
 \begin{array}{lcl}
 \Arg &::=&  \INT{\Int} \mid \REG{\itm{register}}
-    \mid (\key{deref}\,\itm{register}\,\Int) \\ 
+    \mid (\key{deref}\;\itm{register}\;\Int) \\ 
 \Instr &::=& (\key{addq} \; \Arg\; \Arg) \mid 
              (\key{subq} \; \Arg\; \Arg) \mid 
              (\key{negq} \; \Arg) \mid (\key{movq} \; \Arg\; \Arg) \\
@@ -1683,25 +1680,27 @@ As discussed in Section~\ref{sec:plan-s0-x86}, the
 Consider again the example $R_1$ program \code{(+ 52 (- 10))},
 which after \key{select-instructions} looks like the following.
 \begin{lstlisting}
-   (movq (int 10) (var x))
-   (negq (var x))
-   (movq (int 52) (reg rax))
-   (addq (var x) (reg rax))
+   (movq (int 10) (var tmp.1))
+   (negq (var tmp.1))
+   (movq (var tmp.1) (var tmp.2))
+   (addq (int 52) (var tmp.2))
+   (movq (var tmp.2) (reg rax)))
 \end{lstlisting}
-The one and only variable \code{x} is assigned to stack location
-\code{-8(\%rbp)}, so the \code{assign-homes} pass translates the
-above to
+The variable \code{tmp.1} is assigned to stack location
+\code{-8(\%rbp)}, and \code{tmp.2} is assign to \code{-16(\%rbp)}, so
+the \code{assign-homes} pass translates the above to
 \begin{lstlisting}
-   (movq (int 10) (stack -8))
-   (negq (stack -8))
-   (movq (int 52) (reg rax))
-   (addq (stack -8) (reg rax))
+   (movq (int 10) (deref rbp -16))
+   (negq (deref rbp -16))
+   (movq (deref rbp -16) (deref rbp -8))
+   (addq (int 52) (deref rbp -8))
+   (movq (deref rbp -8) (reg rax)))
 \end{lstlisting}
 
 In the process of assigning stack locations to variables, it is
-convenient to compute and store the size of the frame in the first
-field of the \key{program} node which will be needed later to generate
-the procedure conclusion. 
+convenient to compute and store the size of the frame (in bytes) in
+the first field of the \key{program} node which will be needed later
+to generate the procedure conclusion.
 \[
   (\key{program}\;\Int\;\Instr^{+})
 \]
@@ -1734,19 +1733,19 @@ Consider again the following example.
 \end{lstlisting}
 After \key{assign-homes} pass, the above has been translated to
 \begin{lstlisting}
-   (movq (int 42) (stack -8))
-   (movq (stack -8) (stack -16))
-   (movq (stack -16) (reg rax))
+   (movq (int 42) (deref rbp -8))
+   (movq (deref rbp -8) (deref rbp -16))
+   (movq (deref rbp -16) (reg rax))
 \end{lstlisting}
-The second \key{movq} instruction is problematic because both arguments
-are stack locations. We suggest fixing this problem by moving from the
-source to \key{rax} and then from \key{rax} to the destination, as
-follows.
+The second \key{movq} instruction is problematic because both
+arguments are stack locations. We suggest fixing this problem by
+moving from the source to the register \key{rax} and then from
+\key{rax} to the destination, as follows.
 \begin{lstlisting}
-   (movq (int 42) (stack -8))
-   (movq (stack -8) (reg rax))
-   (movq (reg rax) (stack -16))
-   (movq (stack -16) (reg rax))
+   (movq (int 42) (deref rbp -8))
+   (movq (deref rbp -8) (reg rax))
+   (movq (reg rax) (deref rbp -16))
+   (movq (deref rbp -16) (reg rax))
 \end{lstlisting}
 
 \begin{exercise}
