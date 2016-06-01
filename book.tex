@@ -927,8 +927,12 @@ refer to integer constants (called \emph{immediate values}), variables
 called \emph{registers}, and instructions may load and store values
 into \emph{memory}.  Memory is a mapping of 64-bit addresses to 64-bit
 values. Figure~\ref{fig:x86-a} defines the syntax for the subset of
-the x86 assembly language needed for this chapter.  (We use the
-AT\&T syntax expected by the GNU assembler inside \key{gcc}.)
+the x86 assembly language needed for this chapter.  (We use the AT\&T
+syntax expected by the GNU assembler inside \key{gcc}.)  Also,
+Appendix~\ref{sec:x86-quick-reference} includes a quick-reference of
+all the x86 instructions used in this book and a short explanation of
+what they do.
+
 
 % to do: finish treatment of imulq
 % it's needed for vector's in R6/R7
@@ -2865,25 +2869,26 @@ programs to make sure that your move biasing is working properly.
 \chapter{Booleans, Control Flow, and Type Checking}
 \label{ch:bool-types}
 
-Up until now the input languages have only included a single kind of
-value, the integers. In this Chapter we add a second kind of value,
-the Booleans (true and false, written \key{\#t} and \key{\#f}
-respectively), together with some new operations (\key{and},
-\key{not}, \key{eq?}, \key{<}, etc.) and conditional expressions to
-create the $R_2$ language.  With the addition of conditional
-expressions, programs can have non-trivial control flow which has an
-impact on several parts of the compiler. Also, because we now have two
-kinds of values, we need to worry about programs that apply an
-operation to the wrong kind of value, such as \code{(not 1)}.
+The $R_0$ and $R_1$ languages only had a single kind of value, the
+integers. In this Chapter we add a second kind of value, the Booleans,
+to create the $R_2$ language. The Boolean values \emph{true} and
+\emph{false} are written \key{\#t} and \key{\#f} respectively in
+Racket.  We also introduce several operations that involve Booleans
+(\key{and}, \key{not}, \key{eq?}, \key{<}, etc.) and the conditional
+\key{if} expression. With the addition of \key{if} expressions,
+programs can have non-trivial control flow which has an impact on
+several parts of the compiler. Also, because we now have two kinds of
+values, we need to worry about programs that apply an operation to the
+wrong kind of value, such as \code{(not 1)}.
 
 There are two language design options for such situations.  One option
 is to signal an error and the other is to provide a wider
 interpretation of the operation. The Racket language uses a mixture of
 these two options, depending on the operation and the kind of
 value. For example, the result of \code{(not 1)} in Racket is
-\code{\#f} because Racket treats non-zero integers as true. On the
-other hand, \code{(car 1)} results in a run-time error in Racket,
-which states that \code{car} expects a pair.
+\code{\#f} because Racket treats non-zero integers like \code{\#t}. On
+the other hand, \code{(car 1)} results in a run-time error in Racket
+stating that \code{car} expects a pair.
 
 The Typed Racket language makes similar design choices as Racket,
 except much of the error detection happens at compile time instead of
@@ -2893,11 +2898,13 @@ reports a compile-time error because the type of the argument is
 expected to be of the form \code{(Listof T)} or \code{(Pairof T1 T2)}.
 
 For the $R_2$ language we choose to be more like Typed Racket in that
-we shall perform type checking during compilation.  However, we shall
-take a narrower interpretation of the operations, rejecting
-\code{(not 1)}. Despite this difference in design,
-$R_2$ is literally a subset of Typed Racket.  Every $R_2$
-program is a Typed Racket program.
+we shall perform type checking during compilation. In
+Chapter~\ref{ch:type-dynamic} we study the alternative choice, that
+is, how to compile a dynamically typed language like Racket.  The
+$R_2$ language is a subset of Typed Racket but by no means includes
+all of Typed Racket. Furthermore, for many of the operations we shall
+take a narrower interpretation than Typed Racket, for example,
+rejecting \code{(not 1)}.
 
 This chapter is organized as follows.  We begin by defining the syntax
 and interpreter for the $R_2$ language (Section~\ref{sec:r2-lang}). We
@@ -2913,12 +2920,12 @@ conditional control flow.
 \label{sec:r2-lang}
 
 The syntax of the $R_2$ language is defined in
-Figure~\ref{fig:r2-syntax}. It includes all of $R_1$, so we only show
-the new operators and expressions. We add the Boolean literals
-\code{\#t} and \code{\#f} for true and false and the conditional
-expression. The operators are expanded to include the \key{and} and
-\key{not} operations on Booleans and the \key{eq?} operation for
-comparing two integers and for comparing two Booleans.
+Figure~\ref{fig:r2-syntax}. It includes all of $R_1$ (shown in gray) ,
+the Boolean literals \code{\#t} and \code{\#f}, and the conditional
+\code{if} expression. Also, we expand the operators to include the
+\key{and} and \key{not} on Booleans, the \key{eq?}  operations for
+comparing two integers or two Booleans, and the \key{<}, \key{<=},
+\key{>}, and \key{>=} operations for comparing integers.
 
 \begin{figure}[tp]
 \centering
@@ -2945,14 +2952,14 @@ comparing two integers and for comparing two Booleans.
 Figure~\ref{fig:interp-R2} defines the interpreter for $R_2$, omitting
 the parts that are the same as the interpreter for $R_1$
 (Figure~\ref{fig:interp-R1}). The literals \code{\#t} and \code{\#f}
-simply evaluate to themselves. The conditional expression \code{(if
-  cnd thn els)} evaluates the Boolean expression \code{cnd} and then
-either evaluates \code{thn} or \code{els} depending on whether
-\code{cnd} produced \code{\#t} or \code{\#f}. The logical operations
-\code{not} and \code{and} behave as you might expect, but note that
-the \code{and} operation is short-circuiting. That is, the second
-expression \code{e2} is not evaluated if \code{e1} evaluates to
-\code{\#f}.
+simply evaluate to themselves. The conditional expression $(\key{if}\,
+\itm{cnd}\,\itm{thn}\,\itm{els})$ evaluates the Boolean expression
+\itm{cnd} and then either evaluates \itm{thn} or \itm{els} depending
+on whether \itm{cnd} produced \code{\#t} or \code{\#f}. The logical
+operations \code{not} and \code{and} behave as you might expect, but
+note that the \code{and} operation is short-circuiting. That is, given
+the expression $(\key{and}\,e_1\,e_2)$, the expression $e_2$ is not
+evaluated if $e_1$ evaluates to \code{\#f}.
 
 With the addition of the comparison operations, there are quite a few
 primitive operations and the interpreter code for them is somewhat
@@ -3039,10 +3046,10 @@ produces a \key{Boolean}.
 
 As mentioned at the beginning of this chapter, a type checker also
 rejects programs that apply operators to the wrong type of value. Our
-type checker for $R_2$ will signal an error for the following because,
-as we have seen above, the expression \code{(+ 10 ...)} has type
-\key{Integer}, and we shall require an argument of \code{not} to have
-type \key{Boolean}.
+type checker for $R_2$ will signal an error for the following
+expression because, as we have seen above, the expression \code{(+ 10
+  ...)} has type \key{Integer}, and we require the argument of a
+\code{not} to have type \key{Boolean}.
 \begin{lstlisting}
    (not (+ 10 (- (+ 12 20))))
 \end{lstlisting}
@@ -3057,9 +3064,10 @@ Boolean literal is \code{Boolean}.  To handle variables, the type
 checker, like the interpreter, uses an association list. However, in
 this case the association list maps variables to types instead of
 values. Consider the clause for \key{let}.  We type check the
-initializing expression to obtain its type \key{T} and then map the
-variable \code{x} to \code{T}. When the type checker encounters the
-use of a variable, it can lookup its type in the association list.
+initializing expression to obtain its type \key{T} and then associate
+type \code{T} with the variable \code{x}. When the type checker
+encounters the use of a variable, it can lookup its type in the
+association list.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -3092,8 +3100,7 @@ To print the resulting value correctly, the overall type of the
 program must be threaded through the remainder of the passes. We can
 store the type within the \key{program} form as shown in Figure
 \ref{fig:type-check-R2}. The syntax for post-typechecking $R_2$
-programs is below:
-
+programs as follows: \\
 \fbox{
 \begin{minipage}{0.87\textwidth}
 \[
@@ -3157,11 +3164,10 @@ C_1 & ::= & (\key{program}\;(\Var^{*})\;(\key{type}\;\textit{type})\;\Stmt^{+})
 \section{Flatten Expressions}
 \label{sec:flatten-r2}
 
-The \code{flatten} pass needs to be expanded to handle the Boolean
-literals \key{\#t} and \key{\#f}, the new logic and comparison
-operations, and \key{if} expressions. We shall start with a simple
-example of translating a \key{if} expression, shown below on the
-left. \\
+We expand the \code{flatten} pass to handle the Boolean literals
+\key{\#t} and \key{\#f}, the new logic and comparison operations, and
+\key{if} expressions. We shall start with a simple example of
+translating a \key{if} expression, shown below on the left. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -3184,12 +3190,13 @@ $\Rightarrow$
 The value of the \key{if} expression is the value of the branch that
 is selected. Recall that in the \code{flatten} pass we need to replace
 arbitrary expressions with $\Arg$'s (variables or literals). In the
-translation above, on the right, we have translated the \key{if}
-expression into a new variable \key{if.1} and we have produced code
-that will assign the appropriate value to \key{if.1}.  For $R_1$, the
-\code{flatten} pass returned a list of assignment statements. Here,
-for $R_2$, we return a list of statements that can include both
-\key{if} statements and assignment statements.
+translation above, on the right, we have replaced the \key{if}
+expression with a new variable \key{if.1}, inside \code{(return
+  if.1)}, and we have produced code that will assign the appropriate
+value to \key{if.1} using an \code{if} statement prior to the
+\code{return}.  For $R_1$, the \code{flatten} pass returned a list of
+assignment statements. Here, for $R_2$, we return a list of statements
+that can include both \key{if} statements and assignment statements.
 
 The next example is a bit more involved, showing what happens when
 there are complex expressions (not variables or literals) in the
@@ -3237,11 +3244,13 @@ imitate the order of evaluation of the interpreter for $R_2$
 (Figure~\ref{fig:interp-R2}). We recommend using an \key{if} statement
 in the code you generate for \key{and}.
 
-The \code{flatten} clause for \key{if} requires some care because the
-condition of the \key{if} can be an arbitrary expression in $R_2$ but
-in $C_1$ the condition must be an equality predicate. We recommend
-flattening the condition into an $\Arg$ and then comparing it with
-\code{\#t}.
+The \code{flatten} clause for \key{if} also requires some care because
+the condition of the \key{if} can be an arbitrary expression in $R_2$,
+but in $C_1$ the condition must be an equality predicate. For now we
+recommend flattening the condition into an $\Arg$ and then comparing
+it with \code{\#t}. We discuss a more efficient approach in
+Section~\ref{sec:opt-if}.
+
 
 \begin{exercise}\normalfont
 Expand your \code{flatten} pass to handle $R_2$, that is, handle the
@@ -3308,20 +3317,25 @@ x86_1 &::= & (\key{program} \;\itm{info} \;(\key{type}\;\itm{type})\; \Instr^{+}
 \label{fig:x86-1}
 \end{figure}
 
-The \key{cmpq} instruction is somewhat unusual in that its arguments
-are the two things to be compared and the result (less than, greater
-than, equal, not equal, etc.) is placed in the special EFLAGS
-register. This register cannot be accessed directly but it can be
-queried by a number of instructions, including the \key{set}
+The \key{cmpq} instruction comparies its two arguments to determine
+whether one argument is less than, equal, or greater than the other
+argument. The \key{cmpq} instruction is unusual regarding the order of
+its arguments and where the result is placed. The argument order is
+backwards: if you want to test whether $x < y$, then write
+$(\code{cmpq}\,y\,x)$. The result of \key{cmpq} is placed in the
+special EFLAGS register. This register cannot be accessed directly but
+it can be queried by a number of instructions, including the \key{set}
 instruction. The \key{set} instruction puts a \key{1} or \key{0} into
 its destination depending on whether the comparison came out according
-to the condition code \itm{cc} ('e' for equal, 'l' for less, 'le' for
-less-or-equal, 'g' for greater, 'ge' for greater-or-equal). The
-\key{set} instruction has an annoying quirk in that its destination
-argument must be single byte register, such as \code{al}, which is
-part of the \code{rax} register.  Thankfully, the \key{movzbq}
-instruction can then be used to move from a single byte register to a
-normal 64-bit register.
+to the condition code \itm{cc} (\key{e} for equal, \key{l} for less,
+\key{le} for less-or-equal, \key{g} for greater, \key{ge} for
+greater-or-equal).  The set instruction has an annoying quirk in that
+its destination argument must be single byte register, such as
+\code{al}, which is part of the \code{rax} register.  Thankfully, the
+\key{movzbq} instruction can then be used to move from a single byte
+register to a normal 64-bit register.
+
+
 
 The \key{jmp} instruction jumps to the instruction after the indicated
 label.  The \key{jmp-if} instruction jumps to the instruction after
@@ -3669,6 +3683,12 @@ A close inspection of the x86 code generated in
 Figure~\ref{fig:if-example-x86} reveals some redundant computation
 regarding the condition of the \key{if}. We compare \key{rcx} to $1$
 twice using \key{cmpq} as follows.
+
+% Wierd LaTeX bug if I remove the following. -Jeremy
+% Does it have to do with page breaks?
+\begin{lstlisting}
+\end{lstlisting}
+
 \begin{lstlisting}
 	cmpq	$1, %rcx
 	sete	%al
