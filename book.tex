@@ -2024,7 +2024,7 @@ I recommend organizing your code to use a helper function that takes a
 list of statements and an initial live-after set (typically empty) and
 returns the list of statements and the list of live-after sets.  For
 this chapter, returning the list of statements is unnecessary, as they
-will be unchanged, but in Chapter~\ref{ch:bool-types} we introduce
+awill be unchanged, but in Chapter~\ref{ch:bool-types} we introduce
 \key{if} statements and will need to annotate them with the live-after
 sets of the two branches.
 
@@ -2475,10 +2475,9 @@ arrive at the assignment:
   t.2\mapsto \key{-8(\%rbp)} \}
 \end{gather*}
 Applying this assignment to our running example
-(Figure~\ref{fig:reg-eg}) yields the program on the right.
-
+(Figure~\ref{fig:reg-eg}) yields the program on the right.\\
 % why frame size of 32? -JGS
-\begin{minipage}{0.45\textwidth}
+\begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
   (program (v w x y z)
     (movq (int 1) (var v))
@@ -2501,18 +2500,18 @@ $\Rightarrow$
 \begin{lstlisting}
 (program 16
   (movq (int 1) (reg rbx))
-  (movq (int 46) (stack -8))
-  (movq (reg rbx) (stack -16))
-  (addq (int 7) (stack -16))
-  (movq (stack -16) (reg rbx))
+  (movq (int 46) (deref rbp -8))
+  (movq (reg rbx) (deref rbp -16))
+  (addq (int 7) (deref rbp -16))
+  (movq (deref rbp -16) (reg rbx))
   (addq (int 4) (reg rbx))
-  (movq (stack -16) (stack -16))
-  (addq (stack -8) (stack -16))
+  (movq (deref rbp -16) (deref rbp -16))
+  (addq (deref rbp -8) (deref rbp -16))
   (movq (reg rbx) (reg rbx))
   (negq (reg rbx))
-  (movq (stack -16) (stack -8))
-  (addq (reg rbx) (stack -8))
-  (movq (stack -8) (reg rax)))
+  (movq (deref rbp -16) (deref rbp -8))
+  (addq (reg rbx) (deref rbp -8))
+  (movq (deref rbp -8) (reg rax)))
 \end{lstlisting}
 \end{minipage}
 
@@ -2524,8 +2523,8 @@ move of \code{-16(\%rbp)} to itself is deleted and the addition of
 changed.
 \begin{lstlisting}
   (addq (int 4) (reg rbx))
-  (movq (stack -8) (reg rax)
-  (addq (reg rax) (stack -16))
+  (movq (deref rbp -8) (reg rax)
+  (addq (reg rax) (deref rbp -16))
 \end{lstlisting}
 An overview of all of the passes involved in register allocation is
 shown in Figure~\ref{fig:reg-alloc-passes}.
@@ -2563,16 +2562,15 @@ new example programs that exercise all of the register allocation
 algorithm, such as forcing variables to be spilled to the stack.
 
 I recommend organizing our code by creating a helper function named
-\code{allocate-homes} that takes an interference graph, a list of all
-the variables in the program, and the list of statements. This
-function should return a mapping of variables to their homes
-(registers or stack locations) and the total size needed for the
-stack. By creating this helper function, we will be able to reuse it
-in Chapter~\ref{ch:functions} when we add support for functions.
-
-Once you have obtained the mapping from \code{allocate-homes}, you can
-use the \code{assign-homes} function from Section~\ref{sec:assign-s0}
-to replace the variables with their homes.
+\code{color-graph} that takes an interference graph and a list of all
+the variables in the program. This function should return a mapping of
+variables to their colors. By creating this helper function, we will
+be able to reuse it in Chapter~\ref{ch:functions} when we add support
+for functions.  Once you have obtained the coloring from
+\code{color-graph}, you can assign the variables to registers or stack
+locations based on their color and then use the \code{assign-homes}
+function from Section~\ref{sec:assign-s0} to replace the variables
+with their assigned location.
 \end{exercise}
 
 
@@ -5188,11 +5186,12 @@ In the mirror image of handling the parameters of function
 definitions, some of the arguments \itm{args} need to be moved to the
 argument passing registers and the rest should be moved to the
 appropriate stack locations, as discussed in
-Section~\ref{sec:fun-x86}. You might want to introduce a new kind of
-AST node for stack arguments, \code{(stack-arg $i$)} where $i$ is the
-index of this argument with respect to the other stack arguments. As
-you're generating this code for parameter passing, take note of how many
-stack arguments are needed for purposes of computing the
+Section~\ref{sec:fun-x86}. 
+%% You might want to introduce a new kind of AST node for stack
+%% arguments, \code{(stack-arg $i$)} where $i$ is the index of this
+%% argument with respect to the other stack arguments.
+As you're generating the code for parameter passing, take note of how
+many stack arguments are needed for purposes of computing the
 \itm{maxStack} discussed above.
 
 Once the instructions for parameter passing have been generated, the
@@ -5219,7 +5218,6 @@ For the \code{print-x86} pass, I recommend the following translations:
 \begin{lstlisting}
   (function-ref |\itm{label}|) |$\Rightarrow$| |\itm{label}|(%rip)
   (indirect-callq |\itm{arg}|) |$\Rightarrow$| callq *|\itm{arg}|
-  (stack-arg |$i$|) |$\Rightarrow$| |$i$|(%rsp)
 \end{lstlisting}
 For function definitions, the \code{print-x86} pass should add the
 code for saving and restoring the callee save registers, if you
