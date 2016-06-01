@@ -1836,6 +1836,8 @@ passes described in this Chapter.  The x86$^{*}$ language extends x86
 with variables and looser rules regarding instruction arguments. The
 x86$^{\dagger}$ language is the concrete syntax (string) for x86.
 
+\marginpar{\footnotesize To do: add a challenge section. Perhaps
+  extending the partial evaluation to $R_0$? \\ --Jeremy}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Register Allocation}
@@ -1845,13 +1847,13 @@ In Chapter~\ref{ch:int-exp} we simplified the generation of x86
 assembly by placing all variables on the stack. We can improve the
 performance of the generated code considerably if we instead try to
 place as many variables as possible into registers.  The CPU can
-access a register in a single cycle, whereas accessing the stack can
-take from several cycles (to go to cache) to hundreds of cycles (to go
-to main memory).  Figure~\ref{fig:reg-eg} shows a program with four
-variables that serves as a running example. We show the source program
-and also the output of instruction selection. At that point the
-program is almost x86 assembly but not quite; it still contains
-variables instead of stack locations or registers.
+access a register in a single cycle, whereas accessing the stack takes
+many cycles to go to cache or many more to access main memory.
+Figure~\ref{fig:reg-eg} shows a program with four variables that
+serves as a running example. We show the source program and also the
+output of instruction selection. At that point the program is almost
+x86 assembly but not quite; it still contains variables instead of
+stack locations or registers.
 
 \begin{figure}
 \begin{minipage}{0.45\textwidth}
@@ -1891,15 +1893,29 @@ After instruction selection:
 
 The goal of register allocation is to fit as many variables into
 registers as possible. It is often the case that we have more
-variables than registers, so we cannot naively map each variable to a
-register. Fortunately, it is also common for different variables to be
-needed during different periods of time, and in such cases the
-variables can be mapped to the same register.  Consider variables
-\code{x} and \code{y} in Figure~\ref{fig:reg-eg}.  After the variable
-\code{x} is moved to \code{z} it is no longer needed.  Variable
-\code{y}, on the other hand, is used only after this point, so
-\code{x} and \code{y} could share the same register. The topic of the
-next section is how we compute where a variable is needed.
+variables than registers, so we cannot map each variable to a
+different register. Fortunately, it is common for different variables
+to be needed during different periods of time, and in such cases
+several variables can be mapped to the same register.  Consider
+variables \code{x} and \code{y} in Figure~\ref{fig:reg-eg}.  After the
+variable \code{x} is moved to \code{z} it is no longer needed.
+Variable \code{y}, on the other hand, is used only after this point,
+so \code{x} and \code{y} could share the same register. The topic of
+Section~\ref{sec:liveness-analysis} is how we compute where a variable
+is needed.  Once we have that information, we compute which variables
+are needed at the same time, i.e., which ones \emph{interfere}, and
+represent this relation as graph whose vertices are variables and
+edges indicate when two variables interfere with eachother
+(Section~\ref{sec:build-interference}). We then model register
+allocation as a graph coloring problem, which we discuss in
+Section~\ref{sec:graph-coloring}.
+
+In the event that we run out of registers despite these efforts, we
+place the remaining variables on the stack, similar to what we did in
+Chapter~\ref{ch:int-exp}. It is common to say that when a variable
+that is assigned to a stack location, it has been \emph{spilled}. The
+process of spilling variables is handled as part of the graph coloring
+process described in \ref{sec:graph-coloring}.
 
 
 \section{Liveness Analysis}
@@ -2020,6 +2036,7 @@ instruction which corresponds to $W$.
 \end{exercise}
 
 \section{Building the Interference Graph}
+\label{sec:build-interference}
 
 Based on the liveness analysis, we know where each variable is needed.
 However, during register allocation, we need to answer questions of
@@ -2141,6 +2158,7 @@ follows.
 \end{exercise}
 
 \section{Graph Coloring via Sudoku}
+\label{sec:graph-coloring}
 
 We now come to the main event, mapping variables to registers (or to
 stack locations in the event that we run out of registers).  We need
@@ -2841,6 +2859,8 @@ opportunity for move biasing and visually inspect the output x86
 programs to make sure that your move biasing is working properly.
 \end{exercise}
 
+\marginpar{\footnotesize To do: another neat challenge would be to do
+  live range splitting~\citep{Cooper:1998ly}. \\ --Jeremy}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
