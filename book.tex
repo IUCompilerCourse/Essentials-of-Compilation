@@ -922,16 +922,21 @@ language to compile $R_1$.
 \section{The x86 Assembly Language}
 \label{sec:x86}
 
-An x86 program is a sequence of instructions. The instructions may
-refer to integer constants (called \emph{immediate values}), variables
-called \emph{registers}, and instructions may load and store values
-into \emph{memory}.  Memory is a mapping of 64-bit addresses to 64-bit
-values. Figure~\ref{fig:x86-a} defines the syntax for the subset of
-the x86 assembly language needed for this chapter.  (We use the AT\&T
-syntax expected by the GNU assembler inside \key{gcc}.)  Also,
-Appendix~\ref{sec:x86-quick-reference} includes a quick-reference of
-all the x86 instructions used in this book and a short explanation of
-what they do.
+An x86 program is a sequence of instructions. The program is stored in
+the computer's memory and the \emph{program counter} points to the
+address of the next instruction to be executed. For most instructions,
+once the instruction is executed, the program counter is incremented
+to point to the immediately following instruction in the program.
+Each instruction may refer to integer constants (called
+\emph{immediate values}), variables called \emph{registers}, and
+instructions may load and store values into memory.  For our purposes,
+we can think of the computer's memory as a mapping of 64-bit addresses
+to 64-bit values. Figure~\ref{fig:x86-a} defines the syntax for the
+subset of the x86 assembly language needed for this chapter.  (We use
+the AT\&T syntax expected by the GNU assembler inside \key{gcc}.)
+Also, Appendix~\ref{sec:x86-quick-reference} includes a
+quick-reference of all the x86 instructions used in this book and a
+short explanation of what they do.
 
 
 % to do: finish treatment of imulq
@@ -3271,12 +3276,13 @@ language. Figure~\ref{fig:x86-2} defines the abstract syntax for a
 larger subset of x86 that includes instructions for logical
 operations, comparisons, and jumps.
 
-In addition to its arithmetic operations, x86 provides bitwise
-operators that perform an operation on every bit of their
-arguments. For example, the \key{xorq} instruction takes two
-arguments, performs a pairwise exclusive-or (XOR) operation on the
-bits of its arguments, and writes the result into its second argument.
-Recall the truth table for XOR: 
+One small challenge is that x86 does not provide an instruction that
+directly implements logical negation (\code{not} in $R_2$ and $C_1$).
+However, the \code{xorq} instruction can be used to encode \code{not}.
+The \key{xorq} instruction takes two arguments, performs a pairwise
+exclusive-or operation on each bit of its arguments, and writes the
+results into its second argument.  Recall the truth table for
+exclusive-or:
 \begin{center}
 \begin{tabular}{l|cc}
    & 0 & 1 \\ \hline
@@ -3284,7 +3290,12 @@ Recall the truth table for XOR:
 1  & 1 & 0
 \end{tabular}
 \end{center}
-So $0011 \mathrel{\mathrm{XOR}} 0101 = 0110$.
+For example, $0011 \mathrel{\mathrm{XOR}} 0101 = 0110$.  Notice that
+in row of the table for the bit $1$, the result is the opposite of the
+second bit.  Thus, the \code{not} operation can be implemented by
+\code{xorq} with $1$ as the first argument: $0001
+\mathrel{\mathrm{XOR}} 0000 = 0001$ and $0001 \mathrel{\mathrm{XOR}}
+0001 = 0000$.
 
 \begin{figure}[tp]
 \fbox{
@@ -3317,38 +3328,44 @@ x86_1 &::= & (\key{program} \;\itm{info} \;(\key{type}\;\itm{type})\; \Instr^{+}
 \label{fig:x86-1}
 \end{figure}
 
-The \key{cmpq} instruction comparies its two arguments to determine
-whether one argument is less than, equal, or greater than the other
-argument. The \key{cmpq} instruction is unusual regarding the order of
-its arguments and where the result is placed. The argument order is
-backwards: if you want to test whether $x < y$, then write
-$(\code{cmpq}\,y\,x)$. The result of \key{cmpq} is placed in the
-special EFLAGS register. This register cannot be accessed directly but
-it can be queried by a number of instructions, including the \key{set}
-instruction. The \key{set} instruction puts a \key{1} or \key{0} into
-its destination depending on whether the comparison came out according
-to the condition code \itm{cc} (\key{e} for equal, \key{l} for less,
-\key{le} for less-or-equal, \key{g} for greater, \key{ge} for
-greater-or-equal).  The set instruction has an annoying quirk in that
-its destination argument must be single byte register, such as
-\code{al}, which is part of the \code{rax} register.  Thankfully, the
-\key{movzbq} instruction can then be used to move from a single byte
-register to a normal 64-bit register.
+Next we consider the x86 instructions that are relevant for
+compiling the comparison operations. The \key{cmpq} instruction
+compares its two arguments to determine whether one argument is less
+than, equal, or greater than the other argument. The \key{cmpq}
+instruction is unusual regarding the order of its arguments and where
+the result is placed. The argument order is backwards: if you want to
+test whether $x < y$, then write \code{cmpq y, x}. The result of
+\key{cmpq} is placed in the special EFLAGS register. This register
+cannot be accessed directly but it can be queried by a number of
+instructions, including the \key{set} instruction. The \key{set}
+instruction puts a \key{1} or \key{0} into its destination depending
+on whether the comparison came out according to the condition code
+\itm{cc} (\key{e} for equal, \key{l} for less, \key{le} for
+less-or-equal, \key{g} for greater, \key{ge} for greater-or-equal).
+The set instruction has an annoying quirk in that its destination
+argument must be single byte register, such as \code{al}, which is
+part of the \code{rax} register.  Thankfully, the \key{movzbq}
+instruction can then be used to move from a single byte register to a
+normal 64-bit register.
 
-
-
-The \key{jmp} instruction jumps to the instruction after the indicated
-label.  The \key{jmp-if} instruction jumps to the instruction after
-the indicated label depending whether the result in the EFLAGS
-register matches the condition code \itm{cc}, otherwise the
-\key{jmp-if} instruction falls through to the next instruction.
+For compiling the \key{if} expression, the x86 instructions for
+jumping are relevant. The \key{jmp} instruction updates the program
+counter to point to the instruction after the indicated label.  The
+\key{jmp-if} instruction updates the program counter to point to the
+instruction after the indicated label depending on whether the result
+in the EFLAGS register matches the condition code \itm{cc}, otherwise
+the \key{jmp-if} instruction falls through to the next
+instruction. Our abstract syntax for \key{jmp-if} differs from the
+concrete syntax for x86 to separate the instruction name from the
+condition code. For example, \code{(jmp-if le foo)} corresponds to
+\code{jle foo}.
 
 \section{Select Instructions}
 \label{sec:select-r2}
 
-The \code{select-instructions} pass needs to lower from $C_1$ to an
+The \code{select-instructions} pass lowers from $C_1$ to another
 intermediate representation suitable for conducting register
-allocation, i.e., close to x86$_1$. 
+allocation, that is, a language close to x86$_1$.
 
 We can take the usual approach of encoding Booleans as integers, with
 true as 1 and false as 0.
@@ -3357,15 +3374,16 @@ true as 1 and false as 0.
 \qquad
 \key{\#f} \Rightarrow \key{0}
 \]
-The \code{not} operation can be implemented in terms of \code{xorq}.
-Can you think of a bit pattern that, when XOR'd with the bit
-representation of 0 produces 1, and when XOR'd with the bit
-representation of 1 produces 0?
+The \code{not} operation can be implemented in terms of \code{xorq}
+as we discussed at the beginning of this section.
+%% Can you think of a bit pattern that, when XOR'd with the bit
+%% representation of 0 produces 1, and when XOR'd with the bit
+%% representation of 1 produces 0?
 
-Translating the \code{eq?} operation to x86 is slightly involved due
-to the unusual nature of the \key{cmpq} instruction discussed above.
-We recommend translating an assignment from \code{eq?} into the
-following sequence of three instructions. \\
+Translating the \code{eq?} and the other comparison operations to x86
+is slightly involved due to the unusual nature of the \key{cmpq}
+instruction discussed above.  We recommend translating an assignment
+from \code{eq?} into the following sequence of three instructions. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -3377,7 +3395,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(cmpq |$\Arg_1$| |$\Arg_2$|)
+(cmpq |$\Arg_2$| |$\Arg_1$|)
 (set e (byte-reg al))
 (movzbq (byte-reg al) |$\itm{lhs}$|)
 \end{lstlisting}
@@ -3405,11 +3423,10 @@ $\Rightarrow$
 % not by using \key{notq} and then masking the upper bits of the result with
 % the \key{andq} instruction.
 
-Regarding \key{if} statements, we recommend that you not lower them in
-\code{select-instructions} but instead lower them in
-\code{patch-instructions}.  The reason is that for purposes of
-liveness analysis, \key{if} statements are easier to deal with than
-jump instructions.
+Regarding \key{if} statements, we recommend delaying when they are
+lowered until the \code{patch-instructions} pass.  The reason is that
+for purposes of liveness analysis, \key{if} statements are easier to
+deal with than jump instructions.
 
 \begin{exercise}\normalfont
 Expand your \code{select-instructions} pass to handle the new features
@@ -3425,21 +3442,22 @@ created and make sure that you have some test programs that use the
 
 The changes required for $R_2$ affect the liveness analysis, building
 the interference graph, and assigning homes, but the graph coloring
-algorithm itself should not need to change.
+algorithm itself does not need to change.
 
 \subsection{Liveness Analysis}
 \label{sec:liveness-analysis-r2}
 
 The addition of \key{if} statements brings up an interesting issue in
 liveness analysis. Recall that liveness analysis works backwards
-through the program, for each instruction computing the variables that
-are live before the instruction based on which variables are live
+through the program, for each instruction it computes the variables
+that are live before the instruction based on which variables are live
 after the instruction. Now consider the situation for \code{(\key{if}
-  (\key{eq?} $e_1$ $e_2$) $\itm{thns}$ $\itm{elss}$)}, where we know the
-$L_{\mathsf{after}}$ set and need to produce the $L_{\mathsf{before}}$
-set.  We can recursively perform liveness analysis on the $\itm{thns}$
-and $\itm{elss}$ branches, using $L_{\mathsf{after}}$ as the starting
-point, to obtain $L^{\mathsf{thns}}_{\mathsf{before}}$ and
+  (\key{eq?} $e_1$ $e_2$) $\itm{thns}$ $\itm{elss}$)}, where we know
+the $L_{\mathsf{after}}$ set and we need to produce the
+$L_{\mathsf{before}}$ set.  We can recursively perform liveness
+analysis on the $\itm{thns}$ and $\itm{elss}$ branches, using
+$L_{\mathsf{after}}$ as the starting point, to obtain
+$L^{\mathsf{thns}}_{\mathsf{before}}$ and
 $L^{\mathsf{elss}}_{\mathsf{before}}$ respectively. However, we do not
 know, during compilation, which way the branch will go, so we do not
 know whether to use $L^{\mathsf{thns}}_{\mathsf{before}}$ or
@@ -3449,7 +3467,7 @@ that there is no harm in identifying more variables as live than
 absolutely necessary. Thus, we can take the union of the live
 variables from the two branches to be the live set for the whole
 \key{if}, as shown below. Of course, we also need to include the
-variables that are read in the $\itm{cnd}$ argument.
+variables that are read in $e_1$ and $e_2$.
 \[
   L_{\mathsf{before}} = L^{\mathsf{thns}}_{\mathsf{before}} \cup 
   L^{\mathsf{elss}}_{\mathsf{before}} \cup
@@ -3459,13 +3477,13 @@ We need the live-after sets for all the instructions in both branches
 of the \key{if} when we build the interference graph, so I recommend
 storing that data in the \key{if} statement AST as follows:
 \begin{lstlisting}
-   (if (eq? |$\itm{arg}$| |$\itm{arg}$|) |$\itm{thns}$| |$\itm{thn{-}lives}$| |$\itm{elss}$| |$\itm{els{-}lives}$|)
+   (if (eq? |$e_1$| |$e_2$|) |$\itm{thns}$| |$\itm{thn{-}lives}$| |$\itm{elss}$| |$\itm{els{-}lives}$|)
 \end{lstlisting}
 
 If you wrote helper functions for computing the variables in an
-argument and the variables read-from ($R$) or written-to ($W$) by an
-instruction, you need to be update them to handle the new kinds of
-arguments and instructions in x86$_1$.
+instruction's argument and for computing the variables read-from ($R$)
+or written-to ($W$) by an instruction, you need to be update them to
+handle the new kinds of arguments and instructions in x86$_1$.
 
 \subsection{Build Interference}
 \label{sec:build-interference-r2}
@@ -3476,9 +3494,9 @@ code was already quite general, it will not need to be changed to
 handle the logical operations. If not, I recommend that you change
 your code to be more general. The \key{movzbq} instruction should be
 handled like the \key{movq} instruction. The \key{if} statement is
-straightforward to handle because we stored the live-after sets for the
-two branches in the AST node as described above. Here we just need to
-recursively process the two branches. The output of this pass can
+straightforward to handle because we stored the live-after sets for
+the two branches in the AST node as described above. Here we just need
+to recursively process the two branches. The output of this pass can
 discard the live after sets, as they are no longer needed.
 
 \subsection{Assign Homes}
@@ -3501,22 +3519,24 @@ created programs on the \code{interp-x86} interpreter
 \label{sec:lower-conditionals}
 
 In the \code{select-instructions} pass we decided to procrastinate in
-the lowering of the \key{if} statement (thereby making liveness
-analysis easier). Now we need to make up for that and turn the
-\key{if} statement into the appropriate instruction sequence.  The
-following translation gives the general idea. If $e_1$ and $e_2$ are
-equal we need to execute the $\itm{thns}$ branch and otherwise we need
-to execute the $\itm{elss}$ branch. So use \key{cmpq} and do a
-conditional jump to the $\itm{thenlabel}$ (which we can generate with
-\code{gensym}).  Otherwise we fall through to the $\itm{elss}$
-branch. At the end of the $\itm{elss}$ branch we need to take care to
-not fall through to the $\itm{thns}$ branch. So we jump to the
-$\itm{endlabel}$ (also generated with \code{gensym}).
+the lowering of the \key{if} statement, thereby making liveness
+analysis easier. Now we need to make up for that and turn the \key{if}
+statement into the appropriate instruction sequence.  The following
+translation gives the general idea. If the condition is true, we need
+to execute the $\itm{thns}$ branch and otherwise we need to execute
+the $\itm{elss}$ branch. So we use \key{cmpq} and do a conditional
+jump to the $\itm{thenlabel}$, choosing the condition code $cc$ that
+is appropriate for the comparison operator \itm{cmp}.  If the
+condition is false, we fall through to the $\itm{elss}$ branch. At the
+end of the $\itm{elss}$ branch we need to take care to not fall
+through to the $\itm{thns}$ branch. So we jump to the
+$\itm{endlabel}$. All of the labels in the generated code should be
+created with \code{gensym}.
 
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
- (if (eq? |$e_1$| |$e_2$|) |$\itm{thns}$| |$\itm{elss}$|)
+ (if (|\itm{cmp}| |$\Arg_1$| |$\Arg_2$|) |$\itm{thns}$| |$\itm{elss}$|)
 \end{lstlisting}
 \end{minipage}
 &
@@ -3524,8 +3544,8 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
- (cmpq |$e_1$| |$e_2$|)
- (jmp-if e |$\itm{thenlabel}$|)
+ (cmpq |$\Arg_2$| |$\Arg_1$|)
+ (jmp-if |$cc$| |$\itm{thenlabel}$|)
  |$\itm{elss}$|
  (jmp |$\itm{endlabel}$|)
  (label |$\itm{thenlabel}$|)
@@ -3814,26 +3834,43 @@ if_end21289:
   parameters, etc. \\ --Jeremy}
 
 In this chapter we study the implementation of mutable tuples (called
-``vectors'' in Racket). This language feature is the first to require
-use the of the ``heap'' because the lifetime of a Racket tuple is
-indefinite, that is, the lifetime of a tuple does not follow a stack
-(FIFO) discipline but they instead live forever from the programmer's
-viewpoint. Of course, from an implementor's viewpoint, it is important
-to recycle the space associated with tuples that will no longer be
-used by the program, which is why we also study \emph{garbage
-  collection} techniques in this chapter.
+``vectors'' in Racket). This language feature is the first to use the
+computer's \emph{heap} because the lifetime of a Racket tuple is
+indefinite, that is, a tuple does not follow a stack (FIFO) discipline
+but instead lives forever from the programmer's viewpoint. Of course,
+from an implementor's viewpoint, it is important to recycle the space
+associated with tuples when they are no longer needed, which is why we
+also study \emph{garbage collection} techniques in this chapter.
+
+Section~\ref{sec:r3} introduces the $R_3$ language including its
+interpreter and type checker. The $R_3$ language extends the $R_2$
+language of Chapter~\ref{ch:bool-types} with vectors and void values
+(because the \code{vector-set!}  operation returns a void
+value). Section~\ref{sec:GC} describes a garbage collection algorithm
+based on copying live objects back and forth between two halves of the
+heap. The garbage collector requires coordination with the compiler so
+that it can see all of the \emph{root} pointers, that is, pointers in
+registers or on the procedure call stack.
+Section~\ref{sec:code-generation-gc} discusses all the necessary
+changes and additions to the compiler passes, including type checking,
+instruction selection, register allocation, and a new compiler pass
+named \code{expose-allocation}.
 
 \section{The $R_3$ Language}
+\label{sec:r3}
 
-Figure~\ref{fig:r3-syntax} defines the syntax
-for $R_3$, which includes three new forms for creating a tuple,
-reading an element of a tuple, and writing an element into a
-tuple. The following program shows the usage of tuples in Racket. We
+Figure~\ref{fig:r3-syntax} defines the syntax for $R_3$, which
+includes three new forms for creating a tuple, reading an element of a
+tuple, and writing to an element of a tuple. The program in
+Figure~\ref{fig:vector-eg} shows the usage of tuples in Racket. We
 create a 3-tuple \code{t} and a 1-tuple. The 1-tuple is stored at
-index $2$ of the 3-tuple, showing that tuples are first-class values.
-The element at index $1$ of \code{t} is \code{\#t}, so the ``then''
-branch is taken.  The element at index $0$ of \code{t} is $40$, to
-which we add the $2$, the element at index $0$ of the 1-tuple.
+index $2$ of the 3-tuple, demonstrating that tuples are first-class
+values.  The element at index $1$ of \code{t} is \code{\#t}, so the
+``then'' branch is taken.  The element at index $0$ of \code{t} is
+$40$, to which we add the $2$, the element at index $0$ of the
+1-tuple.
+
+\begin{figure}[tbp]
 \begin{lstlisting}
   (let ([t (vector 40 #t (vector 2))])
     (if (vector-ref t 1)
@@ -3841,12 +3878,11 @@ which we add the $2$, the element at index $0$ of the 1-tuple.
            (vector-ref (vector-ref t 2) 0))
         44))
 \end{lstlisting}
+\caption{Example program that creates tuples and reads from them.}
+\label{fig:vector-eg}
+\end{figure}
 
-Figure~\ref{fig:interp-R3} shows the definitional interpreter for the
-$R_3$ language and Figure~\ref{fig:typecheck-R3} shows the type
-checker.
-
-\begin{figure}[tp]
+\begin{figure}[tbp]
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
@@ -3872,6 +3908,59 @@ checker.
 \caption{The syntax of $R_3$, extending $R_2$ with tuples.}
 \label{fig:r3-syntax}
 \end{figure}
+
+
+Tuples are our first encounter with heap-allocated data, which raises
+several interesting issues. First, variable binding performs a
+shallow-copy when dealing with tuples, which means that different
+variables can refer to the same tuple, i.e., different variables can
+be \emph{aliases} for the same thing. Consider the following example
+in which both \code{t1} and \code{t2} refer to the same tuple.  Thus,
+the mutation through \code{t2} is visible when referencing the tuple
+from \code{t1}, so the result of this program is \code{42}.
+\begin{lstlisting}
+(let ([t1 (vector 3 7)])
+  (let ([t2 t1])
+    (let ([_ (vector-set! t2 0 42)])
+      (vector-ref t1 0))))
+\end{lstlisting}
+
+The next issue concerns the lifetime of tuples. Of course, they are
+created by the \code{vector} form, but when does their lifetime end?
+Notice that the grammar in Figure~\ref{fig:r3-syntax} does not include
+an operation for deleting tuples. Furthermore, the lifetime of a tuple
+is not tied to any notion of static scoping. For example, the
+following program returns \code{3} even though the variable \code{t}
+goes out of scope prior to accessing the vector.
+\begin{lstlisting}
+(vector-ref
+  (let ([t (vector 3 7)])
+    t)
+  0)
+\end{lstlisting}
+From the perspective of programmer-observable behavior, tuples live
+forever. Of course, if they really lived forever, then many programs
+would run out of memory.\footnote{The $R_3$ language does not have
+  looping or recursive function, so it is nigh impossible to write a
+  program in $R_3$ that will run out of memory. However, we add
+  recursive functions in the next Chapter!} A Racket implementation
+must therefore perform automatic garbage collection.
+
+Figure~\ref{fig:interp-R3} shows the definitional interpreter for the
+$R_3$ language and Figure~\ref{fig:typecheck-R3} shows the type
+checker. The additions to the interpreter are straightforward but the
+updates to the type checker deserve some explanation.  As we shall see
+in Section~\ref{sec:GC}, we need to know which variables are pointers
+into the heap, that is, which variables are vectors. Also, when
+allocating a vector, we shall need to know which elements of the
+vector are pointers. We can obtain this information during type
+checking and flattening. The type checker in
+Figure~\ref{fig:typecheck-R3} not only computes the type of an
+expression, it also wraps every sub-expression $e$ with the form
+$(\key{has-type}\; e\; T)$, where $T$ is $e$'s type. Subsequently, in
+the flatten pass (Section~\ref{sec:flatten-gc}) this type information is
+propagated to all variables (including temporaries generated during
+flattening).
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -3944,51 +4033,10 @@ checker.
 \label{fig:typecheck-R3}
 \end{figure}
 
-Tuples are our first encounter with heap-allocated data, which raises
-several interesting issues. First, variable binding performs a
-shallow-copy when dealing with tuples, which means that different
-variables can refer to the same tuple, i.e., the variables can be
-\emph{aliases} for the same thing. Consider the following example in
-which both \code{t1} and \code{t2} refer to the same tuple.  Thus, the
-mutation through \code{t2} is visible when referencing the tuple from
-\code{t1}, so the result of the program is \code{42}.
-\begin{lstlisting}
-(let ([t1 (vector 3 7)])
-  (let ([t2 t1])
-    (let ([_ (vector-set! t2 0 42)])
-      (vector-ref t1 0))))
-\end{lstlisting}
-
-The next issue concerns the lifetime of tuples. Of course, they are
-created by the \code{vector} form, but when does their lifetime end?
-Notice that the grammar in Figure~\ref{fig:r3-syntax} does not include
-an operation for deleting tuples. Furthermore, the lifetime of a tuple
-is not tied to any notion of static scoping. For example, the
-following program returns \code{3} even though the variable \code{t}
-goes out of scope prior to accessing the vector.
-\begin{lstlisting}
-(vector-ref
-  (let ([t (vector 3 7)])
-    t)
-  0)
-\end{lstlisting}
-From the perspective of programmer-observable behavior, tuples live
-forever. Of course, if they really lived forever, then many programs
-would run out of memory.\footnote{The $R_3$ language does not have
-  looping or recursive function, so it is nigh impossible to write a
-  program in $R_3$ that will run out of memory. However, we add
-  recursive functions in the next Chapter!} A Racket implementation
-must therefore perform automatic garbage collection.
-
 
 \section{Garbage Collection}
 \label{sec:GC}
 
-\marginpar{\tiny Need to add comment somewhere about the goodness
- of copying collection, especially that it doesn't touch
- the garbage, so its time complexity only depends on the
- amount of live data.\\ --Jeremy}
-%
 Here we study a relatively simple algorithm for garbage collection
 that is the basis of state-of-the-art garbage
 collectors~\citep{Lieberman:1983aa,Ungar:1984aa,Jones:1996aa,Detlefs:2004aa,Dybvig:2006aa,Tene:2011kx}. In
@@ -3999,7 +4047,7 @@ copy~\citep{Cheney:1970aa}. Figure~\ref{fig:copying-collector} gives a
 coarse-grained depiction of what happens in a two-space collector,
 showing two time steps, prior to garbage collection on the top and
 after garbage collection on the bottom. In a two-space collector, the
-heap is segmented into two parts, the FromSpace and the
+heap is divided into two parts, the FromSpace and the
 ToSpace. Initially, all allocations go to the FromSpace until there is
 not enough room for the next allocation request. At that point, the
 garbage collector goes to work to make more room.
@@ -4008,27 +4056,30 @@ A running program has direct access to registers and the procedure
 call stack, and they may contain pointers into the heap. Those
 pointers are called the \emph{root set}. In
 Figure~\ref{fig:copying-collector} there are three pointers in the
-root set, one in a register and two on the stack.
+root set, one in a register and two on the stack.%
 %
 \footnote{The sitation in Figure~\ref{fig:copying-collector}, with a
   cycle, cannot be created by a well-typed program in $R_3$. However,
-  creating cycles will be possible once we get to $R_6$.
-  We design the garbage collector to deal with cycles 
-  to begin with, so we will not need to revisit this issue.}
+  creating cycles will be possible once we get to $R_6$.  We design
+  the garbage collector to deal with cycles to begin with, so we will
+  not need to revisit this issue.}
 %
-The goal of the
-garbage collector is to 1) preserve all objects that are reachable
+The goal of the garbage collector is twofold:
+\begin{enumerate}
+\item preserve all objects that are reachable
 from the root set via a path of pointers, i.e., the \emph{live}
-objects and 2) reclaim the storage of everything else, i.e., the
-\emph{garbage}. A copying collector accomplished this by copying all
-of the live objects into the ToSpace and then performs a slight of
-hand, treating the ToSpace as the new FromSpace and the old FromSpace
-as the new ToSpace. In the bottom of
-Figure~\ref{fig:copying-collector} you can see the result of the copy.
-All of the live objects have been copied to the ToSpace in a way that
-preserves the pointer relationships. For example, the pointer in the
-register still points to a 2-tuple whose first element is a 3-tuple
-and second element is a 2-tuple.
+objects, and
+\item reclaim the storage of everything else, i.e., the
+\emph{garbage}. 
+\end{enumerate}
+A copying collector accomplished this by copying all of the live
+objects into the ToSpace and then performs a slight of hand, treating
+the ToSpace as the new FromSpace and the old FromSpace as the new
+ToSpace. In the bottom of Figure~\ref{fig:copying-collector} you can
+see the result of the copy.  All of the live objects have been copied
+to the ToSpace in a way that preserves the pointer relationships. For
+example, the pointer in the register still points to a 2-tuple whose
+first element is a 3-tuple and second element is a 2-tuple.
 
 \begin{figure}[tbp]
 \centering
@@ -4038,7 +4089,16 @@ and second element is a 2-tuple.
 \label{fig:copying-collector}
 \end{figure}
 
+%% \marginpar{\tiny Need to add comment somewhere about the goodness
+%%  of copying collection, especially that it doesn't touch
+%%  the garbage, so its time complexity only depends on the
+%%  amount of live data.\\ --Jeremy}
+
+[extol the virtues of copying collection here --Jeremy]
+
+
 \subsection{Graph Copying via Cheney's Algorithm}
+\label{sec:cheney}
 
 Let us take a closer look at how the copy works. The allocated objects
 and pointers essentially form a graph and we need to copy the part of
@@ -4241,9 +4301,6 @@ succeed.
 \end{exercise}
 
 
-
-
-
 \section{Compiler Passes}
 \label{sec:code-generation-gc}
 
@@ -4261,6 +4318,7 @@ via two vector references.
 
 
 \subsection{Flatten and the $C_2$ intermediate language}
+\label{sec:flatten-gc}
 
 \begin{figure}[tp]
 \fbox{
@@ -4382,52 +4440,52 @@ red the parts of the program that were changed by the pass.
 \label{fig:expose-alloc-output}
 \end{figure}
 
-\subsection{Uncover Call-Live Roots (New)}
-\label{sec:call-live-roots}
+%% \subsection{Uncover Call-Live Roots (New)}
+%% \label{sec:call-live-roots}
 
-The goal of this pass is to discover which roots (variables of type
-\code{Vector}) are live during calls to the collector.  We recommend
-using an algorithm similar to the liveness analysis used in the
-register allocator.  In the next pass we shall copy these roots to and
-from the root stack. We extend $C_2$ again, adding a new statement
-form for recording the live variables that are roots.
-\[
-\begin{array}{lcl}
-\Stmt &::=& \ldots \mid (\key{call-live-roots}\, (\Var^{*}) \, \Stmt^{*})
-\end{array}
-\]
+%% The goal of this pass is to discover which roots (variables of type
+%% \code{Vector}) are live during calls to the collector.  We recommend
+%% using an algorithm similar to the liveness analysis used in the
+%% register allocator.  In the next pass we shall copy these roots to and
+%% from the root stack. We extend $C_2$ again, adding a new statement
+%% form for recording the live variables that are roots.
+%% \[
+%% \begin{array}{lcl}
+%% \Stmt &::=& \ldots \mid (\key{call-live-roots}\, (\Var^{*}) \, \Stmt^{*})
+%% \end{array}
+%% \]
 
-Figure~\ref{fig:call-live-roots-output} shows the output of
-\code{uncover-call-live-roots} on the running example.  The only
-changes to the program are wrapping the two \code{collect} forms with
-the \code{call-live-roots}. For the first \code{collect} there are no
-live roots. For the second \code{collect}, the variable \code{t.1} is
-a root and it is live at that point.
+%% Figure~\ref{fig:call-live-roots-output} shows the output of
+%% \code{uncover-call-live-roots} on the running example.  The only
+%% changes to the program are wrapping the two \code{collect} forms with
+%% the \code{call-live-roots}. For the first \code{collect} there are no
+%% live roots. For the second \code{collect}, the variable \code{t.1} is
+%% a root and it is live at that point.
 
-\begin{figure}[tbp]
-\begin{lstlisting}
-   (program (t.1 t.2 t.3 t.4 void.1 void.2) (type Integer)
-     (initialize 10000 10000)
-     (if (collection-needed? 16)
-         (~(call-live-roots () (collect 16))~) 
-         ())
-     (assign t.1 (allocate 1 (Vector Integer)))
-     (assign void.1 (vector-set! t.1 0 42))
-     (if (collection-needed? 16)
-         (~(call-live-roots (t.1) (collect 16))~)
-         ())
-     (assign t.2 (allocate 1 (Vector (Vector Integer))))
-     (assign void.2 (vector-set! t.2 0 t.1))
-     (assign t.3 (vector-ref t.2 0))
-     (assign t.4 (vector-ref t.3 0))
-     (return t.4))
-\end{lstlisting}
-\caption{Output of the \code{uncover-call-live-roots} pass.}
-\label{fig:call-live-roots-output}
-\end{figure}
+%% \begin{figure}[tbp]
+%% \begin{lstlisting}
+%%    (program (t.1 t.2 t.3 t.4 void.1 void.2) (type Integer)
+%%      (initialize 10000 10000)
+%%      (if (collection-needed? 16)
+%%          (~(call-live-roots () (collect 16))~) 
+%%          ())
+%%      (assign t.1 (allocate 1 (Vector Integer)))
+%%      (assign void.1 (vector-set! t.1 0 42))
+%%      (if (collection-needed? 16)
+%%          (~(call-live-roots (t.1) (collect 16))~)
+%%          ())
+%%      (assign t.2 (allocate 1 (Vector (Vector Integer))))
+%%      (assign void.2 (vector-set! t.2 0 t.1))
+%%      (assign t.3 (vector-ref t.2 0))
+%%      (assign t.4 (vector-ref t.3 0))
+%%      (return t.4))
+%% \end{lstlisting}
+%% \caption{Output of the \code{uncover-call-live-roots} pass.}
+%% \label{fig:call-live-roots-output}
+%% \end{figure}
 
-\marginpar{\tiny mention that we discard type information
-  for the local variables.\\--Jeremy}
+%% \marginpar{\tiny mention that we discard type information
+%%   for the local variables.\\--Jeremy}
 
 \subsection{Select Instructions}
 \label{sec:select-instructions-gc}
@@ -4641,6 +4699,11 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
 \caption{Output of the \code{select-instructions} pass.}
 \label{fig:select-instr-output-gc}
 \end{figure}
+
+\subsection{Register Allocation}
+\label{sec:reg-alloc-gc}
+
+UNDER CONSTRUCTION
 
 
 \subsection{Print x86}
