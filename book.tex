@@ -4094,51 +4094,65 @@ first element is a 3-tuple and second element is a 2-tuple.
 %%  the garbage, so its time complexity only depends on the
 %%  amount of live data.\\ --Jeremy}
 
-[extol the virtues of copying collection here --Jeremy]
-
+There are many alternatives to copying collectors (and their older
+siblings, the generational collectors) when its comes to garbage
+collection, such as mark-and-sweep and reference counting.  The
+strengths of copying collectors are that allocation is fast (just a
+test and pointer increment), there is no fragmentation, cyclic garbage
+is collected, and the time complexity of collection only depends on
+the amount of live data, and not on the amount of
+garbage~\citep{Wilson:1992fk}. The main disadvantage of two-space
+copying collectors is that they use a lot of space, though that
+problem is ameliorated in the generational collectors.  Racket and
+Scheme programs tend to allocate many small objects and generate a lot
+of garbage, so copying and generational collectors are a good fit.  Of
+course, garbage collection is an active research topic, especially
+concurrent garbage collection~\citep{Tene:2011kx}. Researchers are
+continuously development new techniques and revisiting old
+trade-offs~\citep{Blackburn:2004aa,Jones:2011aa,Shahriyar:2013aa,Cutler:2015aa,Shidal:2015aa}.
 
 \subsection{Graph Copying via Cheney's Algorithm}
 \label{sec:cheney}
 
 Let us take a closer look at how the copy works. The allocated objects
-and pointers essentially form a graph and we need to copy the part of
+and pointers can be viewed as a graph and we need to copy the part of
 the graph that is reachable from the root set. To make sure we copy
-all of the reachable nodes, we need an exhaustive graph traversal
-algorithm, such as depth-first search or breadth-first
+all of the reachable vertices in the graph, we need an exhaustive
+graph traversal algorithm, such as depth-first search or breadth-first
 search~\citep{Moore:1959aa,Cormen:2001uq}. Recall that such algorithms
-take into account the possibility of cycles by marking which objects
+take into account the possibility of cycles by marking which vertices
 have already been visited, so as to ensure termination of the
 algorithm. These search algorithms also use a data structure such as a
-stack or queue as a to-do list to keep track of the objects that need
+stack or queue as a to-do list to keep track of the vertices that need
 to be visited. We shall use breadth-first search and a trick due to
 Cheney~\citep{Cheney:1970aa} for simultaneously representing the queue
-and copying the objects into the ToSpace.
+and copying tuples into the ToSpace.
 
 Figure~\ref{fig:cheney} shows several snapshots of the ToSpace as the
 copy progresses. The queue is represented by a chunk of contiguous
 memory at the beginning of the ToSpace, using two pointers to track
 the front and the back of the queue. The algorithm starts by copying
-all objects that are immediately reachable from the root set into the
-ToSpace to form the initial queue.  When we copy an object, we mark
-the old object to indicate that it has been visited. (We discuss the
+all tuples that are immediately reachable from the root set into the
+ToSpace to form the initial queue.  When we copy a tuple, we mark the
+old tuple to indicate that it has been visited. (We discuss the
 marking in Section~\ref{sec:data-rep-gc}.) Note that any pointers
-inside the copied objects in the queue still point back to the
+inside the copied tuples in the queue still point back to the
 FromSpace. Once the initial queue has been created, the algorithm
-enters a loop in which it repeatedly processes the object at the front
-of the queue and pops it off the queue.  To process an object, the
-algorithm copies all the objects that are directly reachable from it
-to the ToSpace, placing them at the back of the queue. The algorithm
-then updates the pointers in the popped object so they point to the
-newly copied objects. So getting back to Figure~\ref{fig:cheney}, in
-the first step we copy the tuple whose second element is $42$ to the
-back of the queue. The other pointer goes to a tuple that has already
-been copied, so we do not need to copy it again, but we do need to
-update the pointer to the new location. This can be accomplished by
-storing a \emph{forwarding} pointer to the new location in the old
-object, back when we initially copied the object into the
-ToSpace. This completes one step of the algorithm. The algorithm
-continues in this way until the front of the queue is empty, that is,
-until the front catches up with the back.
+enters a loop in which it repeatedly processes the tuple at the front
+of the queue and pops it off the queue.  To process a tuple, the
+algorithm copies all the tuple that are directly reachable from it to
+the ToSpace, placing them at the back of the queue. The algorithm then
+updates the pointers in the popped tuple so they point to the newly
+copied tuples. Getting back to Figure~\ref{fig:cheney}, in the first
+step we copy the tuple whose second element is $42$ to the back of the
+queue. The other pointer goes to a tuple that has already been copied,
+so we do not need to copy it again, but we do need to update the
+pointer to the new location. This can be accomplished by storing a
+\emph{forwarding} pointer to the new location in the old tuple, back
+when we initially copied the tuple into the ToSpace. This completes
+one step of the algorithm. The algorithm continues in this way until
+the front of the queue is empty, that is, until the front catches up
+with the back.
 
 
 \begin{figure}[tbp]
