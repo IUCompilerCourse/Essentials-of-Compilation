@@ -3838,7 +3838,7 @@ In this chapter we study the implementation of mutable tuples (called
 computer's \emph{heap} because the lifetime of a Racket tuple is
 indefinite, that is, a tuple does not follow a stack (FIFO) discipline
 but instead lives forever from the programmer's viewpoint. Of course,
-from an implementor's viewpoint, it is important to recycle the space
+from an implementor's viewpoint, it is important to reclaim the space
 associated with tuples when they are no longer needed, which is why we
 also study \emph{garbage collection} techniques in this chapter.
 
@@ -4052,34 +4052,44 @@ ToSpace. Initially, all allocations go to the FromSpace until there is
 not enough room for the next allocation request. At that point, the
 garbage collector goes to work to make more room.
 
-A running program has direct access to registers and the procedure
-call stack, and they may contain pointers into the heap. Those
-pointers are called the \emph{root set}. In
-Figure~\ref{fig:copying-collector} there are three pointers in the
-root set, one in a register and two on the stack.%
+
+The garbage collector must be careful not to reclaim tuples that will
+be used by the program in the future. Of course, it is impossible in
+general to predict what a program will do, but we can overapproximate
+the will-be-used tuples by preserving all tuples that could be
+accessed by \emph{any} program given the current computer state.  A
+program could access any tuple whose address is in a register or on
+the procedure call stack. These addresses are called the \emph{root
+  set}. In addition, a program could access any tuple that is
+transitively reachable from the root set. Thus, it is safe for the
+garbage collector to reclaim the tuples that are not reachable in this
+way. 
 %
 \footnote{The sitation in Figure~\ref{fig:copying-collector}, with a
   cycle, cannot be created by a well-typed program in $R_3$. However,
   creating cycles will be possible once we get to $R_6$.  We design
   the garbage collector to deal with cycles to begin with, so we will
   not need to revisit this issue.}
-%
-The goal of the garbage collector is twofold:
+
+So the goal of the garbage collector is twofold:
 \begin{enumerate}
-\item preserve all objects that are reachable
-from the root set via a path of pointers, i.e., the \emph{live}
-objects, and
-\item reclaim the storage of everything else, i.e., the
-\emph{garbage}. 
+\item preserve all tuple that are reachable from the root set via a
+  path of pointers, that is, the \emph{live} tuples, and
+\item reclaim the memory of everything else, that is, the
+  \emph{garbage}.
 \end{enumerate}
-A copying collector accomplished this by copying all of the live
+A copying collector accomplishes this by copying all of the live
 objects into the ToSpace and then performs a slight of hand, treating
 the ToSpace as the new FromSpace and the old FromSpace as the new
-ToSpace. In the bottom of Figure~\ref{fig:copying-collector} you can
-see the result of the copy.  All of the live objects have been copied
-to the ToSpace in a way that preserves the pointer relationships. For
-example, the pointer in the register still points to a 2-tuple whose
-first element is a 3-tuple and second element is a 2-tuple.
+ToSpace.  In the example of Figure~\ref{fig:copying-collector}, there
+are three pointers in the root set, one in a register and two on the
+stack.  All of the live objects have been copied to the ToSpace (the
+right-hand side of Figure~\ref{fig:copying-collector}) in a way that
+preserves the pointer relationships. For example, the pointer in the
+register still points to a 2-tuple whose first element is a 3-tuple
+and second element is a 2-tuple.  There are four tuples that are not
+reachable from the root set and therefore do not get copied into the
+ToSpace.
 
 \begin{figure}[tbp]
 \centering
@@ -4103,12 +4113,12 @@ is collected, and the time complexity of collection only depends on
 the amount of live data, and not on the amount of
 garbage~\citep{Wilson:1992fk}. The main disadvantage of two-space
 copying collectors is that they use a lot of space, though that
-problem is ameliorated in the generational collectors.  Racket and
-Scheme programs tend to allocate many small objects and generate a lot
-of garbage, so copying and generational collectors are a good fit.  Of
+problem is ameliorated in generational collectors.  Racket and Scheme
+programs tend to allocate many small objects and generate a lot of
+garbage, so copying and generational collectors are a good fit.  Of
 course, garbage collection is an active research topic, especially
 concurrent garbage collection~\citep{Tene:2011kx}. Researchers are
-continuously development new techniques and revisiting old
+continuously developing new techniques and revisiting old
 trade-offs~\citep{Blackburn:2004aa,Jones:2011aa,Shahriyar:2013aa,Cutler:2015aa,Shidal:2015aa}.
 
 \subsection{Graph Copying via Cheney's Algorithm}
@@ -4125,8 +4135,8 @@ have already been visited, so as to ensure termination of the
 algorithm. These search algorithms also use a data structure such as a
 stack or queue as a to-do list to keep track of the vertices that need
 to be visited. We shall use breadth-first search and a trick due to
-Cheney~\citep{Cheney:1970aa} for simultaneously representing the queue
-and copying tuples into the ToSpace.
+\citet{Cheney:1970aa} for simultaneously representing the queue and
+copying tuples into the ToSpace.
 
 Figure~\ref{fig:cheney} shows several snapshots of the ToSpace as the
 copy progresses. The queue is represented by a chunk of contiguous
@@ -4154,11 +4164,9 @@ one step of the algorithm. The algorithm continues in this way until
 the front of the queue is empty, that is, until the front catches up
 with the back.
 
-
 \begin{figure}[tbp]
 \centering \includegraphics[width=0.9\textwidth]{cheney}
-\caption{Depiction of the Cheney algorithm copying
-   the live objects.}
+\caption{Depiction of the Cheney algorithm copying the live tuples.}
 \label{fig:cheney}
 \end{figure}
 
@@ -4171,10 +4179,10 @@ representations used by our compiler. First, the garbage collector
 needs to distinguish between pointers and other kinds of data. There
 are several ways to accomplish this.
 \begin{enumerate}
-\item Attached a tag to each object that says what kind of object it
-  is~\citep{Jones:1996aa}.
-\item Store different kinds of objects in different regions of
-  memory~\citep{Steele:1977ab}.
+\item Attached a tag to each object that identifies what type of
+  object it is~\citep{McCarthy:1960dz}.
+\item Store different types of objects in different
+  regions~\citep{Steele:1977ab}.
 \item Use type information from the program to either generate
   type-specific code for collecting or to generate tables that can
   guide the
@@ -4191,19 +4199,18 @@ a relatively high implementation complexity. To keep this chapter to a
 with separate strategies used for the stack and the heap.
 
 Regarding the stack, we recommend using a separate stack for
-pointers~\citep{Siebert:2001aa,Henderson:2002aa,Baker:2009aa} , which
-we call a \emph{root stack} (a.k.a a ``shadow stack''). That is, when
-a local variable needs to be spilled and is of type \code{(Vector
+pointers~\citep{Siebert:2001aa,Henderson:2002aa,Baker:2009aa}, which
+we call a \emph{root stack} (a.k.a. ``shadow stack''). That is, when a
+local variable needs to be spilled and is of type \code{(Vector
   $\Type_1 \ldots \Type_n$)}, then we put it on the root stack instead
-of the normal procedure call stack.  Figure~\ref{fig:shadow-stack}
-reproduces the example from Figure~\ref{fig:copying-collector} and
-contrasts it with the data layout using a root stack. The root stack
-contains the two pointers from the regular stack and also the pointer
-in the second register. Prior to invoking the garbage collector, we
-shall push all pointers in local variables (resident in registers or
-spilled to the stack) onto the root stack.  After the collection, the
-pointers must be popped back into the local variables because the
-locations of the pointed-to objects will have changed.
+of the normal procedure call stack. Furthermore, we always spill
+vector-typed variables if they are live during a call to the
+collector, thereby ensuring that no pointers are in registers during a
+collection. Figure~\ref{fig:shadow-stack} reproduces the example from
+Figure~\ref{fig:copying-collector} and contrasts it with the data
+layout using a root stack. The root stack contains the two pointers
+from the regular stack and also the pointer in the second
+register. 
 
 \begin{figure}[tbp]
 \centering \includegraphics[width=0.7\textwidth]{root-stack}
@@ -4239,20 +4246,20 @@ are always zero anyways because our tuples are 8-byte aligned.)
 \label{sec:organize-gz}
 
 The implementation of the garbage collector needs to do a lot of
-bit-level data manipulation and we will need to link it with our
+bit-level data manipulation and we need to link it with our
 compiler-generated x86 code. Thus, we recommend implementing the
 garbage collector in C~\citep{Kernighan:1988nx} and putting the code
 in the \code{runtime.c} file. Figure~\ref{fig:gc-header} shows the
 interface to the garbage collector. The \code{initialize} function
 creates the FromSpace, ToSpace, and root stack. The \code{initialize}
 function is meant to be called near the beginning of \code{main},
-before the body of the program executes.  The \code{initialize}
+before the rest of the program executes.  The \code{initialize}
 function puts the address of the beginning of the FromSpace into the
 global variable \code{free\_ptr}. The global \code{fromspace\_end}
 points to the address that is 1-past the last element of the
 FromSpace. (We use half-open intervals to represent chunks of
 memory~\citep{Dijkstra:1982aa}.)  The \code{rootstack\_begin} global
-should point to the first element of the root stack.
+points to the first element of the root stack.
 
 As long as there is room left in the FromSpace, your generated code
 can allocate tuples simply by moving the \code{free\_ptr} forward.
@@ -4308,10 +4315,6 @@ succeed.
   update the root stack so that it points to the objects in the
   ToSpace, and finally to swap the global pointers for the FromSpace
   and ToSpace.
-
-  [to do: talk about the \code{copy\_vector} auxilliary
-    function. --Jeremy]
-
 \end{exercise}
 
 
@@ -4319,17 +4322,111 @@ succeed.
 \label{sec:code-generation-gc}
 
 The introduction of garbage collection has a non-trivial impact on our
-compiler passes. We introduce two new compiler passes and make
-non-trivial changes to \code{flatten} and \code{select-instructions}.
-The following program will serve as our running example.  It creates
-two tuples, one nested inside the other. Both tuples have length
-one. The example then accesses the element in the inner tuple tuple
-via two vector references.
+compiler passes. We introduce one new compiler pass called
+\code{expose-allocation} and make non-trivial changes to
+\code{type-check}, \code{flatten}, \code{select-instructions},
+\code{allocate-registers}, and \code{print-x86}.  The following
+program will serve as our running example.  It creates two tuples, one
+nested inside the other. Both tuples have length one. The example then
+accesses the element in the inner tuple tuple via two vector
+references.
 % tests/s2_17.rkt
 \begin{lstlisting}
    (vector-ref (vector-ref (vector (vector 42)) 0) 0))
 \end{lstlisting}
 
+We already discuss the changes to \code{type-check} in
+Section~\ref{sec:r3}, including the addition of \code{has-type}, so we
+proceed to discuss the new \code{expose-allocation} pass.
+
+\subsection{Expose Allocation (New)}
+\label{sec:expose-allocation}
+
+The pass \code{expose-allocation} lowers the \code{vector} creation
+form into a conditional call to the collector followed by the
+allocation.  In the following, we show the transformation for the
+\code{vector} form into a conditional \code{collect} followed by
+\code{allocate} and then the initialization of the vector.  (The
+\itm{len} is the length of the vector and \itm{bytes} is how many
+total bytes need to be allocated for the vector, which is 8 for the
+tag plus \itm{len} times 8.)
+
+\begin{lstlisting}
+  (has-type (vector |$e_0 \ldots e_{n-1}$|) |\itm{type}|)
+|$\Longrightarrow$|
+  (let ([|$x_0$| |$e_0$|]) ... (let ([|$x_{n-1}$| |$e_{n-1}$|])
+  (let ([_ (if (< (+ (global-value free_ptr) |\itm{bytes}|)
+                  (global-value fromspace_end))
+               (void)
+               (collect |\itm{bytes}|))])
+  (let ([|$v$| (allocate |\itm{len}| |\itm{type}|)])
+  (let ([_ (vector-set! |$v$| |$0$| |$x_0$|)]) ...
+  (let ([_ (vector-set! |$v$| |$n-1$| |$x_{n-1}$|)])
+     |$v$|) ... )))) ...)
+\end{lstlisting}
+(In the above, we suppressed all of the \code{has-type} forms in the
+output for the sake of readability.)
+
+The output of \code{expose-allocation} is a language that extends
+$R_3$ with the three new forms that we use above in the translation of
+\code{vector}.
+\[
+\begin{array}{lcl}
+  \Exp &::=& \cdots 
+      \mid (\key{collect} \,\itm{int}) 
+      \mid (\key{allocate} \,\itm{int}\,\itm{type}) 
+      \mid (\key{global-value} \,\itm{name}) 
+\end{array}
+\]
+
+%% The \code{expose-allocation} inserts an \code{initialize} statement at
+%% the beginning of the program which will instruct the garbage collector
+%% to set up the FromSpace, ToSpace, and all the global variables.  The
+%% two arguments of \code{initialize} specify the initial allocated space
+%% for the root stack and for the heap.
+%
+%% The \code{expose-allocation} pass annotates all of the local variables
+%% in the \code{program} form with their type.
+
+
+Figure~\ref{fig:expose-alloc-output} shows the output of the
+\code{expose-allocation} pass on our running example.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+(program (type Integer)
+ (vector-ref
+  (vector-ref
+   (let ((vecinit32990
+	  (let ([vecinit32986 42])
+	    (let ((collectret32988
+		   (if (< (+ (global-value free_ptr) 16)
+			  (global-value fromspace_end))
+		       (void)
+		       (collect 16))))
+	      (let ([alloc32985
+		     (allocate 1 (Vector Integer))])
+		(let ([initret32987
+		       (vector-set! alloc32985 0 vecinit32986)])
+		  alloc32985))))))
+     (let ([collectret32992
+	    (if (< (+ (global-value free_ptr) 16)
+                   (global-value fromspace_end))
+                (void)
+                (collect 16))])
+       (let ([alloc32989 (allocate 1 (Vector (Vector Integer)))])
+	 (let ([initret32991 (vector-set! alloc32989 0 vecinit32990)])
+	   alloc32989))))
+   0)
+  0))
+\end{lstlisting}
+\caption{Output of the \code{expose-allocation} pass, minus
+  all of the \code{has-type} forms.}
+\label{fig:expose-alloc-output}
+\end{figure}
+
+
+\clearpage
 
 \subsection{Flatten and the $C_2$ intermediate language}
 \label{sec:flatten-gc}
@@ -4343,163 +4440,88 @@ via two vector references.
 \itm{cmp} &::= & \gray{  \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=}  } \\
 \Exp &::= & \gray{ \Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)
       \mid (\key{not}\;\Arg) \mid (\itm{cmp}\;\Arg\;\Arg)  } \\
-   &\mid& (\key{vector}\, \Arg^{+}) 
+   &\mid& (\key{allocate} \,\itm{int}\,\itm{type}) 
    \mid (\key{vector-ref}\, \Arg\, \Int)  \\
-   &\mid& (\key{vector-set!}\,\Arg\,\Int\,\Arg) \\
+   &\mid& (\key{vector-set!}\,\Arg\,\Int\,\Arg) 
+    \mid (\key{global-value} \,\itm{name}) \\
 \Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg} } \\
       &\mid& \gray{ \IF{(\itm{cmp}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} } \\
-      &\mid& (\key{initialize}\,\itm{int}\,\itm{int}) \\
-      &\mid& \IF{(\key{collection-needed?}\,\itm{int})}{\Stmt^{*}}{\Stmt^{*}} \\
       &\mid& (\key{collect} \,\itm{int}) \\
-      &\mid& (\key{allocate} \,\itm{int}\,\itm{type}) \\
-      &\mid& (\key{call-live-roots}\,(\Var^{*}) \,\Stmt^{*}) \\
 C_2 & ::= & \gray{ (\key{program}\;(\Var^{*})\;(\key{type}\;\textit{type})\;\Stmt^{+}) }
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The $C_2$ language, extending $C_1$ with tuples.}
+\caption{The $C_2$ language, extending $C_1$ with support for tuples.}
 \label{fig:c2-syntax}
 \end{figure}
 
-\marginpar{\tiny I don't like the collection-needed form.
-  Would it make sense to instead expose the free-ptr here?\\--Jeremy}
+The output of \code{flatten} is a program in the intermediate language
+$C_2$, whose syntax is defined in Figure~\ref{fig:c2-syntax}.  The new
+forms of $C_2$ include the expressions \key{allocate},
+\key{vector-ref}, and \key{vector-set!}, and \key{global-value} and
+the statement \code{collect}.  The \code{flatten} pass can treat these
+new forms much like the other forms.
 
-The impact on \code{flatten} is straightforward. We add several $\Exp$
-forms for vectors. The output of \code{flatten} is a program in the
-intermediate language $C_2$, whose syntax is defined in
-Figure~\ref{fig:c2-syntax}.  Some of the forms in $C_2$ do not get
-used in \code{flatten}, but get used in upcoming passes.  The
-\code{flatten} pass should treat the new forms much like the other
-kinds of expressions. The output on our running example is shown in
-Figure~\ref{fig:flatten-gc}.
+Recall that the \code{flatten} function collects all of the local
+variables so that it can decorate the \code{program} form with
+them. Also recall that we need to know the types of all the local
+variables for purposes of identifying the root set for the garbage
+collector.  Thus, we change \code{flatten} to collect not just the
+variables, but the variables and their types in the form of an
+association list.  Thanks to the \code{has-type} forms, the types are
+readily available.  For example, consider the translation of the
+\code{let} form.
+\begin{lstlisting}
+  (let ([|$x$| (has-type |\itm{rhs}| |\itm{type}|)]) |\itm{body}|)
+|$\Longrightarrow$|
+  |\itm{body'}|
+  (|\itm{ss_1}| (assign |$x$| |\itm{rhs'}|)  |\itm{ss_2}|)
+  ((|$x$| . |\itm{type}|) |\itm{xt_1}| |\itm{xt_2}|)
+\end{lstlisting}
+where \itm{rhs'}, \itm{ss_1}, and \itm{xs_1} are the results of
+recursively flattening \itm{rhs} and \itm{body'}, \itm{ss_2}, and
+\itm{xs_2} are the results of recursively flattening \itm{body}.  The
+output on our running example is shown in Figure~\ref{fig:flatten-gc}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-   (program (t.1 t.2 t.3 t.4) (type Integer)
-     (assign t.1 (vector 42))
-     (assign t.2 (vector t.1))
-     (assign t.3 (vector-ref t.2 0))
-     (assign t.4 (vector-ref t.3 0))
-     (return t.4))
+'(program
+  ((tmp33002 . Integer) (tmp33001 Vector Integer) (vecinit32990 Vector Integer)
+   (vecinit32986 . Integer) (collectret32988 . Void) (if32996 . Void)
+   (tmp32994 . Integer) (global32993 . Integer) (global32995 . Integer)
+   (alloc32985 Vector Integer) (initret32987 . Void) (collectret32992 . Void)
+   (if33000 . Void) (tmp32998 . Integer) (global32997 . Integer)
+   (global32999 . Integer) (alloc32989 Vector (Vector Integer))
+   (initret32991 . Void))
+  (type Integer)
+  (assign vecinit32986 42)
+  (assign global32993 (global-value free_ptr))
+  (assign tmp32994 (+ global32993 16))
+  (assign global32995 (global-value fromspace_end))
+  (if (< tmp32994 global32995)
+    ((assign if32996 (void)))
+    ((collect 16) (assign if32996 (void))))
+  (assign collectret32988 if32996)
+  (assign alloc32985 (allocate 1 (Vector Integer)))
+  (assign initret32987 (vector-set! alloc32985 0 vecinit32986))
+  (assign vecinit32990 alloc32985)
+  (assign global32997 (global-value free_ptr))
+  (assign tmp32998 (+ global32997 16))
+  (assign global32999 (global-value fromspace_end))
+  (if (< tmp32998 global32999)
+    ((assign if33000 (void)))
+    ((collect 16) (assign if33000 (void))))
+  (assign collectret32992 if33000)
+  (assign alloc32989 (allocate 1 (Vector (Vector Integer))))
+  (assign initret32991 (vector-set! alloc32989 0 vecinit32990))
+  (assign tmp33001 (vector-ref alloc32989 0))
+  (assign tmp33002 (vector-ref tmp33001 0))
+  (return tmp33002))
 \end{lstlisting}
 \caption{Output of \code{flatten} for the running example.}
 \label{fig:flatten-gc}
 \end{figure}
-
-\subsection{Expose Allocation (New)}
-\label{sec:expose-allocation}
-
-The pass \code{expose-allocation} lowers the vector creation form into
-a conditional call to the collector followed by the allocation.  In
-the following, we show the transformation for the \code{vector} form.
-The $\itm{len}$ is the length of the vector and $\itm{bytes}$ is how
-many total bytes need to be allocated for the vector, which is 8 (for
-the tag) plus $\itm{len}$ times 8.
-\begin{lstlisting}
-  (assign |$\itm{lhs}$| (vector |$e_0 \ldots e_{n-1}$|))
-|$\Longrightarrow$|
-  (if (collection-needed? |$\itm{bytes}$|)
-      ((collect |$\itm{bytes}$|)) 
-      ())
-  (assign |$\itm{lhs}$| (allocate |$\itm{len}$| |$T$|))
-  (vector-set! |$\itm{lhs}$| |$0$| |$e_0$|)
-  |$\ldots$|
-  (vector-set! |$\itm{lhs}$| |$n{-}1$| |$e_{n-1}$|)
-\end{lstlisting}
-
-The \code{expose-allocation} inserts an \code{initialize} statement at
-the beginning of the program which will instruct the garbage collector
-to set up the FromSpace, ToSpace, and all the global variables.  The
-two arguments of \code{initialize} specify the initial allocated space
-for the root stack and for the heap.
-%
-Finally, the \code{expose-allocation} pass
-annotates all of the local variables in the \code{program} form with
-their type.
-
-
-Figure~\ref{fig:expose-alloc-output} shows the output of the
-\code{expose-allocation} pass on our running example.  We highlight in
-red the parts of the program that were changed by the pass.
-
-\begin{figure}[tbp]
-\begin{lstlisting}
-(program (~(t.1 . (Vector Integer))
-           (t.2 . (Vector (Vector Integer)))
-           (t.3 . (Vector Integer))
-           (t.4 . Integer)
-           (void.1 . Void)
-           (void.2 . Void)~) (type Integer)
-
-  ~(initialize 10000 10000)~
-
-  ~(if (collection-needed? 16)
-      ((collect 16))
-      ())
-  (assign t.1 (allocate 1 (Vector Integer)))
-  (assign void.1 (vector-set! t.1 0 42))~
-
-  ~(if (collection-needed? 16)
-      ((collect 16))
-      ())
-  (assign t.2 (allocate 1 (Vector (Vector Integer))))
-  (assign void.2 (vector-set! t.2 0 t.1))~
-
-  (assign t.3 (vector-ref t.2 0))
-  (assign t.4 (vector-ref t.3 0))
-  (return t.4))
-\end{lstlisting}
-\caption{Output of the \code{expose-allocation} pass.}
-\label{fig:expose-alloc-output}
-\end{figure}
-
-%% \subsection{Uncover Call-Live Roots (New)}
-%% \label{sec:call-live-roots}
-
-%% The goal of this pass is to discover which roots (variables of type
-%% \code{Vector}) are live during calls to the collector.  We recommend
-%% using an algorithm similar to the liveness analysis used in the
-%% register allocator.  In the next pass we shall copy these roots to and
-%% from the root stack. We extend $C_2$ again, adding a new statement
-%% form for recording the live variables that are roots.
-%% \[
-%% \begin{array}{lcl}
-%% \Stmt &::=& \ldots \mid (\key{call-live-roots}\, (\Var^{*}) \, \Stmt^{*})
-%% \end{array}
-%% \]
-
-%% Figure~\ref{fig:call-live-roots-output} shows the output of
-%% \code{uncover-call-live-roots} on the running example.  The only
-%% changes to the program are wrapping the two \code{collect} forms with
-%% the \code{call-live-roots}. For the first \code{collect} there are no
-%% live roots. For the second \code{collect}, the variable \code{t.1} is
-%% a root and it is live at that point.
-
-%% \begin{figure}[tbp]
-%% \begin{lstlisting}
-%%    (program (t.1 t.2 t.3 t.4 void.1 void.2) (type Integer)
-%%      (initialize 10000 10000)
-%%      (if (collection-needed? 16)
-%%          (~(call-live-roots () (collect 16))~) 
-%%          ())
-%%      (assign t.1 (allocate 1 (Vector Integer)))
-%%      (assign void.1 (vector-set! t.1 0 42))
-%%      (if (collection-needed? 16)
-%%          (~(call-live-roots (t.1) (collect 16))~)
-%%          ())
-%%      (assign t.2 (allocate 1 (Vector (Vector Integer))))
-%%      (assign void.2 (vector-set! t.2 0 t.1))
-%%      (assign t.3 (vector-ref t.2 0))
-%%      (assign t.4 (vector-ref t.3 0))
-%%      (return t.4))
-%% \end{lstlisting}
-%% \caption{Output of the \code{uncover-call-live-roots} pass.}
-%% \label{fig:call-live-roots-output}
-%% \end{figure}
-
-%% \marginpar{\tiny mention that we discard type information
-%%   for the local variables.\\--Jeremy}
 
 \subsection{Select Instructions}
 \label{sec:select-instructions-gc}
@@ -5952,20 +5974,20 @@ The type checker for $R_6$ is given in Figure~\ref{fig:typecheck-R6}.
        [`(inject ,(app recur new-e e-ty) ,ty)
         (cond
          [(equal? e-ty ty)
-          (values `(has-type (inject ,new-e ,ty) Any) 'Any)]
+          (values `(inject ,new-e ,ty) 'Any)]
          [else
           (error "inject expected ~a to have type ~a" e ty)])]
        [`(project ,(app recur new-e e-ty) ,ty)
         (cond
          [(equal? e-ty 'Any)
-          (values `(has-type (project ,new-e ,ty) ,ty) ty)]
+          (values `(project ,new-e ,ty) ty)]
          [else
           (error "project expected ~a to have type Any" e)])]
        [`(,pred ,e) #:when (set-member? type-predicates pred)
         (define-values (new-e e-ty) (recur e))
         (cond
          [(equal? e-ty 'Any)
-          (values `(has-type (,pred ,new-e) Boolean) 'Boolean)]
+          (values `(,pred ,new-e) 'Boolean)]
          [else
           (error "predicate expected arg of type Any, not" e-ty)])]
        [`(vector-ref ,(app recur e t) ,i)
@@ -5974,7 +5996,7 @@ The type checker for $R_6$ is given in Figure~\ref{fig:typecheck-R6}.
           [`(Vectorof ,t)
            (unless (exact-nonnegative-integer? i)
              (error 'type-check "invalid index ~a" i))
-           (values `(has-type (vector-ref ,e (has-type ,i Integer)) ,t) t)]
+           (values `(vector-ref ,e ,i) t)]
           [else (error "expected a vector in vector-ref, not" t)])]
        [`(vector-set! ,(app recur e-vec^ t-vec) ,i
                        ,(app recur e-arg^ t-arg))
@@ -5986,9 +6008,9 @@ The type checker for $R_6$ is given in Figure~\ref{fig:typecheck-R6}.
            (unless (equal? t t-arg)
              (error 'type-check "type mismatch in vector-set! ~a ~a" 
                     t t-arg))
-           (values `(has-type (vector-set! ,e-vec^
-                                           (has-type ,i Integer)
-                                           ,e-arg^) Void) 'Void)]
+           (values `(vector-set! ,e-vec^
+                                           ,i
+                                           ,e-arg^) 'Void)]
           [else (error 'type-check
                        "expected a vector in vector-set!, not ~a"
                        t-vec)])]
