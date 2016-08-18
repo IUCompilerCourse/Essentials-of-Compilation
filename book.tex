@@ -1976,6 +1976,9 @@ Figure~\ref{fig:live-eg} shows the results of live variables analysis
 for the running example, with each instruction aligned with its
 $L_{\mathtt{after}}$ set to make the figure easy to read.
 
+\marginpar{JM: I think you should walk through the explanation of this formula,
+   connecting it back to the example from before. \\
+   JS: Agreed.}
 
 \begin{figure}[tbp]
 \hspace{20pt}
@@ -2082,6 +2085,10 @@ following.
   $\mathit{label}$), then add an edge $(r,v)$ for every caller-save
   register $r$ and every variable $v \in L_{\mathsf{after}}(k)$.
 \end{itemize}
+\marginpar{JM: I think you could give examples of each one of these
+  using the example program and use those to help explain why these
+  rules are correct.\\
+  JS: Agreed.}
 
 Working from the top to bottom of Figure~\ref{fig:live-eg}, we obtain
 the following interference for the instruction at the specified line
@@ -2142,7 +2149,7 @@ structure is to study the algorithm that uses the data structure,
 determine what operations need to be performed, and then choose the
 data structure that provide the most efficient implementations of
 those operations. Often times the choice of data structure can have an
-affect on the time complexity of the algorithm, as it does here. If
+effect on the time complexity of the algorithm, as it does here. If
 you skim the next section, you will see that the register allocation
 algorithm needs to ask the graph for all of its vertices and, given a
 vertex, it needs to known all of the adjacent vertices. Thus, the
@@ -4344,10 +4351,14 @@ proceed to discuss the new \code{expose-allocation} pass.
 
 The pass \code{expose-allocation} lowers the \code{vector} creation
 form into a conditional call to the collector followed by the
-allocation.  In the following, we show the transformation for the
-\code{vector} form into a conditional \code{collect} followed by
-\code{allocate} and then the initialization of the vector.  (The
-\itm{len} is the length of the vector and \itm{bytes} is how many
+allocation. We choose to place the \code{expose-allocation} pass
+before \code{flatten} because \code{expose-allocation} introduces new
+variables, which can be done locally with \code{let}, but \code{let}
+is gone after \code{flatten}.  In the following, we show the
+transformation for the \code{vector} form into let-bindings for the
+intializing expressions, by a conditional \code{collect}, an
+\code{allocate}, and the initialization of the vector. 
+(The \itm{len} is the length of the vector and \itm{bytes} is how many
 total bytes need to be allocated for the vector, which is 8 for the
 tag plus \itm{len} times 8.)
 
@@ -4365,7 +4376,11 @@ tag plus \itm{len} times 8.)
      |$v$|) ... )))) ...)
 \end{lstlisting}
 (In the above, we suppressed all of the \code{has-type} forms in the
-output for the sake of readability.)
+output for the sake of readability.)  The ordering of the initializing
+expressions ($e_0,\ldots,e_{n-1}$) prior to the \code{allocate} is
+important, as those expressions may trigger garbage collection and we
+do not want an allocated but uninitialized tuple to be present during
+a garbage collection.
 
 The output of \code{expose-allocation} is a language that extends
 $R_3$ with the three new forms that we use above in the translation of
@@ -4443,7 +4458,7 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
    &\mid& (\key{allocate} \,\itm{int}\,\itm{type}) 
    \mid (\key{vector-ref}\, \Arg\, \Int)  \\
    &\mid& (\key{vector-set!}\,\Arg\,\Int\,\Arg) 
-    \mid (\key{global-value} \,\itm{name}) \\
+    \mid (\key{global-value} \,\itm{name}) \mid (\key{void}) \\
 \Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg} } \\
       &\mid& \gray{ \IF{(\itm{cmp}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} } \\
       &\mid& (\key{collect} \,\itm{int}) \\
@@ -4475,9 +4490,9 @@ readily available.  For example, consider the translation of the
 \begin{lstlisting}
   (let ([|$x$| (has-type |\itm{rhs}| |\itm{type}|)]) |\itm{body}|)
 |$\Longrightarrow$|
-  |\itm{body'}|
-  (|\itm{ss_1}| (assign |$x$| |\itm{rhs'}|)  |\itm{ss_2}|)
-  ((|$x$| . |\itm{type}|) |\itm{xt_1}| |\itm{xt_2}|)
+  (values |\itm{body'}|
+          (|\itm{ss_1}| (assign |$x$| |\itm{rhs'}|)  |\itm{ss_2}|)
+          ((|$x$| . |\itm{type}|) |\itm{xt_1}| |\itm{xt_2}|))
 \end{lstlisting}
 where \itm{rhs'}, \itm{ss_1}, and \itm{xs_1} are the results of
 recursively flattening \itm{rhs} and \itm{body'}, \itm{ss_2}, and
@@ -4487,124 +4502,94 @@ output on our running example is shown in Figure~\ref{fig:flatten-gc}.
 \begin{figure}[tbp]
 \begin{lstlisting}
 '(program
-  ((tmp33002 . Integer) (tmp33001 Vector Integer) (vecinit32990 Vector Integer)
-   (vecinit32986 . Integer) (collectret32988 . Void) (if32996 . Void)
-   (tmp32994 . Integer) (global32993 . Integer) (global32995 . Integer)
-   (alloc32985 Vector Integer) (initret32987 . Void) (collectret32992 . Void)
-   (if33000 . Void) (tmp32998 . Integer) (global32997 . Integer)
-   (global32999 . Integer) (alloc32989 Vector (Vector Integer))
-   (initret32991 . Void))
+  ((tmp02 . Integer) (tmp01 Vector Integer) (tmp90 Vector Integer)
+   (tmp86 . Integer) (tmp88 . Void) (tmp96 . Void)
+   (tmp94 . Integer) (tmp93 . Integer) (tmp95 . Integer)
+   (tmp85 Vector Integer) (tmp87 . Void) (tmp92 . Void)
+   (tmp00 . Void) (tmp98 . Integer) (tmp97 . Integer)
+   (tmp99 . Integer) (tmp89 Vector (Vector Integer))
+   (tmp91 . Void))
   (type Integer)
-  (assign vecinit32986 42)
-  (assign global32993 (global-value free_ptr))
-  (assign tmp32994 (+ global32993 16))
-  (assign global32995 (global-value fromspace_end))
-  (if (< tmp32994 global32995)
-    ((assign if32996 (void)))
-    ((collect 16) (assign if32996 (void))))
-  (assign collectret32988 if32996)
-  (assign alloc32985 (allocate 1 (Vector Integer)))
-  (assign initret32987 (vector-set! alloc32985 0 vecinit32986))
-  (assign vecinit32990 alloc32985)
-  (assign global32997 (global-value free_ptr))
-  (assign tmp32998 (+ global32997 16))
-  (assign global32999 (global-value fromspace_end))
-  (if (< tmp32998 global32999)
-    ((assign if33000 (void)))
-    ((collect 16) (assign if33000 (void))))
-  (assign collectret32992 if33000)
-  (assign alloc32989 (allocate 1 (Vector (Vector Integer))))
-  (assign initret32991 (vector-set! alloc32989 0 vecinit32990))
-  (assign tmp33001 (vector-ref alloc32989 0))
-  (assign tmp33002 (vector-ref tmp33001 0))
-  (return tmp33002))
+  (assign tmp86 42)
+  (assign tmp93 (global-value free_ptr))
+  (assign tmp94 (+ tmp93 16))
+  (assign tmp95 (global-value fromspace_end))
+  (if (< tmp94 tmp95)
+    ((assign tmp96 (void)))
+    ((collect 16) (assign tmp96 (void))))
+  (assign tmp88 tmp96)
+  (assign tmp85 (allocate 1 (Vector Integer)))
+  (assign tmp87 (vector-set! tmp85 0 tmp86))
+  (assign tmp90 tmp85)
+  (assign tmp97 (global-value free_ptr))
+  (assign tmp98 (+ tmp97 16))
+  (assign tmp99 (global-value fromspace_end))
+  (if (< tmp98 tmp99)
+    ((assign tmp00 (void)))
+    ((collect 16) (assign tmp00 (void))))
+  (assign tmp92 tmp00)
+  (assign tmp89 (allocate 1 (Vector (Vector Integer))))
+  (assign tmp91 (vector-set! tmp89 0 tmp90))
+  (assign tmp01 (vector-ref tmp89 0))
+  (assign tmp02 (vector-ref tmp01 0))
+  (return tmp02))
 \end{lstlisting}
 \caption{Output of \code{flatten} for the running example.}
 \label{fig:flatten-gc}
 \end{figure}
 
+\clearpage
+
 \subsection{Select Instructions}
 \label{sec:select-instructions-gc}
 
-In this pass we generate the code for explicitly manipulating the root
-stack, lower the forms needed for garbage collection, and also lower
-the \code{vector-ref} and \code{vector-set!} forms.  We shall use a
-register, \code{r15}, to store the pointer to the top of the root
-stack. (So \code{r15} is no longer available for use by the register
-allocator.) For readability, we shall refer to this register as the
-\emph{rootstack}.
-%
-We shall obtain the top of the root stack to begin with from the
-global variable \code{rootstack\_begin}.
+%% void (rep as zero)
+%% allocate
+%% collect (callq collect)
+%% vector-ref
+%% vector-set!
+%% global-value (postpone)
 
-The translation of the \code{call-live-roots} introduces the code that
-manipulates the root stack.  We push all of the call-live roots onto
-the root stack prior to the call to \code{collect} and we move them
-back afterwards.
-%
-\marginpar{\tiny I would prefer to instead have roots live solely on
-  the root stack and in registers, not on the normal stack. Then we
-  would only need to push the roots in registers, decreasing memory
-  traffic for function calls. (to do: next year)\\ --Jeremy}
-%
+In this pass we generate x86 code for most of the new operations that
+were needed to compile tuples, including \code{allocate},
+\code{collect}, \code{vector-ref}, \code{vector-set!}, and
+\code{(void)}. We postpone \code{global-value} to \code{print-x86}.
+
+The \code{vector-ref} and \code{vector-set!} forms translate into
+\code{movq} instructions with the appropriate \key{deref}.  (The
+plus one is to get past the tag at the beginning of the tuple
+representation.) 
 \begin{lstlisting}
-   (call-live-roots (|$x_0 \ldots x_{n-1}$|) (collect |$\itm{bytes}$|))
+   (assign |$\itm{lhs}$| (vector-ref |$\itm{vec}$| |$n$|))
    |$\Longrightarrow$|
-   (movq (var |$x_0$|) (deref |$\itm{rootstack}$| |$0$|))
-   |$\ldots$|
-   (movq (var |$x_{n-1}$|) (deref |$\itm{rootstack}$| |$8(n-1)$|))
-   (addq |$n$| (reg |$\itm{rootstack}$|))
-   (movq (reg |$\itm{rootstack}$|) (reg rdi))
-   (movq (int |$\itm{bytes}$|) (reg rsi))
-   (callq collect)
-   (subq |$n$| (reg |$\itm{rootstack}$|))
-   (movq (deref |$\itm{rootstack}$| |$0$|) (var |$x_0$|))
-   |$\ldots$|
-   (movq (deref |$\itm{rootstack}$| |$8(n-1)$|) (var |$x_{n-1}$|))
-\end{lstlisting}
+   (movq |$\itm{vec}'$| (reg r11))
+   (movq (deref r11 |$8(n+1)$|) |$\itm{lhs}$|)
 
-\noindent We simply translate \code{initialize} into a call to the
-function in \code{runtime.c}.
-\begin{lstlisting}
-   (initialize |$\itm{rootlen}\;\itm{heaplen}$|)
+   (assign |$\itm{lhs}$| (vector-set! |$\itm{vec}$| |$n$| |$\itm{arg}$|))
    |$\Longrightarrow$|
-   (movq (int |\itm{rootlen}|) (reg rdi))
-   (movq (int |\itm{heaplen}|) (reg rsi))
-   (callq initialize)
-   (movq (global-value rootstack_begin) (reg |\itm{rootstack}|))
+   (movq |$\itm{vec}'$| (reg r11))
+   (movq |$\itm{arg}'$| (deref r11 |$8(n+1)$|))
+   (movq (int 0) |$\itm{lhs}$|)
 \end{lstlisting}
-%
-We translate the special \code{collection-needed?} predicate into code
-that compares the \code{free\_ptr} to the \code{fromspace\_end}.
-%
-\begin{lstlisting}
-   (if (collection-needed? |$\itm{bytes}$|) |$\itm{thn}$| |$\itm{els}$|)
-   |$\Longrightarrow$|
-   (movq (global-value free_ptr) (var end-data.1))
-   (addq (int |$\itm{bytes}$|) (var end-data.1))
-   (if (< (var end-data.1) (global-value fromspace_end))
-        |$\itm{thn}'$|
-        |$\itm{els}'$|)
-\end{lstlisting}
+The $\itm{vec}'$ and $\itm{arg}'$ are obtained by recursively
+processing $\itm{vec}$ and $\itm{arg}$.  The move of $\itm{vec}'$ to
+register \code{r11} ensures that offsets are only performed with
+register operands. This requires removing \code{r11} from
+consideration by the register allocating.
 
-
-The \code{allocate} form translates to operations on the
+We compile the \code{allocate} form to operations on the
 \code{free\_ptr}, as shown below. The address in the \code{free\_ptr}
 is the next free address in the FromSpace, so we move it into the
-\itm{lhs} and then move it forward by enough space for the vector
-being allocated, which is $8(\itm{len}+1)$ bytes because each element
-is 8 bytes (64 bits) and we use 8 bytes for the tag. Last but not
-least, we need to initialize the \itm{tag}. Refer to
-Figure~\ref{fig:tuple-rep} to see how the tag is organized. We
-recommend using the Racket operations \code{bitwise-ior} and
-\code{arithmetic-shift} to compute the tag.  The \itm{types} in the
-\code{has-type } annotation can be used to determine
-the pointer mask region of the tag. The move of $ \itm{lhs}^\prime $ to
-register \code{r11}, before the move to the offset of \code{r11}
-ensures that if $ \itm{lhs}^\prime $ offsets are only performed with
-register operands.
+\itm{lhs} and then move it forward by enough space for the tuple being
+allocated, which is $8(\itm{len}+1)$ bytes because each element is 8
+bytes (64 bits) and we use 8 bytes for the tag. Last but not least, we
+initialize the \itm{tag}. Refer to Figure~\ref{fig:tuple-rep} to see
+how the tag is organized. We recommend using the Racket operations
+\code{bitwise-ior} and \code{arithmetic-shift} to compute the tag.
+The type annoation in the \code{vector} form is used to determine the
+pointer mask region of the tag.
 \begin{lstlisting}
-   (assign |$\itm{lhs}$| (allocate |$\itm{len}$| (Vector |$\itm{types}$|)))
+   (assign |$\itm{lhs}$| (allocate |$\itm{len}$| (Vector |$\itm{type} \ldots$|)))
    |$\Longrightarrow$|
    (movq (global-value free_ptr) |$\itm{lhs}'$|)
    (addq (int |$8(\itm{len}+1)$|) (global-value free_ptr))
@@ -4612,24 +4597,19 @@ register operands.
    (movq (int |$\itm{tag}$|) (deref r11 0))
 \end{lstlisting}
 
-The \code{vector-ref} and \code{vector-set!} forms translate into
-\code{movq} instructions with the appropriate \key{deref}.  (The
-plus one is to get past the tag at the beginning of the tuple
-representation.) 
+The \code{collect} form is compiled to a call to the \code{collect}
+function in the runtime. The arguments to \code{collect} are the top
+of the root stack and the number of bytes that need to be allocated.
+We shall use a dedicated register, \code{r15}, to store the pointer to
+the top of the root stack. So \code{r15} is not available for use by
+the register allocator.
 \begin{lstlisting}
-(assign |$\itm{lhs}$| (vector-ref |$\itm{vec}$| |$n$|))
-  |$\Longrightarrow$|
-(movq |$\itm{vec}'$| (reg r11))
-(movq (deref r11 |$8(n+1)$|) |$\itm{lhs}$|)
-
-(assign |$\itm{lhs}$| (vector-set! |$\itm{vec}$| |$n$| |$\itm{arg}$|))
-|$\Longrightarrow$|
-(movq |$\itm{vec}'$| (reg r11))
-(movq |$\itm{arg}'$| (deref r11 |$8(n+1)$|))
-(movq (int 0) |$\itm{lhs}$|)
+   (collect |$\itm{bytes}$|)
+   |$\Longrightarrow$|
+   (movq (reg 15) (reg rdi))
+   (movq |\itm{bytes}| (reg rsi))
+   (callq collect)
 \end{lstlisting}
-The $\itm{vec}'$ and $\itm{arg}'$ are obtained by recursively
-processing $\itm{vec}$ and $\itm{arg}$.
 
 
 \begin{figure}[tp]
@@ -4667,79 +4647,117 @@ x86_2 &::= & \gray{  (\key{program} \;\itm{info} \;(\key{type}\;\itm{type})\; \I
 The syntax of the $x86_2$ language is defined in
 Figure~\ref{fig:x86-2}.  It differs from $x86_1$ just in the addition
 of the form for global variables.
-
+%
 Figure~\ref{fig:select-instr-output-gc} shows the output of the
 \code{select-instructions} pass on the running example.
 
 \begin{figure}[tbp]
 \centering
 \begin{minipage}{0.75\textwidth}
-\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-  (program (lt28655 end-data28654 lt28652 end-data28651 tmp28644
-            tmp28645 tmp28646 tmp28647 void28649 void28648)
-           (type Integer)
-    (movq (int 16384) (reg rdi))
-    (movq (int 16) (reg rsi))
-    (callq initialize)
-    (movq (global-value rootstack_begin) (reg r15))
-
-    (movq (global-value free_ptr) (var end-data28651))
-    (addq (int 16) (var end-data28651))
-    (cmpq (global-value fromspace_end) (var end-data28651))
-    (set l (byte-reg al))
-    (movzbq (byte-reg al) (var lt28652))
-    (if (eq? (int 0) (var lt28652))
-      ((movq (reg r15) (reg rdi))
-       (movq (int 16) (reg rsi))
-       (callq collect))
-      ())
-
-    (movq (global-value free_ptr) (var tmp28644))
-    (addq (int 16) (global-value free_ptr))
-    (movq (var tmp28644) (reg r11))
-    (movq (int 3) (deref r11 0))
-    (movq (var tmp28644) (reg r11))
-    (movq (int 42) (deref r11 8))
-
-    (movq (global-value free_ptr) (var end-data28654))
-    (addq (int 16) (var end-data28654))
-    (cmpq (global-value fromspace_end) (var end-data28654))
-    (set l (byte-reg al))
-    (movzbq (byte-reg al) (var lt28655))
-    (if (eq? (int 0) (var lt28655))
-      ((movq (var tmp28644) (deref r15 0))
-       (addq (int 8) (reg r15))
-       (movq (reg r15) (reg rdi))
-       (movq (int 16) (reg rsi))
-       (callq collect)
-       (subq (int 8) (reg r15))
-       (movq (deref r15 0) (var tmp28644)))
-      ())
-
-    (movq (global-value free_ptr) (var tmp28645))
-    (addq (int 16) (global-value free_ptr))
-    (movq (var tmp28645) (reg r11))
-    (movq (int 131) (deref r11 0))
-    (movq (var tmp28645) (reg r11))
-    (movq (var tmp28644) (deref r11 8))
-
-    (movq (var tmp28645) (reg r11))
-    (movq (deref r11 8) (var tmp28646))
-
-    (movq (var tmp28646) (reg r11))
-    (movq (deref r11 8) (var tmp28647))
-
-    (movq (var tmp28647) (reg rax)))
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+(program
+  ((tmp02 . Integer) (tmp01 Vector Integer) (tmp90 Vector Integer)
+   (tmp86 . Integer) (tmp88 . Void) (tmp96 . Void) (tmp94 . Integer)
+   (tmp93 . Integer) (tmp95 . Integer) (tmp85 Vector Integer)
+   (tmp87 . Void) (tmp92 . Void) (tmp00 . Void) (tmp98 . Integer)
+   (tmp97 . Integer) (tmp99 . Integer) (tmp89 Vector (Vector Integer))
+   (tmp91 . Void)) (type Integer)
+  (movq (int 42) (var tmp86))
+  (movq (global-value free_ptr) (var tmp93))
+  (movq (var tmp93) (var tmp94))
+  (addq (int 16) (var tmp94))
+  (movq (global-value fromspace_end) (var tmp95))
+  (if (< (var tmp94) (var tmp95))
+    ((movq (int 0) (var tmp96)))
+    ((movq (reg r15) (reg rdi))
+     (movq (int 16) (reg rsi))
+     (callq collect)
+     (movq (int 0) (var tmp96))))
+  (movq (var tmp96) (var tmp88))
+  (movq (global-value free_ptr) (var tmp85))
+  (addq (int 16) (global-value free_ptr))
+  (movq (var tmp85) (reg r11))
+  (movq (int 3) (deref r11 0))
+  (movq (var tmp85) (reg r11))
+  (movq (var tmp86) (deref r11 8))
+  (movq (int 0) (var tmp87))
+  (movq (var tmp85) (var tmp90))
+  (movq (global-value free_ptr) (var tmp97))
+  (movq (var tmp97) (var tmp98))
+  (addq (int 16) (var tmp98))
+  (movq (global-value fromspace_end) (var tmp99))
+  (if (< (var tmp98) (var tmp99))
+    ((movq (int 0) (var tmp00)))
+    ((movq (reg r15) (reg rdi))
+     (movq (int 16) (reg rsi))
+     (callq collect)
+     (movq (int 0) (var tmp00))))
+  (movq (var tmp00) (var tmp92))
+  (movq (global-value free_ptr) (var tmp89))
+  (addq (int 16) (global-value free_ptr))
+  (movq (var tmp89) (reg r11))
+  (movq (int 131) (deref r11 0))
+  (movq (var tmp89) (reg r11))
+  (movq (var tmp90) (deref r11 8))
+  (movq (int 0) (var tmp91))
+  (movq (var tmp89) (reg r11))
+  (movq (deref r11 8) (var tmp01))
+  (movq (var tmp01) (reg r11))
+  (movq (deref r11 8) (var tmp02))
+  (movq (var tmp02) (reg rax)))
 \end{lstlisting}
 \end{minipage}
 \caption{Output of the \code{select-instructions} pass.}
 \label{fig:select-instr-output-gc}
 \end{figure}
 
+\clearpage
+
 \subsection{Register Allocation}
 \label{sec:reg-alloc-gc}
 
-UNDER CONSTRUCTION
+As discussed earlier in this chapter, the garbage collector needs to
+access all the pointers in the root set, that is, all variables that
+are vectors. It will be the responsibility of the register allocator
+to make sure that:
+\begin{enumerate}
+\item the root stack is used for spilling vector-typed variables, and
+\item if a vector-typed variable is live during a call to the
+  collector, it must be spilled to ensure it is visible to the
+  collector.
+\end{enumerate}
+
+The later responsibility can be handled during construction of the
+inference graph, by adding interference edges between the call-live
+vector-typed variables and all the callee-save registers. (They
+already interfere with the caller-save registers.)  The type
+information for variables is in the \code{program} form, so we
+recommend adding another parameter to the \code{build-interference}
+function to communicate this association list.
+
+The spilling of vector-typed variables to the root stack can be
+handled after graph coloring, when choosing how to assign the colors
+(integers) to registers and stack locations. The \code{program} output
+of this pass changes to also record the number of spills to the root
+stack.
+\[
+\begin{array}{lcl}
+x86_2 &::= & (\key{program} \;(\itm{stackSpills} \; \itm{rootstackSpills}) \;(\key{type}\;\itm{type})\; \Instr^{+}) 
+\end{array}
+\]
+
+
+% build-interference
+%
+% callq
+%   extra parameter for var->type assoc. list
+% update 'program' and 'if'
+
+% allocate-registers
+%    allocate spilled vectors to the rootstack
+
+% don't change color-graph
+
 
 
 \subsection{Print x86}
