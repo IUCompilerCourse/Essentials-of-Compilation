@@ -92,7 +92,7 @@ moredelim=[is][\color{red}]{~}{~}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\title{\Huge \textbf{Essentials of Compilation} \\ 
+\title{\Huge \textbf{Essentials of Compilation} \\
   \huge An Incremental Approach}
 
 \author{\textsc{Jeremy G. Siek, Ryan R. Newton} \\
@@ -232,7 +232,7 @@ parts of x86-64 assembly language that are needed.
 
 \section*{Acknowledgments}
 
-Need to give thanks to 
+Need to give thanks to
 \begin{itemize}
 \item Bor-Yuh Evan Chang
 \item Kent Dybvig
@@ -248,7 +248,7 @@ Need to give thanks to
 \mbox{}\\
 \noindent Jeremy G. Siek \\
 \noindent \url{http://homes.soic.indiana.edu/jsiek} \\
-\noindent Spring 2016 
+\noindent Spring 2016
 
 \fi{} %% End Preface
 
@@ -635,7 +635,7 @@ programs. The following program simply adds two integers.
 \begin{lstlisting}
    (+ 10 32)
 \end{lstlisting}
-The result is \key{42}, as you might have expected. 
+The result is \key{42}, as you might have expected.
 %
 The next example demonstrates that expressions may be nested within
 each other, in this case nesting several additions and negations.
@@ -734,7 +734,7 @@ partially evaluating the children nodes.
        [`(- ,(app pe-arith r1))
          (pe-neg r1)]
        [`(+ ,(app pe-arith r1) ,(app pe-arith r2))
-         (pe-add r1 r2)]))   
+         (pe-add r1 r2)]))
 \end{lstlisting}
 \caption{A partial evaluator for the $R_0$ language.}
 \label{fig:pe-arith}
@@ -975,9 +975,9 @@ short explanation of what they do.
               && \key{r8} \mid \key{r9} \mid \key{r10}
               \mid \key{r11} \mid \key{r12} \mid \key{r13}
               \mid \key{r14} \mid \key{r15} \\
-\Arg &::=&  \key{\$}\Int \mid \key{\%}\Reg \mid \Int(\key{\%}\Reg) \\ 
-\Instr &::=& \key{addq} \; \Arg, \Arg \mid 
-      \key{subq} \; \Arg, \Arg \mid 
+\Arg &::=&  \key{\$}\Int \mid \key{\%}\Reg \mid \Int(\key{\%}\Reg) \\
+\Instr &::=& \key{addq} \; \Arg, \Arg \mid
+      \key{subq} \; \Arg, \Arg \mid
       \key{negq} \; \Arg \mid \key{movq} \; \Arg, \Arg \mid \\
   &&  \key{callq} \; \mathit{label} \mid
       \key{pushq}\;\Arg \mid \key{popq}\;\Arg \mid \key{retq} \\
@@ -992,7 +992,7 @@ short explanation of what they do.
 \end{figure}
 
 An immediate value is written using the notation \key{\$}$n$ where $n$
-is an integer. 
+is an integer.
 %
 A register is written with a \key{\%} followed by the register name,
 such as \key{\%rax}.
@@ -1008,7 +1008,7 @@ source $s$ and destination $d$, applies the arithmetic operation, then
 writes the result in $d$.
 %
 The move instruction, $\key{movq}\,s\,d$ reads from $s$ and stores the
-result in $d$. 
+result in $d$.
 %
 The $\key{callq}\,\mathit{label}$ instruction executes the procedure
 specified by the label.
@@ -1022,13 +1022,19 @@ the operating system starts executing this program.  The instruction
 \lstinline{movq $10, %rax} puts $10$ into register \key{rax}. The
 following instruction \lstinline{addq $32, %rax} adds $32$ to the
 $10$ in \key{rax} and puts the result, $42$, back into
-\key{rax}. The instruction \lstinline{movq %rax, %rdi} moves the value 
-in \key{rax} into another register, \key{rdi}, and 
+\key{rax}. Finally, the instruction \lstinline{movq %rax, %rdi} moves the value
+in \key{rax} into another register, \key{rdi}, and
 \lstinline{callq print_int} calls the external function \code{print\_int}, which
 prints the value in \key{rdi}.
-The instruction \key{retq} finishes the \key{main}
-function by returning the integer in \key{rax} to the
-operating system.
+
+The last two instructions---\lstinline{movq $0, %rax} and \key{retq}---finish
+the \key{main} function by returning the integer in \key{rax} to the
+operating system. The operating system interprets this integer as the program's
+exit code. By convention, an exit code of 0 indicates the program was
+successful, and all other exit codes indicate various errors. To ensure that
+we successfully communicate with the operating system, we explicitly move 0
+into \key{rax}, lest the previous value in \key{rax} be misinterpreted as an
+error code.
 
 
 %\begin{wrapfigure}{r}{2.25in}
@@ -1040,6 +1046,7 @@ main:
 	addq	$32, %rax
 	movq	%rax, %rdi
 	callq	print_int
+	movq    $0, %rax
 	retq
 \end{lstlisting}
 \caption{An x86 program equivalent to $\BINOP{+}{10}{32}$.}
@@ -1096,6 +1103,7 @@ main:
 	movq	%rax, %rdi
 	callq	print_int
 	addq	$16, %rsp
+	movq    $0, %rax
 	popq	%rbp
 	retq
 \end{lstlisting}
@@ -1140,16 +1148,18 @@ places $52$ in the register \key{rax} and \key{addq -8(\%rbp), \%rax}
 adds the contents of variable $1$ to \key{rax}, at which point
 \key{rax} contains $42$.
 
-The last five instructions are the typical \emph{conclusion} of a
+The last six instructions are the typical \emph{conclusion} of a
 procedure. The first two print the final result of the program. The
 latter three are necessary to get the state of the machine back to
 where it was before the current procedure was called.  The \key{addq
   \$16, \%rsp} instruction moves the stack pointer back to point at
 the old base pointer. The amount added here needs to match the amount
-that was subtracted in the prelude of the procedure.  Then \key{popq
-  \%rbp} returns the old base pointer to \key{rbp} and adds $8$ to the
-stack pointer.  The \key{retq} instruction jumps back to the procedure
-that called this one and subtracts 8 from the stack pointer.
+that was subtracted in the prelude of the procedure. The \key{movq
+  \$0, \%rax} instruction ensures that the returned exit code is 0.
+Then \key{popq \%rbp} returns the old base pointer to \key{rbp} and
+adds $8$ to the stack pointer.  The \key{retq} instruction jumps back
+to the procedure that called this one and subtracts 8 from the stack
+pointer.
 
 The compiler will need a convenient representation for manipulating
 x86 programs, so we define an abstract syntax for x86 in
@@ -1165,13 +1175,13 @@ auxiliary data from one step of the compiler to the next. )
 \[
 \begin{array}{lcl}
 \Arg &::=&  \INT{\Int} \mid \REG{\itm{register}}
-    \mid (\key{deref}\;\itm{register}\;\Int) \\ 
-\Instr &::=& (\key{addq} \; \Arg\; \Arg) \mid 
-             (\key{subq} \; \Arg\; \Arg) \mid 
+    \mid (\key{deref}\;\itm{register}\;\Int) \\
+\Instr &::=& (\key{addq} \; \Arg\; \Arg) \mid
+             (\key{subq} \; \Arg\; \Arg) \mid
              (\key{negq} \; \Arg) \mid (\key{movq} \; \Arg\; \Arg) \\
       &\mid& (\key{callq} \; \mathit{label}) \mid
-             (\key{pushq}\;\Arg) \mid 
-             (\key{popq}\;\Arg) \mid 
+             (\key{pushq}\;\Arg) \mid
+             (\key{popq}\;\Arg) \mid
              (\key{retq}) \\
 x86_0 &::= & (\key{program} \;\Int \; \Instr^{+})
 \end{array}
@@ -1236,7 +1246,7 @@ ordering.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \foreach \i/\p in {4/1,2/2,1/3,3/4}
-{ 
+{
   \node (\i) at (\p*1.5,0) {$\i$};
 }
 \foreach \x/\y in {4/2,2/1,1/3}
@@ -1256,7 +1266,7 @@ $C_0$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \foreach \i/\p in {R_1/1,R_1/2,C_0/3}
-{ 
+{
   \node (\p) at (\p*3,0) {\large $\i$};
 }
 \foreach \x/\y/\lbl in {1/2/uniquify,2/3/flatten}
@@ -1460,7 +1470,7 @@ implement the clauses for variables and for the \key{let} construct.
 \end{figure}
 
 \begin{exercise}
-\normalfont % I don't like the italics for exercises. -Jeremy 
+\normalfont % I don't like the italics for exercises. -Jeremy
 
 Test your \key{uniquify} pass by creating five example $R_1$ programs
 and checking whether the output programs produce the same result as
@@ -1834,7 +1844,7 @@ placing underscores on \key{main}, you need to put them in front of
 the example programs that you created for the previous passes. Use the
 \key{compiler-tests} function (Appendix~\ref{appendix:utilities}) from
 \key{utilities.rkt} to test your complete compiler on the example
-programs. 
+programs.
 % The following is specific to P423/P523. -Jeremy
 %Mac support is optional, but your compiler has to output
 %valid code for Unix machines.
@@ -1984,9 +1994,9 @@ instruction.
   L_{\mathsf{after}}(k) = L_{\mathsf{before}}(k+1)
 \end{equation*}
 To start things off, there are no live variables after the last
-instruction, so 
+instruction, so
 \begin{equation*}
-  L_{\mathsf{after}}(n) = \emptyset 
+  L_{\mathsf{after}}(n) = \emptyset
 \end{equation*}
 We then apply the following rule repeatedly, traversing the
 instruction sequence back to front.
@@ -2103,7 +2113,7 @@ following.
 \item If instruction $I_k$ is not a move but some other arithmetic
   instruction such as (\key{addq} $s$\, $d$), then add the edge $(d,v)$
   for every $v \in L_{\mathsf{after}}(k)$ unless $v = d$.
-  
+
 \item If instruction $I_k$ is of the form (\key{callq}
   $\mathit{label}$), then add an edge $(r,v)$ for every caller-save
   register $r$ and every variable $v \in L_{\mathsf{after}}(k)$.
@@ -2129,10 +2139,10 @@ Line 10: $t.1$ interferes with $z$, \\
 Line 11: $t.1$ interferes with $z$, \\
 Line 12: $t.2$ interferes with $t.1$, \\
 Line 13: no interference. \\
-Line 14: no interference. 
+Line 14: no interference.
 \end{quote}
 The resulting interference graph is shown in
-Figure~\ref{fig:interfere}. 
+Figure~\ref{fig:interfere}.
 
 \begin{figure}[tbp]
 \large
@@ -2147,10 +2157,10 @@ Figure~\ref{fig:interfere}.
 \node (t2) at (6,-2) {$t.2$};
 
 \draw (v) to (w);
-\foreach \i in {w,x,y} 
+\foreach \i in {w,x,y}
 {
   \foreach \j in {w,x,y}
-  { 
+  {
     \draw (\i) to (\j);
   }
 }
@@ -2206,7 +2216,7 @@ variables interfere with each other.  In terms of the interference
 graph, this means we cannot map adjacent nodes to the same register.
 If we think of registers as colors, the register allocation problem
 becomes the widely-studied graph coloring
-problem~\citep{Balakrishnan:1996ve,Rosen:2002bh}.  
+problem~\citep{Balakrishnan:1996ve,Rosen:2002bh}.
 
 The reader may be more familiar with the graph coloring problem then he
 or she realizes; the popular game of Sudoku is an instance of the
@@ -2255,7 +2265,7 @@ The Pencil Marks technique corresponds to the notion of color
 node, in Sudoku terms, is the set of colors that are no longer
 available. In graph terminology, we have the following definition:
 \begin{equation*}
-  \mathrm{saturation}(u) = \{ c \;|\; \exists v. v \in \mathrm{adjacent}(u) 
+  \mathrm{saturation}(u) = \{ c \;|\; \exists v. v \in \mathrm{adjacent}(u)
      \text{ and } \mathrm{color}(v) = c \}
 \end{equation*}
 where $\mathrm{adjacent}(u)$ is the set of nodes adjacent to $u$.
@@ -2326,10 +2336,10 @@ with a dash for their color and an empty set for the saturation.
 \node (t2) at (9,-1.5) {$t.2:-,\{\}$};
 
 \draw (v) to (w);
-\foreach \i in {w,x,y} 
+\foreach \i in {w,x,y}
 {
   \foreach \j in {w,x,y}
-  { 
+  {
     \draw (\i) to (\j);
   }
 }
@@ -2353,10 +2363,10 @@ with $y$.
 \node (t1) at (9,0)   {$t.1:-,\{\}$};
 \node (t2) at (9,-1.5) {$t.2:-,\{\}$};
 \draw (v) to (w);
-\foreach \i in {w,x,y} 
+\foreach \i in {w,x,y}
 {
   \foreach \j in {w,x,y}
-  { 
+  {
     \draw (\i) to (\j);
   }
 }
@@ -2381,10 +2391,10 @@ $w$ with $1$.
 \draw (t1) to (z);
 \draw (t2) to (t1);
 \draw (v) to (w);
-\foreach \i in {w,x,y} 
+\foreach \i in {w,x,y}
 {
   \foreach \j in {w,x,y}
-  { 
+  {
     \draw (\i) to (\j);
   }
 }
@@ -2406,10 +2416,10 @@ next available color which is $2$.
 \draw (t1) to (z);
 \draw (t2) to (t1);
 \draw (v) to (w);
-\foreach \i in {w,x,y} 
+\foreach \i in {w,x,y}
 {
   \foreach \j in {w,x,y}
-  { 
+  {
     \draw (\i) to (\j);
   }
 }
@@ -2430,10 +2440,10 @@ Node $z$ is the next most highly saturated, so we color $z$ with $2$.
 \draw (t1) to (z);
 \draw (t2) to (t1);
 \draw (v) to (w);
-\foreach \i in {w,x,y} 
+\foreach \i in {w,x,y}
 {
   \foreach \j in {w,x,y}
-  { 
+  {
     \draw (\i) to (\j);
   }
 }
@@ -2455,10 +2465,10 @@ $0$.
 \draw (t1) to (z);
 \draw (t2) to (t1);
 \draw (v) to (w);
-\foreach \i in {w,x,y} 
+\foreach \i in {w,x,y}
 {
   \foreach \j in {w,x,y}
-  { 
+  {
     \draw (\i) to (\j);
   }
 }
@@ -2480,10 +2490,10 @@ then $t.2$ with $1$.
 \draw (t1) to (z);
 \draw (t2) to (t1);
 \draw (v) to (w);
-\foreach \i in {w,x,y} 
+\foreach \i in {w,x,y}
 {
   \foreach \j in {w,x,y}
-  { 
+  {
     \draw (\i) to (\j);
   }
 }
@@ -2632,7 +2642,7 @@ before and after using them. The caller save registers are
 \begin{lstlisting}
   rax rdx rcx rsi rdi r8 r9 r10 r11
 \end{lstlisting}
-while the callee save registers are 
+while the callee save registers are
 \begin{lstlisting}
   rsp rbp rbx r12 r13 r14 r15
 \end{lstlisting}
@@ -2713,7 +2723,7 @@ $\Rightarrow$
 While this allocation is quite good, we could do better. For example,
 the variables \key{v} and \key{x} ended up in different registers, but
 if they had been placed in the same register, then the move from
-\key{v} to \key{x} could be removed. 
+\key{v} to \key{x} could be removed.
 
 We say that two variables $p$ and $q$ are \emph{move related} if they
 participate together in a \key{movq} instruction, that is, \key{movq
@@ -2760,10 +2770,10 @@ saturated vertex is $z$.
 \draw (t1) to (z);
 \draw (t2) to (t1);
 \draw (v) to (w);
-\foreach \i in {w,x,y} 
+\foreach \i in {w,x,y}
 {
   \foreach \j in {w,x,y}
-  { 
+  {
     \draw (\i) to (\j);
   }
 }
@@ -2790,10 +2800,10 @@ case choosing $2$ because that's the color of $x$.
 \draw (t1) to (z);
 \draw (t2) to (t1);
 \draw (v) to (w);
-\foreach \i in {w,x,y} 
+\foreach \i in {w,x,y}
 {
   \foreach \j in {w,x,y}
-  { 
+  {
     \draw (\i) to (\j);
   }
 }
@@ -2818,10 +2828,10 @@ that $v$ is move related to $x$, so we choose the color $2$.
 \draw (t1) to (z);
 \draw (t2) to (t1);
 \draw (v) to (w);
-\foreach \i in {w,x,y} 
+\foreach \i in {w,x,y}
 {
   \foreach \j in {w,x,y}
-  { 
+  {
     \draw (\i) to (\j);
   }
 }
@@ -3260,7 +3270,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program (t.1 t.2 if.1 t.3 t.4 
+(program (t.1 t.2 if.1 t.3 t.4
            if.2 t.5)
   (assign t.1 (read))
   (assign t.2 (eq? t.1 0))
@@ -3340,19 +3350,19 @@ second bit.  Thus, the \code{not} operation can be implemented by
 \begin{array}{lcl}
 \Arg &::=&  \gray{\INT{\Int} \mid \REG{\itm{register}}
     \mid (\key{deref}\,\itm{register}\,\Int)} \\
-     &\mid& (\key{byte-reg}\; \itm{register}) \\ 
+     &\mid& (\key{byte-reg}\; \itm{register}) \\
 \itm{cc} & ::= & \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge} \\
-\Instr &::=& \gray{(\key{addq} \; \Arg\; \Arg) \mid 
-             (\key{subq} \; \Arg\; \Arg) \mid 
+\Instr &::=& \gray{(\key{addq} \; \Arg\; \Arg) \mid
+             (\key{subq} \; \Arg\; \Arg) \mid
              (\key{negq} \; \Arg) \mid (\key{movq} \; \Arg\; \Arg)} \\
       &\mid& \gray{(\key{callq} \; \mathit{label}) \mid
-             (\key{pushq}\;\Arg) \mid 
-             (\key{popq}\;\Arg) \mid 
+             (\key{pushq}\;\Arg) \mid
+             (\key{popq}\;\Arg) \mid
              (\key{retq})} \\
-       &\mid& (\key{xorq} \; \Arg\;\Arg) 
+       &\mid& (\key{xorq} \; \Arg\;\Arg)
        \mid (\key{cmpq} \; \Arg\; \Arg) \mid (\key{set}\;\itm{cc} \; \Arg) \\
-       &\mid& (\key{movzbq}\;\Arg\;\Arg) 
-       \mid  (\key{jmp} \; \itm{label}) 
+       &\mid& (\key{movzbq}\;\Arg\;\Arg)
+       \mid  (\key{jmp} \; \itm{label})
        \mid (\key{jmp-if}\; \itm{cc} \; \itm{label}) \\
        &\mid& (\key{label} \; \itm{label}) \\
 x86_1 &::= & (\key{program} \;\itm{info} \;(\key{type}\;\itm{type})\; \Instr^{+})
@@ -3440,10 +3450,10 @@ $\Rightarrow$
 
 
 % The translation of the \code{not} operator is not quite as simple
-% as it seems. Recall that \key{notq} is a bitwise operator, not a boolean 
+% as it seems. Recall that \key{notq} is a bitwise operator, not a boolean
 % one. For example, the following program performs bitwise negation on
 % the integer 1:
-% 
+%
 % \begin{tabular}{lll}
 % \begin{minipage}{0.4\textwidth}
 % \begin{lstlisting}
@@ -3452,9 +3462,9 @@ $\Rightarrow$
 % \end{lstlisting}
 % \end{minipage}
 % \end{tabular}
-% 
-% After the program is run, \key{rax} does not contain 0, as you might 
-% hope -- it contains the binary value $111\ldots10$, which is the 
+%
+% After the program is run, \key{rax} does not contain 0, as you might
+% hope -- it contains the binary value $111\ldots10$, which is the
 % two's complement representation of $-2$. We recommend implementing boolean
 % not by using \key{notq} and then masking the upper bits of the result with
 % the \key{andq} instruction.
@@ -3505,7 +3515,7 @@ variables from the two branches to be the live set for the whole
 \key{if}, as shown below. Of course, we also need to include the
 variables that are read in $e_1$ and $e_2$.
 \[
-  L_{\mathsf{before}} = L^{\mathsf{thns}}_{\mathsf{before}} \cup 
+  L_{\mathsf{before}} = L^{\mathsf{thns}}_{\mathsf{before}} \cup
   L^{\mathsf{elss}}_{\mathsf{before}} \cup
   \mathit{Vars}(e_1) \cup \mathit{Vars}(e_2)
 \]
@@ -3589,7 +3599,7 @@ $\Rightarrow$
  (label |$\itm{endlabel}$|)
 \end{lstlisting}
 \end{minipage}
-\end{tabular} 
+\end{tabular}
 
 \begin{exercise}\normalfont
 Implement the \code{lower-conditionals} pass. Test your compiler using
@@ -3691,7 +3701,7 @@ if_end21289:
 	retq
 \end{lstlisting}
 \end{minipage}
-\end{tabular} 
+\end{tabular}
 \caption{Example compilation of an \key{if} expression to x86.}
 \label{fig:if-example-x86}
 \end{figure}
@@ -3763,7 +3773,7 @@ generate more optimized code. For example, if the condition is
 \code{\#t} or \code{\#f}, we do not need to generate an \code{if} at
 all. If the condition is a \code{let}, we can optimize based on the
 form of its body. If the condition is a \code{not}, then we can flip
-the two branches. 
+the two branches.
 %
 \margincomment{\tiny We could do even better by converting to basic
   blocks.\\ --Jeremy}
@@ -3851,7 +3861,7 @@ if_end21289:
 	retq
 \end{lstlisting}
 \end{minipage}
-\end{tabular} 
+\end{tabular}
 \caption{Example program with optimized conditionals.}
 \label{fig:opt-if}
 \end{figure}
@@ -3923,15 +3933,15 @@ $40$, to which we add the $2$, the element at index $0$ of the
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-  \Type &::=& \gray{\key{Integer} \mid \key{Boolean}} 
+  \Type &::=& \gray{\key{Integer} \mid \key{Boolean}}
   \mid (\key{Vector}\;\Type^{+}) \mid \key{Void}\\
   \itm{cmp} &::= & \gray{  \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=}  } \\
   \Exp &::=& \gray{  \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)  }  \\
   &\mid&  \gray{  \Var \mid \LET{\Var}{\Exp}{\Exp}  }\\
-  &\mid& \gray{  \key{\#t} \mid \key{\#f} 
+  &\mid& \gray{  \key{\#t} \mid \key{\#f}
     \mid (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp)  }\\
   &\mid& \gray{  (\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}  } \\
-  &\mid& (\key{vector}\;\Exp^{+}) \mid 
+  &\mid& (\key{vector}\;\Exp^{+}) \mid
     (\key{vector-ref}\;\Exp\;\Int) \\
   &\mid& (\key{vector-set!}\;\Exp\;\Int\;\Exp)\\
   &\mid& (\key{void}) \\
@@ -4038,25 +4048,25 @@ flattening).
                        (i . < . (length ts)))
                   (error 'type-check "invalid index ~a" i))
           (let ([t (list-ref ts i)])
-            (values `(has-type (vector-ref ,e (has-type ,i Integer)) ,t) 
+            (values `(has-type (vector-ref ,e (has-type ,i Integer)) ,t)
                     t))]
          [else (error "expected a vector in vector-ref, not" t)])]
-      [`(vector-set! ,(app (type-check env) e-vec^ t-vec) ,i 
-                     ,(app (type-check env) e-arg^ t-arg)) 
+      [`(vector-set! ,(app (type-check env) e-vec^ t-vec) ,i
+                     ,(app (type-check env) e-arg^ t-arg))
        (match t-vec
          [`(Vector ,ts ...)
           (unless (and (exact-nonnegative-integer? i)
                        (i . < . (length ts)))
             (error 'type-check "invalid index ~a" i))
           (unless (equal? (list-ref ts i) t-arg)
-            (error 'type-check "type mismatch in vector-set! ~a ~a" 
+            (error 'type-check "type mismatch in vector-set! ~a ~a"
                    (list-ref ts i) t-arg))
           (values `(has-type (vector-set! ,e-vec^
                                           (has-type ,i Integer)
                                           ,e-arg^) Void) 'Void)]
          [else (error 'type-check
                       "expected a vector in vector-set!, not ~a" t-vec)])]
-      [`(eq? ,(app (type-check env) e1 t1) 
+      [`(eq? ,(app (type-check env) e1 t1)
               ,(app (type-check env) e2 t2))
        (match* (t1 t2)
          [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))
@@ -4098,7 +4108,7 @@ the procedure call stack. These addresses are called the \emph{root
   set}. In addition, a program could access any tuple that is
 transitively reachable from the root set. Thus, it is safe for the
 garbage collector to reclaim the tuples that are not reachable in this
-way. 
+way.
 %
 \footnote{The sitation in Figure~\ref{fig:copying-collector}, with a
   cycle, cannot be created by a well-typed program in $R_3$. However,
@@ -4245,7 +4255,7 @@ collection. Figure~\ref{fig:shadow-stack} reproduces the example from
 Figure~\ref{fig:copying-collector} and contrasts it with the data
 layout using a root stack. The root stack contains the two pointers
 from the regular stack and also the pointer in the second
-register. 
+register.
 
 \begin{figure}[tbp]
 \centering \includegraphics[width=0.7\textwidth]{figs/root-stack}
@@ -4331,7 +4341,7 @@ succeed.
   The \code{collect} function calls another function, \code{cheney},
   to perform the actual copy, and that function is left to the reader
   to implement. The following is the prototype for \code{cheney}.
-\begin{lstlisting}  
+\begin{lstlisting}
    static void cheney(int64_t** rootstack_ptr);
 \end{lstlisting}
   The parameter \code{rootstack\_ptr} is a pointer to the top of the
@@ -4385,7 +4395,7 @@ variables, which can be done locally with \code{let}, but \code{let}
 is gone after \code{flatten}.  In the following, we show the
 transformation for the \code{vector} form into let-bindings for the
 intializing expressions, by a conditional \code{collect}, an
-\code{allocate}, and the initialization of the vector. 
+\code{allocate}, and the initialization of the vector.
 (The \itm{len} is the length of the vector and \itm{bytes} is how many
 total bytes need to be allocated for the vector, which is 8 for the
 tag plus \itm{len} times 8.)
@@ -4415,10 +4425,10 @@ $R_3$ with the three new forms that we use above in the translation of
 \code{vector}.
 \[
 \begin{array}{lcl}
-  \Exp &::=& \cdots 
-      \mid (\key{collect} \,\itm{int}) 
-      \mid (\key{allocate} \,\itm{int}\,\itm{type}) 
-      \mid (\key{global-value} \,\itm{name}) 
+  \Exp &::=& \cdots
+      \mid (\key{collect} \,\itm{int})
+      \mid (\key{allocate} \,\itm{int}\,\itm{type})
+      \mid (\key{global-value} \,\itm{name})
 \end{array}
 \]
 
@@ -4483,9 +4493,9 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
 \itm{cmp} &::= & \gray{  \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=}  } \\
 \Exp &::= & \gray{ \Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)
       \mid (\key{not}\;\Arg) \mid (\itm{cmp}\;\Arg\;\Arg)  } \\
-   &\mid& (\key{allocate} \,\itm{int}\,\itm{type}) 
+   &\mid& (\key{allocate} \,\itm{int}\,\itm{type})
    \mid (\key{vector-ref}\, \Arg\, \Int)  \\
-   &\mid& (\key{vector-set!}\,\Arg\,\Int\,\Arg) 
+   &\mid& (\key{vector-set!}\,\Arg\,\Int\,\Arg)
     \mid (\key{global-value} \,\itm{name}) \mid (\key{void}) \\
 \Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg} } \\
       &\mid& \gray{ \IF{(\itm{cmp}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} } \\
@@ -4586,7 +4596,7 @@ were needed to compile tuples, including \code{allocate},
 The \code{vector-ref} and \code{vector-set!} forms translate into
 \code{movq} instructions with the appropriate \key{deref}.  (The
 plus one is to get past the tag at the beginning of the tuple
-representation.) 
+representation.)
 \begin{lstlisting}
    (assign |$\itm{lhs}$| (vector-ref |$\itm{vec}$| |$n$|))
    |$\Longrightarrow$|
@@ -4647,20 +4657,20 @@ the register allocator.
 \begin{array}{lcl}
 \Arg &::=&  \gray{  \INT{\Int} \mid \REG{\itm{register}}
     \mid (\key{deref}\,\itm{register}\,\Int) } \\
-   &\mid& \gray{ (\key{byte-reg}\; \itm{register})  } 
+   &\mid& \gray{ (\key{byte-reg}\; \itm{register})  }
    \mid (\key{global-value}\; \itm{name}) \\
 \itm{cc} & ::= & \gray{  \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge}  } \\
-\Instr &::=& \gray{(\key{addq} \; \Arg\; \Arg) \mid 
-             (\key{subq} \; \Arg\; \Arg) \mid 
+\Instr &::=& \gray{(\key{addq} \; \Arg\; \Arg) \mid
+             (\key{subq} \; \Arg\; \Arg) \mid
              (\key{negq} \; \Arg) \mid (\key{movq} \; \Arg\; \Arg)} \\
       &\mid& \gray{(\key{callq} \; \mathit{label}) \mid
-             (\key{pushq}\;\Arg) \mid 
-             (\key{popq}\;\Arg) \mid 
+             (\key{pushq}\;\Arg) \mid
+             (\key{popq}\;\Arg) \mid
              (\key{retq})} \\
-       &\mid& \gray{  (\key{xorq} \; \Arg\;\Arg) 
+       &\mid& \gray{  (\key{xorq} \; \Arg\;\Arg)
        \mid (\key{cmpq} \; \Arg\; \Arg) \mid (\key{set}\itm{cc} \; \Arg)  } \\
-       &\mid& \gray{  (\key{movzbq}\;\Arg\;\Arg) 
-       \mid  (\key{jmp} \; \itm{label}) 
+       &\mid& \gray{  (\key{movzbq}\;\Arg\;\Arg)
+       \mid  (\key{jmp} \; \itm{label})
        \mid (\key{j}\itm{cc} \; \itm{label})
        \mid (\key{label} \; \itm{label})  } \\
 x86_2 &::= & \gray{  (\key{program} \;\itm{info} \;(\key{type}\;\itm{type})\; \Instr^{+})  }
@@ -4770,7 +4780,7 @@ of this pass changes to also record the number of spills to the root
 stack.
 \[
 \begin{array}{lcl}
-x86_2 &::= & (\key{program} \;(\itm{stackSpills} \; \itm{rootstackSpills}) \;(\key{type}\;\itm{type})\; \Instr^{+}) 
+x86_2 &::= & (\key{program} \;(\itm{stackSpills} \; \itm{rootstackSpills}) \;(\key{type}\;\itm{type})\; \Instr^{+})
 \end{array}
 \]
 
@@ -4977,7 +4987,7 @@ inside each other; they can only be defined at the top level.
     &\mid& \gray{ \key{\#t} \mid \key{\#f} \mid
       (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp)} \\
       &\mid& \gray{(\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
-  &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid 
+  &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid
     (\key{vector-ref}\;\Exp\;\Int)} \\
   &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})} \\
       &\mid& (\Exp \; \Exp^{*}) \\
@@ -5093,11 +5103,11 @@ Recall from Section~\ref{sec:x86} that the stack is also used for
 local variables and for storing the values of callee-save registers
 (we shall refer to all of these collectively as ``locals''), and that
 at the beginning of a function we move the stack pointer \code{rsp}
-down to make room for them.  
+down to make room for them.
 %% We recommend storing the local variables
 %% first and then the callee-save registers, so that the local variables
 %% can be accessed using \code{rbp} the same as before the addition of
-%% functions.  
+%% functions.
 To make additional room for passing arguments, we shall
 move the stack pointer even further down. We count how many stack
 arguments are needed for each function call that occurs inside the
@@ -5157,7 +5167,7 @@ $8n-8$\key{(\%rsp)} & $8n+8$(\key{\%rbp})& argument $n$ \\
 \section{The compilation of functions}
 
 \margincomment{\scriptsize To do: discuss the need to push and
-  pop call-live pointers (vectors and functions) 
+  pop call-live pointers (vectors and functions)
   to the root stack \\ --Jeremy}
 
 Now that we have a good understanding of functions as they appear in
@@ -5175,12 +5185,12 @@ kinds of AST nodes to any of the intermediate languages?
   \Type &::=& \gray{ \key{Integer} \mid \key{Boolean}
          \mid (\key{Vector}\;\Type^{+}) \mid \key{Void}  } \mid (\Type^{*} \; \key{->}\; \Type) \\
   \Exp &::=& \gray{ \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)}  \\
-     &\mid&  (\key{function-ref}\, \itm{label}) 
+     &\mid&  (\key{function-ref}\, \itm{label})
      \mid \gray{ \Var \mid \LET{\Var}{\Exp}{\Exp} }\\
   &\mid& \gray{ \key{\#t} \mid \key{\#f} \mid
       (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp)} \\
       &\mid& \gray{(\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
-  &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid 
+  &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid
     (\key{vector-ref}\;\Exp\;\Int)} \\
   &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})} \\
       &\mid& (\key{app}\, \Exp \; \Exp^{*}) \\
@@ -5216,7 +5226,7 @@ variables and functions that share the same name. On the other hand,
 \code{reveal-functions} needs to come before the \code{flatten} pass
 because \code{flatten} will help us compile \code{function-ref}.
 Figure~\ref{fig:c3-syntax} defines the syntax for $C_3$, the output of
-\key{flatten}. 
+\key{flatten}.
 
 
 \begin{figure}[tp]
@@ -5229,7 +5239,7 @@ Figure~\ref{fig:c3-syntax} defines the syntax for $C_3$, the output of
 \itm{cmp} &::= & \gray{  \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=}  } \\
 \Exp &::= & \gray{ \Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)
       \mid (\key{not}\;\Arg) \mid (\itm{cmp}\;\Arg\;\Arg)  } \\
-   &\mid& \gray{  (\key{vector}\, \Arg^{+}) 
+   &\mid& \gray{  (\key{vector}\, \Arg^{+})
    \mid (\key{vector-ref}\, \Arg\, \Int)  } \\
    &\mid& \gray{  (\key{vector-set!}\,\Arg\,\Int\,\Arg)  } \\
    &\mid& (\key{app} \,\Arg\,\Arg^{*}) \\
@@ -5241,7 +5251,7 @@ Figure~\ref{fig:c3-syntax} defines the syntax for $C_3$, the output of
        \mid \gray{ (\key{allocate} \,\itm{int}) }\\
       &\mid& \gray{ (\key{call-live-roots}\,(\Var^{*}) \,\Stmt^{*}) } \\
   \Def &::=& (\key{define}\; (\itm{label} \; [\Var \key{:} \Type]^{*}) \key{:} \Type \; \Stmt^{+}) \\
-C_3 & ::= & (\key{program}\;(\Var^{*})\;(\key{type}\;\textit{type})\;(\key{defines}\,\Def^{*})\;\Stmt^{+}) 
+C_3 & ::= & (\key{program}\;(\Var^{*})\;(\key{type}\;\textit{type})\;(\key{defines}\,\Def^{*})\;\Stmt^{+})
 \end{array}
 \]
 \end{minipage}
@@ -5284,20 +5294,20 @@ language, whose syntax is defined in Figure~\ref{fig:x86-3}.
 \[
 \begin{array}{lcl}
 \Arg &::=&  \gray{  \INT{\Int} \mid \REG{\itm{register}}
-    \mid (\key{deref}\,\itm{register}\,\Int) \mid (\key{byte-reg}\; \itm{register})  } \\ 
+    \mid (\key{deref}\,\itm{register}\,\Int) \mid (\key{byte-reg}\; \itm{register})  } \\
    &\mid& \gray{  (\key{global-value}\; \itm{name})  } \\
 \itm{cc} & ::= & \gray{  \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge}  } \\
-\Instr &::=& \gray{  (\key{addq} \; \Arg\; \Arg) \mid 
-             (\key{subq} \; \Arg\; \Arg) \mid 
+\Instr &::=& \gray{  (\key{addq} \; \Arg\; \Arg) \mid
+             (\key{subq} \; \Arg\; \Arg) \mid
              (\key{negq} \; \Arg) \mid (\key{movq} \; \Arg\; \Arg)  } \\
       &\mid& \gray{  (\key{callq} \; \mathit{label}) \mid
-             (\key{pushq}\;\Arg) \mid 
-             (\key{popq}\;\Arg) \mid 
+             (\key{pushq}\;\Arg) \mid
+             (\key{popq}\;\Arg) \mid
              (\key{retq})  } \\
-       &\mid& \gray{  (\key{xorq} \; \Arg\;\Arg) 
+       &\mid& \gray{  (\key{xorq} \; \Arg\;\Arg)
        \mid (\key{cmpq} \; \Arg\; \Arg) \mid (\key{set}\itm{cc} \; \Arg)  } \\
-       &\mid& \gray{  (\key{movzbq}\;\Arg\;\Arg) 
-       \mid  (\key{jmp} \; \itm{label}) 
+       &\mid& \gray{  (\key{movzbq}\;\Arg\;\Arg)
+       \mid  (\key{jmp} \; \itm{label})
        \mid (\key{j}\itm{cc} \; \itm{label})
        \mid (\key{label} \; \itm{label})  } \\
      &\mid& (\key{indirect-callq}\;\Arg ) \mid (\key{leaq}\;\Arg\;\Arg)\\
@@ -5351,7 +5361,7 @@ In the mirror image of handling the parameters of function
 definitions, some of the arguments \itm{args} need to be moved to the
 argument passing registers and the rest should be moved to the
 appropriate stack locations, as discussed in
-Section~\ref{sec:fun-x86}. 
+Section~\ref{sec:fun-x86}.
 %% You might want to introduce a new kind of AST node for stack
 %% arguments, \code{(stack-arg $i$)} where $i$ is the index of this
 %% argument with respect to the other stack arguments.
@@ -5400,16 +5410,16 @@ ways to improve the translation?
 \begin{minipage}{0.5\textwidth}
 \begin{lstlisting}
 (program
- (define (add [x : Integer] 
-                [y : Integer]) 
+ (define (add [x : Integer]
+                [y : Integer])
     : Integer (+ x y))
  (add 40 2))
 \end{lstlisting}
 $\Downarrow$
 \begin{lstlisting}
 (program (t.1 t.2)
-  (defines 
-    (define (add.1 [x.1 : Integer] 
+  (defines
+    (define (add.1 [x.1 : Integer]
                     [y.1 : Integer])
       : Integer (t.3)
       (assign t.3 (+ x.1 y.1))
@@ -5507,7 +5517,7 @@ _main:
 	retq
 \end{lstlisting}
 \end{minipage}
-\end{tabular} 
+\end{tabular}
 \caption{Example compilation of a simple function to x86.}
 \label{fig:add-fun}
 \end{figure}
@@ -5581,15 +5591,15 @@ $R_3$).
 \[
 \begin{array}{lcl}
   \Type &::=& \gray{\key{Integer} \mid \key{Boolean}
-     \mid (\key{Vector}\;\Type^{+}) \mid \key{Void} 
+     \mid (\key{Vector}\;\Type^{+}) \mid \key{Void}
      \mid (\Type^{*} \; \key{->}\; \Type)} \\
-  \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp) 
+  \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp)
      \mid (\key{+} \; \Exp\;\Exp)}  \\
-    &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp} 
+    &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp}
      \mid \key{\#t} \mid \key{\#f} \mid
            (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp)} \\
     &\mid& \gray{(\key{eq?}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
-    &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid 
+    &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid
           (\key{vector-ref}\;\Exp\;\Int)} \\
     &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})} \\
     &\mid& \gray{(\Exp \; \Exp^{*})} \\
@@ -5930,7 +5940,7 @@ define the following auxilliary function.
 \itm{tagof}((\key{Vector} \ldots)) &= 010 \\
 \itm{tagof}((\key{Vectorof} \ldots)) &= 010 \\
 \itm{tagof}((\ldots \key{->} \ldots)) &= 011 \\
-\itm{tagof}(\key{Void}) &= 101 
+\itm{tagof}(\key{Void}) &= 101
 \end{align*}
 (We shall say more about the new \key{Vectorof} type shortly.)
 This stealing of 3 bits comes at some
@@ -5969,13 +5979,13 @@ compilation of $R_6$ and $R_7$ in the remainder of this chapter.
   \FType &::=& \key{Integer} \mid \key{Boolean} \mid (\key{Vectorof}\;\key{Any})
      \mid (\key{Any}^{*} \; \key{->}\; \key{Any})\\
   \itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
-  \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp) 
+  \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp)
      \mid (\key{+} \; \Exp\;\Exp)}  \\
     &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp}} \\
     &\mid& \gray{\key{\#t} \mid \key{\#f} \mid
            (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp)} \\
     &\mid& \gray{(\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
-    &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid 
+    &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid
           (\key{vector-ref}\;\Exp\;\Int)} \\
     &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})} \\
     &\mid& \gray{(\Exp \; \Exp^{*})
@@ -6052,7 +6062,7 @@ The type checker for $R_6$ is given in Figure~\ref{fig:typecheck-R6}.
            (unless (exact-nonnegative-integer? i)
              (error 'type-check "invalid index ~a" i))
            (unless (equal? t t-arg)
-             (error 'type-check "type mismatch in vector-set! ~a ~a" 
+             (error 'type-check "type mismatch in vector-set! ~a ~a"
                     t t-arg))
            (values `(vector-set! ,e-vec^
                                            ,i
@@ -6124,7 +6134,7 @@ for $R_6$.
      &\mid& \key{\#t} \mid \key{\#f} \mid
       (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp) \\
      &\mid& (\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp} \\
-     &\mid& (\key{vector}\;\Exp^{+}) \mid 
+     &\mid& (\key{vector}\;\Exp^{+}) \mid
       (\key{vector-ref}\;\Exp\;\Exp) \\
   &\mid& (\key{vector-set!}\;\Exp\;\Exp\;\Exp) \mid (\key{void}) \\
   &\mid& (\Exp \; \Exp^{*}) \mid (\key{lambda}\; (\Var^{*}) \; \Exp) \\
@@ -6168,7 +6178,7 @@ Figure~\ref{fig:interp-R7}.
          (for/list ([b top-level])
            (set-mcdr! b (match (mcdr b)
                           [`(lambda ,xs ,body)
-                           `(inject (lambda ,xs ,body ,top-level) 
+                           `(inject (lambda ,xs ,body ,top-level)
                                     (,@(map (lambda (x) 'Any) xs) -> Any))])))
          ((interp-r7 top-level) body))]
       [`(vector ,(app recur elts) ...)
@@ -6192,7 +6202,7 @@ Figure~\ref{fig:interp-R7}.
          [`(inject #f Boolean) (recur f)]
          [else (recur t)])]
       [`(,(app recur f-val) ,(app recur vs) ...)
-       (match f-val 
+       (match f-val
          [`(inject (lambda (,xs ...) ,body ,lam-env) ,ty)
           (define new-env (append (map cons xs vs) lam-env))
           ((interp-r7 new-env) body)]
@@ -6382,7 +6392,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.6\textwidth}
 \begin{lstlisting}
-(inject 
+(inject
    (+ (project |$e'_1$| Integer)
       (project |$e'_2$| Integer))
    Integer)
@@ -6399,7 +6409,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.6\textwidth}
 \begin{lstlisting}
-(inject (lambda: ([|$x_1$|:Any]|$\ldots$|):Any |$e'$|) 
+(inject (lambda: ([|$x_1$|:Any]|$\ldots$|):Any |$e'$|)
         (Any|$\ldots$|Any -> Any))
 \end{lstlisting}
 \end{minipage}
@@ -6639,7 +6649,7 @@ registers.
 \texttt{cmpq} $A$, $B$ & compare $A$ and $B$ and set flag \\
 \texttt{je} $L$ & \multirow{5}{3.7in}{Jump to label $L$ if the flag matches
    the condition code, otherwise go to the next instructions.
-  The condition codes are \key{e} for ``equal'', 
+  The condition codes are \key{e} for ``equal'',
   \key{l} for ``less'', \key{le} for ``less or equal'', \key{g}
   for ``greater'', and \key{ge} for ``greater or equal''.} \\
 \texttt{jl} $L$ & \\
@@ -6648,9 +6658,9 @@ registers.
 \texttt{jge} $L$ & \\
 \texttt{jmp} $L$ & Jump to label $L$ \\
 \texttt{movq} $A$, $B$ &  $A \to B$ \\
-\texttt{movzbq} $A$, $B$ & 
+\texttt{movzbq} $A$, $B$ &
   \multirow{3}{3.7in}{$A \to B$, \text{where } $A$ is a single-byte register
-  (e.g., \texttt{al} or \texttt{cl}), $B$ is a 8-byte register, 
+  (e.g., \texttt{al} or \texttt{cl}), $B$ is a 8-byte register,
   and the extra bytes of $B$ are set to zero.} \\
  & \\
  & \\
@@ -6660,13 +6670,13 @@ registers.
 \texttt{salq} $A$, $B$ & $B$ \texttt{<<} $A \to B$ (arithmetic shift left, where $A$ is a constant)\\
 \texttt{sarq} $A$, $B$ & $B$ \texttt{>>} $A \to B$ (arithmetic shift right, where $A$ is a constant)\\
 \texttt{sete} $A$ & \multirow{5}{3.7in}{If the flag matches the condition code,
-   then $1 \to A$, else $0 \to A$. Refer to \texttt{je} above for the 
+   then $1 \to A$, else $0 \to A$. Refer to \texttt{je} above for the
    description of the condition codes. $A$ must be a single byte register
    (e.g., \texttt{al} or \texttt{cl}).} \\
 \texttt{setl} $A$ & \\
 \texttt{setle} $A$ & \\
 \texttt{setg} $A$ & \\
-\texttt{setge} $A$ & 
+\texttt{setge} $A$ &
 \end{tabular}
 \vspace{5pt}
   \caption{Quick-reference for the x86 instructions used in this book.}
