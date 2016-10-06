@@ -4768,7 +4768,26 @@ x86_2 &::= & (\key{program} \;(\itm{stackSpills} \; \itm{rootstackSpills}) \;(\k
   to do about global-value. \\ --Jeremy}
 
 Figure~\ref{fig:print-x86-output-gc} shows the output of the
-\code{print-x86} pass.
+\code{print-x86} pass on the running example. In the prelude and
+conclusion of the \code{main} function, we treat the root stack very
+much like the regular stack in that we move the root stack pointer
+(\code{r15}) to make room for all of the spills to the root stack,
+except that the root stack grows up instead of down.  For the running
+example, there was just one spill so we increment \code{r15} by 8
+bytes. In the conclusion we decrement \code{r15} by 8 bytes.
+
+One issue that deserves special care is that there may be a call to
+\code{collect} prior to the initializing assignments for all the
+variables in the root stack. We do not want the garbage collector to
+accidentaly think that some uninitialized variable is a pointer that
+needs to be followed. Thus, we zero-out all locations on the root
+stack in the prelude of \code{main}. In
+Figure~\ref{fig:print-x86-output-gc}, the instruction
+%
+\lstinline{movq $0, (%r15)} 
+%
+accomplishes this task. The garbage collector tests each root to see
+if it is null prior to dereferencing it.
 
 \begin{figure}[htbp]
 \begin{minipage}[t]{0.5\textwidth}
