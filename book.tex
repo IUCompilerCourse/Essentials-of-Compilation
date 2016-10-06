@@ -4782,58 +4782,62 @@ _main:
 	pushq	%r12
 	pushq	%rbx
 	subq	$0, %rsp
+	movq $16384, %rdi
+	movq $16, %rsi
+	callq _initialize
+	movq _rootstack_begin(%rip), %r15
+	movq $0, (%r15)
+	addq $8, %r15
 
-	movq	$16384, %rdi
-	movq	$16, %rsi
-	callq	_initialize
-	movq	_rootstack_begin(%rip), %r15
-	movq	_free_ptr(%rip), %rbx
-	addq	$16, %rbx
-	cmpq	_fromspace_end(%rip), %rbx
-	setl	%al
-	movzbq	%al, %rbx
-	cmpq	$0, %rbx
-	je then30964
-	jmp if_end30965
-then30964:
+	movq	$42, %rbx
+	movq	_free_ptr(%rip), %rcx
+	addq	$16, %rcx
+	movq	_fromspace_end(%rip), %rdx
+	cmpq	%rdx, %rcx
+	jl then33131
 	movq	%r15, %rdi
 	movq	$16, %rsi
 	callq	_collect
-if_end30965:
-	movq	_free_ptr(%rip), %rbx
-	addq	$16, _free_ptr(%rip)
-	movq	%rbx, %r11
-	movq	$3, 0(%r11)
-	movq	%rbx, %r11
-	movq	$42, 8(%r11)
+	movq	$0, %rcx
+	jmp if_end33132
+then33131:
+	movq	$0, %rcx
+if_end33132:
 	movq	_free_ptr(%rip), %rcx
+	addq	$16, _free_ptr(%rip)
+	movq	%rcx, %r11
+	movq	$3, 0(%r11)
+	movq	%rcx, %r11
+	movq	%rbx, 8(%r11)
+	movq	$0, %rbx
+	movq	%rcx, -8(%r15)
+	movq	_free_ptr(%rip), %rbx
+	movq	%rbx, %rcx
 	addq	$16, %rcx
-	cmpq	_fromspace_end(%rip), %rcx
-	setl	%al
-	movzbq	%al, %rcx
-	cmpq	$0, %rcx
-	je then30966
-	jmp if_end30967
+	movq	_fromspace_end(%rip), %rbx
+	cmpq	%rbx, %rcx
+	jl then33133
+	movq	%r15, %rdi
+	movq	$16, %rsi
+	callq	_collect
+	movq	$0, %rbx
+	jmp if_end33134
 \end{lstlisting}
 \end{minipage}
 \begin{minipage}[t]{0.45\textwidth}
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-then30966:
-	movq	%rbx, 0(%r15)
-	addq	$8, %r15
-	movq	%r15, %rdi
-	movq	$16, %rsi
-	callq	_collect
-	subq	$8, %r15
-	movq	0(%r15), %rbx
-if_end30967:
-	movq	_free_ptr(%rip), %rcx
+then33133:
+	movq	$0, %rbx
+if_end33134:
+	movq	_free_ptr(%rip), %rbx
 	addq	$16, _free_ptr(%rip)
-	movq	%rcx, %r11
+	movq	%rbx, %r11
 	movq	$131, 0(%r11)
-	movq	%rcx, %r11
-	movq	%rbx, 8(%r11)
-	movq	%rcx, %r11
+	movq	%rbx, %r11
+	movq	-8(%r15), %rax
+	movq	%rax, 8(%r11)
+	movq	$0, %rcx
+	movq	%rbx, %r11
 	movq	8(%r11), %rbx
 	movq	%rbx, %r11
 	movq	8(%r11), %rbx
@@ -4842,6 +4846,7 @@ if_end30967:
 	movq	%rax, %rdi
 	callq	_print_int
 	movq	$0, %rax
+	subq $8, %r15
 	addq	$0, %rsp
 	popq	%rbx
 	popq	%r12
