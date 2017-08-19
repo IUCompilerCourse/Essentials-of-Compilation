@@ -22,6 +22,12 @@ clean:
 nix:
 	NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/51a83266d164195698f04468d90d2c6238ed3491.tar.gz $(MAKE) nix-head
 
+# This is a compromise.  Build faster by using a binary cache, but
+# still allow minor version patches by pointing at the head of a
+# (dynamic) channel.
+nix-fast:
+	NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/nixos-17.03.tar.gz $(MAKE) nix-head
+
 # Build with whatever version of nixpkgs is in the users environment:
 nix-head:
 	nix-shell --pure --run make
