@@ -4346,9 +4346,9 @@ succeed.
    static void cheney(int64_t** rootstack_ptr);
 \end{lstlisting}
   The parameter \code{rootstack\_ptr} is a pointer to the top of the
-  rootstack (which is array of pointers).  The \code{cheney} function
+  rootstack (which is an array of pointers).  The \code{cheney} function
   also communicates with \code{collect} through several global
-  variables, the \code{framespace\_begin} and \code{framespace\_end}
+  variables, the \code{fromspace\_begin} and \code{fromspace\_end}
   mentioned in Figure~\ref{fig:gc-header} as well as the pointers for
   the ToSpace:
 \begin{lstlisting}
@@ -4807,7 +4807,26 @@ x86_2 &::= & (\key{program} \;(\itm{stackSpills} \; \itm{rootstackSpills}) \;(\k
   to do about global-value. \\ --Jeremy}
 
 Figure~\ref{fig:print-x86-output-gc} shows the output of the
-\code{print-x86} pass.
+\code{print-x86} pass on the running example. In the prelude and
+conclusion of the \code{main} function, we treat the root stack very
+much like the regular stack in that we move the root stack pointer
+(\code{r15}) to make room for all of the spills to the root stack,
+except that the root stack grows up instead of down.  For the running
+example, there was just one spill so we increment \code{r15} by 8
+bytes. In the conclusion we decrement \code{r15} by 8 bytes.
+
+One issue that deserves special care is that there may be a call to
+\code{collect} prior to the initializing assignments for all the
+variables in the root stack. We do not want the garbage collector to
+accidentaly think that some uninitialized variable is a pointer that
+needs to be followed. Thus, we zero-out all locations on the root
+stack in the prelude of \code{main}. In
+Figure~\ref{fig:print-x86-output-gc}, the instruction
+%
+\lstinline{movq $0, (%r15)} 
+%
+accomplishes this task. The garbage collector tests each root to see
+if it is null prior to dereferencing it.
 
 \begin{figure}[htbp]
 \begin{minipage}[t]{0.5\textwidth}
@@ -4821,58 +4840,62 @@ _main:
 	pushq	%r12
 	pushq	%rbx
 	subq	$0, %rsp
+	movq $16384, %rdi
+	movq $16, %rsi
+	callq _initialize
+	movq _rootstack_begin(%rip), %r15
+	movq $0, (%r15)
+	addq $8, %r15
 
-	movq	$16384, %rdi
-	movq	$16, %rsi
-	callq	_initialize
-	movq	_rootstack_begin(%rip), %r15
-	movq	_free_ptr(%rip), %rbx
-	addq	$16, %rbx
-	cmpq	_fromspace_end(%rip), %rbx
-	setl	%al
-	movzbq	%al, %rbx
-	cmpq	$0, %rbx
-	je then30964
-	jmp if_end30965
-then30964:
+	movq	$42, %rbx
+	movq	_free_ptr(%rip), %rcx
+	addq	$16, %rcx
+	movq	_fromspace_end(%rip), %rdx
+	cmpq	%rdx, %rcx
+	jl then33131
 	movq	%r15, %rdi
 	movq	$16, %rsi
 	callq	_collect
-if_end30965:
-	movq	_free_ptr(%rip), %rbx
-	addq	$16, _free_ptr(%rip)
-	movq	%rbx, %r11
-	movq	$3, 0(%r11)
-	movq	%rbx, %r11
-	movq	$42, 8(%r11)
+	movq	$0, %rcx
+	jmp if_end33132
+then33131:
+	movq	$0, %rcx
+if_end33132:
 	movq	_free_ptr(%rip), %rcx
+	addq	$16, _free_ptr(%rip)
+	movq	%rcx, %r11
+	movq	$3, 0(%r11)
+	movq	%rcx, %r11
+	movq	%rbx, 8(%r11)
+	movq	$0, %rbx
+	movq	%rcx, -8(%r15)
+	movq	_free_ptr(%rip), %rbx
+	movq	%rbx, %rcx
 	addq	$16, %rcx
-	cmpq	_fromspace_end(%rip), %rcx
-	setl	%al
-	movzbq	%al, %rcx
-	cmpq	$0, %rcx
-	je then30966
-	jmp if_end30967
+	movq	_fromspace_end(%rip), %rbx
+	cmpq	%rbx, %rcx
+	jl then33133
+	movq	%r15, %rdi
+	movq	$16, %rsi
+	callq	_collect
+	movq	$0, %rbx
+	jmp if_end33134
 \end{lstlisting}
 \end{minipage}
 \begin{minipage}[t]{0.45\textwidth}
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-then30966:
-	movq	%rbx, 0(%r15)
-	addq	$8, %r15
-	movq	%r15, %rdi
-	movq	$16, %rsi
-	callq	_collect
-	subq	$8, %r15
-	movq	0(%r15), %rbx
-if_end30967:
-	movq	_free_ptr(%rip), %rcx
+then33133:
+	movq	$0, %rbx
+if_end33134:
+	movq	_free_ptr(%rip), %rbx
 	addq	$16, _free_ptr(%rip)
-	movq	%rcx, %r11
+	movq	%rbx, %r11
 	movq	$131, 0(%r11)
-	movq	%rcx, %r11
-	movq	%rbx, 8(%r11)
-	movq	%rcx, %r11
+	movq	%rbx, %r11
+	movq	-8(%r15), %rax
+	movq	%rax, 8(%r11)
+	movq	$0, %rcx
+	movq	%rbx, %r11
 	movq	8(%r11), %rbx
 	movq	%rbx, %r11
 	movq	8(%r11), %rbx
@@ -4881,6 +4904,7 @@ if_end30967:
 	movq	%rax, %rdi
 	callq	_print_int
 	movq	$0, %rax
+	subq $8, %r15
 	addq	$0, %rsp
 	popq	%rbx
 	popq	%r12
@@ -4906,8 +4930,7 @@ if_end30967:
 \node (R1) at (0,2)  {\large $R_1$};
 \node (R1-2) at (3,2)  {\large $R_1$};
 \node (R1-3) at (6,2)  {\large $R_1$};
-\node (C1-1) at (9,0)  {\large $C_1$};
-\node (C1-2) at (6,0)  {\large $C_1$};
+\node (C1-1) at (6,0)  {\large $C_1$};
 \node (C1-3) at (3,0)  {\large $C_1$};
 
 \node (x86-2) at (3,-2)  {\large $\text{x86}^{*}$};
@@ -4919,18 +4942,17 @@ if_end30967:
 \node (x86-2-1) at (3,-4)  {\large $\text{x86}^{*}$};
 \node (x86-2-2) at (6,-4)  {\large $\text{x86}^{*}$};
 
-\path[->,bend left=15] (R1) edge [above] node {\ttfamily\footnotesize typecheck} (R1-2);
+\path[->,bend left=15] (R1) edge [above] node {\ttfamily\footnotesize\color{red} typecheck} (R1-2);
 \path[->,bend left=15] (R1-2) edge [above] node {\ttfamily\footnotesize uniquify} (R1-3);
-\path[->,bend left=15] (R1-3) edge [right] node {\ttfamily\footnotesize flatten} (C1-1);
-\path[->,bend left=15] (C1-1) edge [below] node {\ttfamily\footnotesize\color{red} expose-alloc.} (C1-2);
-\path[->,bend left=15] (C1-2) edge [below] node {\ttfamily\footnotesize\color{red} uncover...roots} (C1-3);
+\path[->,bend left=15] (R1-3) edge [right] node {\ttfamily\footnotesize\color{red} flatten} (C1-1);
+\path[->,bend right=15] (C1-1) edge [above] node {\ttfamily\footnotesize\color{red} expose-alloc.} (C1-3);
 \path[->,bend right=15] (C1-3) edge [left] node {\ttfamily\footnotesize\color{red} select-instr.} (x86-2);
 \path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize uncover-live} (x86-2-1);
-\path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build-inter.} (x86-2-2);
-\path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate-reg.} (x86-3);
+\path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize \color{red}build-inter.} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize\color{red} allocate-reg.} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize lower-cond.} (x86-4);
 \path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-5);
-\path[->,bend right=15] (x86-5) edge [left] node {\ttfamily\footnotesize print-x86} (x86-6);
+\path[->,bend right=15] (x86-5) edge [left] node {\ttfamily\footnotesize\color{red} print-x86} (x86-6);
 \end{tikzpicture}
 \caption{Diagram of the passes for $R_3$, a language with tuples.}
 \label{fig:R3-passes}
