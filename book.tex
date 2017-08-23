@@ -663,24 +663,37 @@ then a call to the \lstinline{exp} helper function, which in turn has
 one match clause per grammar rule for $R_0$ expressions.
 
 The \lstinline{exp} function is naturally recursive: clauses for internal AST
-nodes make recursive calls on each child node. Here we make use of the \key{app}
-feature of Racket's \key{match} to concisely apply a function and bind the
-result.  For example, in the case for negation, we use \lstinline{(app exp v)}
-to recursively apply \texttt{exp} to the child node and bind the \emph{result value} to
-variable \texttt{v}.
+nodes make recursive calls on each child node.  Note that the recursive cases
+for negation and addition are a place where we could have made use of the
+\key{app} feature of Racket's \key{match} to apply a function and bind the
+result.  The two recursive cases of \lstinline{interp-R0} would become:
+
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}
+     [`(- ,(app exp v))  (fx- 0 v)]
+     [`(+ ,(app exp v1) ,(app exp v2)) (fx+ v1 v2)]))
+\end{lstlisting}
+\end{minipage}
+
+Here we use \lstinline{(app exp v)} to recursively apply \texttt{exp} to the
+child node and bind the \emph{result value} to variable \texttt{v}.  The
+difference between this version and the code in Figure~\ref{fig:interp-R0} is
+mainly stylistic, although if side effects are involved the order of evaluation
+can become important.  Further, when we write functions with multiple return
+values, the \key{app} form can be convenient for binding the resulting values.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
    (define (interp-R0 p)
      (define (exp ex)
        (match ex
-         [(? fixnum?) e]
+         [(? fixnum?) ex]
          [`(read)
           (let ([r (read)])
             (cond [(fixnum? r) r]
                   [else (error 'interp-R0 "input not an integer" r)]))]
-         [`(- ,(app exp v))                    (fx- 0 v)]
-         [`(+ ,(app exp v1) ,(app exp v2)) (fx+ v1 v2)]))
+         [`(- ,e)        (fx- 0 (exp e))]
+         [`(+ ,e1 ,e2) (fx+ (exp e1) (exp e2))]))
      (match p
        [`(program ,e) (exp e)]))
 \end{lstlisting}
