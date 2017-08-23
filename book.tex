@@ -658,30 +658,31 @@ regard~\citep{reynolds72:_def_interp}. Here we will warm up by writing
 an interpreter for the $R_0$ language, which will also serve as a
 second example of structural recursion. The \texttt{interp-R0}
 function is defined in Figure~\ref{fig:interp-R0}. The body of the
-function is a match on the input expression \texttt{e} and there is
-one clause per grammar rule for $R_0$. The clauses for internal AST
-nodes make recursive calls to \texttt{interp-R0} on each child
-node. Here we make use of the \key{app} feature of Racket's
-\key{match} to concisely apply a function and bind the result.  For
-example, in the case for negation, we use \key{app} to recursively
-apply \texttt{interp-R0} to the child node and bind the result value
-to variable \texttt{v}.
+function is a match on the input program \texttt{p} and
+then a call to the \lstinline{exp} helper function, which in turn has 
+one match clause per grammar rule for $R_0$ expressions.
+
+The \lstinline{exp} function is naturally recursive: clauses for internal AST
+nodes make recursive calls on each child node. Here we make use of the \key{app}
+feature of Racket's \key{match} to concisely apply a function and bind the
+result.  For example, in the case for negation, we use \lstinline{(app exp v)}
+to recursively apply \texttt{exp} to the child node and bind the \emph{result value} to
+variable \texttt{v}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-   (define (interp-R0 e)
-     (match e
-       [(? fixnum?) e]
-       [`(read)
-        (let ([r (read)])
-          (cond [(fixnum? r) r]
-                 [else (error 'interp-R0 "input not an integer" r)]))]
-       [`(- ,(app interp-R0 v))
-        (fx- 0 v)]
-       [`(+ ,(app interp-R0 v1) ,(app interp-R0 v2))
-        (fx+ v1 v2)]
-       [`(program ,(app interp-R0 v)) v]
-       ))
+   (define (interp-R0 p)
+     (define (exp ex)
+       (match ex
+         [(? fixnum?) e]
+         [`(read)
+          (let ([r (read)])
+            (cond [(fixnum? r) r]
+                  [else (error 'interp-R0 "input not an integer" r)]))]
+         [`(- ,(app exp v))                    (fx- 0 v)]
+         [`(+ ,(app exp v1) ,(app exp v2)) (fx+ v1 v2)]))
+     (match p
+       [`(program ,e) (exp e)]))
 \end{lstlisting}
 \caption{Interpreter for the $R_0$ language.
   \rn{Having two functions here for prog/exp wouldn't take much more space.
@@ -695,8 +696,10 @@ programs. The following program simply adds two integers.
 \begin{lstlisting}
    (+ 10 32)
 \end{lstlisting}
-The result is \key{42}, as you might have expected.
-%
+The result is \key{42}, as you might have expected.  Here we have written the
+program in concrete syntax, whereas the parsed abstract syntax would be the
+slightly different: \lstinline{(program (+ 10 32))}.
+
 The next example demonstrates that expressions may be nested within
 each other, in this case nesting several additions and negations.
 \begin{lstlisting}
@@ -704,6 +707,7 @@ each other, in this case nesting several additions and negations.
 \end{lstlisting}
 What is the result of the above program?
 
+\noindent
 If we interpret the AST \eqref{eq:arith-prog} and give it the input
 \texttt{50}
 \begin{lstlisting}
@@ -723,8 +727,8 @@ produces \key{42}.
 We include the \key{read} operation in $R_1$ so that a compiler for
 $R_1$ cannot be implemented simply by running the interpreter at
 compilation time to obtain the output and then generating the trivial
-code to return the output. (A clever student at Colorado did this the
-first time I taught the course.)
+code to return the output.
+(A clever did this in a previous version of the course.)
 
 The job of a compiler is to translate a program in one language into a
 program in another language so that the output program behaves the
@@ -796,7 +800,7 @@ partially evaluating the children nodes.
        [`(+ ,(app pe-arith r1) ,(app pe-arith r2))
          (pe-add r1 r2)]))
 \end{lstlisting}
-\caption{A partial evaluator for the $R_0$ language.}
+\caption{A partial evaluator for $R_0$ expressions.}
 \label{fig:pe-arith}
 \end{figure}
 
