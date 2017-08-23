@@ -560,8 +560,8 @@ S-expression to see if it is a machine-representable integer.
 \section{Recursion}
 \label{sec:recursion}
 
-Programs are inherently recursive in that an $R_0$ AST is made
-up of smaller $R_0$ ASTs. Thus, the natural way to process in
+Programs are inherently recursive in that an $R_0$ $\Exp$ AST is made
+up of smaller expressions. Thus, the natural way to process in
 entire program is with a recursive function.  As a first example of
 such a function, we define \texttt{R0?} below, which takes an
 arbitrary S-expression, {\tt sexp}, and determines whether or not {\tt
@@ -573,17 +573,20 @@ general, when a recursive function is defined using a sequence of
 match clauses that correspond to a grammar, and each clause body makes
 a recursive call on each child node, then we say the function is
 defined by structural recursion.
+%
 \begin{center}
 \begin{minipage}{0.7\textwidth}
 \begin{lstlisting}
 (define (R0? sexp)
+  (define (exp? ex)
+    (match ex
+      [(? fixnum?) #t]
+      [`(read) #t]
+      [`(- ,e) (exp? e)]
+      [`(+ ,e1 ,e2)
+       (and (exp? e1) (exp? e2))]))  
   (match sexp
-    [(? fixnum?) #t]
-    [`(read) #t]
-    [`(- ,e) (R0? e)]
-    [`(+ ,e1 ,e2)
-     (and (R0? e1) (R0? e2))]
-    [`(program ,e) (R0? e)]
+    [`(program ,e) (exp? e)]    
     [else #f]))
 
 (R0? `(+ (read) (- 8)))
@@ -594,6 +597,8 @@ defined by structural recursion.
 \begin{minipage}{0.25\textwidth}
 \begin{lstlisting}
 
+
+  
 
 
 
@@ -607,6 +612,37 @@ defined by structural recursion.
 \end{minipage}
 \end{center}
 
+Indeed, the structural recursion follows the grammar itself.  We can generally
+expect to write a recursive function to handle each non-terminal in the
+grammar\footnote{If you took the \emph{How to Design Programs} course
+  \url{http://www.ccs.neu.edu/home/matthias/HtDP2e/}, this principle of
+  structuring code according to the data definition is probably quite familiar.}
+
+You may be tempted to write the program like this:
+\begin{center}
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}
+(define (R0? sexp)
+  (match sexp
+    [(? fixnum?) #t]
+    [`(read) #t]
+    [`(- ,e) (R0? e)]
+    [`(+ ,e1 ,e2) (and (R0? e1) (R0? e2))]
+    [`(program ,e) (R0? e)]
+    [else #f]))
+\end{lstlisting}
+\end{minipage}
+\end{center}
+%
+Sometimes such a trick will save a few lines of code, especially when it comes
+to the {\tt program} wrapper.  Yet this style is generally \emph{not}
+recommended, because it can get you into trouble.
+%
+For instance, the above function is subtly wrong:
+\lstinline{(R0? `(program (program 3)))} will return true, when it
+should return false.
+
+%% NOTE FIXME - must check for consistency on this issue throughout.
 
 
 \section{Interpreters}
