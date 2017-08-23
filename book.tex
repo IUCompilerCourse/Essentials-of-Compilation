@@ -189,7 +189,7 @@ Racket~\citep{plt-tr}.
 
 This is the textbook for the incremental version of the compiler
 course at Indiana University (Spring 2016) and it is the first
-textbook for an Indiana compiler course.  With this book I hope to
+open textbook for an Indiana compiler course.  With this book I hope to
 make the Indiana compiler course available to people that have not had
 the chance to study in Bloomington in person.  Many of the compiler
 design decisions in this book are drawn from the assignment
@@ -256,9 +256,16 @@ Need to give thanks to
 \chapter{Preliminaries}
 \label{ch:trees-recur}
 
-In this chapter, we review the basic tools that are needed for
-implementing a compiler. We use abstract syntax trees (ASTs) in the
-form of S-expressions to represent programs (Section~\ref{sec:ast})
+In this chapter, we review the basic tools that are needed for implementing a
+compiler. We use abstract syntax trees (ASTs), which refer to data structures in
+the compilers memory, rather than programs as they are stored on disk, in
+\emph{concrete syntax}.
+%
+ASTs can be represented in many different ways, depending on the programming
+language used to write the compiler.
+%
+Because this book uses Racket (\url{http://racket-lang.org}), a descendant of
+Scheme, we use S-expressions to represent programs (Section~\ref{sec:ast})
 and pattern matching to inspect individual nodes in an AST
 (Section~\ref{sec:pattern-matching}).  We use recursion to construct
 and deconstruct entire ASTs (Section~\ref{sec:recursion}).
@@ -269,8 +276,8 @@ and deconstruct entire ASTs (Section~\ref{sec:recursion}).
 The primary data structure that is commonly used for representing
 programs is the \emph{abstract syntax tree} (AST). When considering
 some part of a program, a compiler needs to ask what kind of part it
-is and what sub-parts it has. For example, the program on the left is
-represented by the AST on the right.
+is and what sub-parts it has. For example, the program on the left,
+represented by an S-expression, corresponds to the AST on the right.
 \begin{center}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -965,16 +972,18 @@ short explanation of what they do.
 % to do: finish treatment of imulq
 % it's needed for vector's in R6/R7
 
+\newcommand{\allregisters}{\key{rsp} \mid \key{rbp} \mid \key{rax} \mid \key{rbx} \mid \key{rcx}
+              \mid \key{rdx} \mid \key{rsi} \mid \key{rdi} \mid \\
+              && \key{r8} \mid \key{r9} \mid \key{r10}
+              \mid \key{r11} \mid \key{r12} \mid \key{r13}
+              \mid \key{r14} \mid \key{r15}}
+
 \begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-\Reg &::=& \key{rsp} \mid \key{rbp} \mid \key{rax} \mid \key{rbx} \mid \key{rcx}
-              \mid \key{rdx} \mid \key{rsi} \mid \key{rdi} \mid \\
-              && \key{r8} \mid \key{r9} \mid \key{r10}
-              \mid \key{r11} \mid \key{r12} \mid \key{r13}
-              \mid \key{r14} \mid \key{r15} \\
+\Reg &::=& \allregisters{} \\
 \Arg &::=&  \key{\$}\Int \mid \key{\%}\Reg \mid \Int(\key{\%}\Reg) \\
 \Instr &::=& \key{addq} \; \Arg, \Arg \mid
       \key{subq} \; \Arg, \Arg \mid
@@ -1174,15 +1183,17 @@ auxiliary data from one step of the compiler to the next. )
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
+\itm{register} &::=& \allregisters{} \\
 \Arg &::=&  \INT{\Int} \mid \REG{\itm{register}}
     \mid (\key{deref}\;\itm{register}\;\Int) \\
 \Instr &::=& (\key{addq} \; \Arg\; \Arg) \mid
              (\key{subq} \; \Arg\; \Arg) \mid
-             (\key{negq} \; \Arg) \mid (\key{movq} \; \Arg\; \Arg) \\
-      &\mid& (\key{callq} \; \mathit{label}) \mid
+             (\key{movq} \; \Arg\; \Arg) \mid
+             (\key{retq})\\
+      &\mid& (\key{negq} \; \Arg) \mid 
+             (\key{callq} \; \mathit{label}) \mid
              (\key{pushq}\;\Arg) \mid
-             (\key{popq}\;\Arg) \mid
-             (\key{retq}) \\
+             (\key{popq}\;\Arg) \\
 x86_0 &::= & (\key{program} \;\Int \; \Instr^{+})
 \end{array}
 \]
