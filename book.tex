@@ -261,14 +261,16 @@ the compilers memory, rather than programs as they are stored on disk, in
 ASTs can be represented in many different ways, depending on the programming
 language used to write the compiler.
 %
-Because this book uses Racket (\url{http://racket-lang.org}), a descendant of
-Scheme, we use S-expressions to represent programs (Section~\ref{sec:ast})
-and pattern matching to inspect individual nodes in an AST
-(Section~\ref{sec:pattern-matching}).  We use recursion to construct
-and deconstruct entire ASTs (Section~\ref{sec:recursion}).
-This chapter provides an introduction to these ideas.
+Because this book uses Racket (\url{http://racket-lang.org}), a
+descendant of Lisp, we use S-expressions to represent programs
+(Section~\ref{sec:ast}), grammars to defined programming languages
+(Section~\ref{sec:grammar}), and pattern matching to inspect
+individual nodes in an AST (Section~\ref{sec:pattern-matching}).  We
+use recursion to construct and deconstruct entire ASTs
+(Section~\ref{sec:recursion}).  This chapter provides an brief
+introduction to these ideas.
 
-\section{Abstract Syntax Trees}
+\section{Abstract Syntax Trees and S-expressions}
 \label{sec:ast}
 
 The primary data structure that is commonly used for representing
@@ -311,11 +313,15 @@ Recall that an \emph{symbolic expression} (S-expression) is either
 \item a pair of two S-expressions, written $(e_1 \key{.} e_2)$,
     where $e_1$ and $e_2$ are each an S-expression.
 \end{enumerate}
-An \emph{atom} can be a symbol, such as \code{'hello}, a number, the null
-value \code{'()}, etc. It is quite common to use S-expressions
+An \emph{atom} can be a symbol, such as \code{`hello}, a number, the null
+value \code{'()}, etc.
+We can create an S-expression in Racket simply by writing a backquote
+(called a quasi-quote in Racket).
+followed by the textual representation of the S-expression.
+It is quite common to use S-expressions
 to represent a list, such as $a, b ,c$ in the following way:
 \begin{lstlisting}
-    '(a . (b . (c . ())))
+    `(a . (b . (c . ())))
 \end{lstlisting}
 Each element of the list is in the first slot of a pair, and the
 second slot is either the rest of the list or the null value, to mark
@@ -323,21 +329,42 @@ the end of the list. Such lists are so common that Racket provides
 special notation for them that removes the need for the periods
 and so many parenthesis:
 \begin{lstlisting}
-    '(a b c)
+    `(a b c)
 \end{lstlisting}
-Thus, the S-expression of \eqref{eq:arith-prog} is a list whose first
-element is the symbol \code{'+}, whose second element is a list
-(containing just one element, the symbol \code{read}), and whose third
-element is another list (containing two atoms).
+For another example,
+an S-expression to represent the AST \eqref{eq:arith-prog} is created
+by the following Racket expression:
+\begin{center}
+\texttt{`(+ (read) (- 8))}
+\end{center}
+The result is a list whose first element is the symbol \code{`+},
+second element is a list (containing just one symbol), and third
+element is another list (containing a symbol and a number).
 
-When deciding how to compile the above program, we need to know that
-the root node operation is addition and that it has two children:
-\texttt{read} and a negation. The abstract syntax tree data structure
-directly supports these queries and hence is a good choice. In this
-book, we will often write down the textual representation of a program
-even when we really have in mind the AST because the textual
-representation is more concise.  We recommend that, in your mind, you
-always interpret programs as abstract syntax trees.
+To build larger S-expressions one often needs to splice together
+several smaller S-expressions. Racket provides the comma operator to
+splice an S-expression into a larger one. For example, instead of
+creating the S-expression for AST \eqref{eq:arith-prog} all at once,
+we could have first created an S-expression for AST
+\eqref{eq:arith-neg8} and then spliced that into the addition
+S-expression.
+\begin{lstlisting}
+   (define ast1.4 `(- 8))
+   (define ast1.1 `(+ (read) ,ast1.4))
+\end{lstlisting}
+In general, the Racket expression that follows the comma (splice)
+can be any expression that computes an S-expression.
+
+
+When deciding how to compile program \eqref{eq:arith-prog}, we need to
+know that the operation associated with the root node is addition and
+that it has two children: \texttt{read} and a negation. The AST data
+structure directly supports these queries, as we shall see in
+Section~\ref{sec:pattern-matching}, and hence is a good choice for use
+in compilers. In this book, we will often write down the S-expression
+representation of a program even when we really have in mind the AST
+because the S-expression is more concise.  We recommend that, in your
+mind, you always think of programs as abstract syntax trees.
 
 \section{Grammars}
 \label{sec:grammar}
@@ -431,8 +458,8 @@ language with a grammar, we implicitly mean for the language to be the
 smallest set of programs that are justified by the rules. That is, the
 language only includes those programs that the rules allow.
 
-The last grammar for $R_0$ states that there is a \key{program} node
-to mark the top of the whole program:
+The last grammar rule for $R_0$ states that there is a \key{program}
+node to mark the top of the whole program:
 \[
   R_0 ::= (\key{program} \; \Exp)
 \]
@@ -467,34 +494,8 @@ R_0  &::=& (\key{program} \; \Exp)
 \label{fig:r0-syntax}
 \end{figure}
 
-\section{S-Expressions}
-\label{sec:s-expr}
 
-Racket, as a descendant of Lisp, has
-convenient support for creating and manipulating abstract syntax trees
-with its \emph{symbolic expression} feature, or S-expression for
-short. We can create an S-expression simply by writing a backquote
-followed by the textual representation of the AST. (Technically
-speaking, this is called a \emph{quasiquote} in Racket.)  For example,
-an S-expression to represent the AST \eqref{eq:arith-prog} is created
-by the following Racket expression:
-\begin{center}
-\texttt{`(+ (read) (- 8))}
-\end{center}
 
-To build larger S-expressions one often needs to splice together
-several smaller S-expressions. Racket provides the comma operator to
-splice an S-expression into a larger one. For example, instead of
-creating the S-expression for AST \eqref{eq:arith-prog} all at once,
-we could have first created an S-expression for AST
-\eqref{eq:arith-neg8} and then spliced that into the addition
-S-expression.
-\begin{lstlisting}
-   (define ast1.4 `(- 8))
-   (define ast1.1 `(+ (read) ,ast1.4))
-\end{lstlisting}
-In general, the Racket expression that follows the comma (splice)
-can be any expression that computes an S-expression.
 
 \section{Pattern Matching}
 \label{sec:pattern-matching}
@@ -529,7 +530,7 @@ The \texttt{match} form takes AST \eqref{eq:arith-prog} and binds its
 parts to the three variables \texttt{op}, \texttt{child1}, and
 \texttt{child2}. In general, a match clause consists of a
 \emph{pattern} and a \emph{body}. The pattern is a quoted S-expression
-that may contain pattern-variables (preceded by a comma).
+that may contain pattern-variables (each one preceded by a comma).
 %
 The pattern is not the same thing as a quasiquote expression used to
 \emph{construct} ASTs, however, the similarity is intentional: constructing and
@@ -565,7 +566,8 @@ S-expression to see if it is a machine-representable integer.
 \end{minipage}
 \vrule
 \begin{minipage}{0.25\textwidth}
-\begin{lstlisting}
+  \begin{lstlisting}
+    
 
 
 
@@ -583,31 +585,34 @@ S-expression to see if it is a machine-representable integer.
 \section{Recursion}
 \label{sec:recursion}
 
-Programs are inherently recursive in that an $R_0$ $\Exp$ AST is made
-up of smaller expressions. Thus, the natural way to process in
+Programs are inherently recursive in that an $R_0$ expression ($\Exp$)
+is made up of smaller expressions. Thus, the natural way to process an
 entire program is with a recursive function.  As a first example of
-such a function, we define \texttt{R0?} below, which takes an
+such a function, we define \texttt{exp?} below, which takes an
 arbitrary S-expression, {\tt sexp}, and determines whether or not {\tt
-  sexp} is in {\tt arith}. Note that each match clause corresponds to
-one grammar rule for $R_0$ and the body of each clause makes a
+  sexp} is an $R_0$ expression. Note that each match clause
+corresponds to one grammar rule the body of each clause makes a
 recursive call for each child node. This pattern of recursive function
 is so common that it has a name, \emph{structural recursion}.  In
 general, when a recursive function is defined using a sequence of
 match clauses that correspond to a grammar, and each clause body makes
 a recursive call on each child node, then we say the function is
-defined by structural recursion.
+defined by structural recursion. Below we also define a second
+function, named \code{R0?}, determines whether an S-expression is an
+$R_0$ program.
 %
 \begin{center}
 \begin{minipage}{0.7\textwidth}
 \begin{lstlisting}
+(define (exp? sexp)
+  (match sexp
+    [(? fixnum?) #t]
+    [`(read) #t]
+    [`(- ,e) (exp? e)]
+    [`(+ ,e1 ,e2)
+     (and (exp? e1) (exp? e2))]))  
+
 (define (R0? sexp)
-  (define (exp? ex)
-    (match ex
-      [(? fixnum?) #t]
-      [`(read) #t]
-      [`(- ,e) (exp? e)]
-      [`(+ ,e1 ,e2)
-       (and (exp? e1) (exp? e2))]))  
   (match sexp
     [`(program ,e) (exp? e)]    
     [else #f]))
@@ -637,11 +642,11 @@ defined by structural recursion.
 
 Indeed, the structural recursion follows the grammar itself.  We can generally
 expect to write a recursive function to handle each non-terminal in the
-grammar\footnote{If you took the \emph{How to Design Programs} course
+grammar.\footnote{If you read the book \emph{How to Design Programs} 
   \url{http://www.ccs.neu.edu/home/matthias/HtDP2e/}, this principle of
   structuring code according to the data definition is probably quite familiar.}
 
-You may be tempted to write the program like this:
+You may be tempted to write the program with just one function, like this:
 \begin{center}
 \begin{minipage}{0.5\textwidth}
 \begin{lstlisting}
@@ -659,7 +664,7 @@ You may be tempted to write the program like this:
 %
 Sometimes such a trick will save a few lines of code, especially when it comes
 to the {\tt program} wrapper.  Yet this style is generally \emph{not}
-recommended, because it can get you into trouble.
+recommended because it can get you into trouble.
 %
 For instance, the above function is subtly wrong:
 \lstinline{(R0? `(program (program 3)))} will return true, when it
@@ -677,13 +682,13 @@ defined in the report by \cite{SPERBER:2009aa}. The Racket language is
 defined in its reference manual~\citep{plt-tr}. In this book we use an
 interpreter to define the meaning of each language that we consider,
 following Reynold's advice in this
-regard~\citep{reynolds72:_def_interp}. Here we will warm up by writing
-an interpreter for the $R_0$ language, which will also serve as a
-second example of structural recursion. The \texttt{interp-R0}
-function is defined in Figure~\ref{fig:interp-R0}. The body of the
-function is a match on the input program \texttt{p} and
-then a call to the \lstinline{exp} helper function, which in turn has 
-one match clause per grammar rule for $R_0$ expressions.
+regard~\citep{reynolds72:_def_interp}. Here we warm up by writing an
+interpreter for the $R_0$ language, which serves as a second example
+of structural recursion. The \texttt{interp-R0} function is defined in
+Figure~\ref{fig:interp-R0}. The body of the function is a match on the
+input program \texttt{p} and then a call to the \lstinline{exp} helper
+function, which in turn has one match clause per grammar rule for
+$R_0$ expressions.
 
 The \lstinline{exp} function is naturally recursive: clauses for internal AST
 nodes make recursive calls on each child node.  Note that the recursive cases
@@ -727,8 +732,8 @@ values, the \key{app} form can be convenient for binding the resulting values.
 \label{fig:interp-R0}
 \end{figure}
 
-Let us consider the result of interpreting some example $R_0$
-programs. The following program simply adds two integers.
+Let us consider the result of interpreting a few $R_0$ programs. The
+following program simply adds two integers.
 \begin{lstlisting}
    (+ 10 32)
 \end{lstlisting}
@@ -760,11 +765,11 @@ produces \key{42}.
 \begin{lstlisting}
    (+ (read) 32)
 \end{lstlisting}
-We include the \key{read} operation in $R_1$ so that a compiler for
-$R_1$ cannot be implemented simply by running the interpreter at
-compilation time to obtain the output and then generating the trivial
-code to return the output.
-(A clever did this in a previous version of the course.)
+We include the \key{read} operation in $R_1$ so a clever student
+cannot implement a compiler for $R_1$ simply by running the
+interpreter at compilation time to obtain the output and then
+generating the trivial code to return the output.  (A clever student
+did this in a previous version of the course.)
 
 The job of a compiler is to translate a program in one language into a
 program in another language so that the output program behaves the
