@@ -907,7 +907,7 @@ and then a description of x86 (Section~\ref{sec:x86}). The
 x86 assembly language is quite large, so we only discuss what is
 needed for compiling $R_1$. We introduce more of x86 in later
 chapters. Once we have introduced $R_1$ and x86, we reflect on
-their differences and come up with a plan breaking down the
+their differences and come up with a plan to break down the
 translation from $R_1$ to x86 into a handful of steps
 (Section~\ref{sec:plan-s0-x86}).  The rest of the sections in this
 Chapter give detailed hints regarding each step
@@ -924,15 +924,16 @@ The $R_1$ language extends the $R_0$ language
 the $R_1$ language is defined by the grammar in
 Figure~\ref{fig:r1-syntax}.  The non-terminal \Var{} may be any Racket
 identifier. As in $R_0$, \key{read} is a nullary operator, \key{-} is
-a unary operator, and \key{+} is a binary operator. In addition to
-variable definitions, the $R_1$ language includes the \key{program}
-form to mark the top of the program, which is helpful in some of the
-compiler passes.  The $R_1$ language is rich enough to exhibit several
-compilation techniques but simple enough so that the reader can
-implement a compiler for it in a week of part-time work.  To give the
-reader a feeling for the scale of this first compiler, the instructor
-solution for the $R_1$ compiler consists of 6 recursive functions and
-a few small helper functions that together span 256 lines of code.
+a unary operator, and \key{+} is a binary operator.  Similar to $R_0$,
+the $R_1$ language includes the \key{program} form to mark the top of
+the program, which is helpful in some of the compiler passes.  The
+$R_1$ language is rich enough to exhibit several compilation
+techniques but simple enough so that the reader, together with couple
+friends, can implement a compiler for it in a week or two of part-time
+work.  To give the reader a feeling for the scale of this first
+compiler, the instructor solution for the $R_1$ compiler consists of 6
+recursive functions and a few small helper functions that together
+span 256 lines of code.
 
 \begin{figure}[btp]
 \centering
@@ -951,10 +952,11 @@ R_1  &::=& (\key{program} \; \Exp)
 \label{fig:r1-syntax}
 \end{figure}
 
-The \key{let} construct defines a variable for use within its body
-and initializes the variable with the value of an expression.  So the
-following program initializes \code{x} to \code{32} and then evaluates
-the body \code{(+ 10 x)}, producing \code{42}.
+Let us dive into the description of the $R_1$ language.  The \key{let}
+construct defines a variable for use within its body and initializes
+the variable with the value of an expression.  So the following
+program initializes \code{x} to \code{32} and then evaluates the body
+\code{(+ 10 x)}, producing \code{42}.
 \begin{lstlisting}
    (program
       (let ([x (+ 12 20)]) (+ 10 x)))
@@ -1003,30 +1005,29 @@ to the variable, then evaluates the body of the \key{let}.
 \begin{figure}[tbp]
 \begin{lstlisting}
    (define (interp-R1 env)
-     (lambda (e)
-       (define recur (interp-R1 env))
-       (match e
-         [(? symbol?) (lookup e env)]
-         [`(let ([,x ,(app recur v)]) ,body)
-          (define new-env (cons (cons x v) env))
-          ((interp-R1 new-env) body)]
-         [(? fixnum?) e]
-         [`(read)
-          (define r (read))
-          (cond [(fixnum? r) r]
-                [else (error 'interp-R1 "expected an integer" r)])]
-         [`(- ,(app recur v))
-          (fx- 0 v)]
-         [`(+ ,(app recur v1) ,(app recur v2))
-          (fx+ v1 v2)]
-         [`(program ,e) ((interp-R1 '()) e)]
-         )))
+     (define (exp env)
+       (lambda (e)
+         (match e
+           [(? symbol?) (lookup e env)]
+           [`(let ([,x ,(app (exp env) v)]) ,body)
+            (define new-env (cons (cons x v) env))
+            ((exp new-env) body)]
+           [(? fixnum?) e]
+           [`(read)
+            (define r (read))
+            (cond [(fixnum? r) r]
+                  [else (error 'interp-R1 "expected an integer" r)])]
+           [`(- ,(app (exp env) v))
+            (fx- 0 v)]
+           [`(+ ,(app (exp env) v1) ,(app (exp env) v2))
+             (fx+ v1 v2)])))
+     (lambda (p)
+       (match p
+         [`(program ,e) ((exp '()) e)])))
 \end{lstlisting}
 \caption{Interpreter for the $R_1$ language.}
 \label{fig:interp-R1}
 \end{figure}
-
-
 
 The goal for this chapter is to implement a compiler that translates
 any program $P_1$ in the $R_1$ language into an x86 assembly
