@@ -337,9 +337,12 @@ by the following Racket expression:
 \begin{center}
 \texttt{`(+ (read) (- 8))}
 \end{center}
-The result is a list whose first element is the symbol \code{`+},
-second element is a list (containing just one symbol), and third
-element is another list (containing a symbol and a number).
+When using S-expressions to represent ASTs, the convention is to
+represent each AST node as a list and to put the operation symbol at
+the front of the list. The rest of the list contains the children.  So
+in the above case, the root AST node has operation \code{`+} and its
+two children are \code{`(read)} and \code{`(- 8)}, just as in the
+diagram \eqref{eq:arith-prog}.
 
 To build larger S-expressions one often needs to splice together
 several smaller S-expressions. Racket provides the comma operator to
@@ -640,11 +643,12 @@ $R_0$ program.
 \end{minipage}
 \end{center}
 
-Indeed, the structural recursion follows the grammar itself.  We can generally
-expect to write a recursive function to handle each non-terminal in the
-grammar.\footnote{If you read the book \emph{How to Design Programs} 
-  \url{http://www.ccs.neu.edu/home/matthias/HtDP2e/}, this principle of
-  structuring code according to the data definition is probably quite familiar.}
+Indeed, the structural recursion follows the grammar itself.  We can
+generally expect to write a recursive function to handle each
+non-terminal in the grammar.\footnote{This principle of structuring
+  code according to the data definition is advocated in the book
+  \emph{How to Design Programs}
+  \url{http://www.ccs.neu.edu/home/matthias/HtDP2e/}.}
 
 You may be tempted to write the program with just one function, like this:
 \begin{center}
@@ -686,49 +690,27 @@ regard~\citep{reynolds72:_def_interp}. Here we warm up by writing an
 interpreter for the $R_0$ language, which serves as a second example
 of structural recursion. The \texttt{interp-R0} function is defined in
 Figure~\ref{fig:interp-R0}. The body of the function is a match on the
-input program \texttt{p} and then a call to the \lstinline{exp} helper
-function, which in turn has one match clause per grammar rule for
-$R_0$ expressions.
-
-The \lstinline{exp} function is naturally recursive: clauses for internal AST
-nodes make recursive calls on each child node.  Note that the recursive cases
-for negation and addition are a place where we could have made use of the
-\key{app} feature of Racket's \key{match} to apply a function and bind the
-result.  The two recursive cases of \lstinline{interp-R0} would become:
-
-\begin{minipage}{0.5\textwidth}
-\begin{lstlisting}
-     [`(- ,(app exp v))  (fx- 0 v)]
-     [`(+ ,(app exp v1) ,(app exp v2)) (fx+ v1 v2)]))
-\end{lstlisting}
-\end{minipage}
-
-Here we use \lstinline{(app exp v)} to recursively apply \texttt{exp} to the
-child node and bind the \emph{result value} to variable \texttt{v}.  The
-difference between this version and the code in Figure~\ref{fig:interp-R0} is
-mainly stylistic, although if side effects are involved the order of evaluation
-can become important.  Further, when we write functions with multiple return
-values, the \key{app} form can be convenient for binding the resulting values.
+input program \texttt{p} and then a call to the \lstinline{interp-exp}
+helper function, which in turn has one match clause per grammar rule
+for $R_0$ expressions.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
+   (define (interp-exp e)
+     (match e
+       [(? fixnum?) e]
+       [`(read)
+        (let ([r (read)])
+          (cond [(fixnum? r) r]
+                [else (error 'interp-R0 "input not an integer" r)]))]
+       [`(- ,e1)     (fx- 0 (interp-exp e1))]
+       [`(+ ,e1 ,e2) (fx+ (interp-exp e1) (interp-exp e2))]))
+
    (define (interp-R0 p)
-     (define (exp ex)
-       (match ex
-         [(? fixnum?) ex]
-         [`(read)
-          (let ([r (read)])
-            (cond [(fixnum? r) r]
-                  [else (error 'interp-R0 "input not an integer" r)]))]
-         [`(- ,e)        (fx- 0 (exp e))]
-         [`(+ ,e1 ,e2) (fx+ (exp e1) (exp e2))]))
      (match p
-       [`(program ,e) (exp e)]))
+       [`(program ,e) (interp-exp e)]))
 \end{lstlisting}
-\caption{Interpreter for the $R_0$ language.
-  \rn{Having two functions here for prog/exp wouldn't take much more space.
-    I'll change that once I get further.. but I also need to know what the story
-   is for running this code?}}
+\caption{Interpreter for the $R_0$ language.}
 \label{fig:interp-R0}
 \end{figure}
 
@@ -748,9 +730,29 @@ each other, in this case nesting several additions and negations.
 \end{lstlisting}
 What is the result of the above program?
 
+As mentioned previously, the $R0$ language does not support
+arbitrarily-large integers, but only $63$-bit integers, so we
+interpret the arithmetic operations of $R0$ using fixnum arithmetic.
+What happens when we run the following program?
+\begin{lstlisting}
+   (define large 999999999999999999)
+   (interp-R0 `(program (+ (+ (+ ,large ,large) (+ ,large ,large))
+                           (+ (+ ,large ,large) (+ ,large ,large)))))
+\end{lstlisting}
+It produces an error:
+\begin{lstlisting}
+   fx+: result is not a fixnum
+\end{lstlisting}
+We shall use the convention that if the interpreter for a language
+produces an error when run on a program, then the meaning of the
+program is unspecified. The compiler for the language is under no
+obligation for such a program; it can produce an executable that does
+anything.
+
 \noindent
-If we interpret the AST \eqref{eq:arith-prog} and give it the input
-\texttt{50}
+Moving on, the \key{read} operation prompts the user of the program
+for an integer. If we interpret the AST \eqref{eq:arith-prog} and give
+it the input \texttt{50}
 \begin{lstlisting}
    (interp-R0 ast1.1)
 \end{lstlisting}
@@ -758,15 +760,8 @@ we get the answer to life, the universe, and everything:
 \begin{lstlisting}
    42
 \end{lstlisting}
-
-Moving on, the \key{read} operation prompts the user of the program
-for an integer. Given an input of \key{10}, the following program
-produces \key{42}.
-\begin{lstlisting}
-   (+ (read) 32)
-\end{lstlisting}
-We include the \key{read} operation in $R_1$ so a clever student
-cannot implement a compiler for $R_1$ simply by running the
+We include the \key{read} operation in $R_0$ so a clever student
+cannot implement a compiler for $R_0$ simply by running the
 interpreter at compilation time to obtain the output and then
 generating the trivial code to return the output.  (A clever student
 did this in a previous version of the course.)
@@ -844,6 +839,17 @@ partially evaluating the children nodes.
 \caption{A partial evaluator for $R_0$ expressions.}
 \label{fig:pe-arith}
 \end{figure}
+
+Note that in the recursive cases in \code{pe-arith} for negation and
+addition, we have made use of the \key{app} feature of Racket's
+\key{match} to apply a function and bind the result.  Here we use
+\lstinline{(app pe-arith r1)} to recursively apply \texttt{pe-arith}
+to the child node and bind the \emph{result value} to variable
+\texttt{r1}.  The choice of whether to use \key{app} is mainly
+stylistic, although if side effects are involved the change in order
+of evaluation may be in issue.  Further, when we write functions with
+multiple return values, the \key{app} form can be convenient for
+binding the resulting values.
 
 Our code for \texttt{pe-neg} and \texttt{pe-add} implements the simple
 idea of checking whether the inputs are integers and if they are, to
@@ -1004,26 +1010,27 @@ to the variable, then evaluates the body of the \key{let}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
+   (define (interp-exp env)
+     (lambda (e)
+       (match e
+         [(? symbol?) (lookup e env)]
+         [`(let ([,x ,(app (interp-exp env) v)]) ,body)
+          (define new-env (cons (cons x v) env))
+          ((interp-exp new-env) body)]
+         [(? fixnum?) e]
+         [`(read)
+          (define r (read))
+          (cond [(fixnum? r) r]
+                [else (error 'interp-R1 "expected an integer" r)])]
+         [`(- ,(app (interp-exp env) v))
+          (fx- 0 v)]
+         [`(+ ,(app (interp-exp env) v1) ,(app (interp-exp env) v2))
+           (fx+ v1 v2)])))
+           
    (define (interp-R1 env)
-     (define (exp env)
-       (lambda (e)
-         (match e
-           [(? symbol?) (lookup e env)]
-           [`(let ([,x ,(app (exp env) v)]) ,body)
-            (define new-env (cons (cons x v) env))
-            ((exp new-env) body)]
-           [(? fixnum?) e]
-           [`(read)
-            (define r (read))
-            (cond [(fixnum? r) r]
-                  [else (error 'interp-R1 "expected an integer" r)])]
-           [`(- ,(app (exp env) v))
-            (fx- 0 v)]
-           [`(+ ,(app (exp env) v1) ,(app (exp env) v2))
-             (fx+ v1 v2)])))
      (lambda (p)
        (match p
-         [`(program ,e) ((exp '()) e)])))
+         [`(program ,e) ((interp-exp '()) e)])))
 \end{lstlisting}
 \caption{Interpreter for the $R_1$ language.}
 \label{fig:interp-R1}
@@ -1397,7 +1404,7 @@ $C_0$.
 Each of these steps in the compiler is implemented by a function,
 typically a structurally recursive function that translates an input
 AST into an output AST. We refer to such a function as a \emph{pass}
-because it makes a pass over, i.e. it traverses the entire AST.
+because it makes a pass over, i.e. it traverses, the entire AST.
 
 The syntax for $C_0$ is defined in Figure~\ref{fig:c0-syntax}.  The
 $C_0$ language supports the same operators as $R_1$ but the arguments
@@ -1428,23 +1435,24 @@ C_0 & ::= & (\key{program}\;(\Var^{*})\;\Stmt^{+})
 \label{fig:c0-syntax}
 \end{figure}
 
-To get from $C_0$ to x86 assembly it remains for us to handle
+To get from $C_0$ to x86 assembly, it remains for us to handle
 difference \#1 (the format of instructions) and difference \#3
-(variables versus registers). These two differences are intertwined,
-creating a bit of a Gordian Knot. To handle difference \#3, we need to
-map some variables to registers (there are only 16 registers) and the
-remaining variables to locations on the stack (which is unbounded). To
-make good decisions regarding this mapping, we need the program to be
-close to its final form (in x86 assembly) so we know exactly when
-which variables are used. After all, variables that are used in
-disjoint parts of the program can be assigned to the same register.
-However, our choice of x86 instructions depends on whether the
-variables are mapped to registers or stack locations, so we have a
-circular dependency. We cut this knot by doing an optimistic selection
-of instructions in the \key{select-instructions} pass, followed by the
-\key{assign-homes} pass to map variables to registers or stack
-locations, and conclude by finalizing the instruction selection in the
-\key{patch-instructions} pass.
+(variables versus stack locations and registers). These two
+differences are intertwined, creating a bit of a Gordian Knot. To
+handle difference \#3, we need to map some variables to registers
+(there are only 16 registers) and the remaining variables to locations
+on the stack (which is unbounded). To make good decisions regarding
+this mapping, we need the program to be close to its final form (in
+x86 assembly) so we know exactly when which variables are used. After
+all, variables that are used at different time periods during program
+execution can be assigned to the same register.  However, our choice
+of x86 instructions depends on whether the variables are mapped to
+registers or stack locations, so we have a circular dependency. We cut
+this knot by doing an optimistic selection of instructions in the
+\key{select-instructions} pass, followed by the \key{assign-homes}
+pass to map variables to registers or stack locations, and conclude by
+finalizing the instruction selection in the \key{patch-instructions}
+pass.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (1) at (0,0)  {\large $C_0$};
