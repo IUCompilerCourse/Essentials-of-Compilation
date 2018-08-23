@@ -3156,52 +3156,61 @@ the order of evaluation of its arguments.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-    (define primitives (set '+ '- 'eq? '< '<= '> '>= 'not 'read))
+   (define primitives (set '+ '- 'eq? '< '<= '> '>= 'not 'read))
 
-    (define (interp-op op)
-      (match op
-         ['+ fx+]
-         ['- (lambda (n) (fx- 0 n))]
-         ['not (lambda (v) (match v [#t #f] [#f #t]))]
-	 ['read read-fixnum]
-         ['eq? (lambda (v1 v2)
-                 (cond [(or (and (fixnum? v1) (fixnum? v2))
-                            (and (boolean? v1) (boolean? v2))
-                            (and (vector? v1) (vector? v2)))
-                        (eq? v1 v2)]))]
-         ['< (lambda (v1 v2)
-                 (cond [(and (fixnum? v1) (fixnum? v2))
-                        (< v1 v2)]))]
-         ['<= (lambda (v1 v2)
-                 (cond [(and (fixnum? v1) (fixnum? v2))
-                        (<= v1 v2)]))]
-         ['> (lambda (v1 v2)
-                 (cond [(and (fixnum? v1) (fixnum? v2))
-                        (<= v1 v2)]))]
-         ['>= (lambda (v1 v2)
-                 (cond [(and (fixnum? v1) (fixnum? v2))
-                        (<= v1 v2)]))]
-	 [else (error 'interp-op "unknown operator")]))
+   (define (interp-op op)
+     (match op
+       ...
+       ['not (lambda (v) (match v [#t #f] [#f #t]))]
+       ['eq? (lambda (v1 v2)
+               (cond [(or (and (fixnum? v1) (fixnum? v2))
+                          (and (boolean? v1) (boolean? v2))
+                          (and (vector? v1) (vector? v2)))
+                      (eq? v1 v2)]))]
+       ['< (lambda (v1 v2)
+             (cond [(and (fixnum? v1) (fixnum? v2))
+                    (< v1 v2)]))]
+       ['<= (lambda (v1 v2)
+              (cond [(and (fixnum? v1) (fixnum? v2))
+                     (<= v1 v2)]))]
+       ['> (lambda (v1 v2)
+             (cond [(and (fixnum? v1) (fixnum? v2))
+                    (> v1 v2)]))]
+       ['>= (lambda (v1 v2)
+              (cond [(and (fixnum? v1) (fixnum? v2))
+                     (>= v1 v2)]))]
+       [else (error 'interp-op "unknown operator")]
+       ))
 
-   (define (interp-R2 env)
+   (define (interp-exp env)
      (lambda (e)
-       (define recur (interp-R2 env))
+       (define recur (interp-exp env))
        (match e
          ...
          [(? boolean?) e]
          [`(if ,(app recur cnd) ,thn ,els)
           (match cnd
-            [#t (recur thn)]
-            [#f (recur els)])]
+                 [#t (recur thn)]
+                 [#f (recur els)])]
          [`(not ,(app recur v))
           (match v [#t #f] [#f #t])]
          [`(and ,(app recur v1) ,e2)
-           (match v1
-             [#t (match (recur e2) [#t #t] [#f #f])]
-             [#f #f])]
+          (match v1
+                 [#t (match (recur e2) [#t #t] [#f #f])]
+                 [#f #f])]
+         [`(has-type ,(app recur v) ,t)
+          v]
          [`(,op ,(app recur args) ...)
-           #:when (set-member? primitives op)
-           (apply (interp-op op) args)]
+          #:when (set-member? primitives op)
+          (apply (interp-op op) args)]
+         )))
+
+   (define (interp-R2 env)
+     (lambda (p)
+       (match p
+         [`(program ,e) ((interp-exp '()) e)]
+         ;; the following variant is needed after type checking
+         [`(program ,xs ,e) ((interp-exp '()) e)]
          )))
 \end{lstlisting}
 \caption{Interpreter for the $R_2$ language.}
@@ -5184,25 +5193,35 @@ Figure~\ref{fig:interp-R4}.
 
 \begin{figure}[tp]
 \begin{lstlisting}
-   (define (interp-R4 env)
-     (lambda (e)
-       (match e
-          ....
-          [`(define (,f [,xs : ,ps] ...) : ,rt ,body)
-           (cons f `(lambda ,xs ,body))]
-          [`(program ,ds ... ,body)
-           (let ([top-level (map  (interp-R4 '()) ds)])
-	      ((interp-R4 top-level) body))]
-          [`(,fun ,args ...)
-	    (define arg-vals (map (interp-R4 env) args))
-            (define fun-val ((interp-R4 env) fun))
-            (match fun-val
-               [`(lambda (,xs ...) ,body)
-                 (define new-env (append (map cons xs arg-vals) env))
- 		 ((interp-R4 new-env) body)]
-               [else (error "interp-R4, expected function, not" fun-val)]))]
-         [else (error 'interp-R4 "unrecognized expression")]
-         )))
+(define (interp-exp env)
+  (lambda (e)
+    (define recur (interp-exp env))
+    (match e
+      ...
+      [`(,fun ,args ...)
+       (define arg-vals (map (interp-exp env) args))
+       (define fun-val ((interp-exp env) fun))
+       (match fun-val
+	 [`(lambda (,xs ...) ,body)
+	  (define new-env (append (map cons xs arg-vals) env))
+	  ((interp-exp new-env) body)]
+	 [else (error "interp-exp, expected function, not" fun-val)])]
+      [else (error 'interp-exp "unrecognized expression")]
+      )))
+
+(define (interp-def env)
+  (lambda (d)
+    (match d
+      [`(define (,f [,xs : ,ps] ...) : ,rt ,body)
+       (cons f `(lambda ,xs ,body))]
+      )))
+
+(define (interp-R4 env)
+  (lambda (p)
+    (match p
+      [`(program ,ds ... ,body)
+       (let ([top-level (map  (interp-def '()) ds)])
+	 ((interp-exp top-level) body))])))
 \end{lstlisting}
 \caption{Interpreter for the $R_4$ language.}
 \label{fig:interp-R4}
@@ -5833,30 +5852,34 @@ top-level environment.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
+(define (interp-exp env)
+  (lambda (e)
+    (define recur (interp-exp env))
+    (match e
+      ...
+      [`(lambda: ([,xs : ,Ts] ...) : ,rT ,body)
+       `(lambda ,xs ,body ,env)]
+      [else (error 'interp-exp "unrecognized expression")]
+      )))
+
+(define (interp-def env)
+  (lambda (d)
+    (match d
+      [`(define (,f [,xs : ,ps] ...) : ,rt ,body)
+       (mcons f `(lambda ,xs ,body))]
+      )))
+
 (define (interp-R5 env)
-  (lambda (ast)
-    (match ast
-       ...
-       [`(lambda: ([,xs : ,Ts] ...) : ,rT ,body)
-        `(lambda ,xs ,body ,env)]
-       [`(define (,f [,xs : ,ps] ...) : ,rt ,body)
-        (mcons f `(lambda ,xs ,body))]
-       [`(program ,defs ... ,body)
-        (let ([top-level (map (interp-R5 '()) defs)])
-          (for/list ([b top-level])
-                    (set-mcdr! b (match (mcdr b)
-                                    [`(lambda ,xs ,body)
-                                     `(lambda ,xs ,body ,top-level)])))
-          ((interp-R5 top-level) body))]
-       [`(,fun ,args ...)
-        (define arg-vals (map (interp-R5 env) args))
-        (define fun-val ((interp-R5 env) fun))
-        (match fun-val
-           [`(lambda (,xs ...) ,body ,lam-env)
-            (define new-env (append (map cons xs arg-vals) lam-env))
-            ((interp-R5 new-env) body)]
-           [else (error "interp-R5, expected function, not" fun-val)])]
-       )))
+  (lambda (p)
+    (match p
+      [`(program ,defs ... ,body)
+       (let ([top-level (map (interp-def '()) defs)])
+	 (for/list ([b top-level])
+		   (set-mcdr! b (match (mcdr b)
+				  [`(lambda ,xs ,body)
+				   `(lambda ,xs ,body ,top-level)])))
+	 ((interp-exp top-level) body))]
+      )))
 \end{lstlisting}
 \caption{Interpreter for $R_5$.}
 \label{fig:interp-R5}
