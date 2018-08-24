@@ -2102,6 +2102,35 @@ that is assigned to a stack location, it has been \emph{spilled}. The
 process of spilling variables is handled as part of the graph coloring
 process described in \ref{sec:graph-coloring}.
 
+\section{Registers and Calling Conventions}
+\label{sec:calling-conventions}
+
+As we perform register allocation, we will need to be aware of the
+conventions that govern the way in which registers interact with
+function calls. The convention for x86 is that the caller is
+responsible for freeing up some registers, the \emph{caller save
+  registers}, prior to the function call, and the callee is
+responsible for saving and restoring some other registers, the
+\emph{callee save registers}, before and after using them. The caller
+save registers are
+\begin{lstlisting}
+  rax rdx rcx rsi rdi r8 r9 r10 r11
+\end{lstlisting}
+while the callee save registers are
+\begin{lstlisting}
+  rsp rbp rbx r12 r13 r14 r15
+\end{lstlisting}
+Another way to think about this caller/callee convention is the
+following. The caller should assume that all the caller save registers
+get overwritten with arbitrary values by the callee.  On the other
+hand, the caller can safely assume that all the callee save registers
+contain the same values after the call that they did before the call.
+The callee can freely use any of the caller save registers.  However,
+if the callee wants to use a callee save register, the callee must
+arrange to put the original value back in the register prior to
+returning to the caller, which is usually accomplished by saving and
+restoring the value from the stack.
+
 
 \section{Liveness Analysis}
 \label{sec:liveness-analysis}
@@ -2770,44 +2799,21 @@ with their assigned location.
 \label{sec:print-x86-reg-alloc}
 
 Recall the the \code{print-x86} pass generates the prelude and
-conclusion instructions for the \code{main} function.  The prelude
-saved the values in \code{rbp} and \code{rsp} and the conclusion
-returned those values to \code{rbp} and \code{rsp}. The reason for
-this is that there are agreed-upon conventions for how different
-functions share the same fixed set of registers. There is a function
-inside the operating system (OS) that calls our \code{main} function,
-and that OS function uses the same registers that we use in
-\code{main}. The convention for x86 is that the caller is responsible
-for freeing up some registers, the \emph{caller save registers}, prior
-to the function call, and the callee is responsible for saving and
-restoring some other registers, the \emph{callee save registers},
-before and after using them. The caller save registers are
-\begin{lstlisting}
-  rax rdx rcx rsi rdi r8 r9 r10 r11
-\end{lstlisting}
-while the callee save registers are
-\begin{lstlisting}
-  rsp rbp rbx r12 r13 r14 r15
-\end{lstlisting}
-Another way to think about this caller/callee convention is the
-following. The caller should assume that all the caller save registers
-get overwritten with arbitrary values by the callee.  On the other
-hand, the caller can safely assume that all the callee save registers
-contain the same values after the call that they did before the call.
-The callee can freely use any of the caller save registers.  However,
-if the callee wants to use a callee save register, the callee must
-arrange to put the original value back in the register prior to
-returning to the caller, which is usually accomplished by saving and
-restoring the value from the stack.
-
-The upshot of these conventions is that the \code{main} function needs
-to save (in the prelude) and restore (in the conclusion) any callee
-save registers that get used during register allocation. The simplest
-approach is to save and restore all the callee save registers. The
+conclusion instructions for the \code{main} function.
+%
+The prelude saved the values in \code{rbp} and \code{rsp} and the
+conclusion returned those values to \code{rbp} and \code{rsp}.  The
+reason for this is that our \code{main} function must adhere to the
+x86 calling conventions that we described in
+Section~\ref{sec:calling-conventions}. In addition, the \code{main}
+function needs and restore (in the conclusion) any callee save
+registers that get used during register allocation. The simplest
+approach is to save and restore all of the callee save registers. The
 more efficient approach is to keep track of which callee save
 registers were used and only save and restore them. Either way, make
-sure to take this use of stack space into account when you round up
-the size of the frame to make sure it is a multiple of 16 bytes.
+sure to take this use of stack space into account when you are
+calculating the size of the frame. Also, don't forget that the size of
+the frame needs to be a multiple of 16 bytes.
 
 \section{Challenge: Move Biasing$^{*}$}
 \label{sec:move-biasing}
