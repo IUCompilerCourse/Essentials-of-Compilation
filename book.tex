@@ -1196,25 +1196,28 @@ _main:
 	...
 \end{lstlisting}
 
-The next example exhibits the use of memory.  Figure~\ref{fig:p1-x86}
-lists an x86 program that is equivalent to $\BINOP{+}{52}{
-  \UNIOP{-}{10} }$. To understand how this x86 program works, we
-need to explain a region of memory called the \emph{procedure call
-  stack} (or \emph{stack} for short). The stack consists of a separate
-\emph{frame} for each procedure call. The memory layout for an
-individual frame is shown in Figure~\ref{fig:frame}.  The register
-\key{rsp} is called the \emph{stack pointer} and points to the item at
-the top of the stack. The stack grows downward in memory, so we
-increase the size of the stack by subtracting from the stack
-pointer. The frame size is required to be a multiple of 16 bytes. The
-register \key{rbp} is the \emph{base pointer} which serves two
-purposes: 1) it saves the location of the stack pointer for the
-procedure that called the current one and 2) it is used to access
-variables associated with the current procedure. We number the
-variables from $1$ to $n$. Variable $1$ is stored at address
-$-8\key{(\%rbp)}$, variable $2$ at $-16\key{(\%rbp)}$, etc.
+We exhibit the use of memory for storing intermediate results in the
+next example.  Figure~\ref{fig:p1-x86} lists an x86 program that is
+equivalent to $\BINOP{+}{52}{ \UNIOP{-}{10} }$. This program uses a
+region of memory called the \emph{procedure call stack} (or
+\emph{stack} for short). The stack consists of a separate \emph{frame}
+for each procedure call. The memory layout for an individual frame is
+shown in Figure~\ref{fig:frame}.  The register \key{rsp} is called the
+\emph{stack pointer} and points to the item at the top of the
+stack. The stack grows downward in memory, so we increase the size of
+the stack by subtracting from the stack pointer. The frame size is
+required to be a multiple of 16 bytes. In the context of a procedure
+call, the \emph{return address} is the next instruction on the caller
+side that comes after the call instruction. During a function call,
+the return address is pushed onto the stack.  The register \key{rbp}
+is the \emph{base pointer} which serves two purposes: 1) it saves the
+location of the stack pointer for the calling procedure and 2) it is
+used to access variables associated with the current procedure.  The
+base pointer of the calling procedure is pushed onto the stack after
+the return address. We number the variables from $1$ to $n$. Variable
+$1$ is stored at address $-8\key{(\%rbp)}$, variable $2$ at
+$-16\key{(\%rbp)}$, etc.
 
-%\begin{wrapfigure}{r}{2.1in}
 \begin{figure}[tbp]
 \begin{lstlisting}
 	.globl main
@@ -1238,7 +1241,6 @@ main:
 \caption{An x86 program equivalent to $\BINOP{+}{52}{\UNIOP{-}{10} }$.}
 \label{fig:p1-x86}
 \end{figure}
-%\end{wrapfigure}
 
 
 \begin{figure}[tbp]
@@ -1286,16 +1288,18 @@ that was subtracted in the prelude of the procedure. The \key{movq
   \$0, \%rax} instruction ensures that the returned exit code is 0.
 Then \key{popq \%rbp} returns the old base pointer to \key{rbp} and
 adds $8$ to the stack pointer.  The \key{retq} instruction jumps back
-to the procedure that called this one and subtracts 8 from the stack
-pointer.
+to the procedure that called this one and adds 8 to the stack pointer,
+returning the stack pointer to where it was prior to the procedure
+call.
 
 The compiler will need a convenient representation for manipulating
 x86 programs, so we define an abstract syntax for x86 in
 Figure~\ref{fig:x86-ast-a}. The $\Int$ field of the \key{program} AST
-node is number of bytes of stack space needed for variables in the
-program. (Some of the intermediate languages will store other
-information in that location for the purposes of communicating
-auxiliary data from one step of the compiler to the next. )
+node records the number of bytes of stack space needed for variables
+in the program. (Some of the intermediate languages will store other
+information in that part of the S-expression for the purposes of
+communicating auxiliary data from one step of the compiler to the
+next. )
 
 \begin{figure}[tp]
 \fbox{
