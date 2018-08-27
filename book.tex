@@ -2787,7 +2787,7 @@ Implement the pass \code{allocate-registers} and test it by creating
 new example programs that exercise all of the register allocation
 algorithm, such as forcing variables to be spilled to the stack.
 
-I recommend organizing our code by creating a helper function named
+We recommend that you create a helper function named
 \code{color-graph} that takes an interference graph and a list of all
 the variables in the program. This function should return a mapping of
 variables to their colors. By creating this helper function, we will
@@ -2803,7 +2803,7 @@ with their assigned location.
 \section{Print x86 and Conventions for Registers}
 \label{sec:print-x86-reg-alloc}
 
-Recall the the \code{print-x86} pass generates the prelude and
+Recall the \code{print-x86} pass generates the prelude and
 conclusion instructions for the \code{main} function.
 %
 The prelude saved the values in \code{rbp} and \code{rsp} and the
@@ -3185,19 +3185,14 @@ the order of evaluation of its arguments.
                           (and (vector? v1) (vector? v2)))
                       (eq? v1 v2)]))]
        ['< (lambda (v1 v2)
-             (cond [(and (fixnum? v1) (fixnum? v2))
-                    (< v1 v2)]))]
+             (cond [(and (fixnum? v1) (fixnum? v2)) (< v1 v2)]))]
        ['<= (lambda (v1 v2)
-              (cond [(and (fixnum? v1) (fixnum? v2))
-                     (<= v1 v2)]))]
+              (cond [(and (fixnum? v1) (fixnum? v2)) (<= v1 v2)]))]
        ['> (lambda (v1 v2)
-             (cond [(and (fixnum? v1) (fixnum? v2))
-                    (> v1 v2)]))]
+             (cond [(and (fixnum? v1) (fixnum? v2)) (> v1 v2)]))]
        ['>= (lambda (v1 v2)
-              (cond [(and (fixnum? v1) (fixnum? v2))
-                     (>= v1 v2)]))]
-       [else (error 'interp-op "unknown operator")]
-       ))
+              (cond [(and (fixnum? v1) (fixnum? v2)) (>= v1 v2)]))]
+       [else (error 'interp-op "unknown operator")]))
 
    (define (interp-exp env)
      (lambda (e)
@@ -3207,28 +3202,23 @@ the order of evaluation of its arguments.
          [(? boolean?) e]
          [`(if ,(app recur cnd) ,thn ,els)
           (match cnd
-                 [#t (recur thn)]
-                 [#f (recur els)])]
-         [`(not ,(app recur v))
-          (match v [#t #f] [#f #t])]
+            [#t (recur thn)]
+            [#f (recur els)])]
+         [`(not ,(app recur v)) (match v [#t #f] [#f #t])]
          [`(and ,(app recur v1) ,e2)
           (match v1
-                 [#t (match (recur e2) [#t #t] [#f #f])]
-                 [#f #f])]
-         [`(has-type ,(app recur v) ,t)
-          v]
+            [#t (match (recur e2) [#t #t] [#f #f])]
+            [#f #f])]
+         [`(has-type ,(app recur v) ,t) v]
          [`(,op ,(app recur args) ...)
           #:when (set-member? primitives op)
-          (apply (interp-op op) args)]
-         )))
+          (apply (interp-op op) args)])))
 
    (define (interp-R2 env)
      (lambda (p)
        (match p
-         [`(program ,e) ((interp-exp '()) e)]
-         ;; the following variant is needed after type checking
-         [`(program ,xs ,e) ((interp-exp '()) e)]
-         )))
+        [(or `(program ,_ ,e) `(program ,e))
+         ((interp-exp '()) e)])))
 \end{lstlisting}
 \caption{Interpreter for the $R_2$ language.}
 \label{fig:interp-R2}
@@ -3279,9 +3269,9 @@ association list.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-   (define (typecheck-R2 env)
+   (define (type-check-exp env)
      (lambda (e)
-       (define recur (typecheck-R2 env e))
+       (define recur (type-check-exp env))
        (match e
          [(? fixnum?)  'Integer]
          [(? boolean?) 'Boolean]
@@ -3289,15 +3279,20 @@ association list.
          [`(read)      'Integer]
          [`(let ([,x ,(app recur T)]) ,body)
           (define new-env (cons (cons x T) env))
-          (typecheck-R2 new-env body)]
+          (type-check-exp new-env body)]
          ...
-         [`(not ,(app (typecheck-R2 env) T))
+         [`(not ,(app recur T))
           (match T
             ['Boolean 'Boolean]
-            [else (error 'typecheck-R2 "'not' expects a Boolean" e)])]
+            [else (error 'type-check-exp "'not' expects a Boolean" e)])]
          ...
+         )))
+
+   (define (type-check-R2 env)
+     (lambda (e)
+       (match e
          [`(program ,body)
-          (define ty ((typecheck-R2 '()) body))
+          (define ty ((type-check-exp '()) body))
           `(program (type ,ty) ,body)]
          )))
 \end{lstlisting}
@@ -3345,10 +3340,11 @@ we need to grow that intermediate language to handle the new features
 in $R_2$. Figure~\ref{fig:c1-syntax} shows the new features of $C_1$;
 we add logic and comparison operators to the $\Exp$ non-terminal, the
 literals \key{\#t} and \key{\#f} to the $\Arg$ non-terminal, and we
-add an \key{if} statement. The \key{if} statement of $C_1$ includes an
-\key{eq?} test, which is needed for improving code generation in
-Section~\ref{sec:opt-if}.  We do not include \key{and} in $C_1$
-because it is not needed in the translation of the \key{and} of $R_2$.
+add an \key{if} statement. The \key{if} statement of $C_1$ includes a
+built-in comparison (unlike the $C$ language), which is needed for
+improving code generation in Section~\ref{sec:opt-if}.  We do not
+include \key{and} in $C_1$ because it is not needed in the translation
+of the \key{and} of $R_2$.
 
 \begin{figure}[tp]
 \fbox{
@@ -3476,7 +3472,7 @@ running the output programs with \code{interp-C}
 
 To implement the new logical operations, the comparison operations,
 and the \key{if} statement, we need to delve further into the x86
-language. Figure~\ref{fig:x86-2} defines the abstract syntax for a
+language. Figure~\ref{fig:x86-1} defines the abstract syntax for a
 larger subset of x86 that includes instructions for logical
 operations, comparisons, and jumps.
 
