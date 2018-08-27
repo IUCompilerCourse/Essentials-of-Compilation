@@ -3682,7 +3682,7 @@ storing that data in the \key{if} statement AST as follows:
 
 If you wrote helper functions for computing the variables in an
 instruction's argument and for computing the variables read-from ($R$)
-or written-to ($W$) by an instruction, you need to be update them to
+or written-to ($W$) by an instruction, you need to update them to
 handle the new kinds of arguments and instructions in x86$_1$.
 
 \subsection{Build Interference}
@@ -3763,10 +3763,10 @@ your previously created programs on the \code{interp-x86} interpreter
 
 \section{Patch Instructions}
 
-There are no special restrictions on the instructions \key{jmp-if},
-\key{jmp}, and \key{label}, but there is an unusual restriction on
-\key{cmpq}. The second argument is not allowed to be an immediate
-value (such as a literal integer). If you are comparing two
+There are no special restrictions on the x86 instructions
+\key{jmp-if}, \key{jmp}, and \key{label}, but there is an unusual
+restriction on \key{cmpq}. The second argument is not allowed to be an
+immediate value (such as a literal integer). If you are comparing two
 immediates, you must insert another \key{movq} instruction to put the
 second argument in \key{rax}.
 
@@ -4187,45 +4187,45 @@ flattening).
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(define (typecheck-R3 env)
+(define (type-check-exp env)
   (lambda (e)
+    (define recur (type-check-exp env))
     (match e
       ...
       ['(void) (values '(has-type (void) Void) 'Void)]
-      [`(vector ,(app (type-check env) e* t*) ...)
+      [`(vector ,(app recur e* t*) ...)
        (let ([t `(Vector ,@t*)])
          (values `(has-type (vector ,@e*) ,t) t))]
-      [`(vector-ref ,(app (type-check env) e t) ,i)
+      [`(vector-ref ,(app recur e t) ,i)
        (match t
          [`(Vector ,ts ...)
           (unless (and (exact-nonnegative-integer? i)
                        (i . < . (length ts)))
-                  (error 'type-check "invalid index ~a" i))
+                  (error 'type-check-exp "invalid index ~a" i))
           (let ([t (list-ref ts i)])
             (values `(has-type (vector-ref ,e (has-type ,i Integer)) ,t)
                     t))]
          [else (error "expected a vector in vector-ref, not" t)])]
-      [`(vector-set! ,(app (type-check env) e-vec^ t-vec) ,i
-                     ,(app (type-check env) e-arg^ t-arg))
+      [`(vector-set! ,(app recur e-vec t-vec) ,i
+                     ,(app recur e-arg t-arg))
        (match t-vec
          [`(Vector ,ts ...)
           (unless (and (exact-nonnegative-integer? i)
                        (i . < . (length ts)))
-            (error 'type-check "invalid index ~a" i))
+            (error 'type-check-exp "invalid index ~a" i))
           (unless (equal? (list-ref ts i) t-arg)
-            (error 'type-check "type mismatch in vector-set! ~a ~a"
+            (error 'type-check-exp "type mismatch in vector-set! ~a ~a"
                    (list-ref ts i) t-arg))
-          (values `(has-type (vector-set! ,e-vec^
+          (values `(has-type (vector-set! ,e-vec
                                           (has-type ,i Integer)
-                                          ,e-arg^) Void) 'Void)]
-         [else (error 'type-check
+                                          ,e-arg) Void) 'Void)]
+         [else (error 'type-check-exp
                       "expected a vector in vector-set!, not ~a" t-vec)])]
-      [`(eq? ,(app (type-check env) e1 t1)
-              ,(app (type-check env) e2 t2))
+      [`(eq? ,(app recur e1 t1) ,(app recur e2 t2))
        (match* (t1 t2)
          [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))
           (values `(has-type (eq? ,e1 ,e2) Boolean) 'Boolean)]
-         [(other wise) ((super type-check env) e)])]
+         [(other wise) ((super type-check-exp env) e)])]
       )))
 \end{lstlisting}
 \caption{Type checker for the $R_3$ language.}
@@ -6242,8 +6242,8 @@ The type checker for $R_6$ is given in Figure~\ref{fig:typecheck-R6}.
              (error 'type-check "invalid index ~a" i))
            (values `(vector-ref ,e ,i) t)]
           [else (error "expected a vector in vector-ref, not" t)])]
-       [`(vector-set! ,(app recur e-vec^ t-vec) ,i
-                       ,(app recur e-arg^ t-arg))
+       [`(vector-set! ,(app recur e-vec t-vec) ,i
+                       ,(app recur e-arg t-arg))
         (match t-vec
           [`(Vector ,ts ...) ...]
           [`(Vectorof ,t)
@@ -6252,9 +6252,7 @@ The type checker for $R_6$ is given in Figure~\ref{fig:typecheck-R6}.
            (unless (equal? t t-arg)
              (error 'type-check "type mismatch in vector-set! ~a ~a"
                     t t-arg))
-           (values `(vector-set! ,e-vec^
-                                           ,i
-                                           ,e-arg^) 'Void)]
+           (values `(vector-set! ,e-vec ,i ,e-arg) 'Void)]
           [else (error 'type-check
                        "expected a vector in vector-set!, not ~a"
                        t-vec)])]
@@ -6838,10 +6836,10 @@ registers.
 \texttt{popq} $A$ & $*\mathtt{rsp} \to A; \mathtt{rsp} + 8 \to \mathtt{rsp}$ \\
 \texttt{pushq} $A$ & $\texttt{rsp} - 8 \to \texttt{rsp}; A \to *\texttt{rsp}$\\
 \texttt{leaq} $A$,$B$ & $A \to B$ ($C$ must be a register) \\
-\texttt{cmpq} $A$, $B$ & compare $A$ and $B$ and set flag \\
-\texttt{je} $L$ & \multirow{5}{3.7in}{Jump to label $L$ if the flag matches
-   the condition code, otherwise go to the next instructions.
-  The condition codes are \key{e} for ``equal'',
+\texttt{cmpq} $A$, $B$ & compare $A$ and $B$ and set the flag register \\
+\texttt{je} $L$ & \multirow{5}{3.7in}{Jump to label $L$ if the flag register
+  matches the condition code of the instruction, otherwise go to the
+  next instructions. The condition codes are \key{e} for ``equal'',
   \key{l} for ``less'', \key{le} for ``less or equal'', \key{g}
   for ``greater'', and \key{ge} for ``greater or equal''.} \\
 \texttt{jl} $L$ & \\
