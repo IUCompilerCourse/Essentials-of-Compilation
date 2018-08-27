@@ -1421,15 +1421,18 @@ because it makes a pass over, i.e. it traverses, the entire AST.
 
 The syntax for $C_0$ is defined in Figure~\ref{fig:c0-syntax}.  The
 $C_0$ language supports the same operators as $R_1$ but the arguments
-of operators are now restricted to just variables and integers. The
-\key{let} construct of $R_1$ is replaced by an assignment statement
-and there is a \key{return} construct to specify the return value of
-the program. A program consists of a sequence of statements that
-include at least one \key{return} statement. Each program is also
-annotated with a list of variables (viz. {\tt (var*)}). At the start
-of the program, these variables are uninitialized (they contain garbage)
-and each variable becomes initialized on its first assignment. All of
-the variables used in the program must be present in this list exactly once.
+of operators are now restricted to just variables and integers, so all
+intermediate results are bound to variables. In the literature this
+style of intermediate language is called administrative normal form,
+or ANF for short~\citep{Danvy:1991fk,Flanagan:1993cg}.  The \key{let}
+construct of $R_1$ is replaced by an assignment statement and there is
+a \key{return} construct to specify the return value of the program. A
+program consists of a sequence of statements that include at least one
+\key{return} statement. Each program is also annotated with a list of
+variables (viz. {\tt (var*)}). At the start of the program, these
+variables are uninitialized (they contain garbage) and each variable
+becomes initialized on its first assignment. All of the variables used
+in the program must be present in this list exactly once.
 
 \begin{figure}[tp]
 \fbox{
@@ -1593,16 +1596,21 @@ implement the clauses for variables and for the \key{let} construct.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-   (define (uniquify alist)
+   (define (uniquify-exp alist)
      (lambda (e)
        (match e
          [(? symbol?) ___]
          [(? integer?) e]
          [`(let ([,x ,e]) ,body) ___]
-         [`(program ,e)
-          `(program ,((uniquify alist) e))]
          [`(,op ,es ...)
-          `(,op ,@(map (uniquify alist) es))]
+          `(,op ,@(map (uniquify-exp alist) es))]
+         )))
+
+   (define (uniquify alist)
+     (lambda (e)
+       (match e
+         [`(program ,e)
+          `(program ,((uniquify-exp alist) e))]
          )))
 \end{lstlisting}
 \caption{Skeleton for the \key{uniquify} pass.}
