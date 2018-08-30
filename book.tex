@@ -2280,22 +2280,30 @@ which two variables that are live at the same time do not actually
 interfere with each other: when they both contain the same value
 because we have assigned one to the other.
 
-A better way to compute the interference graph is given by the
-following.
+A better way to compute the interference graph is to focus on the
+writes. That is, for each instruction, create an edge between the
+variable being written to and all the \emph{other} live variables.
+(One should not create self edges.) For a \key{callq} instruction,
+think of all caller-save registers as being written to, so and edge
+must be added between every live variable and every caller-save
+register. For \key{movq}, we deal with the above-mentioned special
+case by not adding an edge between a live variable $v$ and destination
+$d$ if $v$ matches the source of the move. So we have the following
+three rules.
 
-\begin{itemize}
-\item If instruction $I_k$ is a move: (\key{movq} $s$\, $d$), then add
-  the edge $(d,v)$ for every $v \in L_{\mathsf{after}}(k)$ unless $v =
-  d$ or $v = s$.
-
-\item If instruction $I_k$ is not a move but some other arithmetic
-  instruction such as (\key{addq} $s$\, $d$), then add the edge $(d,v)$
-  for every $v \in L_{\mathsf{after}}(k)$ unless $v = d$.
+\begin{enumerate}
+\item If instruction $I_k$ is an arithmetic instruction such as
+  (\key{addq} $s$\, $d$), then add the edge $(d,v)$ for every $v \in
+  L_{\mathsf{after}}(k)$ unless $v = d$.
 
 \item If instruction $I_k$ is of the form (\key{callq}
   $\mathit{label}$), then add an edge $(r,v)$ for every caller-save
   register $r$ and every variable $v \in L_{\mathsf{after}}(k)$.
-\end{itemize}
+
+\item If instruction $I_k$ is a move: (\key{movq} $s$\, $d$), then add
+  the edge $(d,v)$ for every $v \in L_{\mathsf{after}}(k)$ unless $v =
+  d$ or $v = s$.
+\end{enumerate}
 \margincomment{JM: I think you could give examples of each one of these
   using the example program and use those to help explain why these
   rules are correct.\\
@@ -2391,9 +2399,9 @@ We now come to the main event, mapping variables to registers (or to
 stack locations in the event that we run out of registers).  We need
 to make sure not to map two variables to the same register if the two
 variables interfere with each other.  In terms of the interference
-graph, this means we cannot map adjacent nodes to the same register.
-If we think of registers as colors, the register allocation problem
-becomes the widely-studied graph coloring
+graph, this means that adjacent vertices must be mapped to different
+registers.  If we think of registers as colors, the register
+allocation problem becomes the widely-studied graph coloring
 problem~\citep{Balakrishnan:1996ve,Rosen:2002bh}.
 
 The reader may be more familiar with the graph coloring problem then he
@@ -2401,16 +2409,16 @@ or she realizes; the popular game of Sudoku is an instance of the
 graph coloring problem. The following describes how to build a graph
 out of an initial Sudoku board.
 \begin{itemize}
-\item There is one node in the graph for each Sudoku square.
-\item There is an edge between two nodes if the corresponding squares
+\item There is one vertex in the graph for each Sudoku square.
+\item There is an edge between two vertices if the corresponding squares
   are in the same row, in the same column, or if the squares are in
   the same $3\times 3$ region.
 \item Choose nine colors to correspond to the numbers $1$ to $9$.
 \item Based on the initial assignment of numbers to squares in the
   Sudoku board, assign the corresponding colors to the corresponding
-  nodes in the graph.
+  vertices in the graph.
 \end{itemize}
-If you can color the remaining nodes in the graph with the nine
+If you can color the remaining vertices in the graph with the nine
 colors, then you have also solved the corresponding game of Sudoku.
 Figure~\ref{fig:sudoku-graph} shows an initial Sudoku game board and
 the corresponding graph with colored vertices.  We map the Sudoku
@@ -2440,13 +2448,13 @@ the search tree.
 
 The Pencil Marks technique corresponds to the notion of color
 \emph{saturation} due to \cite{Brelaz:1979eu}.  The saturation of a
-node, in Sudoku terms, is the set of colors that are no longer
+vertex, in Sudoku terms, is the set of colors that are no longer
 available. In graph terminology, we have the following definition:
 \begin{equation*}
   \mathrm{saturation}(u) = \{ c \;|\; \exists v. v \in \mathrm{adjacent}(u)
      \text{ and } \mathrm{color}(v) = c \}
 \end{equation*}
-where $\mathrm{adjacent}(u)$ is the set of nodes adjacent to $u$.
+where $\mathrm{adjacent}(u)$ is the set of vertices adjacent to $u$.
 
 Using the Pencil Marks technique leads to a simple strategy for
 filling in numbers: if there is a square with only one possible number
@@ -2457,7 +2465,7 @@ not, backtrack to the guess and make a different guess.  Of course,
 backtracking can be horribly time consuming. One standard way to
 reduce the amount of backtracking is to use the most-constrained-first
 heuristic. That is, when making a guess, always choose a square with
-the fewest possibilities left (the node with the highest saturation).
+the fewest possibilities left (the vertex with the highest saturation).
 The idea is that choosing highly constrained squares earlier rather
 than later is better because later there may not be any possibilities.
 
@@ -2482,11 +2490,11 @@ and the rest of the integers corresponding to stack locations.
 \begin{lstlisting}[basicstyle=\rmfamily,deletekeywords={for,from,with,is,not,in,find},morekeywords={while},columns=fullflexible]
 Algorithm: DSATUR
 Input: a graph |$G$|
-Output: an assignment |$\mathrm{color}[v]$| for each node |$v \in G$|
+Output: an assignment |$\mathrm{color}[v]$| for each vertex |$v \in G$|
 
 |$W \gets \mathit{vertices}(G)$|
 while |$W \neq \emptyset$| do
-    pick a node |$u$| from |$W$| with the highest saturation,
+    pick a vertex |$u$| from |$W$| with the highest saturation,
         breaking ties randomly
     find the lowest color |$c$| that is not in |$\{ \mathrm{color}[v] \;:\; v \in \mathrm{adjacent}(u)\}$|
     |$\mathrm{color}[u] \gets c$|
@@ -2500,7 +2508,7 @@ With this algorithm in hand, let us return to the running example and
 consider how to color the interference graph in
 Figure~\ref{fig:interfere}. We shall not use register \key{rax} for
 register allocation because we use it to patch instructions, so we
-remove that vertex from the graph.  Initially, all of the nodes are
+remove that vertex from the graph.  Initially, all of the vertices are
 not yet colored and they are unsaturated, so we annotate each of them
 with a dash for their color and an empty set for the saturation.
 \[
@@ -2527,7 +2535,7 @@ with a dash for their color and an empty set for the saturation.
 \draw (t2) to (t1);
 \end{tikzpicture}
 \]
-We select a maximally saturated node and color it $0$. In this case we
+We select a maximally saturated vertex and color it $0$. In this case we
 have a 7-way tie, so we arbitrarily pick $y$. The then mark color $0$
 as no longer available for $w$, $x$, and $z$ because they interfere
 with $y$.
@@ -2554,7 +2562,7 @@ with $y$.
 \draw (t2) to (t1);
 \end{tikzpicture}
 \]
-Now we repeat the process, selecting another maximally saturated node.
+Now we repeat the process, selecting another maximally saturated vertex.
 This time there is a three-way tie between $w$, $x$, and $z$. We color
 $w$ with $1$.
 \[
@@ -2580,7 +2588,7 @@ $w$ with $1$.
 \draw (z) to (y);
 \end{tikzpicture}
 \]
-The most saturated nodes are now $x$ and $z$. We color $x$ with the
+The most saturated vertices are now $x$ and $z$. We color $x$ with the
 next available color which is $2$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
@@ -2605,7 +2613,7 @@ next available color which is $2$.
 \draw (z) to (y);
 \end{tikzpicture}
 \]
-Node $z$ is the next most highly saturated, so we color $z$ with $2$.
+Vertex $z$ is the next most highly saturated, so we color $z$ with $2$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (v) at (0,0)   {$v:-,\{1\}$};
