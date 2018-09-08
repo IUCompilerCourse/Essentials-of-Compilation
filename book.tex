@@ -2115,25 +2115,25 @@ process described in \ref{sec:graph-coloring}.
 As we perform register allocation, we will need to be aware of the
 conventions that govern the way in which registers interact with
 function calls. The convention for x86 is that the caller is
-responsible for freeing up some registers, the \emph{caller save
+responsible for freeing up some registers, the \emph{caller-saved
   registers}, prior to the function call, and the callee is
 responsible for saving and restoring some other registers, the
-\emph{callee save registers}, before and after using them. The caller
-save registers are
+\emph{callee-saved registers}, before and after using them. The
+caller-saved registers are
 \begin{lstlisting}
   rax rdx rcx rsi rdi r8 r9 r10 r11
 \end{lstlisting}
-while the callee save registers are
+while the callee-saved registers are
 \begin{lstlisting}
   rsp rbp rbx r12 r13 r14 r15
 \end{lstlisting}
 Another way to think about this caller/callee convention is the
-following. The caller should assume that all the caller save registers
+following. The caller should assume that all the caller-saved registers
 get overwritten with arbitrary values by the callee.  On the other
-hand, the caller can safely assume that all the callee save registers
+hand, the caller can safely assume that all the callee-saved registers
 contain the same values after the call that they did before the call.
-The callee can freely use any of the caller save registers.  However,
-if the callee wants to use a callee save register, the callee must
+The callee can freely use any of the caller-saved registers.  However,
+if the callee wants to use a callee-saved register, the callee must
 arrange to put the original value back in the register prior to
 returning to the caller, which is usually accomplished by saving and
 restoring the value from the stack.
@@ -2285,8 +2285,8 @@ A better way to compute the interference graph is to focus on the
 writes. That is, for each instruction, create an edge between the
 variable being written to and all the \emph{other} live variables.
 (One should not create self edges.) For a \key{callq} instruction,
-think of all caller-save registers as being written to, so and edge
-must be added between every live variable and every caller-save
+think of all caller-saved registers as being written to, so and edge
+must be added between every live variable and every caller-saved
 register. For \key{movq}, we deal with the above-mentioned special
 case by not adding an edge between a live variable $v$ and destination
 $d$ if $v$ matches the source of the move. So we have the following
@@ -2298,7 +2298,7 @@ three rules.
   L_{\mathsf{after}}(k)$ unless $v = d$.
 
 \item If instruction $I_k$ is of the form (\key{callq}
-  $\mathit{label}$), then add an edge $(r,v)$ for every caller-save
+  $\mathit{label}$), then add an edge $(r,v)$ for every caller-saved
   register $r$ and every variable $v \in L_{\mathsf{after}}(k)$.
 
 \item If instruction $I_k$ is a move: (\key{movq} $s$\, $d$), then add
@@ -2821,10 +2821,10 @@ conclusion returned those values to \code{rbp} and \code{rsp}.  The
 reason for this is that our \code{main} function must adhere to the
 x86 calling conventions that we described in
 Section~\ref{sec:calling-conventions}. In addition, the \code{main}
-function needs and restore (in the conclusion) any callee save
+function needs and restore (in the conclusion) any callee-saved
 registers that get used during register allocation. The simplest
-approach is to save and restore all of the callee save registers. The
-more efficient approach is to keep track of which callee save
+approach is to save and restore all of the callee-saved registers. The
+more efficient approach is to keep track of which callee-saved
 registers were used and only save and restore them. Either way, make
 sure to take this use of stack space into account when you are
 calculating the size of the frame. Also, don't forget that the size of
@@ -4929,8 +4929,8 @@ to make sure that:
 
 The later responsibility can be handled during construction of the
 inference graph, by adding interference edges between the call-live
-vector-typed variables and all the callee-save registers. (They
-already interfere with the caller-save registers.)  The type
+vector-typed variables and all the callee-saved registers. (They
+already interfere with the caller-saved registers.)  The type
 information for variables is in the \code{program} form, so we
 recommend adding another parameter to the \code{build-interference}
 function to communicate this association list.
@@ -5254,7 +5254,7 @@ Figure~\ref{fig:interp-R4}.
 \section{Functions in x86}
 \label{sec:fun-x86}
 
-\margincomment{\tiny Make sure callee save registers are discussed
+\margincomment{\tiny Make sure callee-saved registers are discussed
    in enough depth, especially updating Fig 6.4 \\ --Jeremy }
 
 \margincomment{\tiny Talk about the return address on the
@@ -5294,12 +5294,12 @@ paragraphs. The register \code{rax} is for the return value of the
 function.
 
 Recall from Section~\ref{sec:x86} that the stack is also used for
-local variables and for storing the values of callee-save registers
+local variables and for storing the values of callee-saved registers
 (we shall refer to all of these collectively as ``locals''), and that
 at the beginning of a function we move the stack pointer \code{rsp}
 down to make room for them.
 %% We recommend storing the local variables
-%% first and then the callee-save registers, so that the local variables
+%% first and then the callee-saved registers, so that the local variables
 %% can be accessed using \code{rbp} the same as before the addition of
 %% functions.
 To make additional room for passing arguments, we shall
@@ -5323,14 +5323,14 @@ local variables will smash into each other!
 
 As discussed in Section~\ref{sec:print-x86-reg-alloc}, an x86 function
 is responsible for following conventions regarding the use of
-registers: the caller should assume that all the caller save registers
-get overwritten with arbitrary values by the callee. Thus, the caller
-should either 1) not put values that are live across a call in caller
-save registers, or 2) save and restore values that are live across
-calls. We shall recommend option 1).  On the flip side, if the callee
-wants to use a callee save register, the callee must arrange to put
-the original value back in the register prior to returning to the
-caller.
+registers: the caller should assume that all the caller-saved
+registers get overwritten with arbitrary values by the callee. Thus,
+the caller should either 1) not put values that are live across a call
+in caller-saved registers, or 2) save and restore values that are live
+across calls. We shall recommend option 1).  On the flip side, if the
+callee wants to use a callee-saved register, the callee must arrange
+to put the original value back in the register prior to returning to
+the caller.
 
 
 \begin{figure}[tbp]
@@ -5577,11 +5577,11 @@ The rest of the passes need only minor modifications to handle the new
 kinds of AST nodes: \code{function-ref}, \code{indirect-callq}, and
 \code{leaq}. Inside \code{uncover-live}, when computing the $W$ set
 (written variables) for an \code{indirect-callq} instruction, I
-recommend including all the caller save registers, which will have the
-affect of making sure that no caller save register actually needs to be
-saved. In \code{patch-instructions}, you should deal with the x86
-idiosyncrasy that the destination argument of \code{leaq} must be a
-register.
+recommend including all the caller-saved registers, which will have
+the affect of making sure that no caller-saved register actually needs
+to be saved. In \code{patch-instructions}, you should deal with the
+x86 idiosyncrasy that the destination argument of \code{leaq} must be
+a register.
 
 For the \code{print-x86} pass, I recommend the following translations:
 \begin{lstlisting}
@@ -5589,7 +5589,7 @@ For the \code{print-x86} pass, I recommend the following translations:
   (indirect-callq |\itm{arg}|) |$\Rightarrow$| callq *|\itm{arg}|
 \end{lstlisting}
 For function definitions, the \code{print-x86} pass should add the
-code for saving and restoring the callee save registers, if you
+code for saving and restoring the callee-saved registers, if you
 haven't already done that.
 
 \section{An Example Translation}
