@@ -3982,30 +3982,32 @@ applying the above suggested optimizations.
 \begin{lstlisting}
 (program
   (if (let ([x 1])
-        (not (eq? 2 x)))
-    42
-    777))
+        (not (eq? x (read))))
+    777
+    42))
 \end{lstlisting}
 $\Downarrow$
 \begin{lstlisting}
-(program (x.1 t.1 if.1)
+(program (x.1 if.2 tmp.3)
+  (type Integer)
   (assign x.1 1)
-  (assign t.1 (read))
-  (if (eq? x.1 t.1)
-    ((assign if.1 42))
-    ((assign if.1 777)))
-  (return if.1))
+  (assign tmp.3 (read))
+  (if (eq? x.1 tmp.3)
+    ((assign if.2 42))
+    ((assign if.2 777)))
+  (return if.2))
 \end{lstlisting}
 $\Downarrow$
 \begin{lstlisting}
-(program (x.1 t.1 if.1)
+(program (x.1 if.2 tmp.3)
+  (type Integer)
   (movq (int 1) (var x.1))
   (callq read_int)
-  (movq (reg rax) (var t.1))
-  (if (eq? (var x.1) (var t.1))
-    ((movq (int 42) (var if.1)))
-    ((movq (int 777) (var if.1))))
-  (movq (var if.1) (reg rax)))
+  (movq (reg rax) (var tmp.3))
+  (if (eq? (var x.1) (var tmp.3))
+    ((movq (int 42) (var if.2)))
+    ((movq (int 777) (var if.2))))
+  (movq (var if.2) (reg rax)))
 \end{lstlisting}
 \end{minipage}
 &
@@ -4016,32 +4018,32 @@ $\Rightarrow$
 _main:
 	pushq	%rbp
 	movq	%rsp, %rbp
-	pushq	%r15
-	pushq	%r14
 	pushq	%r13
+	pushq	%r14
 	pushq	%r12
 	pushq	%rbx
-	subq	$8, %rsp
+	subq	$0, %rsp
+
 	movq	$1, %rbx
 	callq	_read_int
 	movq	%rax, %rcx
-	cmpq	%rbx, %rcx
-	je then21288
-	movq	$777, %r12
-	jmp if_end21289
-then21288:
-	movq	$42, %r12
-if_end21289:
-	movq	%r12, %rax
+	cmpq	%rcx, %rbx
+	je then35989
+	movq	$777, %rbx
+	jmp if_end35990
+then35989:
+	movq	$42, %rbx
+if_end35990:
+	movq	%rbx, %rax
+
 	movq	%rax, %rdi
 	callq	_print_int
 	movq	$0, %rax
-	addq	$8, %rsp
+	addq	$0, %rsp
 	popq	%rbx
 	popq	%r12
-	popq	%r13
 	popq	%r14
-	popq	%r15
+	popq	%r13
 	popq	%rbp
 	retq
 \end{lstlisting}
