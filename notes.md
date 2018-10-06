@@ -11,80 +11,57 @@ Revising the architecture to better match Dybvig's P523 compiler
 
 R2:
 
-	e ::= x | n | #t | #f | (op e*) | (let ([x e]) e) | (if e e e)
-	R2 ::= (program e)
+    exp ::= x | n | #t | #f | (op exp*) | (let ([x exp]) exp) | (if exp exp exp)
+    R2 ::= (program exp)
 
-normalize-context (where is this needed? perhaps not thanks to type system?)
-|
-V
-
-    v ::= x | n | #t | #f | (op v*) | (let ([x v]) v) | (if p v v) 
-	p ::= #t | #f | (pred-op v*) | (let ([x v]) p) | (if p p p)
-	R2' ::= (program v)
-    
-uncover-locals and remove-let
-|
-V
-
-    v ::= x | n | #t | #f | (if p v v) | (val-op v*) (begin f* v)
-	f ::= (set! x v) | (if p f f) | (begin f* f)
-	p ::= #t | #f | (if p p p) | (pred-op v*) | (begin f* p)
-	UIL ::= (program (x*) v)
-
-  Note: Dybvig doesn't allow variables in p, instead converts them:
-  
-    x
-	=>
-	(if (eq? x #f) #f #t)
-
-flatten-args (remove-complex-opera*)
+flatten (uncover-locals, remove-let, remove-complex-opera*)
 |
 V
 
     arg ::= x | n | #t | #f
-    v ::= x | n | #t | #f | (if p v v) | (val-op arg*) (begin f* v)
-	f ::= (set! x v) | (if p f f) | (begin f* f)
-	p ::= x | #t | #f | (if p p p) | (pred-op arg*) | (begin f* p)
-	UIL' ::= (program (x*) v)
+    exp ::= arg | (if exp exp exp) | (op arg*) | (begin stmt* exp)
+    stmt ::= (set! x exp) | (if exp stmt stmt) | (begin stmt* stmt)
+    C2 ::= (program (x*) stmt)
 
-select-instr
+select-instructions
 |
 V
 
-    arg ::= (var x) | (int n)
-    instr ::= (addq arg arg) | ...
-	f ::= instr | (if p f f) | (begin f* f)
-	p ::= x | #t | #f | (if p p p) | (pred-op arg*) | (begin f* p)
-    pseudo-x86 :: (program (x*) f)
+    arg ::= x | n | #t | #f
+    exp ::= arg | (if exp exp exp) | (op arg*) | (begin stmt* exp)
+    stmt ::= instr | (if exp stmt stmt) | (begin stmt* stmt)
+    iarg ::= (var x) | (int n)
+    instr ::= (addq iarg iarg) | ...
+    pseudo-x86 :: (program (x*) stmt)
 
 uncover-live, build-interference, allocate-registers
 |
 V
 
-    arg ::= (reg r) | (int n)
-    instr ::= (addq arg arg) | ...
-	f ::= instr | (if p f f) | (begin f* f)
-	p ::= x | #t | #f | (if p p p) | (pred-op arg*) | (begin f* p)
-    pseudo-x86 ::= (program (x*) f)
+    arg ::= x | n | #t | #f
+    exp ::= arg | (if exp exp exp) | (op arg*) | (begin stmt* exp)
+    stmt ::= instr | (if exp stmt stmt) | (begin stmt* stmt)
+    iarg ::= (reg r) | (deref r n) | (int n)
+    instr ::= (addq iarg iarg) | ...
+    pseudo-x86 :: (program (x*) stmt)
 
-expose-basic-blocks
+expose-basic-blocks (create-cfg)
 |
 V
 
-    f ::= instr
-	t ::= (jump label) | (if (pre-op arg*) label label) | (begin f* t)
-    cfg-x86 ::= (program ([label t]*) t)
-
-
-
+    stmt ::= (jump label) | (if (pre-op arg*) label label) | (begin instr* stmt)
+    cfg-x86 ::= (program ([label . stmt]*) stmt)
 
 optimize-jumps
 |
 V
 
+    stmt ::= (jump label) | (if (pre-op arg*) label label) | (begin instr* stmt)
+    cfg-x86 ::= (program ([label . stmt]*) stmt)
 
 print-x86
-
+|
+V
 
 
 
