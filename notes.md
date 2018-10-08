@@ -67,7 +67,7 @@ V
 	p ::= x | #t | #f | (if p p p) | (pred-op arg*) | (begin f* p)
     pseudo-x86 ::= (program (x*) f)
 
-expose-basic-blocks
+expose-basic-blocks (convert-to-cfg)
 |
 V
 
