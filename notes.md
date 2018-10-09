@@ -9,83 +9,138 @@ Revising the architecture to better match Dybvig's P523 compiler
 
 * to do: insert type checking
 
+
+R1:
+    exp ::= x | n | (op exp*) | (let ([x exp]) exp)
+    R1 ::= (program exp)
+
+remove-complex-opera*
+|
+V
+
+    arg ::= x | n
+    exp ::= arg | (op arg*) | (let ([x exp]) exp)
+    R2 ::= (program exp)
+
+
+create-CFG (the graph is empty for this assignment)
+|
+V
+
+    arg ::= x | n
+    exp ::= arg | (op arg*)
+    stmt ::= (assign x exp)
+	tail ::= (return exp) | (stmt . tail)
+    CFG ::= (program tail)
+
+uncover-locals
+|
+V
+
+    arg ::= x | n
+    exp ::= arg | (op arg*)
+    stmt ::= (assign x exp)
+	tail ::= (return exp) | (stmt . tail)
+    CFG ::= (program (x ...) tail)
+    
+select-instructions
+|
+V
+
+    imm ::= (var x) | (deref r n) | (int n)
+    instr ::= (addq imm imm) | ...
+    x86-CFG ::= (program (x ...) instr ...)
+    
+
+assign-homes
+|
+V
+
+    imm ::= (reg r) | (deref r n) | (int n)
+    instr ::= (addq imm imm) | ...
+    x86 ::= (program stack-size instr ...)
+    
+patch-instructions
+|
+V
+
+    same grammar as above
+
+print-x86
+|
+V
+
+
+
+--------------------------------------------------------------------------------
+
 R2:
 
-	e ::= x | n | #t | #f | (op e*) | (let ([x e]) e) | (if e e e)
-	R2 ::= (program e)
+    exp ::= x | n | #t | #f | (op exp*) | (let ([x exp]) exp) | (if exp exp exp)
+    R2 ::= (program exp)
 
-normalize-context (where is this needed? perhaps not thanks to type system?)
+type-check
 |
 V
 
-    v ::= x | n | #t | #f | (op v*) | (let ([x v]) v) | (if p v v) 
-	p ::= #t | #f | (pred-op v*) | (let ([x v]) p) | (if p p p)
-	R2' ::= (program v)
-    
-uncover-locals and remove-let
-|
-V
+    exp ::= x | n | #t | #f | (op exp*) | (let ([x exp]) exp) | (if exp exp exp)
+    R2 ::= (program (type type) exp)
 
-    v ::= x | n | #t | #f | (if p v v) | (val-op v*) (begin f* v)
-	f ::= (set! x v) | (if p f f) | (begin f* f)
-	p ::= #t | #f | (if p p p) | (pred-op v*) | (begin f* p)
-	UIL ::= (program (x*) v)
-
-  Note: Dybvig doesn't allow variables in p, instead converts them:
-  
-    x
-	=>
-	(if (eq? x #f) #f #t)
-
-flatten-args (remove-complex-opera*)
+remove-complex-opera*
 |
 V
 
     arg ::= x | n | #t | #f
-    v ::= x | n | #t | #f | (if p v v) | (val-op arg*) (begin f* v)
-	f ::= (set! x v) | (if p f f) | (begin f* f)
-	p ::= x | #t | #f | (if p p p) | (pred-op arg*) | (begin f* p)
-	UIL' ::= (program (x*) v)
+    exp ::= arg | (op arg*) | (let ([x exp]) exp) | (if exp exp exp)
+    R2 ::= (program (type type) exp)
 
-select-instr
+create-CFG
 |
 V
 
-    arg ::= (var x) | (int n)
-    instr ::= (addq arg arg) | ...
-	f ::= instr | (if p f f) | (begin f* f)
-	p ::= x | #t | #f | (if p p p) | (pred-op arg*) | (begin f* p)
-    pseudo-x86 :: (program (x*) f)
-
-uncover-live, build-interference, allocate-registers
-|
-V
-
-    arg ::= (reg r) | (int n)
-    instr ::= (addq arg arg) | ...
-	f ::= instr | (if p f f) | (begin f* f)
-	p ::= x | #t | #f | (if p p p) | (pred-op arg*) | (begin f* p)
-    pseudo-x86 ::= (program (x*) f)
-
-expose-basic-blocks (convert-to-cfg)
-|
-V
-
-    f ::= instr
-	t ::= (jump label) | (if (pre-op arg*) label label) | (begin f* t)
-    cfg-x86 ::= (program ([label t]*) t)
-
-
-
+    arg ::= x | n | #t | #f
+    exp ::= arg | (op arg*)
+    tail ::= (jump label) | (if (rel-op exp*) label label) | (return exp)
+	         | (stmt . tail)
+    stmt ::= (assign x exp)
+    CFG ::= (program (type type) ([label . tail] ...) tail)
 
 optimize-jumps
 |
 V
 
+    same grammar as above
 
+uncover-locals
+|
+V
+
+    arg ::= x | n | #t | #f
+    exp ::= arg | (op arg*)
+    tail ::= (jump label) | (if (rel-op exp*) label label) | (return exp)
+	      | (stmt . tail)
+    stmt ::= (assign x exp)
+    CFG ::= (program (x*) (type type) ([label . tail] ...) tail)
+
+select-instructions
+|
+V
+
+    tail ::= (jmp label) | (jmp-if cc label label) | (retq) | (instr . tail)
+    imm ::= (var x) | (deref r n) | (int n)
+    instr ::= (addq imm imm) | ...
+    x86-CFG ::= (program (x ...) (type type) ([label . tail] ...) tail)
+
+uncover-live, build-interference, allocate-registers
+|
+V
+
+    tail ::= (jmp label) | (jmp-if cc label label) | (retq) | (instr . tail)
+    imm ::= (reg r) | (deref r n) | (int n)
+    instr ::= (addq imm imm) | ...
+    x86-CFG ::= (program (x ...) (type type) ([label . tail] ...) tail)
+    
 print-x86
-
-
-
-
+|
+V
 
