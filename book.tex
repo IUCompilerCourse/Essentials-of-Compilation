@@ -4150,7 +4150,7 @@ $40$, to which we add the $2$, the element at index $0$ of the
     (\key{vector-ref}\;\Exp\;\Int) \\
   &\mid& (\key{vector-set!}\;\Exp\;\Int\;\Exp)\\
   &\mid& (\key{void}) \\
-  R_3 &::=& (\key{program} \;(\key{type}\;\itm{type})\; \Exp)
+  R_3 &::=& (\key{program} \; \Exp)
 \end{array}
 \]
 \end{minipage}
@@ -5254,21 +5254,20 @@ that does what its name suggests. The program then applies
 The definitional interpreter for $R_4$ is in
 Figure~\ref{fig:interp-R4}.
 
-%% change to do backpatching -Jeremy 
 \begin{figure}[tp]
 \begin{lstlisting}
-(define (interp-exp env global-env)
+(define (interp-exp env)
   (lambda (e)
-    (define recur (interp-exp env global-env))
+    (define recur (interp-exp env))
     (match e
       ...
       [`(,fun ,args ...)
-       (define fun-val (recur fun))
        (define arg-vals (map recur args))
+       (define fun-val (recur fun))
        (match fun-val
-	 [`(lambda (,xs ...) ,body)
-	  (define new-env (append (map cons xs arg-vals) global-env))
-	  ((interp-exp new-env global-env) body)]
+	 [`(lambda (,xs ...) ,body ,fun-env)
+	  (define new-env (append (map cons xs arg-vals) fun-env))
+	  ((interp-exp new-env) body)]
 	 [else (error "interp-exp, expected function, not" fun-val)])]
       [else (error 'interp-exp "unrecognized expression")]
       )))
@@ -5276,14 +5275,19 @@ Figure~\ref{fig:interp-R4}.
 (define (interp-def d)
   (match d
     [`(define (,f [,xs : ,ps] ...) : ,rt ,body)
-     (cons f `(lambda ,xs ,body))]
+     (mcons f `(lambda ,xs ,body ()))]
     ))
 
 (define (interp-R4 p)
   (match p
     [`(program ,ds ... ,body)
      (let ([top-level (map interp-def ds)])
-       ((interp-exp top-level top-level) body))]
+       (for/list ([b top-level])
+         (set-mcdr! b
+                    (match (mcdr b)
+                      [`(lambda ,xs ,body ())
+                       `(lambda ,xs ,body ,top-level)])))
+       ((interp-exp top-level) body))]
     ))
 \end{lstlisting}
 \caption{Interpreter for the $R_4$ language.}
