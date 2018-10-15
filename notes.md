@@ -19,7 +19,7 @@ uniquify
 |
 V
 
-    exp ::= ...
+    exp ::= x | n | (op exp*) | (let ([x exp]) exp)
     R1 ::= (program () exp)
 
 remove-complex-opera*
@@ -28,8 +28,7 @@ V
 
     arg ::= x | n
     exp ::= arg | (op arg*) | (let ([x exp]) exp)
-    R2 ::= (program () exp)
-
+    R1' ::= (program () exp)
 
 create-CFG (the graph is empty for this assignment)
 |
@@ -57,15 +56,15 @@ V
 
     imm ::= (var x) | (deref r n) | (int n)
     instr ::= (addq imm imm) | ...
-    x86 ::= (program ((locals . x*)) instr ...)
-    
+    x86 ::= (program ((locals . x*)) instr*)
+
 assign-homes
 |
 V
 
     imm ::= (reg r) | (deref r n) | (int n)
     instr ::= (addq imm imm) | ...
-    x86 ::= (program ((stack-space . n)) instr ...)
+    x86 ::= (program ((stack-space . n)) instr*)
     
 patch-instructions
 |
@@ -137,17 +136,36 @@ V
 
     imm ::= (var x) | (deref r n) | (int n)
     instr ::= (addq imm imm) | ... | (jmp label) | (jmp-if cc label) | (retq) 
-    x86-CFG ::= (program ((locals . x*) (type . type) 
-                          (flow-graph . ((label . instr*)*))) instr*)
+    x86 ::= (program ((locals . x*) (type . type) 
+                      (flow-graph . ((label . instr*)*))) instr*)
 
-uncover-live, build-interference, allocate-registers
+uncover-live
+|
+V
+
+    imm ::= (var x) | (deref r n) | (int n)
+    instr ::= (addq imm imm) | (jmp label) | (jmp-if cc label) | (retq)
+	block ::= (block (lives ls*) instr*)
+    x86 ::= (program ((locals . x*) (type . type)
+                      (flow-graph . ([label . block]*))) block)
+
+build-interference
+|
+V
+
+    x86 ::= (program ((locals . x*) (type . type)
+                      (flow-graph . ([label . block]*))
+						  (conflicts . graph))
+					     block)
+
+allocate-registers
 |
 V
 
     imm ::= (reg r) | (deref r n) | (int n)
     instr ::= (addq imm imm) | ... | (jmp label) | (jmp-if cc label) | (retq)
-    x86-CFG ::= (program  ((locals . x*) (type . type) 
-                          (flow-graph . ((label . instr*)*))) instr*)
+    x86 ::= (program  ((locals . x*) (type . type) 
+                       (flow-graph . ((label . instr*)*))) instr*)
     
 print-x86
 |
