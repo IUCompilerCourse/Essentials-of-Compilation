@@ -1,13 +1,6 @@
 
 
-Revising the architecture to better match Dybvig's P523 compiler
-----------------------------------------------------------------
 
-* to do: figure out where to introduce the Tail context. It seems to
-  happen in Dybvig's A10, but that assignment doesn't say anything
-  about it.
-
-* to do: insert type checking
 
 --------------------------------------------------------------------------------
 R1:
@@ -20,7 +13,7 @@ uniquify
 V
 
     exp ::= x | n | (op exp*) | (let ([x exp]) exp)
-    R1 ::= (program () exp)
+    R1' ::= (program () exp)
 
 remove-complex-opera*
 |
@@ -55,13 +48,8 @@ select-instructions
 V
 
     imm ::= (var x) | (deref r n) | (int n)
-<<<<<<< HEAD
     instr ::= (addq imm imm) | (retq) | ...
-    x86-CFG ::= (program ((locals . x*)) instr*)
-=======
-    instr ::= (addq imm imm) | ...
     x86 ::= (program ((locals . x*)) instr*)
->>>>>>> 65d8b657cf3fb531ba65dfa5cf93c3318f5bafba
 
 assign-homes
 |
