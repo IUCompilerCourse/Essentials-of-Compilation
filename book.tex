@@ -5326,44 +5326,52 @@ with an asterisk.
    callq *%rbx
 \end{lstlisting}
 
-The x86 architecture does not directly support passing arguments to
-functions; instead we use a combination of registers and stack
-locations for passing arguments, following the conventions used by
-\code{gcc} as described by \cite{Matz:2013aa}. Up to six arguments may
-be passed in registers, using the registers \code{rdi}, \code{rsi},
+Because the x86 architecture does not have any direct support for
+passing arguments to functions, compiler implementers typically adopt
+a \emph{convention} to follow for how arguments are passed to
+functions. The convention for C compilers such as \code{gcc} (as
+described in \cite{Matz:2013aa}), uses a combination of registers and
+stack locations for passing arguments. Up to six arguments may be
+passed in registers, using the registers \code{rdi}, \code{rsi},
 \code{rdx}, \code{rcx}, \code{r8}, and \code{r9}, in that order.  If
 there are more than six arguments, then the rest must be placed on the
-stack, which we call \emph{stack arguments}, which we discuss in later
-paragraphs. The register \code{rax} is for the return value of the
-function.
+stack, which we call \emph{stack arguments}. The register \code{rax}
+is for the return value of the function.
 
-Recall from Section~\ref{sec:x86} that the stack is also used for
-local variables and for storing the values of callee-saved registers
-(we shall refer to all of these collectively as ``locals''), and that
-at the beginning of a function we move the stack pointer \code{rsp}
-down to make room for them.
+We will be using a modification of this convention. For reasons that
+will be explained in subsequent paragraphs, we will not make use of
+stack arguments, and instead restrict functions to passing arguments
+exclusively in registers. To enforce this restriction, functions of
+too many arguments will be transformed to pass additional arguments in
+a vector.
+
+%% Recall from Section~\ref{sec:x86} that the stack is also used for
+%% local variables and for storing the values of callee-saved registers
+%% (we shall refer to all of these collectively as ``locals''), and that
+%% at the beginning of a function we move the stack pointer \code{rsp}
+%% down to make room for them.
 %% We recommend storing the local variables
 %% first and then the callee-saved registers, so that the local variables
 %% can be accessed using \code{rbp} the same as before the addition of
 %% functions.
-To make additional room for passing arguments, we shall
-move the stack pointer even further down. We count how many stack
-arguments are needed for each function call that occurs inside the
-body of the function and find their maximum. Adding this number to the
-number of locals gives us how much the \code{rsp} should be moved at
-the beginning of the function. In preparation for a function call, we
-offset from \code{rsp} to set up the stack arguments. We put the first
-stack argument in \code{0(\%rsp)}, the second in \code{8(\%rsp)}, and
-so on.
+%% To make additional room for passing arguments, we shall
+%% move the stack pointer even further down. We count how many stack
+%% arguments are needed for each function call that occurs inside the
+%% body of the function and find their maximum. Adding this number to the
+%% number of locals gives us how much the \code{rsp} should be moved at
+%% the beginning of the function. In preparation for a function call, we
+%% offset from \code{rsp} to set up the stack arguments. We put the first
+%% stack argument in \code{0(\%rsp)}, the second in \code{8(\%rsp)}, and
+%% so on.
 
-Upon calling the function, the stack arguments are retrieved by the
-callee using the base pointer \code{rbp}. The address \code{16(\%rbp)}
-is the location of the first stack argument, \code{24(\%rbp)} is the
-address of the second, and so on. Figure~\ref{fig:call-frames} shows
-the layout of the caller and callee frames. Notice how important it is
-that we correctly compute the maximum number of arguments needed for
-function calls; if that number is too small then the arguments and
-local variables will smash into each other!
+%% Upon calling the function, the stack arguments are retrieved by the
+%% callee using the base pointer \code{rbp}. The address \code{16(\%rbp)}
+%% is the location of the first stack argument, \code{24(\%rbp)} is the
+%% address of the second, and so on. Figure~\ref{fig:call-frames} shows
+%% the layout of the caller and callee frames. Notice how important it is
+%% that we correctly compute the maximum number of arguments needed for
+%% function calls; if that number is too small then the arguments and
+%% local variables will smash into each other!
 
 As discussed in Section~\ref{sec:print-x86-reg-alloc}, an x86 function
 is responsible for following conventions regarding the use of
@@ -5376,6 +5384,33 @@ callee wants to use a callee-saved register, the callee must arrange
 to put the original value back in the register prior to returning to
 the caller.
 
+Figure~\ref{fig:call-frames} shows the layout of the caller and callee
+frames. If we were to use stack arguments, they would be between the
+caller locals and the callee return address. A function call will
+place a new frame onto the stack, growing downward. There are cases,
+however, where we can \emph{replace} the current frame on the stack in
+a function call, rather than add a new frame.
+
+If a call is the last action in a function body, then that call is
+said to be a \emph{tail call}. In the case of a tail call, whatever
+the callee returns will be immediately returned by the caller, so the
+call can be optimized into a \code{jmp} instruction---the caller will
+jump to the new function, maintaining the same frame and return
+address.
+
+A common use case for this optimization is \emph{tail recursion}: a
+function that calls itself in the tail position is essentially a loop,
+and if it does not grow the stack on each call it can act like
+one. Functional languages like Racket and Scheme typically rely
+heavily on recursion, and so they typically guarantee that \emph{all}
+tail calls will be optimized in this way.
+
+If we were to stick to the calling convention used by C compilers like
+\code{gcc}, it would be awkward to optimize tail calls that require
+stack arguments, so we have simplify the process by imposing an
+invariant that no function passes arguments that way. With this
+invariant, space-efficient tail calls are straightforward to
+implement.
 
 \begin{figure}[tbp]
 \centering
@@ -5386,10 +5421,11 @@ Caller View & Callee View & Contents       & Frame \\ \hline
 -8(\key{\%rbp}) &  & local $1$ \\
 \ldots & & \ldots \\
 $-8k$(\key{\%rbp}) &  & local $k$ \\
- & &  \\
-$8n-8$\key{(\%rsp)} & $8n+8$(\key{\%rbp})& argument $n$ \\
-& \ldots           & \ldots \\
-0\key{(\%rsp)} & 16(\key{\%rbp})  & argument $1$   & \\ \hline
+ %% & &  \\
+%% $8n-8$\key{(\%rsp)} & $8n+8$(\key{\%rbp})& argument $n$ \\
+%% & \ldots           & \ldots \\
+%% 0\key{(\%rsp)} & 16(\key{\%rbp})  & argument $1$   & \\
+\hline
 & 8(\key{\%rbp})   & return address & \multirow{5}{*}{Callee}\\
 & 0(\key{\%rbp})   & old \key{rbp} \\
 & -8(\key{\%rbp})  & local $1$ \\
@@ -5414,6 +5450,16 @@ changes to our compiler, that is, do we need any new passes and/or do
 we need to change any existing passes? Also, do we need to add new
 kinds of AST nodes to any of the intermediate languages?
 
+First, we need to transform functions to operate on at most five
+arguments.  There are a total of six registers for passing arguments
+used in the convention previously mentioned, and we will reserve one
+for future use with higher-order functions~\ref{ch:lambdas}. A simple
+strategy for imposing an argument limit of length $n$ is to take all
+arguments $i$ where $i \geq n$ and pack them into a vector, making
+that subsequent vector the $n$th argument, and replacing all
+occurrances of the $i$th variable in the body with a projection from
+the vector. This pass, \code{limit-functions}, can operate directly on $R_4$.
+
 \begin{figure}[tp]
 \centering
 \fbox{
@@ -5431,7 +5477,7 @@ kinds of AST nodes to any of the intermediate languages?
   &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid
     (\key{vector-ref}\;\Exp\;\Int)} \\
   &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})} \\
-      &\mid& (\key{app}\, \Exp \; \Exp^{*}) \\
+      &\mid& (\key{app}\, \Exp \; \Exp^{*}) \mid (\key{tailcall}\, \Exp \; \Exp^{*}) \\
   \Def &::=& (\key{define}\; (\itm{label} \; [\Var \key{:} \Type]^{*}) \key{:} \Type \; \Exp) \\
   F_1 &::=& (\key{program} \; \Def^{*} \; \Exp)
 \end{array}
@@ -5443,11 +5489,11 @@ kinds of AST nodes to any of the intermediate languages?
 \label{fig:f1-syntax}
 \end{figure}
 
-The syntax of $R_4$ is inconvenient for purposes of
-compilation because it conflates the use of function names and local
-variables and it conflates the application of primitive operations and
-the application of functions. This is a problem because we need to
-compile the use of a function name differently than the use of a local
+The syntax of $R_4$ is inconvenient for purposes of compilation
+because it conflates the use of function names and local variables and
+it conflates the application of primitive operations and the
+application of functions. This is a problem because we need to compile
+the use of a function name differently than the use of a local
 variable; we need to use \code{leaq} to move the function name to a
 register. Similarly, the application of a function is going to require
 a complex sequence of instructions, unlike the primitive
@@ -5455,14 +5501,15 @@ operations. Thus, it is a good idea to create a new pass that changes
 function references from just a symbol $f$ to \code{(function-ref
   $f$)} and that changes function application from \code{($e_0$ $e_1$
   $\ldots$ $e_n$)} to the explicitly tagged AST \code{(app $e_0$ $e_1$
-  $\ldots$ $e_n$)}. A good name for this pass is
-\code{reveal-functions} and the output language, $F_1$, is defined in
-Figure~\ref{fig:f1-syntax}. Placing this pass after \code{uniquify} is
-a good idea, because it will make sure that there are no local
-variables and functions that share the same name. On the other hand,
-\code{reveal-functions} needs to come before the \code{flatten} pass
-because \code{flatten} will help us compile \code{function-ref}.
-Figure~\ref{fig:c3-syntax} defines the syntax for $C_3$, the output of
+  $\ldots$ $e_n$)} or \code{(tailcall $e_0$ $e_1$ $\ldots$ $e_n$)}. A
+good name for this pass is \code{reveal-functions} and the output
+language, $F_1$, is defined in Figure~\ref{fig:f1-syntax}. Placing
+this pass after \code{uniquify} is a good idea, because it will make
+sure that there are no local variables and functions that share the
+same name. On the other hand, \code{reveal-functions} needs to come
+before the \code{flatten} pass because \code{flatten} will help us
+compile \code{function-ref}.  Figure~\ref{fig:c3-syntax} defines the
+syntax for $C_3$, the output of
 \key{flatten}.
 
 
