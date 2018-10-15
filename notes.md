@@ -57,8 +57,8 @@ select-instructions
 V
 
     imm ::= (var x) | (deref r n) | (int n)
-    instr ::= (addq imm imm) | ...
-    x86-CFG ::= (program ((locals . x*)) instr ...)
+    instr ::= (addq imm imm) | (retq) | ...
+    x86-CFG ::= (program ((locals . x*)) instr*)
 
 assign-homes
 |
@@ -66,7 +66,7 @@ V
 
     imm ::= (reg r) | (deref r n) | (int n)
     instr ::= (addq imm imm) | ...
-    x86 ::= (program ((stack-space . n)  instr ...)
+    x86 ::= (program ((stack-space . n)) instr*)
     
 patch-instructions
 |
@@ -108,8 +108,8 @@ V
 
     arg ::= x | n | #t | #f
     exp ::= arg | (op arg*)
-    tail ::= (jump label) | (if (rel-op exp*) label label) | (return exp)
-	         | (stmt . tail)
+    tail ::= (goto label) | (if (op arg*) (goto label) (goto label))
+          | (return exp) | (stmt . tail)
     stmt ::= (assign x exp)
     CFG ::= (program ((type . type) (flow-graph . ([label . tail]*))) tail)
 
@@ -126,7 +126,7 @@ V
     arg ::= x | n | #t | #f
     exp ::= arg | (op arg*)
     tail ::= (return exp) | (stmt . tail)
-	      | (goto label) | (if (op exp*) (goto label) (goto label))
+	      | (goto label) | (if (op arg*) (goto label) (goto label))
     stmt ::= (assign x exp)
     CFG ::= (program ((locals . x*) (type . type)
 	                  (flow-graph . ([label . tail]*)))
