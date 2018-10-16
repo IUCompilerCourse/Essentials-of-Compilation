@@ -3,7 +3,7 @@
 
 
 --------------------------------------------------------------------------------
-R1:
+R1: Integers and Variables
 
     exp ::= x | n | (op exp*) | (let ([x exp]) exp)
     R1 ::= (program exp)
@@ -31,7 +31,7 @@ V
     exp ::= arg | (op arg*)
     stmt ::= (assign x exp)
     tail ::= (return exp) | (seq stmt tail)
-    C0 ::= (program () tail)
+    C0 ::= (program () ((label . tail)*))
 
 uncover-locals
 |
@@ -41,7 +41,7 @@ V
     exp ::= arg | (op arg*)
     stmt ::= (assign x exp)
     tail ::= (return exp) | (seq stmt tail)
-    C0 ::= (program ((locals . x*)) tail)
+    C0 ::= (program ((locals . x*)) ((label . tail)*))
     
 select-instructions
 |
@@ -49,7 +49,8 @@ V
 
     imm ::= (var x) | (deref r n) | (int n)
     instr ::= (addq imm imm) | (retq) | ...
-    x86 ::= (program ((locals . x*)) instr*)
+	block ::= (block () instr*)
+    x86 ::= (program ((locals . x*)) ((label . block)*))
 
 assign-homes
 |
@@ -57,7 +58,8 @@ V
 
     imm ::= (reg r) | (deref r n) | (int n)
     instr ::= (addq imm imm) | ...
-    x86 ::= (program ((stack-space . n)) instr*)
+	block ::= (block () instr*)	
+    x86 ::= (program ((stack-space . n)) ((label . block)*))
     
 patch-instructions
 |
@@ -73,7 +75,7 @@ V
 
 --------------------------------------------------------------------------------
 
-R2:
+R2: Booleans and Conditionals
 
     exp ::= x | n | #t | #f | (op exp*) | (let ([x exp]) exp) | (if exp exp exp)
     R2 ::= (program exp)
@@ -102,7 +104,7 @@ V
     tail ::= (return exp) | (seq stmt tail)
            | (goto label) | (if (op arg*) ((goto label)) ((goto label)))
     stmt ::= (assign x exp)
-    C1 ::= (program ((type . type) (flow-graph . ((label . tail)*))) tail)
+    C1 ::= (program ((type . type)) ((label . tail)*))
 
 optimize-jumps
 |
@@ -119,9 +121,8 @@ V
     tail ::= (return exp) | (seq stmt tail)
            | (goto label) | (if (op exp*) ((goto label)) ((goto label)))
     stmt ::= (assign x exp)
-    C1 ::= (program ((type . type) (flow-graph . ((label . tail)*))
-                     (locals . x*)) 
-                    tail)
+    C1 ::= (program ((type . type) (locals . x*)) 
+                    ((label . tail)*))
 
 select-instructions
 |
@@ -129,8 +130,8 @@ V
 
     imm ::= (var x) | (deref r n) | (int n)
     instr ::= (addq imm imm) | ... | (jmp label) | (jmp-if cc label) | (retq) 
-    x86 ::= (program ((locals . x*) (type . type) 
-                      (flow-graph . ((label . instr*)*))) instr*)
+	block ::= (block () instr*)
+    x86 ::= (program ((locals . x*) (type . type)) ((label . block)*))
 
 uncover-live
 |
@@ -139,17 +140,15 @@ V
     imm ::= (var x) | (deref r n) | (int n)
     instr ::= (addq imm imm) | (jmp label) | (jmp-if cc label) | (retq)
 	block ::= (block (lives ls*) instr*)
-    x86 ::= (program ((locals . x*) (type . type)
-                      (flow-graph . ([label . block]*))) block)
+    x86 ::= (program ((locals . x*) (type . type)) ((label . block)*))
 
 build-interference
 |
 V
 
-    x86 ::= (program ((locals . x*) (type . type)
-                      (flow-graph . ([label . block]*))
-						  (conflicts . graph))
-					     block)
+	block ::= (block () instr*)
+    x86 ::= (program ((locals . x*) (type . type) (conflicts . graph))
+	                 ((label . block)*))
 
 allocate-registers
 |
@@ -157,8 +156,9 @@ V
 
     imm ::= (reg r) | (deref r n) | (int n)
     instr ::= (addq imm imm) | ... | (jmp label) | (jmp-if cc label) | (retq)
-    x86 ::= (program  ((locals . x*) (type . type) 
-                       (flow-graph . ((label . instr*)*))) instr*)
+	block ::= (block () instr*)
+    x86 ::= (program ((locals . x*) (type . type))
+	                 ((label . block)*))
     
 print-x86
 |
@@ -166,7 +166,7 @@ V
 
 --------------------------------------------------------------------------------
 
-R3:
+R3: Vectors
 
     exp ::= x | n | #t | #f | (op exp*) | (let ([x exp]) exp) | (if exp exp exp)
           | (vector exp+) | (vector-ref exp n) | (vector-set! exp n exp)
@@ -216,7 +216,7 @@ V
     tail ::= (goto label) | (if (op arg*) ((goto label)) ((goto label)))
           | (return exp) | (seq stmt tail)
     stmt ::= (assign x exp) | (collect n)
-    C1 ::= (program ((type . type) (flow-graph . ((label . tail)*))) tail)
+    C1 ::= (program ((type . type)) ((label . tail)*))
 
 uncover-locals
 |
@@ -232,8 +232,9 @@ V
 
     imm ::= (var x) | (deref r n) | (int n) | (global-value x)
     instr ::= (addq imm imm) | ... | (jmp label) | (jmp-if cc label) | (retq) 
-    x86-CFG ::= (program ((locals . ((x . type)*)) (type . type) 
-                          (flow-graph . ((label . instr*)*))) instr*)
+	block ::= (block () instr*)
+    x86 ::= (program ((locals . ((x . type)*)) (type . type))
+	                 ((label . block)*))
 
 uncover-live
 |
@@ -242,17 +243,17 @@ V
     imm ::= (var x) | (deref r n) | (int n) | (global-value x)
     instr ::= (addq imm imm) | ... | (jmp label) | (jmp-if cc label) | (retq) 
     block ::= (block (lives x**) instr*)
-    x86-CFG ::= (program ((locals . ((x . type)*)) (type . type) 
-                          (flow-graph . ((label . block)*))) block)
+    x86 ::= (program ((locals . ((x . type)*)) (type . type))
+	                 ((label . block)*))
 
 build-interference
 |
 V
 
     ...
-    x86-CFG ::= (program ((locals . ((x . type)*)) (type . type) 
-                          (conflicts . graph)
-                          (flow-graph . ((label . instr*)*))) instr*)
+    x86 ::= (program ((locals . ((x . type)*)) (type . type) 
+                      (conflicts . graph))
+				     ((label . block)*))
 
 build-move-graph
 |
@@ -260,8 +261,8 @@ V
 
     ...
     x86-CFG ::= (program ((locals . ((x . type)*)) (type . type) 
-                          (conflicts . graph) (move-graph . graph)
-                          (flow-graph . ((label . instr*)*))) instr*)
+                          (conflicts . graph) (move-graph . graph))
+					     ((label . block)*))
 
 allocate-registers
 |
@@ -269,8 +270,8 @@ V
 
     imm ::= (reg x) | (deref r n) | (int n) | (global-value x)
     instr ::= (addq imm imm) | ... | (jmp label) | (jmp-if cc label) | (retq) 
-    x86-CFG ::= (program ((locals . ((x . type)*)) (type . type) 
-                          (flow-graph . ((label . instr*)*))) instr*)
+    x86 ::= (program ((locals . ((x . type)*)) (type . type))
+                     ((label . block)*))
 
 patch-instructions
 |
@@ -279,3 +280,10 @@ V
     same as above
 
 print-x96
+|
+V
+
+--------------------------------------------------------------------------------
+
+R4: Functions
+
