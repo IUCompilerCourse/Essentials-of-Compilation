@@ -47,17 +47,18 @@ select-instructions
 |
 V
 
-    imm ::= (var x) | (deref r n) | (int n)
+    imm ::= (var x) | (reg r) | (deref r n) | (int n)
     instr ::= (addq imm imm) | (retq) | ...
-    x86 ::= (program ((locals . x*)) instr*)
+    block ::= (block () instr*)
+    x86 ::= (program ((locals . x*)) block)
 
 assign-homes
 |
 V
 
     imm ::= (reg r) | (deref r n) | (int n)
-    instr ::= (addq imm imm) | ...
-    x86 ::= (program ((stack-space . n)) instr*)
+    instr ::= ...
+    x86 ::= (program ((stack-space . n)) block)
     
 patch-instructions
 |
