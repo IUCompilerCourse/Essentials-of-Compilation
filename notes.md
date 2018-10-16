@@ -169,9 +169,9 @@ V
 R3: Vectors
 
     exp ::= x | n | #t | #f | (op exp*) | (let ([x exp]) exp) | (if exp exp exp)
-          | (vector exp+) | (vector-ref exp n) | (vector-set! exp n exp)
+          | (vector exp*) | (vector-ref exp n) | (vector-set! exp n exp)
           | (void)
-    R2 ::= (program exp)
+    R3 ::= (program exp)
 
 type-check
 |
@@ -179,10 +179,10 @@ V
 
     type ::= ... | Void | (Vector type*)
     exp ::= x | n | #t | #f | (op exp*) | (let ([x exp]) exp) | (if exp exp exp)
-          | (vector exp+) | (vector-ref exp n) | (vector-set! exp n exp)
+          | (vector exp*) | (vector-ref exp n) | (vector-set! exp n exp)
           | (void)
           | (has-type exp type)
-    R2 ::= (program ((type . type)) exp)
+    R3 ::= (program ((type . type)) exp)
 
 expose-allocation
 |
@@ -190,10 +190,10 @@ V
 
     type ::= ... | Void | (Vector type*)
     exp ::= x | n | #t | #f | (op exp*) | (let ([x exp]) exp) | (if exp exp exp)
-          | (vector exp+) | (vector-ref exp n) | (vector-set! exp n exp)
+          | (vector exp*) | (vector-ref exp n) | (vector-set! exp n exp)
           | (void) | (has-type exp type)
           | (collect n) | (allocate n type) | (global-value x)
-    R2 ::= (program ((type . type)) exp)
+    R3 ::= (program ((type . type)) exp)
 
 remove-complex-opera*
 |
@@ -201,10 +201,10 @@ V
 
     arg ::= x | n | #t | #f | (void)
     exp ::= arg | (op arg*) | (let ([x exp]) exp) | (if exp exp exp)
-          | (vector exp+) | (vector-ref exp n) | (vector-set! exp n exp)
+          | (vector exp*) | (vector-ref exp n) | (vector-set! exp n exp)
           | (void) | (has-type exp type)
           | (collect n) | (allocate n type) | (global-value x)
-    R2 ::= (program ((type . type)) exp)
+    R3 ::= (program ((type . type)) exp)
 
 create-CFG
 |
@@ -216,14 +216,14 @@ V
     tail ::= (goto label) | (if (op arg*) ((goto label)) ((goto label)))
           | (return exp) | (seq stmt tail)
     stmt ::= (assign x exp) | (collect n)
-    C1 ::= (program ((type . type)) ((label . tail)*))
+    C2 ::= (program ((type . type)) ((label . tail)*))
 
 uncover-locals
 |
 V
 
     ...
-    C1 ::= (program ((locals . ((x . type)*)) (type . type) 
+    C2 ::= (program ((locals . ((x . type)*)) (type . type) 
                      (flow-graph . ((label . tail)*))) tail)
 
 select-instructions
@@ -286,4 +286,22 @@ V
 --------------------------------------------------------------------------------
 
 R4: Functions
+
+    type ::= ... | (type* -> type)
+    exp ::= x | n | #t | #f | (op exp*) | (let ([x exp]) exp) | (if exp exp exp)
+          | (vector exp*) | (vector-ref exp n) | (vector-set! exp n exp)
+          | (void)
+		  | (exp exp*)
+	def ::= (define (var [var : type]*) : type exp)
+    R4 ::= (program def* exp)
+
+type-check
+|
+V
+
+    R4 ::= (program () def+)
+
+uniquify
+|
+V
 
