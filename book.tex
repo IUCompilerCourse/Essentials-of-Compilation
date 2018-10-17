@@ -5396,21 +5396,28 @@ said to be a \emph{tail call}. In the case of a tail call, whatever
 the callee returns will be immediately returned by the caller, so the
 call can be optimized into a \code{jmp} instruction---the caller will
 jump to the new function, maintaining the same frame and return
-address.
+address. Like the indirect function call, we write an indirect
+jump with a register prefixed with an asterisk.
+
+\begin{lstlisting}
+   jmp *%rax
+\end{lstlisting}
 
 A common use case for this optimization is \emph{tail recursion}: a
 function that calls itself in the tail position is essentially a loop,
 and if it does not grow the stack on each call it can act like
 one. Functional languages like Racket and Scheme typically rely
-heavily on recursion, and so they typically guarantee that \emph{all}
-tail calls will be optimized in this way.
+heavily on function calls, and so they typically guarantee that
+\emph{all} tail calls will be optimized in this way, not just
+functions that call themselves.
+
+\margincomment{\scriptsize To do: better motivate guaranteed tail calls? -mv}
 
 If we were to stick to the calling convention used by C compilers like
 \code{gcc}, it would be awkward to optimize tail calls that require
-stack arguments, so we have simplify the process by imposing an
-invariant that no function passes arguments that way. With this
-invariant, space-efficient tail calls are straightforward to
-implement.
+stack arguments, so we simplify the process by imposing an invariant
+that no function passes arguments that way. With this invariant,
+space-efficient tail calls are straightforward to implement.
 
 \begin{figure}[tbp]
 \centering
@@ -5453,12 +5460,33 @@ kinds of AST nodes to any of the intermediate languages?
 First, we need to transform functions to operate on at most five
 arguments.  There are a total of six registers for passing arguments
 used in the convention previously mentioned, and we will reserve one
-for future use with higher-order functions~\ref{ch:lambdas}. A simple
-strategy for imposing an argument limit of length $n$ is to take all
-arguments $i$ where $i \geq n$ and pack them into a vector, making
-that subsequent vector the $n$th argument, and replacing all
-occurrances of the $i$th variable in the body with a projection from
-the vector. This pass, \code{limit-functions}, can operate directly on $R_4$.
+for future use with higher-order functions (as explained in
+Chapter~\ref{ch:lambdas}). A simple strategy for imposing an argument
+limit of length $n$ is to take all arguments $i$ where $i \geq n$ and
+pack them into a vector, making that subsequent vector the $n$th
+argument.
+
+\begin{tabular}{lll}
+\begin{minipage}{0.2\textwidth}
+\begin{lstlisting}
+  (|$f$| |$x_1$| |$\ldots$| |$x_n$|) 
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(|$f$| |$x_1$| |$\ldots$| |$x_5$| (vector |$x_6$| |$\ldots$| |$x_n$|))
+\end{lstlisting}
+\end{minipage}
+\end{tabular}
+
+Additionally, all occurrances of the $i$th argument (where $i>5$) in
+the body must be replaced with a projection from the vector. A pass
+that limits function arguments like this (which we will name
+\code{limit-functions}), can operate directly on $R_4$.
+
 
 \begin{figure}[tp]
 \centering
@@ -5489,11 +5517,11 @@ the vector. This pass, \code{limit-functions}, can operate directly on $R_4$.
 \label{fig:f1-syntax}
 \end{figure}
 
-The syntax of $R_4$ is inconvenient for purposes of compilation
-because it conflates the use of function names and local variables and
-it conflates the application of primitive operations and the
-application of functions. This is a problem because we need to compile
-the use of a function name differently than the use of a local
+Going forward, the syntax of $R_4$ is inconvenient for purposes of
+compilation because it conflates the use of function names and local
+variables and it conflates the application of primitive operations and
+the application of functions. This is a problem because we need to
+compile the use of a function name differently than the use of a local
 variable; we need to use \code{leaq} to move the function name to a
 register. Similarly, the application of a function is going to require
 a complex sequence of instructions, unlike the primitive
@@ -5503,14 +5531,22 @@ function references from just a symbol $f$ to \code{(function-ref
   $\ldots$ $e_n$)} to the explicitly tagged AST \code{(app $e_0$ $e_1$
   $\ldots$ $e_n$)} or \code{(tailcall $e_0$ $e_1$ $\ldots$ $e_n$)}. A
 good name for this pass is \code{reveal-functions} and the output
-language, $F_1$, is defined in Figure~\ref{fig:f1-syntax}. Placing
-this pass after \code{uniquify} is a good idea, because it will make
-sure that there are no local variables and functions that share the
-same name. On the other hand, \code{reveal-functions} needs to come
-before the \code{flatten} pass because \code{flatten} will help us
-compile \code{function-ref}.  Figure~\ref{fig:c3-syntax} defines the
-syntax for $C_3$, the output of
-\key{flatten}.
+language, $F_1$, is defined in Figure~\ref{fig:f1-syntax}.
+
+Distinguishing between calls in tail position and non-tail position
+requires the pass to have some notion of context. We recommend the
+function take an additional boolean argument which represents whether
+the expression it is considering is in tail position. For example,
+when handling a conditional expression \code{(if $e_1$ $e_2$ $e_3$)}
+in tail position, both $e_2$ and $e_3$ are also in tail position,
+while $e_1$ is not.
+
+Placing this pass after \code{uniquify} is a good idea, because it
+will make sure that there are no local variables and functions that
+share the same name. On the other hand, \code{reveal-functions} needs
+to come before the \code{flatten} pass because \code{flatten} will
+help us compile \code{function-ref}.  Figure~\ref{fig:c3-syntax}
+defines the syntax for $C_3$, the output of \key{flatten}.
 
 
 \begin{figure}[tp]
@@ -5534,6 +5570,7 @@ syntax for $C_3$, the output of
       &\mid& \gray{ (\key{collect} \,\itm{int}) }
        \mid \gray{ (\key{allocate} \,\itm{int}) }\\
       &\mid& \gray{ (\key{call-live-roots}\,(\Var^{*}) \,\Stmt^{*}) } \\
+      &\mid& (\key{tailcall} \,\Arg\,\Arg^{*}) \\
   \Def &::=& (\key{define}\; (\itm{label} \; [\Var \key{:} \Type]^{*}) \key{:} \Type \; \Stmt^{+}) \\
 C_3 & ::= & (\key{program}\;(\Var^{*})\;(\key{type}\;\textit{type})\;(\key{defines}\,\Def^{*})\;\Stmt^{+})
 \end{array}
@@ -5568,6 +5605,11 @@ $\Rightarrow$
 \end{minipage}
 \end{tabular} \\
 %
+Note that in the syntax for $C_3$, tail calls are statements, not
+expressions. Once we perform a tail call, we do not ever expect it to
+return a value to us, and \code{flatten} therefore should handle
+\code{app} and \code{tailcall} forms differently.
+
 The output of select instructions is a program in the x86$_3$
 language, whose syntax is defined in Figure~\ref{fig:x86-3}.
 
@@ -5595,7 +5637,8 @@ language, whose syntax is defined in Figure~\ref{fig:x86-3}.
        \mid  (\key{jmp} \; \itm{label})
        \mid (\key{j}\itm{cc} \; \itm{label})
        \mid (\key{label} \; \itm{label})  } \\
-     &\mid& (\key{indirect-callq}\;\Arg ) \mid (\key{leaq}\;\Arg\;\Arg)\\
+     &\mid& (\key{indirect-callq}\;\Arg ) \mid (\key{indirect-jmp}\;\Arg) \\
+     &\mid& (\key{leaq}\;\Arg\;\Arg)\\
 \Def &::= & (\key{define} \; (\itm{label}) \;\itm{int} \;\itm{info}\; \Instr^{+})\\
 x86_3 &::= & (\key{program} \;\itm{info} \;(\key{type}\;\itm{type})\;
                (\key{defines}\,\Def^{*}) \; \Instr^{+})
@@ -5621,38 +5664,41 @@ local variables in the $\Var^{*}$ field as shown below.
 \end{lstlisting}
 In the \code{select-instructions} pass, we need to encode the
 parameter passing in terms of the conventions discussed in
-Section~\ref{sec:fun-x86}. So depending on the length of the parameter
-list \itm{xs}, some of them may be in registers and some of them may
-be on the stack. I recommend generating \code{movq} instructions to
-move the parameters from their registers and stack locations into the
-variables \itm{xs}, then let register allocation handle the assignment
-of those variables to homes. After this pass, the \itm{xs} can be
-added to the list of local variables. As mentioned in
-Section~\ref{sec:fun-x86}, we need to find out how far to move the
-stack pointer to ensure we have enough space for stack arguments in
-all the calls inside the body of this function. This pass is a good
-place to do this and store the result in the \itm{maxStack} field of
-the output \code{define} shown below.
-\begin{lstlisting}
-  (define (|$f$|) |\itm{numParams}| (|$\Var^{*}$| |\itm{maxStack}|) |$\Instr^{+}$|)
-\end{lstlisting}
+Section~\ref{sec:fun-x86}: a \code{movq} instruction for each
+parameter should be generated, to move the parameter value from the
+appropriate register to the appropriate variable from \itm{xs}.
+%% I recommend generating \code{movq} instructions to
+%% move the parameters from their registers and stack locations into the
+%% variables \itm{xs}, then let register allocation handle the assignment
+%% of those variables to homes.
+%% After this pass, the \itm{xs} can be
+%% added to the list of local variables. As mentioned in
+%% Section~\ref{sec:fun-x86}, we need to find out how far to move the
+%% stack pointer to ensure we have enough space for stack arguments in
+%% all the calls inside the body of this function. This pass is a good
+%% place to do this and store the result in the \itm{maxStack} field of
+%% the output \code{define} shown below.
+%% \begin{lstlisting}
+%%   (define (|$f$|) |\itm{numParams}| (|$\Var^{*}$| |\itm{maxStack}|) |$\Instr^{+}$|)
+%% \end{lstlisting}
 
-Next, consider the compilation of function applications, which have
+Next, consider the compilation of non-tail function applications, which have
 the following form at the start of \code{select-instructions}.
 \begin{lstlisting}
   (assign |\itm{lhs}| (app |\itm{fun}| |\itm{args}| |$\ldots$|))
 \end{lstlisting}
 In the mirror image of handling the parameters of function
-definitions, some of the arguments \itm{args} need to be moved to the
-argument passing registers and the rest should be moved to the
-appropriate stack locations, as discussed in
+definitions, the arguments \itm{args} need to be moved to the
+argument passing registers, as discussed in
 Section~\ref{sec:fun-x86}.
+%% and the rest should be moved to the
+%% appropriate stack locations, 
 %% You might want to introduce a new kind of AST node for stack
 %% arguments, \code{(stack-arg $i$)} where $i$ is the index of this
 %% argument with respect to the other stack arguments.
-As you're generating the code for parameter passing, take note of how
-many stack arguments are needed for purposes of computing the
-\itm{maxStack} discussed above.
+%% As you're generating the code for parameter passing, take note of how
+%% many stack arguments are needed for purposes of computing the
+%% \itm{maxStack} discussed above.
 
 Once the instructions for parameter passing have been generated, the
 function call itself can be performed with an indirect function call,
@@ -5664,6 +5710,15 @@ is stored in \code{rax}, so it needs to be moved into the \itm{lhs}.
   (movq (reg rax) |\itm{lhs}|)
 \end{lstlisting}
 
+Handling function applications in tail positions is only slightly
+different. The parameter passing is the same as non-tail calls,
+but the tail call itself cannot use the \code{indirect-callq} form.
+Generating, instead, an \code{indirect-jmp} form in \code{select-instructions}
+accounts for the fact that we intend to eventually use a \code{jmp}
+rather than a \code{callq} for the tail call. Of course, the
+\code{movq} from \code{rax} is not necessary after a tail call.
+
+
 The rest of the passes need only minor modifications to handle the new
 kinds of AST nodes: \code{function-ref}, \code{indirect-callq}, and
 \code{leaq}. Inside \code{uncover-live}, when computing the $W$ set
@@ -5672,16 +5727,41 @@ recommend including all the caller-saved registers, which will have
 the affect of making sure that no caller-saved register actually needs
 to be saved. In \code{patch-instructions}, you should deal with the
 x86 idiosyncrasy that the destination argument of \code{leaq} must be
-a register.
+a register. Additionally, \code{patch-instructions} should ensure that
+the \code{indirect-jmp} argument is \itm{rax}, our reserved
+register---this is to make code generation more convenient, because
+we will be trampling many registers before the tail call (as explained
+below).
 
-For the \code{print-x86} pass, I recommend the following translations:
+For the \code{print-x86} pass, we recommend the following translations:
 \begin{lstlisting}
   (function-ref |\itm{label}|) |$\Rightarrow$| |\itm{label}|(%rip)
   (indirect-callq |\itm{arg}|) |$\Rightarrow$| callq *|\itm{arg}|
 \end{lstlisting}
-For function definitions, the \code{print-x86} pass should add the
-code for saving and restoring the callee-saved registers, if you
-haven't already done that.
+Handling \code{indirect-jmp} requires a bit more care. A
+straightforward translation of \code{indirect-jmp} would be
+\code{jmp *$\itm{arg}$}, which is what we will want to do,
+but \emph{before} this jump we need to pop the saved registers
+and reset the frame pointer. This is why it was convenient to
+ensure the \code{jmp} argument was \itm{rax}. A sufficiently
+clever compiler could determine that a function body always
+ends in a tail call, and thus avoid generating code to restore
+registers and return via \code{ret}, but for simplicity we do
+not need to do this.
+
+\margincomment{\footnotesize The reason we can't easily optimize
+  this is because the details of function prologue and epilogue
+  are not exposed in the AST, and just emitted as strings in
+  \code{print-x86}.}
+
+As this implies, your \code{print-x86} pass needs to add
+the code for saving and restoring callee-saved registers, if
+you have not already implemented that. This is necessary when
+generating code for function definitions.
+
+%% For function definitions, the \code{print-x86} pass should add the
+%% code for saving and restoring the callee-saved registers, if you
+%% haven't already done that.
 
 \section{An Example Translation}
 
