@@ -317,4 +317,44 @@ reveal-functions
 |
 V
 
-    F1
+    exp ::= (function-ref label) | (app exp exp*) | ...
+    tail ::= x | n | #t | #f | (op exp*) | (let ([x exp]) tail) 
+          | (if exp tail tail)
+          | (vector exp*) | (vector-ref exp n) | (vector-set! exp n exp)
+          | (void)
+          | (function-ref label) | (tailcall exp exp*)
+    def ::= (define (var [var : type]*) : type tail)
+    F1 ::= (program () def+)
+
+expose-allocations
+|
+V
+
+    same as above
+
+remove-complex-opera*
+|
+V
+
+    arg ::= x | n | #t | #f | (void)
+    exp ::= ... | (op arg*) | (app arg arg*) | ...
+    tail ::= ... | (op arg*) | (tailcall arg arg*) | ... 
+    def ::= (define (var [var : type]*) : type tail)
+    F1 ::= (program () def+)
+
+create-CFG
+|
+V
+
+    arg ::= x | n | #t | #f | (void)
+    exp ::= arg | (op arg*) | (allocate n type) | (global-value x) 
+          | (has-type exp type) | (app arg arg*)
+    tail ::= (goto label) | (if (op arg*) ((goto label)) ((goto label)))
+          | (return exp) | (seq stmt tail) | (tailcall arg arg*)
+    stmt ::= (assign x exp) | (collect n)
+    def ::= (define (var [var : type]*) : type ((label . tail)*))
+    C3 ::= (program ((type . type)) def+)
+
+
+|
+V
