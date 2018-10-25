@@ -102,7 +102,7 @@ V
     arg ::= x | n | #t | #f
     exp ::= arg | (op arg*)
     tail ::= (return exp) | (seq stmt tail)
-           | (goto label) | (if (op arg*) ((goto label)) ((goto label)))
+           | (goto label) | (if (op arg*) (goto label) (goto label))
     stmt ::= (assign x exp)
     C1 ::= (program ((type . type)) ((label . tail)*))
 
@@ -119,7 +119,7 @@ V
     arg ::= x | n | #t | #f
     exp ::= arg | (op arg*)
     tail ::= (return exp) | (seq stmt tail)
-           | (goto label) | (if (op exp*) ((goto label)) ((goto label)))
+           | (goto label) | (if (op exp*) (goto label) (goto label))
     stmt ::= (assign x exp)
     C1 ::= (program ((type . type) (locals . x*)) 
                     ((label . tail)*))
@@ -213,7 +213,7 @@ V
     arg ::= x | n | #t | #f | (void)
     exp ::= arg | (op arg*) | (allocate n type) | (global-value x) 
           | (has-type exp type)
-    tail ::= (goto label) | (if (op arg*) ((goto label)) ((goto label)))
+    tail ::= (goto label) | (if (op arg*) (goto label) (goto label))
           | (return exp) | (seq stmt tail)
     stmt ::= (assign x exp) | (collect n)
     C2 ::= (program ((type . type)) ((label . tail)*))
@@ -349,7 +349,7 @@ V
     arg ::= x | n | #t | #f | (void)
     exp ::= arg | (op arg*) | (allocate n type) | (global-value x) 
           | (has-type exp type) | (app arg arg*)
-    tail ::= (goto label) | (if (op arg*) ((goto label)) ((goto label)))
+    tail ::= (goto label) | (if (op arg*) (goto label) (goto label))
           | (return exp) | (seq stmt tail) | (tailcall arg arg*)
     stmt ::= (assign x exp) | (collect n)
     def ::= (define (var [var : type]*) : type ((label . tail)*))
