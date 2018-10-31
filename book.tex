@@ -719,7 +719,8 @@ for $R_0$ expressions.
           (cond [(fixnum? r) r]
                 [else (error 'interp-R0 "input not an integer" r)]))]
        [`(- ,e1)     (fx- 0 (interp-exp e1))]
-       [`(+ ,e1 ,e2) (fx+ (interp-exp e1) (interp-exp e2))]))
+       [`(+ ,e1 ,e2) (fx+ (interp-exp e1) (interp-exp e2))]
+       ))
 
    (define (interp-R0 p)
      (match p
@@ -1028,10 +1029,6 @@ to the variable, then evaluates the body of the \key{let}.
    (define (interp-exp env)
      (lambda (e)
        (match e
-         [(? symbol?) (lookup e env)]
-         [`(let ([,x ,(app (interp-exp env) v)]) ,body)
-          (define new-env (cons (cons x v) env))
-          ((interp-exp new-env) body)]
          [(? fixnum?) e]
          [`(read)
           (define r (read))
@@ -1040,7 +1037,12 @@ to the variable, then evaluates the body of the \key{let}.
          [`(- ,(app (interp-exp env) v))
           (fx- 0 v)]
          [`(+ ,(app (interp-exp env) v1) ,(app (interp-exp env) v2))
-           (fx+ v1 v2)])))
+           (fx+ v1 v2)]
+         [(? symbol?) (lookup e env)]
+         [`(let ([,x ,(app (interp-exp env) v)]) ,body)
+          (define new-env (cons (cons x v) env))
+          ((interp-exp new-env) body)]
+         )))
 
    (define (interp-R1 env)
      (lambda (p)
@@ -1350,18 +1352,22 @@ $R_1$ and x86 assembly? Here we list some of the most important the
 differences.
 
 \begin{enumerate}
-\item x86 arithmetic instructions typically take two arguments and
+\item[(a)] x86 arithmetic instructions typically take two arguments and
   update the second argument in place. In contrast, $R_1$ arithmetic
-  operations only read their arguments and produce a new value.
+  operations take two arguments and produce a new value.
 
-\item An argument to an $R_1$ operator can be any expression, whereas
+\item[(b)] An argument to an $R_1$ operator can be any expression, whereas
   x86 instructions restrict their arguments to integers, registers,
   and memory locations.
 
-\item An $R_1$ program can have any number of variables whereas x86
+\item[(c)] The order of execution in x86 is explicit in the syntax: a
+  sequence of instructions, whereas in $R_1$ it is a left-to-right
+  depth-first traversal of the abstract syntax tree.
+
+\item[(d)] An $R_1$ program can have any number of variables whereas x86
   has only 16 registers.
 
-\item Variables in $R_1$ can overshadow other variables with the same
+\item[(e)] Variables in $R_1$ can overshadow other variables with the same
   name. The registers and memory locations of x86 all have unique
   names.
 \end{enumerate}
@@ -1369,37 +1375,40 @@ differences.
 We ease the challenge of compiling from $R_1$ to x86 by breaking down
 the problem into several steps, dealing with the above differences one
 at a time. The main question then becomes: in what order do we tackle
-these differences? This is often one of the most challenging questions
-that a compiler writer must answer because some orderings may be much
-more difficult to implement than others. It is difficult to know ahead
-of time which orders will be better so often some trial-and-error is
+these differences? This can be a challenging question for a compiler
+writer to answer because some orderings may be much more difficult to
+implement than others. It is difficult to know ahead of time which
+orders will be better so often some trial-and-error is
 involved. However, we can try to plan ahead and choose the orderings
 based on this planning.
 
-For example, to handle difference \#2 (nested expressions), we shall
-introduce new variables and pull apart the nested expressions into a
-sequence of assignment statements.  To deal with difference \#3 we
+For example, to handle difference (b) (nested expressions), we shall
+introduce temporary variables to hold the intermediate results
+of each subexpression.  To deal with difference (d) we
 will be replacing variables with registers and/or stack
-locations. Thus, it makes sense to deal with \#2 before \#3 so that
-\#3 can replace both the original variables and the new ones. Next,
-consider where \#1 should fit in. Because it has to do with the format
-of x86 instructions, it makes more sense after we have flattened the
-nested expressions (\#2). Finally, when should we deal with \#4
-(variable overshadowing)?  We shall solve this problem by renaming
-variables to make sure they have unique names. Recall that our plan
-for \#2 involves moving nested expressions, which could be problematic
-if it changes the shadowing of variables. However, if we deal with \#4
-first, then it will not be an issue.  Thus, we arrive at the following
-ordering.
+locations. Thus, it makes sense to deal with (b) before (d) so that
+(d) can replace both the original variables and the new ones. Next,
+consider where (a) should fit in. Because it has to do with the format
+of x86 instructions, it makes more sense after we have removed the
+nested expressions (b). What about (c), order of execution?
+
+UNDER CONSTRUCTION
+
+Finally, when should we deal with (e) (variable overshadowing)?  We
+shall solve this problem by renaming variables to make sure they have
+unique names. Recall that our plan for (b) involves moving nested
+expressions, which could be problematic if it changes the shadowing of
+variables. However, if we deal with (e) first, then it will not be an
+issue.  Thus, we arrive at the following ordering.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\foreach \i/\p in {4/1,2/2,1/3,3/4}
+\foreach \i/\p in {1/1,2/2,3/3,4/4,5/5}
 {
-  \node (\i) at (\p*1.5,0) {$\i$};
+  \node (\i) at (\p*1.5,0) {$\bullet$};
 }
-\foreach \x/\y in {4/2,2/1,1/3}
+\foreach \x/\y/\lbl in {1/2/a,2/3/b,3/4/c,4/5/d}
 {
-  \draw[->] (\x) to (\y);
+  \path[->,bend left=15] (\x) edge [above] node {\small\lbl} (\y);
 }
 \end{tikzpicture}
 \]
@@ -1407,7 +1416,7 @@ We further simplify the translation from $R_1$ to x86 by identifying
 an intermediate language named $C_0$, roughly half-way between $R_1$
 and x86, to provide a rest stop along the way. We name the language
 $C_0$ because it is vaguely similar to the $C$
-language~\citep{Kernighan:1988nx}. The differences \#4 and \#1,
+language~\citep{Kernighan:1988nx}. The differences (e) and (a),
 regarding variables and nested expressions, will be handled by two
 steps, \key{uniquify} and \key{flatten}, which bring us to
 $C_0$.
@@ -1461,10 +1470,10 @@ C_0 & ::= & (\key{program}\;(\Var^{*})\;\Stmt^{+})
 \end{figure}
 
 To get from $C_0$ to x86 assembly, it remains for us to handle
-difference \#1 (the format of instructions) and difference \#3
+difference \#1 (the format of instructions) and difference (d)
 (variables versus stack locations and registers). These two
 differences are intertwined, creating a bit of a Gordian Knot. To
-handle difference \#3, we need to map some variables to registers
+handle difference (d), we need to map some variables to registers
 (there are only 16 registers) and the remaining variables to locations
 on the stack (which is unbounded). To make good decisions regarding
 this mapping, we need the program to be close to its final form (in
@@ -2033,7 +2042,9 @@ programs.
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (R1) at (0,2)  {\large $R_1$};
 \node (R1-2) at (3,2)  {\large $R_1$};
-\node (C0-1) at (3,0)  {\large $C_0$};
+\node (R1-3) at (6,2)  {\large $R_1$};
+\node (C0-1) at (6,0)  {\large $C_0$};
+\node (C0-2) at (3,0)  {\large $C_0$};
 
 \node (x86-2) at (3,-2)  {\large $\text{x86}^{*}_0$};
 \node (x86-3) at (6,-2)  {\large $\text{x86}^{*}_0$};
@@ -2041,8 +2052,10 @@ programs.
 \node (x86-5) at (12,-2) {\large $\text{x86}^{\dagger}_0$};
 
 \path[->,bend left=15] (R1) edge [above] node {\ttfamily\footnotesize uniquify} (R1-2);
-\path[->,bend left=15] (R1-2) edge [right] node {\ttfamily\footnotesize flatten} (C0-1);
-\path[->,bend right=15] (C0-1) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
+\path[->,bend left=15] (R1-2) edge [above] node {\ttfamily\footnotesize remove-complex.} (R1-3);
+\path[->,bend left=15] (R1-3) edge [right] node {\ttfamily\footnotesize explicate-control} (C0-1);
+\path[->,bend right=15] (C0-1) edge [above] node {\ttfamily\footnotesize uncover-locals} (C0-2);
+\path[->,bend right=15] (C0-2) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
 \path[->,bend left=15] (x86-2) edge [above] node {\ttfamily\footnotesize assign-homes} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-4);
 \path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize print-x86} (x86-5);
