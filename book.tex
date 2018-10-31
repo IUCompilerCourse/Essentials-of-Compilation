@@ -1163,20 +1163,14 @@ the operating system starts executing this program.  The instruction
 \lstinline{movq $10, %rax} puts $10$ into register \key{rax}. The
 following instruction \lstinline{addq $32, %rax} adds $32$ to the
 $10$ in \key{rax} and puts the result, $42$, back into
-\key{rax}. Finally, the instruction \lstinline{movq %rax, %rdi} moves the value
-in \key{rax} into another register, \key{rdi}, and
-\lstinline{callq print_int} calls the external function \code{print\_int}, which
-prints the value in \key{rdi}.
+  \key{rax}.
 
-The last two instructions---\lstinline{movq $0, %rax} and \key{retq}---finish
-the \key{main} function by returning the integer in \key{rax} to the
-operating system. The operating system interprets this integer as the program's
-exit code. By convention, an exit code of 0 indicates the program was
-successful, and all other exit codes indicate various errors. To ensure that
-we successfully communicate with the operating system, we explicitly move 0
-into \key{rax}, lest the previous value in \key{rax} be misinterpreted as an
-error code.
-
+The last instruction, \key{retq}, finishes the \key{main} function by
+returning the integer in \key{rax} to the operating system. The
+operating system interprets this integer as the program's exit
+code. By convention, an exit code of 0 indicates the program was
+successful, and all other exit codes indicate various errors.
+Nevertheless, we return the result of the program as the exit code.
 
 %\begin{wrapfigure}{r}{2.25in}
 \begin{figure}[tbp]
@@ -1185,24 +1179,18 @@ error code.
 main:
 	movq	$10, %rax
 	addq	$32, %rax
-	movq	%rax, %rdi
-	callq	print_int
-	movq    $0, %rax
 	retq
 \end{lstlisting}
 \caption{An x86 program equivalent to $\BINOP{+}{10}{32}$.}
 \label{fig:p0-x86}
 %\end{wrapfigure}
 \end{figure}
-%% \margincomment{Consider using italics for the texts in these figures.
-%%   It can get confusing to differentiate them from the main text.}
-%% It looks pretty ugly in italics.-Jeremy
 
-Unfortunately, x86 varies in a couple ways depending on what operating system it
-is assembled in. The code examples shown here are correct on Linux and most
-Unix-like platforms, but when assembled on Mac OS X, labels like \key{main} must
-be prefixed with an underscore.  So the correct output for the above program on
-Mac would begin with:
+Unfortunately, x86 varies in a couple ways depending on what operating
+system it is assembled in. The code examples shown here are correct on
+Linux and most Unix-like platforms, but when assembled on Mac OS X,
+labels like \key{main} must be prefixed with an underscore.  So the
+correct output for the above program on Mac would begin with:
 \begin{lstlisting}
 	.globl _main
 _main:
@@ -1243,11 +1231,8 @@ main:
 	negq	-8(%rbp)
 	movq	$52, %rax
 	addq	-8(%rbp), %rax
-	movq	%rax, %rdi
-	callq	print_int
 
 	addq	$16, %rsp
-	movq    $0, %rax
 	popq	%rbp
 	retq
 \end{lstlisting}
@@ -1352,23 +1337,26 @@ $R_1$ and x86 assembly? Here we list some of the most important the
 differences.
 
 \begin{enumerate}
-\item[(a)] x86 arithmetic instructions typically take two arguments and
-  update the second argument in place. In contrast, $R_1$ arithmetic
-  operations take two arguments and produce a new value.
+\item[(a)] x86 arithmetic instructions typically take two arguments
+  and update the second argument in place. In contrast, $R_1$
+  arithmetic operations take two arguments and produce a new value.
+  An x86 instruction may have at most one memory-accessing argument
+  and some instructions place further restrictions on the kinds of
+  their arguments.
 
-\item[(b)] An argument to an $R_1$ operator can be any expression, whereas
-  x86 instructions restrict their arguments to integers, registers,
-  and memory locations.
+\item[(b)] An argument to an $R_1$ operator can be any expression,
+  whereas x86 instructions restrict their arguments to simple things
+  like integers, registers, and memory locations.
 
-\item[(c)] The order of execution in x86 is explicit in the syntax: a
+\item[(d)] The order of execution in x86 is explicit in the syntax: a
   sequence of instructions, whereas in $R_1$ it is a left-to-right
   depth-first traversal of the abstract syntax tree.
 
-\item[(d)] An $R_1$ program can have any number of variables whereas x86
-  has only 16 registers.
+\item[(e)] An $R_1$ program can have any number of variables whereas
+  x86 has only 16 registers.
 
-\item[(e)] Variables in $R_1$ can overshadow other variables with the same
-  name. The registers and memory locations of x86 all have unique
+\item[(f)] Variables in $R_1$ can overshadow other variables with the
+  same name. The registers and memory locations of x86 all have unique
   names.
 \end{enumerate}
 
@@ -1382,31 +1370,45 @@ orders will be better so often some trial-and-error is
 involved. However, we can try to plan ahead and choose the orderings
 based on this planning.
 
+% (b) -> (e)
 For example, to handle difference (b) (nested expressions), we shall
-introduce temporary variables to hold the intermediate results
-of each subexpression.  To deal with difference (d) we
-will be replacing variables with registers and/or stack
-locations. Thus, it makes sense to deal with (b) before (d) so that
-(d) can replace both the original variables and the new ones. Next,
-consider where (a) should fit in. Because it has to do with the format
-of x86 instructions, it makes more sense after we have removed the
-nested expressions (b). What about (c), order of execution?
+introduce temporary variables to hold the intermediate results of each
+subexpression.  To deal with difference (e) we will be replacing
+variables with registers and/or stack locations. Thus, it makes sense
+to deal with (b) before (e) so that (e) can replace both the original
+variables and the new ones.
+%
+% (b) -> (a) ??
+Next, consider where (a) should fit in. Because it has to do with the
+format of x86 instructions, it makes more sense after we have removed
+the nested expressions (b).
+
+What about (c), order of execution?
 
 UNDER CONSTRUCTION
 
+% (e) -> (b)
 Finally, when should we deal with (e) (variable overshadowing)?  We
 shall solve this problem by renaming variables to make sure they have
-unique names. Recall that our plan for (b) involves moving nested
-expressions, which could be problematic if it changes the shadowing of
+unique names. Recall that our plan for (b) involves moving 
+expressions, which could be problematic if a move changes the shadowing of
 variables. However, if we deal with (e) first, then it will not be an
-issue.  Thus, we arrive at the following ordering.
+issue. Of course, this means that during (b), when we insert temporary
+variables, we need to make sure that they are unique.
+%
+
+What about the ordering of (a) (instr. sel) and (e) (register allocation)?
+
+Thus, we arrive at the following ordering.
+
+[ordering of reg. alloc versus instr. sel? -jeremy]
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\foreach \i/\p in {1/1,2/2,3/3,4/4,5/5}
+\foreach \i/\p in {1/1,2/2,3/3,4/4,5/5,6/6}
 {
   \node (\i) at (\p*1.5,0) {$\bullet$};
 }
-\foreach \x/\y/\lbl in {1/2/a,2/3/b,3/4/c,4/5/d}
+\foreach \x/\y/\lbl in {1/2/e,2/3/b,3/4/c,4/5/a,5/6/d}
 {
   \path[->,bend left=15] (\x) edge [above] node {\small\lbl} (\y);
 }
@@ -1470,7 +1472,7 @@ C_0 & ::= & (\key{program}\;(\Var^{*})\;\Stmt^{+})
 \end{figure}
 
 To get from $C_0$ to x86 assembly, it remains for us to handle
-difference \#1 (the format of instructions) and difference (d)
+difference (a) (the format of instructions) and difference (d)
 (variables versus stack locations and registers). These two
 differences are intertwined, creating a bit of a Gordian Knot. To
 handle difference (d), we need to map some variables to registers
