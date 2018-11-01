@@ -1333,29 +1333,29 @@ x86_0 &::= & (\key{program} \;\Int \; \Instr^{+})
 To compile one language to another it helps to focus on the
 differences between the two languages. It is these differences that
 the compiler will need to bridge. What are the differences between
-$R_1$ and x86 assembly? Here we list some of the most important the
-differences.
+$R_1$ and x86 assembly? Here we list some of the most important ones.
 
 \begin{enumerate}
-\item[(a)] x86 arithmetic instructions typically take two arguments
+\item[(a)] x86 arithmetic instructions typically have two arguments
   and update the second argument in place. In contrast, $R_1$
   arithmetic operations take two arguments and produce a new value.
-  An x86 instruction may have at most one memory-accessing argument
-  and some instructions place further restrictions on the kinds of
+  An x86 instruction may have at most one memory-accessing argument.
+  Some instructions place custom restrictions on the kinds of
   their arguments.
 
 \item[(b)] An argument to an $R_1$ operator can be any expression,
-  whereas x86 instructions restrict their arguments to simple things
-  like integers, registers, and memory locations.
+  whereas x86 instructions restrict their arguments to \emph{simple
+  expression} like integers, registers, and memory locations.
+  (All other kinds of expressions are called \emph{complex}.)
 
-\item[(d)] The order of execution in x86 is explicit in the syntax: a
+\item[(c)] The order of execution in x86 is explicit in the syntax: a
   sequence of instructions, whereas in $R_1$ it is a left-to-right
   depth-first traversal of the abstract syntax tree.
 
-\item[(e)] An $R_1$ program can have any number of variables whereas
+\item[(d)] An $R_1$ program can have any number of variables whereas
   x86 has only 16 registers.
 
-\item[(f)] Variables in $R_1$ can overshadow other variables with the
+\item[(e)] Variables in $R_1$ can overshadow other variables with the
   same name. The registers and memory locations of x86 all have unique
   names.
 \end{enumerate}
@@ -1370,36 +1370,67 @@ orders will be better so often some trial-and-error is
 involved. However, we can try to plan ahead and choose the orderings
 based on this planning.
 
-% (b) -> (e)
-For example, to handle difference (b) (nested expressions), we shall
-introduce temporary variables to hold the intermediate results of each
-subexpression.  To deal with difference (e) we will be replacing
-variables with registers and/or stack locations. Thus, it makes sense
-to deal with (b) before (e) so that (e) can replace both the original
-variables and the new ones.
-%
-% (b) -> (a) ??
-Next, consider where (a) should fit in. Because it has to do with the
-format of x86 instructions, it makes more sense after we have removed
-the nested expressions (b).
-
-What about (c), order of execution?
-
-UNDER CONSTRUCTION
+% (e) uniquify
+% (b) rco
+% (c) explicate-control
+% (a) instr-sel.
+% (d) assign-homes (register allocation)
 
 % (e) -> (b)
-Finally, when should we deal with (e) (variable overshadowing)?  We
-shall solve this problem by renaming variables to make sure they have
-unique names. Recall that our plan for (b) involves moving 
-expressions, which could be problematic if a move changes the shadowing of
-variables. However, if we deal with (e) first, then it will not be an
-issue. Of course, this means that during (b), when we insert temporary
-variables, we need to make sure that they are unique.
-%
 
-What about the ordering of (a) (instr. sel) and (e) (register allocation)?
+For example, to handle difference (b) (nested expressions), we shall
+introduce temporary variables to hold the intermediate results of each
+complex subexpression.  To deal with (e) (variable overshadowing) we
+shall renaming variables to make sure they have unique names.  The
+plan for (b) involves moving expressions, which could change the
+shadowing of variables.  However, if we deal with (e) first, then
+shadowing will not be an issue. Of course, this means that during (b),
+when we insert temporary variables, we need to make sure that they are
+unique.
 
-Thus, we arrive at the following ordering.
+% (c) -> (a)
+To handle difference (c) (order of execution), we shall transform the
+program into a control flow graph: each vertex is a basic block,
+within which the order of execution is sequential. At the end of each
+block there is a jump to one or two other blocks, which form the edges
+of the graph. We need to handle this difference prior to (a)
+(operations vs. instructions) because it will determine where we need
+to generate x86 labels and jump instructions.
+% (e),(b) -> (c)
+With respect to (e) and (b), it perhaps does not matter very much
+whether (c) comes before or after them. We find it convenient to place
+(c) after (e) and (b).
+
+% (b) -> (d), (c) -> (d)
+To deal with difference (d) we replace variables with registers and
+stack locations. Thus, it makes sense to deal with (b) before (d) so
+that (d) can replace both the original variables and the temporary
+variables generated in dealing with (b). Also, it's good to handle (c)
+before (d) because while analyzing the control flow, we sometimes
+notice that some code and the variables it uses are unnecessary, so we
+can remove them which speeds up (d).
+
+% (a) -> (d)
+Last but not least, we need to decide on the ordering of (a)
+(selecting instructions) and (d) (mapping variables to stack locations
+and registers). These two issues are intertwined, creating a bit of a
+Gordian Knot. To handle difference (d), we need to map some variables
+to registers (there are only 16 registers) and the remaining variables
+to locations on the stack (which is unbounded). But recall that x86
+instructions have restrictions about which of their arguments can be
+registers versus memory accesses (stack locations).  So to make good
+decisions regarding this mapping, it is helpful to know which
+instructions use which variables. On the other hand, 
+
+
+
+We cut this knot by doing an optimistic selection of instructions in
+the \key{select-instructions} pass, followed by the \key{assign-homes}
+pass to map variables to registers or stack locations, and conclude by
+finalizing the instruction selection in the \key{patch-instructions}
+pass.
+
+
 
 [ordering of reg. alloc versus instr. sel? -jeremy]
 \[

@@ -31,7 +31,7 @@ V
     exp ::= arg | (op arg*)
     stmt ::= (assign x exp)
     tail ::= (return exp) | (seq stmt tail)
-    C0 ::= (program () ((label . tail)*))
+    C0 ::= (program () tail)
 
 uncover-locals
 |
