@@ -847,31 +847,20 @@ partially evaluating the children nodes.
      (match e
        [(? fixnum?) e]
        [`(read) `(read)]
-       [`(- ,(app pe-arith r1))
-         (pe-neg r1)]
-       [`(+ ,(app pe-arith r1) ,(app pe-arith r2))
-         (pe-add r1 r2)]))
+       [`(- ,e1)
+         (pe-neg (pe-arith e1))]
+       [`(+ ,e1 ,e2)
+         (pe-add (pe-arith e1) (pe-arith e2))]))
 \end{lstlisting}
 \caption{A partial evaluator for $R_0$ expressions.}
 \label{fig:pe-arith}
 \end{figure}
 
-Note that in the recursive cases in \code{pe-arith} for negation and
-addition, we have made use of the \key{app} feature of Racket's
-\key{match} to apply a function and bind the result.  Here we use
-\lstinline{(app pe-arith r1)} to recursively apply \texttt{pe-arith}
-to the child node and bind the \emph{result value} to variable
-\texttt{r1}.  The choice of whether to use \key{app} is mainly
-stylistic, although if side effects are involved the change in order
-of evaluation may be in issue.  Further, when we write functions with
-multiple return values, the \key{app} form can be convenient for
-binding the resulting values.
-
 Our code for \texttt{pe-neg} and \texttt{pe-add} implements the simple
-idea of checking whether the inputs are integers and if they are, to
-go ahead and perform the arithmetic.  Otherwise, we use quasiquote to
-create an AST node for the appropriate operation (either negation or
-addition) and use comma to splice in the child nodes.
+idea of checking whether their arguments are integers and if they are,
+to go ahead and perform the arithmetic.  Otherwise, we use quasiquote
+to create an AST node for the appropriate operation (either negation
+or addition) and use comma to splice in the child nodes.
 
 To gain some confidence that the partial evaluator is correct, we can
 test whether it produces programs that get the same result as the
@@ -1026,23 +1015,26 @@ to the variable, then evaluates the body of the \key{let}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-   (define (interp-exp env)
-     (lambda (e)
-       (match e
-         [(? fixnum?) e]
-         [`(read)
-          (define r (read))
-          (cond [(fixnum? r) r]
-                [else (error 'interp-R1 "expected an integer" r)])]
-         [`(- ,(app (interp-exp env) v))
-          (fx- 0 v)]
-         [`(+ ,(app (interp-exp env) v1) ,(app (interp-exp env) v2))
-           (fx+ v1 v2)]
-         [(? symbol?) (lookup e env)]
-         [`(let ([,x ,(app (interp-exp env) v)]) ,body)
-          (define new-env (cons (cons x v) env))
-          ((interp-exp new-env) body)]
-         )))
+(define (interp-exp env)
+  (lambda (e)
+    (match e
+      [(? fixnum?) e]
+      [`(read)
+       (define r (read))
+       (cond [(fixnum? r) r]
+             [else (error 'interp-R1 "expected an integer" r)])]
+      [`(- ,e)
+       (define v ((interp-exp env) e))
+       (fx- 0 v)]
+      [`(+ ,e1 ,e2)
+       (define v1 ((interp-exp env) e1))
+       (define v2 ((interp-exp env) e2))
+       (fx+ v1 v2)]
+      [(? symbol?) (lookup e env)]
+      [`(let ([,x ,e]) ,body)
+       (define new-env (cons (cons x ((interp-exp env) e)) env))
+       ((interp-exp new-env) body)]
+      )))
 
    (define (interp-R1 env)
      (lambda (p)
@@ -1120,7 +1112,7 @@ the x86 instructions used in this book and a short explanation of what they do.
       \key{subq} \; \Arg, \Arg \mid
       \key{negq} \; \Arg \mid \key{movq} \; \Arg, \Arg \mid \\
   &&  \key{callq} \; \mathit{label} \mid
-      \key{pushq}\;\Arg \mid \key{popq}\;\Arg \mid \key{retq} \\
+      \key{pushq}\;\Arg \mid \key{popq}\;\Arg \mid \key{retq} \mid \itm{label}\key{:}\; \Instr \\
 \Prog &::= & \key{.globl main}\\
       &    & \key{main:} \; \Instr^{+}
 \end{array}
@@ -1276,31 +1268,33 @@ places $52$ in the register \key{rax} and \key{addq -8(\%rbp), \%rax}
 adds the contents of variable $1$ to \key{rax}, at which point
 \key{rax} contains $42$.
 
-The next two instructions print the final result of the program.
-
-The last four instructions are the typical \emph{conclusion} of a
-procedure.  The first three are necessary to get the state of the
-machine back to where it was before the current procedure was called.
-The \key{addq \$16, \%rsp} instruction moves the stack pointer back to
+The last three instructions are the typical \emph{conclusion} of a
+procedure.  The first two are necessary to get the state of the
+machine back to where it was at the beginning of the procedure.  The
+\key{addq \$16, \%rsp} instruction moves the stack pointer back to
 point at the old base pointer. The amount added here needs to match
-the amount that was subtracted in the prelude of the procedure. The
-\key{movq \$0, \%rax} instruction ensures that the returned exit code
-is 0.  Then \key{popq \%rbp} returns the old base pointer to \key{rbp}
-and adds $8$ to the stack pointer.  The \key{retq} instruction jumps
+the amount that was subtracted in the prelude of the procedure. Then
+\key{popq \%rbp} returns the old base pointer to \key{rbp} and adds
+$8$ to the stack pointer.  The final instruction, \key{retq}, jumps
 back to the procedure that called this one and adds 8 to the stack
-pointer, returning the stack pointer to where it was prior to the
+pointer, which returns the stack pointer to where it was prior to the
 procedure call.
 
 The compiler will need a convenient representation for manipulating
 x86 programs, so we define an abstract syntax for x86 in
 Figure~\ref{fig:x86-ast-a}. We refer to this language as $x86_0$ with
 a subscript $0$ because later we introduce extended versions of this
-assembly language. The $\Int$ field of the \key{program} AST node
-records the number of bytes of stack space needed for variables in the
-program. (Some of the intermediate languages will store other
-information in that part of the S-expression for the purposes of
-communicating auxiliary data from one step of the compiler to the
-next.
+assembly language. The main difference compared to the concrete syntax
+of x86 (Figure~\ref{fig:x86-a}) is that it does nto allow labelled
+instructions to appear anywhere, but instead organizes instructions
+into groups called \emph{blocks} and a label is associated with every
+block, which is why the \key{program} form includes an association
+list mapping labels to blocks. The reason for this organization
+becomes apparent in Chapter~\ref{ch:bool-types}.
+%
+(The $\itm{info}$ field of the \key{program} and \key{block} AST nodes
+contain an association list that is used to communicating auxiliary
+data from one pass of the compiler to the next.)
 
 \begin{figure}[tp]
 \fbox{
@@ -1318,7 +1312,8 @@ next.
              (\key{callq} \; \mathit{label}) \mid
              (\key{pushq}\;\Arg) \mid
              (\key{popq}\;\Arg) \\
-x86_0 &::= & (\key{program} \;\Int \; \Instr^{+})
+\Block &::= & (\key{block} \;\itm{info}\; \Instr^{+}) \\
+x86_0 &::= & (\key{program} \;\itm{info} \; ((\itm{label} \,\key{.}\, \Block)^{+}))
 \end{array}
 \]
 \end{minipage}
@@ -1362,9 +1357,15 @@ differences.
 
 We ease the challenge of compiling from $R_1$ to x86 by breaking down
 the problem into several steps, dealing with the above differences one
-at a time. The main question then becomes: in what order do we tackle
-these differences? This can be a challenging question for a compiler
-writer to answer because some orderings may be much more difficult to
+at a time. We begin by giving a sketch about how we might accomplish
+each of these steps, and give them names. Then we figure out the
+ordering of the steps.
+
+UNDER CONSTRUCTION
+
+The main question then becomes: in what order do we tackle these
+differences? This can be a challenging question for a compiler writer
+to answer because some orderings may be much more difficult to
 implement than others. It is difficult to know ahead of time which
 orders will be better so often some trial-and-error is
 involved. However, we can try to plan ahead and choose the orderings
