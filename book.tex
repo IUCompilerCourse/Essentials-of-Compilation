@@ -937,7 +937,7 @@ Figure~\ref{fig:r1-syntax}.  The non-terminal \Var{} may be any Racket
 identifier. As in $R_0$, \key{read} is a nullary operator, \key{-} is
 a unary operator, and \key{+} is a binary operator.  Similar to $R_0$,
 the $R_1$ language includes the \key{program} form to mark the top of
-the program, which is helpful in some of the compiler passes.  The
+the program, which is helpful in parts of the compiler.  The
 $R_1$ language is rich enough to exhibit several compilation
 techniques but simple enough so that the reader, together with couple
 friends, can implement a compiler for it in a week or two of part-time
@@ -1294,7 +1294,7 @@ becomes apparent in Chapter~\ref{ch:bool-types}.
 %
 (The $\itm{info}$ field of the \key{program} and \key{block} AST nodes
 contain an association list that is used to communicating auxiliary
-data from one pass of the compiler to the next.)
+data from one step of the compiler to the next.)
 
 \begin{figure}[tp]
 \fbox{
@@ -1339,9 +1339,9 @@ $R_1$ and x86 assembly? Here we list some of the most important ones.
   their arguments.
 
 \item[(b)] An argument to an $R_1$ operator can be any expression,
-  whereas x86 instructions restrict their arguments to \emph{simple
-  expression} like integers, registers, and memory locations.
-  (All other kinds of expressions are called \emph{complex}.)
+  whereas x86 instructions restrict their arguments to be \emph{simple
+    expressions} like integers, registers, and memory locations.  (All
+  other kinds of expressions are called \emph{complex}.)
 
 \item[(c)] The order of execution in x86 is explicit in the syntax: a
   sequence of instructions, whereas in $R_1$ it is a left-to-right
@@ -1358,8 +1358,38 @@ $R_1$ and x86 assembly? Here we list some of the most important ones.
 We ease the challenge of compiling from $R_1$ to x86 by breaking down
 the problem into several steps, dealing with the above differences one
 at a time. We begin by giving a sketch about how we might accomplish
-each of these steps, and give them names. Then we figure out the
-ordering of the steps.
+each of these steps, and give each step a name.  We shall then figure
+out an ordering of the steps. Finally, to implement the compiler, we
+shall write one function, typically recursive, per step. Each function
+is called a \emph{pass} of the compiler, because it traverses (passes
+over) the entire AST of the program.
+
+\begin{description}
+\item[\key{select-instructions}] To handle the difference between
+  $R_1$ operations and x86 instructions we shall convert each $R_1$
+  operation to a short sequence of instructions that accomplishes the
+  same task.
+
+\item[\key{remove-complex-opera*}] To ensure that each argument of an
+  operation is a simple expression, we shall introduce temporary
+  variables to hold the results of complex subexpressions.
+  
+\item[\key{explicate-control}] To make the execution order of the
+  program explicit, we shall convert from the abstract syntax tree
+  representation into a graph representation in which each node
+  contains a sequence of actions and the edges say where to go after
+  the sequence is complete.
+
+\item[\key{assign-homes}] To handle the difference between the
+  variables in $R_1$ versus the registers and stack location in x86,
+  we shall come up with an assignment of each variable to its
+  ``home'', that is, to a register or stack location.
+
+\item[\key{uniquify}] This pass deals with the shadowing of variables
+  by renaming every variable to a unique name, so that shadowing no
+  longer occurs.
+
+\end{description}
 
 UNDER CONSTRUCTION
 
