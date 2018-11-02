@@ -1454,13 +1454,6 @@ the \key{assign-homes}, followed by a third pass, named
 patch-up any outstanding problems regarding instructions that involve
 too many memory accesses.
 
-Figure~\ref{fig:R1-passes} presents the ordering of the compiler
-passes in the form of a graph. Each pass is an edge and the
-input/output language of each pass is a node.
-
-UNDER CONSTRUCTION
-
-
 \begin{figure}[tbp]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (R1) at (0,2)  {\large $R_1$};
@@ -1488,64 +1481,62 @@ UNDER CONSTRUCTION
 \label{fig:R1-passes}
 \end{figure}
 
+Figure~\ref{fig:R1-passes} presents the ordering of the compiler
+passes in the form of a graph. Each pass is an edge and the
+input/output language of each pass is a node in the graph.  The output
+of \key{uniquify} and \key{remove-complex-opera*} are programs that
+are still in the $R_1$ language, but the output of the pass
+\key{explicate-control} is in a different language that is designed to
+make the order of evaluation explicit in its syntax, which we
+introduce in the next section. Also, there are two passes of lesser
+importance in Figure~\ref{fig:R1-passes} that we have not yet talked
+about, \key{uncover-locals} and \key{print-x86}. We shall discuss them
+later in this Chapter.
 
-%% \[
-%% \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-%% \foreach \i/\p in {1/1,2/2,3/3,4/4,5/5,6/6}
-%% {
-%%   \node (\i) at (\p*1.5,0) {$\bullet$};
-%% }
-%% \foreach \x/\y/\lbl in {1/2/e,2/3/b,3/4/c,4/5/a,5/6/d}
-%% {
-%%   \path[->,bend left=15] (\x) edge [above] node {\small\lbl} (\y);
-%% }
-%% \end{tikzpicture}
-%% \]
-We further simplify the translation from $R_1$ to x86 by identifying
-an intermediate language named $C_0$, roughly half-way between $R_1$
-and x86, to provide a rest stop along the way. We name the language
-$C_0$ because it is vaguely similar to the $C$
-language~\citep{Kernighan:1988nx}. The differences (e) and (a),
-regarding variables and nested expressions, will be handled by two
-steps, \key{uniquify} and \key{flatten}, which bring us to
-$C_0$.
-%% \[
-%% \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-%% \foreach \i/\p in {R_1/1,R_1/2,C_0/3}
-%% {
-%%   \node (\p) at (\p*3,0) {\large $\i$};
-%% }
-%% \foreach \x/\y/\lbl in {1/2/uniquify,2/3/flatten}
-%% {
-%%  \path[->,bend left=15] (\x) edge [above] node {\ttfamily\footnotesize \lbl} (\y);
-%% }
-%% \end{tikzpicture}
-%% \]
+\subsection{The $C_0$ Intermediate Language}
 
-The syntax for $C_0$ is defined in Figure~\ref{fig:c0-syntax}.  The
-$C_0$ language supports the same operators as $R_1$ but the arguments
-of operators are now restricted to just variables and integers, so all
-intermediate results are bound to variables. In the literature this
-style of intermediate language is called administrative normal form,
-or ANF for short~\citep{Danvy:1991fk,Flanagan:1993cg}.  The \key{let}
-construct of $R_1$ is replaced by an assignment statement and there is
-a \key{return} construct to specify the return value of the program. A
-program consists of a sequence of statements that include at least one
-\key{return} statement. Each program is also annotated with a list of
-variables (viz. {\tt (var*)}). At the start of the program, these
-variables are uninitialized (they contain garbage) and each variable
-becomes initialized on its first assignment. All of the variables used
-in the program must be present in this list exactly once.
+It so happens that the output of \key{explicate-control} is vaguely
+similar to the $C$ language~\citep{Kernighan:1988nx}, so we name it
+$C_0$.  The syntax for $C_0$ is defined in Figure~\ref{fig:c0-syntax}.
+%
+The $C_0$ language supports the same operators as $R_1$ but the
+arguments of operators are now restricted to just variables and
+integers, thanks to the \key{remove-complex-opera*} pass.  In the
+literature this style of intermediate language is called
+administrative normal form, or ANF for
+short~\citep{Danvy:1991fk,Flanagan:1993cg}.  Instead of \key{let}
+expressions, $C_0$ has assignment statements which can be executed in
+sequence using the \key{seq} construct. A sequent of statements always
+ends with \key{return}, a guarantee that is baked into the grammar
+rules for the \itm{tail} non-terminal. The term \emph{tail position}
+refers to an expression that is the last one to execute within a
+function. (An expression may contain subexpressions, and those may or
+may not be in tail position depending on the kind of expression.)  We
+choose the name ``tail'' for this non-terminal in the grammar because
+indeed, it corresponds to the last thing that needs to execute.
 
-\begin{figure}[tp]
+A $C_0$ program consists of an association list mapping labels to
+tails, though this is overkill for the present Chapter, as we do not
+yet need the introduce \key{goto} for jumping to a label.  For now
+there will just be one label, \key{start}, and the whole program will
+be in it's tail.
+%
+The $\itm{info}$ field of the program, after \key{uncover-locals},
+will contain a mapping from \key{locals} to a list of variables, that
+is, all the variables used in the program. At the start of the
+program, these variables are uninitialized (they contain garbage) and
+each variable becomes initialized on its first assignment.
+
+\begin{figure}[tbp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
 \Arg &::=& \Int \mid \Var \\
 \Exp &::=& \Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)\\
-\Stmt &::=& \ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg} \\
-C_0 & ::= & (\key{program}\;(\Var^{*})\;\Stmt^{+})
+\Stmt &::=& \ASSIGN{\Var}{\Exp} \\
+\Tail &::= & \RETURN{\Arg} \mid (\key{seq}\; \Stmt\; \Tail) \\
+C_0 & ::= & (\key{program}\;\itm{info}\;((\itm{label}\,\key{.}\,\Tail)^{+}))
 \end{array}
 \]
 \end{minipage}
@@ -1554,64 +1545,36 @@ C_0 & ::= & (\key{program}\;(\Var^{*})\;\Stmt^{+})
 \label{fig:c0-syntax}
 \end{figure}
 
-To get from $C_0$ to x86 assembly, it remains for us to handle
-difference (a) (the format of instructions) and difference (d)
-(variables versus stack locations and registers). These two
-differences are intertwined, creating a bit of a Gordian Knot. To
-handle difference (d), we need to map some variables to registers
-(there are only 16 registers) and the remaining variables to locations
-on the stack (which is unbounded). To make good decisions regarding
-this mapping, we need the program to be close to its final form (in
-x86 assembly) so we know exactly when which variables are used. After
-all, variables that are used at different time periods during program
-execution can be assigned to the same register.  However, our choice
-of x86 instructions depends on whether the variables are mapped to
-registers or stack locations, so we have a circular dependency. We cut
-this knot by doing an optimistic selection of instructions in the
-\key{select-instructions} pass, followed by the \key{assign-homes}
-pass to map variables to registers or stack locations, and conclude by
-finalizing the instruction selection in the \key{patch-instructions}
-pass.
-%% \[
-%% \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-%% \node (1) at (0,0)  {\large $C_0$};
-%% \node (2) at (3,0)  {\large $\text{x86}^{*}_0$};
-%% \node (3) at (6,0)  {\large $\text{x86}^{*}_0$};
-%% \node (4) at (9,0) {\large $\text{x86}_0$};
 
-%% \path[->,bend left=15] (1) edge [above] node {\ttfamily\footnotesize select-instr.} (2);
-%% \path[->,bend left=15] (2) edge [above] node {\ttfamily\footnotesize assign-homes} (3);
-%% \path[->,bend left=15] (3) edge [above] node {\ttfamily\footnotesize patch-instr.} (4);
-%% \end{tikzpicture}
-%% \]
+%% The \key{select-instructions} pass is optimistic in the sense that it
+%% treats variables as if they were all mapped to registers. The
+%% \key{select-instructions} pass generates a program that consists of
+%% x86 instructions but that still uses variables, so it is an
+%% intermediate language that is technically different than x86, which
+%% explains the asterisks in the diagram above.
 
-The \key{select-instructions} pass is optimistic in the sense that it
-treats variables as if they were all mapped to registers. The
-\key{select-instructions} pass generates a program that consists of
-x86 instructions but that still uses variables, so it is an
-intermediate language that is technically different than x86, which
-explains the asterisks in the diagram above.
+%% In this Chapter we shall take the easy road to implementing
+%% \key{assign-homes} and simply map all variables to stack locations.
+%% The topic of Chapter~\ref{ch:register-allocation} is implementing a
+%% smarter approach in which we make a best-effort to map variables to
+%% registers, resorting to the stack only when necessary.
 
-In this Chapter we shall take the easy road to implementing
-\key{assign-homes} and simply map all variables to stack locations.
-The topic of Chapter~\ref{ch:register-allocation} is implementing a
-smarter approach in which we make a best-effort to map variables to
-registers, resorting to the stack only when necessary.
+%% Once variables have been assigned to their homes, we can finalize the
+%% instruction selection by dealing with an idiosyncrasy of x86
+%% assembly. Many x86 instructions have two arguments but only one of the
+%% arguments may be a memory reference (and the stack is a part of
+%% memory).  Because some variables may get mapped to stack locations,
+%% some of our generated instructions may violate this restriction.  The
+%% purpose of the \key{patch-instructions} pass is to fix this problem by
+%% replacing every violating instruction with a short sequence of
+%% instructions that use the \key{rax} register. Once we have implemented
+%% a good register allocator (Chapter~\ref{ch:register-allocation}), the
+%% need to patch instructions will be relatively rare.
 
-Once variables have been assigned to their homes, we can finalize the
-instruction selection by dealing with an idiosyncrasy of x86
-assembly. Many x86 instructions have two arguments but only one of the
-arguments may be a memory reference (and the stack is a part of
-memory).  Because some variables may get mapped to stack locations,
-some of our generated instructions may violate this restriction.  The
-purpose of the \key{patch-instructions} pass is to fix this problem by
-replacing every violating instruction with a short sequence of
-instructions that use the \key{rax} register. Once we have implemented
-a good register allocator (Chapter~\ref{ch:register-allocation}), the
-need to patch instructions will be relatively rare.
+\subsection{The dialects x86}
 
-The x86$^{*}$ language extends x86
-with variables and looser rules regarding instruction arguments. The
+The x86$^{*}$ language, pronounced ``pseudo-x86'', extends x86 with
+variables and looser rules regarding instruction arguments. The
 x86$^{\dagger}$ language is the concrete syntax (string) for x86.
 
 
