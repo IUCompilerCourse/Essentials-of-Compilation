@@ -1326,156 +1326,181 @@ x86_0 &::= & (\key{program} \;\itm{info} \; ((\itm{label} \,\key{.}\, \Block)^{+
 \label{sec:plan-s0-x86}
 
 To compile one language to another it helps to focus on the
-differences between the two languages. It is these differences that
-the compiler will need to bridge. What are the differences between
-$R_1$ and x86 assembly? Here we list some of the most important ones.
+differences between the two languages because the compiler will need
+to bridge them. What are the differences between $R_1$ and x86
+assembly? Here we list some of the most important ones.
 
 \begin{enumerate}
 \item[(a)] x86 arithmetic instructions typically have two arguments
   and update the second argument in place. In contrast, $R_1$
   arithmetic operations take two arguments and produce a new value.
   An x86 instruction may have at most one memory-accessing argument.
-  Some instructions place custom restrictions on the kinds of
-  their arguments.
+  Furthermore, some instructions place special restrictions on their
+  arguments.
 
 \item[(b)] An argument to an $R_1$ operator can be any expression,
   whereas x86 instructions restrict their arguments to be \emph{simple
     expressions} like integers, registers, and memory locations.  (All
-  other kinds of expressions are called \emph{complex}.)
+  the other kinds are called \emph{complex expressions}.)
 
 \item[(c)] The order of execution in x86 is explicit in the syntax: a
-  sequence of instructions, whereas in $R_1$ it is a left-to-right
-  depth-first traversal of the abstract syntax tree.
+  sequence of instructions and jumps to labeled positions, whereas in
+  $R_1$ it is a left-to-right depth-first traversal of the abstract
+  syntax tree.
 
 \item[(d)] An $R_1$ program can have any number of variables whereas
-  x86 has only 16 registers.
+  x86 has 16 registers and the procedure calls stack.
 
 \item[(e)] Variables in $R_1$ can overshadow other variables with the
   same name. The registers and memory locations of x86 all have unique
-  names.
+  names or addresses.
 \end{enumerate}
 
 We ease the challenge of compiling from $R_1$ to x86 by breaking down
 the problem into several steps, dealing with the above differences one
-at a time. We begin by giving a sketch about how we might accomplish
-each of these steps, and give each step a name.  We shall then figure
-out an ordering of the steps. Finally, to implement the compiler, we
-shall write one function, typically recursive, per step. Each function
-is called a \emph{pass} of the compiler, because it traverses (passes
-over) the entire AST of the program.
+at a time.  Each of these steps is called a \emph{pass} of the
+compiler, because step traverses (passes over) the AST of the program.
+%
+We begin by giving a sketch about how we might implement each pass,
+and give them names.  We shall then figure out an ordering of the
+passes and the input/output language for each pass. The very first
+pass has $R_1$ as its input language and the last pass has x86 as its
+output language. In between we can choose whichever language is most
+convenient for expressing the output of each pass, whether that be
+$R_1$, x86, or new \emph{intermediate languages} of our own design.
+Finally, to implement the compiler, we shall write one function,
+typically a structural recursive function, per pass.
 
 \begin{description}
-\item[\key{select-instructions}] To handle the difference between
+\item[Pass \key{select-instructions}] To handle the difference between
   $R_1$ operations and x86 instructions we shall convert each $R_1$
   operation to a short sequence of instructions that accomplishes the
   same task.
 
-\item[\key{remove-complex-opera*}] To ensure that each argument of an
-  operation is a simple expression, we shall introduce temporary
-  variables to hold the results of complex subexpressions.
+\item[Pass \key{remove-complex-opera*}] To ensure that each
+  subexpression (i.e. operator and operand, and hence \key{opera*}) is
+  a simple expression, we shall introduce temporary variables to hold
+  the results of subexpressions.
   
-\item[\key{explicate-control}] To make the execution order of the
+\item[Pass \key{explicate-control}] To make the execution order of the
   program explicit, we shall convert from the abstract syntax tree
   representation into a graph representation in which each node
   contains a sequence of actions and the edges say where to go after
   the sequence is complete.
 
-\item[\key{assign-homes}] To handle the difference between the
+\item[Pass \key{assign-homes}] To handle the difference between the
   variables in $R_1$ versus the registers and stack location in x86,
   we shall come up with an assignment of each variable to its
-  ``home'', that is, to a register or stack location.
+  \emph{home}, that is, to a register or stack location.
 
-\item[\key{uniquify}] This pass deals with the shadowing of variables
+\item[Pass \key{uniquify}] This pass deals with the shadowing of variables
   by renaming every variable to a unique name, so that shadowing no
   longer occurs.
 
 \end{description}
 
+The next question is: in what order should we apply these passes? This
+question can be a challenging one to answer because it is difficult to
+know ahead of time which orders will be better (easier to implement,
+produce more efficient code, etc.) so often some trial-and-error is
+involved. Nevertheless, we can try to plan ahead and make educated
+choices regarding the orderings.
+
+Let us consider the ordering of \key{uniquify} and
+\key{remove-complex-opera*}. The assignment of subexpressions to
+temporary variables involving moving subexpressions, which might
+change the shadowing of variables an inadvertently change the program.
+But if we apply \key{uniquify} first, this will not be an issue. Of
+course, this means that in \key{remove-complex-opera*}, we need to
+ensure that the new temporary variables are unique.
+
+Next we shall consider the ordering of the \key{explicate-control}
+pass and \key{select-instructions}. It is clear that
+\key{explicate-control} must come first because the control-flow graph
+that it generates is needed when determing where to place the x86
+label and jump instructions.
+%
+Regarding the ordering of \key{explicate-control} with respect to
+\key{uniquify} and \key{remove-complex-opera*}, it perhaps does not
+matter very much, but it seems to work well to place
+\key{explicate-control} after these other two passes.
+
+The \key{assign-homes} pass should come after
+\key{remove-complex-opera*} and \key{explicate-control}.  The
+\key{remove-complex-opera*} pass generates temporary variables, which
+also need to be assigned homes, so \key{assign-homes} needs to come
+after. Regarding \key{explicate-control}, this pass deletes \emph{dead
+  code} (branches that will never be executed), which can remove
+variables. Thus it is beneficial to place \key{explicate-control}
+prior to \key{assign-homes} so that there are fewer variables that
+need to be assigned homes. This is important because the
+\key{assign-homes} pass has the highest time complexity.
+
+Last, we need to decide on the ordering of \key{select-instructions}
+and \key{assign-homes}.  These two issues are intertwined, creating a
+bit of a Gordian Knot. To do a good job of assigning homes, it is
+helpful to have already determined which instructions will be used,
+because x86 instructions have restrictions about which of their
+arguments can be registers versus stack locations. For example, one
+can give preferential treatment to variables that occur in
+register-argument positions. On the other hand, it may turn out to be
+impossible to make sure that all such variables are assigned to
+registers, and then one must redo the selection of instructions. Some
+compilers handle this problem by iteratively repeating these two
+passes until a good solution is found.  We shall suggest a simpler
+approach in which \key{select-instructions} come first, followed by
+the \key{assign-homes}, followed by a third pass, named
+\key{patch-instructions}, that uses a reserved register (\key{rax}) to
+patch-up any outstanding problems regarding instructions that involve
+too many memory accesses.
+
+Figure~\ref{fig:R1-passes} presents the ordering of the compiler
+passes in the form of a graph. Each pass is an edge and the
+input/output language of each pass is a node.
+
 UNDER CONSTRUCTION
 
-The main question then becomes: in what order do we tackle these
-differences? This can be a challenging question for a compiler writer
-to answer because some orderings may be much more difficult to
-implement than others. It is difficult to know ahead of time which
-orders will be better so often some trial-and-error is
-involved. However, we can try to plan ahead and choose the orderings
-based on this planning.
 
-% (e) uniquify
-% (b) rco
-% (c) explicate-control
-% (a) instr-sel.
-% (d) assign-homes (register allocation)
-
-% (e) -> (b)
-
-For example, to handle difference (b) (nested expressions), we shall
-introduce temporary variables to hold the intermediate results of each
-complex subexpression.  To deal with (e) (variable overshadowing) we
-shall renaming variables to make sure they have unique names.  The
-plan for (b) involves moving expressions, which could change the
-shadowing of variables.  However, if we deal with (e) first, then
-shadowing will not be an issue. Of course, this means that during (b),
-when we insert temporary variables, we need to make sure that they are
-unique.
-
-% (c) -> (a)
-To handle difference (c) (order of execution), we shall transform the
-program into a control flow graph: each vertex is a basic block,
-within which the order of execution is sequential. At the end of each
-block there is a jump to one or two other blocks, which form the edges
-of the graph. We need to handle this difference prior to (a)
-(operations vs. instructions) because it will determine where we need
-to generate x86 labels and jump instructions.
-% (e),(b) -> (c)
-With respect to (e) and (b), it perhaps does not matter very much
-whether (c) comes before or after them. We find it convenient to place
-(c) after (e) and (b).
-
-% (b) -> (d), (c) -> (d)
-To deal with difference (d) we replace variables with registers and
-stack locations. Thus, it makes sense to deal with (b) before (d) so
-that (d) can replace both the original variables and the temporary
-variables generated in dealing with (b). Also, it's good to handle (c)
-before (d) because while analyzing the control flow, we sometimes
-notice that some code and the variables it uses are unnecessary, so we
-can remove them which speeds up (d).
-
-% (a) -> (d)
-Last but not least, we need to decide on the ordering of (a)
-(selecting instructions) and (d) (mapping variables to stack locations
-and registers). These two issues are intertwined, creating a bit of a
-Gordian Knot. To handle difference (d), we need to map some variables
-to registers (there are only 16 registers) and the remaining variables
-to locations on the stack (which is unbounded). But recall that x86
-instructions have restrictions about which of their arguments can be
-registers versus memory accesses (stack locations).  So to make good
-decisions regarding this mapping, it is helpful to know which
-instructions use which variables. On the other hand, 
-
-
-
-We cut this knot by doing an optimistic selection of instructions in
-the \key{select-instructions} pass, followed by the \key{assign-homes}
-pass to map variables to registers or stack locations, and conclude by
-finalizing the instruction selection in the \key{patch-instructions}
-pass.
-
-
-
-[ordering of reg. alloc versus instr. sel? -jeremy]
-\[
+\begin{figure}[tbp]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\foreach \i/\p in {1/1,2/2,3/3,4/4,5/5,6/6}
-{
-  \node (\i) at (\p*1.5,0) {$\bullet$};
-}
-\foreach \x/\y/\lbl in {1/2/e,2/3/b,3/4/c,4/5/a,5/6/d}
-{
-  \path[->,bend left=15] (\x) edge [above] node {\small\lbl} (\y);
-}
+\node (R1) at (0,2)  {\large $R_1$};
+\node (R1-2) at (3,2)  {\large $R_1$};
+\node (R1-3) at (6,2)  {\large $R_1$};
+\node (C0-1) at (6,0)  {\large $C_0$};
+\node (C0-2) at (3,0)  {\large $C_0$};
+
+\node (x86-2) at (3,-2)  {\large $\text{x86}^{*}_0$};
+\node (x86-3) at (6,-2)  {\large $\text{x86}^{*}_0$};
+\node (x86-4) at (9,-2) {\large $\text{x86}_0$};
+\node (x86-5) at (12,-2) {\large $\text{x86}^{\dagger}_0$};
+
+\path[->,bend left=15] (R1) edge [above] node {\ttfamily\footnotesize uniquify} (R1-2);
+\path[->,bend left=15] (R1-2) edge [above] node {\ttfamily\footnotesize remove-complex.} (R1-3);
+\path[->,bend left=15] (R1-3) edge [right] node {\ttfamily\footnotesize explicate-control} (C0-1);
+\path[->,bend right=15] (C0-1) edge [above] node {\ttfamily\footnotesize uncover-locals} (C0-2);
+\path[->,bend right=15] (C0-2) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
+\path[->,bend left=15] (x86-2) edge [above] node {\ttfamily\footnotesize assign-homes} (x86-3);
+\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-4);
+\path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize print-x86} (x86-5);
 \end{tikzpicture}
-\]
+
+\caption{Overview of the passes for compiling $R_1$. }
+\label{fig:R1-passes}
+\end{figure}
+
+
+%% \[
+%% \begin{tikzpicture}[baseline=(current  bounding  box.center)]
+%% \foreach \i/\p in {1/1,2/2,3/3,4/4,5/5,6/6}
+%% {
+%%   \node (\i) at (\p*1.5,0) {$\bullet$};
+%% }
+%% \foreach \x/\y/\lbl in {1/2/e,2/3/b,3/4/c,4/5/a,5/6/d}
+%% {
+%%   \path[->,bend left=15] (\x) edge [above] node {\small\lbl} (\y);
+%% }
+%% \end{tikzpicture}
+%% \]
 We further simplify the translation from $R_1$ to x86 by identifying
 an intermediate language named $C_0$, roughly half-way between $R_1$
 and x86, to provide a rest stop along the way. We name the language
@@ -1484,22 +1509,18 @@ language~\citep{Kernighan:1988nx}. The differences (e) and (a),
 regarding variables and nested expressions, will be handled by two
 steps, \key{uniquify} and \key{flatten}, which bring us to
 $C_0$.
-\[
-\begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\foreach \i/\p in {R_1/1,R_1/2,C_0/3}
-{
-  \node (\p) at (\p*3,0) {\large $\i$};
-}
-\foreach \x/\y/\lbl in {1/2/uniquify,2/3/flatten}
-{
- \path[->,bend left=15] (\x) edge [above] node {\ttfamily\footnotesize \lbl} (\y);
-}
-\end{tikzpicture}
-\]
-Each of these steps in the compiler is implemented by a function,
-typically a structurally recursive function that translates an input
-AST into an output AST. We refer to such a function as a \emph{pass}
-because it makes a pass over, i.e. it traverses, the entire AST.
+%% \[
+%% \begin{tikzpicture}[baseline=(current  bounding  box.center)]
+%% \foreach \i/\p in {R_1/1,R_1/2,C_0/3}
+%% {
+%%   \node (\p) at (\p*3,0) {\large $\i$};
+%% }
+%% \foreach \x/\y/\lbl in {1/2/uniquify,2/3/flatten}
+%% {
+%%  \path[->,bend left=15] (\x) edge [above] node {\ttfamily\footnotesize \lbl} (\y);
+%% }
+%% \end{tikzpicture}
+%% \]
 
 The syntax for $C_0$ is defined in Figure~\ref{fig:c0-syntax}.  The
 $C_0$ language supports the same operators as $R_1$ but the arguments
@@ -1551,18 +1572,18 @@ this knot by doing an optimistic selection of instructions in the
 pass to map variables to registers or stack locations, and conclude by
 finalizing the instruction selection in the \key{patch-instructions}
 pass.
-\[
-\begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (1) at (0,0)  {\large $C_0$};
-\node (2) at (3,0)  {\large $\text{x86}^{*}_0$};
-\node (3) at (6,0)  {\large $\text{x86}^{*}_0$};
-\node (4) at (9,0) {\large $\text{x86}_0$};
+%% \[
+%% \begin{tikzpicture}[baseline=(current  bounding  box.center)]
+%% \node (1) at (0,0)  {\large $C_0$};
+%% \node (2) at (3,0)  {\large $\text{x86}^{*}_0$};
+%% \node (3) at (6,0)  {\large $\text{x86}^{*}_0$};
+%% \node (4) at (9,0) {\large $\text{x86}_0$};
 
-\path[->,bend left=15] (1) edge [above] node {\ttfamily\footnotesize select-instr.} (2);
-\path[->,bend left=15] (2) edge [above] node {\ttfamily\footnotesize assign-homes} (3);
-\path[->,bend left=15] (3) edge [above] node {\ttfamily\footnotesize patch-instr.} (4);
-\end{tikzpicture}
-\]
+%% \path[->,bend left=15] (1) edge [above] node {\ttfamily\footnotesize select-instr.} (2);
+%% \path[->,bend left=15] (2) edge [above] node {\ttfamily\footnotesize assign-homes} (3);
+%% \path[->,bend left=15] (3) edge [above] node {\ttfamily\footnotesize patch-instr.} (4);
+%% \end{tikzpicture}
+%% \]
 
 The \key{select-instructions} pass is optimistic in the sense that it
 treats variables as if they were all mapped to registers. The
@@ -1588,6 +1609,10 @@ replacing every violating instruction with a short sequence of
 instructions that use the \key{rax} register. Once we have implemented
 a good register allocator (Chapter~\ref{ch:register-allocation}), the
 need to patch instructions will be relatively rare.
+
+The x86$^{*}$ language extends x86
+with variables and looser rules regarding instruction arguments. The
+x86$^{\dagger}$ language is the concrete syntax (string) for x86.
 
 
 \section{Uniquify Variables}
@@ -2102,37 +2127,6 @@ programs.
 %valid code for Unix machines.
 \end{exercise}
 
-\begin{figure}[p]
-\begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (R1) at (0,2)  {\large $R_1$};
-\node (R1-2) at (3,2)  {\large $R_1$};
-\node (R1-3) at (6,2)  {\large $R_1$};
-\node (C0-1) at (6,0)  {\large $C_0$};
-\node (C0-2) at (3,0)  {\large $C_0$};
-
-\node (x86-2) at (3,-2)  {\large $\text{x86}^{*}_0$};
-\node (x86-3) at (6,-2)  {\large $\text{x86}^{*}_0$};
-\node (x86-4) at (9,-2) {\large $\text{x86}_0$};
-\node (x86-5) at (12,-2) {\large $\text{x86}^{\dagger}_0$};
-
-\path[->,bend left=15] (R1) edge [above] node {\ttfamily\footnotesize uniquify} (R1-2);
-\path[->,bend left=15] (R1-2) edge [above] node {\ttfamily\footnotesize remove-complex.} (R1-3);
-\path[->,bend left=15] (R1-3) edge [right] node {\ttfamily\footnotesize explicate-control} (C0-1);
-\path[->,bend right=15] (C0-1) edge [above] node {\ttfamily\footnotesize uncover-locals} (C0-2);
-\path[->,bend right=15] (C0-2) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
-\path[->,bend left=15] (x86-2) edge [above] node {\ttfamily\footnotesize assign-homes} (x86-3);
-\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize print-x86} (x86-5);
-\end{tikzpicture}
-
-\caption{Overview of the passes for compiling $R_1$. }
-\label{fig:R1-passes}
-\end{figure}
-
-Figure~\ref{fig:R1-passes} provides an overview of all the compiler
-passes described in this Chapter.  The x86$^{*}$ language extends x86
-with variables and looser rules regarding instruction arguments. The
-x86$^{\dagger}$ language is the concrete syntax (string) for x86.
 
 \margincomment{\footnotesize To do: add a challenge section. Perhaps
   extending the partial evaluation to $R_0$? \\ --Jeremy}
