@@ -936,15 +936,18 @@ the $R_1$ language is defined by the grammar in
 Figure~\ref{fig:r1-syntax}.  The non-terminal \Var{} may be any Racket
 identifier. As in $R_0$, \key{read} is a nullary operator, \key{-} is
 a unary operator, and \key{+} is a binary operator.  Similar to $R_0$,
-the $R_1$ language includes the \key{program} form to mark the top of
-the program, which is helpful in parts of the compiler.  The
-$R_1$ language is rich enough to exhibit several compilation
+the $R_1$ language includes the \key{program} construct to mark the
+top of the program, which is helpful in parts of the compiler.  The
+$\itm{info}$ field of the \key{program} construct contain an
+association list that is used to communicating auxiliary data from one
+step of the compiler to the next.
+
+The $R_1$ language is rich enough to exhibit several compilation
 techniques but simple enough so that the reader, together with couple
 friends, can implement a compiler for it in a week or two of part-time
 work.  To give the reader a feeling for the scale of this first
-compiler, the instructor solution for the $R_1$ compiler consists of 6
-recursive functions and a few small helper functions that together
-span 256 lines of code.
+compiler, the instructor solution for the $R_1$ compiler is less than
+500 lines of code.
 
 \begin{figure}[btp]
 \centering
@@ -954,7 +957,7 @@ span 256 lines of code.
 \begin{array}{rcl}
 \Exp &::=& \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)  \\
      &\mid&  \Var \mid \LET{\Var}{\Exp}{\Exp} \\
-R_1  &::=& (\key{program} \; \Exp)
+R_1  &::=& (\key{program} \;\itm{info}\; \Exp)
 \end{array}
 \]
 \end{minipage}
@@ -969,7 +972,7 @@ the variable with the value of an expression.  So the following
 program initializes \code{x} to \code{32} and then evaluates the body
 \code{(+ 10 x)}, producing \code{42}.
 \begin{lstlisting}
-   (program
+   (program ()
       (let ([x (+ 12 20)]) (+ 10 x)))
 \end{lstlisting}
 When there are multiple \key{let}'s for the same variable, the closest
@@ -977,7 +980,7 @@ enclosing \key{let} is used. That is, variable definitions overshadow
 prior definitions. Consider the following program with two \key{let}'s
 that define variables named \code{x}. Can you figure out the result?
 \begin{lstlisting}
-   (program
+   (program ()
       (let ([x 32]) (+ (let ([x 10]) x) x)))
 \end{lstlisting}
 For the purposes of showing which variable uses correspond to which
@@ -985,7 +988,7 @@ definitions, the following shows the \code{x}'s annotated with subscripts
 to distinguish them. Double check that your answer for the above is
 the same as your answer for this annotated version of the program.
 \begin{lstlisting}
-   (program
+   (program ()
       (let ([x|$_1$| 32]) (+ (let ([x|$_2$| 10]) x|$_2$|) x|$_1$|)))
 \end{lstlisting}
 The initializing expression is always evaluated before the body of the
@@ -994,7 +997,7 @@ performed before the \key{read} for \code{y}. Given the input
 \code{52} then \code{10}, the following produces \code{42} (and not
 \code{-42}).
 \begin{lstlisting}
-   (program
+   (program ()
      (let ([x (read)]) (let ([y (read)]) (- x y))))
 \end{lstlisting}
 
@@ -1039,7 +1042,7 @@ to the variable, then evaluates the body of the \key{let}.
    (define (interp-R1 env)
      (lambda (p)
        (match p
-         [`(program ,e) ((interp-exp '()) e)])))
+         [`(program ,info ,e) ((interp-exp '()) e)])))
 \end{lstlisting}
 \caption{Interpreter for the $R_1$ language.}
 \label{fig:interp-R1}
@@ -1291,10 +1294,6 @@ into groups called \emph{blocks} and a label is associated with every
 block, which is why the \key{program} form includes an association
 list mapping labels to blocks. The reason for this organization
 becomes apparent in Chapter~\ref{ch:bool-types}.
-%
-(The $\itm{info}$ field of the \key{program} and \key{block} AST nodes
-contain an association list that is used to communicating auxiliary
-data from one step of the compiler to the next.)
 
 \begin{figure}[tp]
 \fbox{
@@ -1408,33 +1407,37 @@ choices regarding the orderings.
 
 Let us consider the ordering of \key{uniquify} and
 \key{remove-complex-opera*}. The assignment of subexpressions to
-temporary variables involving moving subexpressions, which might
-change the shadowing of variables an inadvertently change the program.
-But if we apply \key{uniquify} first, this will not be an issue. Of
-course, this means that in \key{remove-complex-opera*}, we need to
-ensure that the new temporary variables are unique.
+temporary variables involves introducing new variables and moving
+subexpressions, which might change the shadowing of variables and
+inadvertently change the behavior of the program.  But if we apply
+\key{uniquify} first, this will not be an issue. Of course, this means
+that in \key{remove-complex-opera*}, we need to ensure that the
+temporary variables that it creates are unique.
 
 Next we shall consider the ordering of the \key{explicate-control}
 pass and \key{select-instructions}. It is clear that
 \key{explicate-control} must come first because the control-flow graph
-that it generates is needed when determing where to place the x86
+that it generates is needed when determining where to place the x86
 label and jump instructions.
 %
 Regarding the ordering of \key{explicate-control} with respect to
-\key{uniquify} and \key{remove-complex-opera*}, it perhaps does not
-matter very much, but it seems to work well to place
-\key{explicate-control} after these other two passes.
+\key{uniquify}, it is important to apply \key{uniquify} first because
+in \key{explicate-control} we change all the \key{let}-bound variables
+to become local variables whose scope is the entire program.
+%
+With respect to \key{remove-complex-opera*}, it perhaps does not
+matter very much, but it works well to place \key{explicate-control}
+after removing complex subexpressions.
 
 The \key{assign-homes} pass should come after
 \key{remove-complex-opera*} and \key{explicate-control}.  The
 \key{remove-complex-opera*} pass generates temporary variables, which
-also need to be assigned homes, so \key{assign-homes} needs to come
-after. Regarding \key{explicate-control}, this pass deletes \emph{dead
-  code} (branches that will never be executed), which can remove
-variables. Thus it is beneficial to place \key{explicate-control}
-prior to \key{assign-homes} so that there are fewer variables that
-need to be assigned homes. This is important because the
-\key{assign-homes} pass has the highest time complexity.
+also need to be assigned homes. The \key{explicate-control} pass
+deletes branches that will never be executed, which can remove
+variables. Thus it is good to place \key{explicate-control} prior to
+\key{assign-homes} so that there are fewer variables that need to be
+assigned homes. This is important because the \key{assign-homes} pass
+has the highest time complexity.
 
 Last, we need to decide on the ordering of \key{select-instructions}
 and \key{assign-homes}.  These two issues are intertwined, creating a
@@ -1447,12 +1450,12 @@ register-argument positions. On the other hand, it may turn out to be
 impossible to make sure that all such variables are assigned to
 registers, and then one must redo the selection of instructions. Some
 compilers handle this problem by iteratively repeating these two
-passes until a good solution is found.  We shall suggest a simpler
-approach in which \key{select-instructions} come first, followed by
+passes until a good solution is found.  We shall use a simpler
+approach in which \key{select-instructions} comes first, followed by
 the \key{assign-homes}, followed by a third pass, named
 \key{patch-instructions}, that uses a reserved register (\key{rax}) to
-patch-up any outstanding problems regarding instructions that involve
-too many memory accesses.
+patch-up outstanding problems regarding instructions with too many
+memory accesses.
 
 \begin{figure}[tbp]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
@@ -1506,26 +1509,27 @@ literature this style of intermediate language is called
 administrative normal form, or ANF for
 short~\citep{Danvy:1991fk,Flanagan:1993cg}.  Instead of \key{let}
 expressions, $C_0$ has assignment statements which can be executed in
-sequence using the \key{seq} construct. A sequent of statements always
-ends with \key{return}, a guarantee that is baked into the grammar
-rules for the \itm{tail} non-terminal. The term \emph{tail position}
-refers to an expression that is the last one to execute within a
-function. (An expression may contain subexpressions, and those may or
-may not be in tail position depending on the kind of expression.)  We
-choose the name ``tail'' for this non-terminal in the grammar because
-indeed, it corresponds to the last thing that needs to execute.
+sequence using the \key{seq} construct. A sequence of statements
+always ends with \key{return}, a guarantee that is baked into the
+grammar rules for the \itm{tail} non-terminal. The naming of this
+non-terminal comes from the term \emph{tail position}, which refers to
+an expression that is the last one to execute within a function. (A
+expression in tail position may contain subexpressions, and those may
+or may not be in tail position depending on the kind of expression.)
 
 A $C_0$ program consists of an association list mapping labels to
-tails, though this is overkill for the present Chapter, as we do not
-yet need the introduce \key{goto} for jumping to a label.  For now
-there will just be one label, \key{start}, and the whole program will
-be in it's tail.
+tails. This is overkill for the present Chapter, as we do not yet need
+to introduce \key{goto} for jumping to labels, but it saves us from
+having to change the syntax of the program construct in
+Chapter~\ref{ch:bool-types}.  For now there will be just one label,
+\key{start}, and the whole program will be it's tail.
 %
-The $\itm{info}$ field of the program, after \key{uncover-locals},
-will contain a mapping from \key{locals} to a list of variables, that
-is, all the variables used in the program. At the start of the
-program, these variables are uninitialized (they contain garbage) and
-each variable becomes initialized on its first assignment.
+The $\itm{info}$ field of the program construt, after the
+\key{uncover-locals} pass, will contain a mapping from the symbol
+\key{locals} to a list of variables, that is, a list of all the
+variables used in the program. At the start of the program, these
+variables are uninitialized (they contain garbage) and each variable
+becomes initialized on its first assignment.
 
 \begin{figure}[tbp]
 \fbox{
@@ -1571,11 +1575,13 @@ C_0 & ::= & (\key{program}\;\itm{info}\;((\itm{label}\,\key{.}\,\Tail)^{+}))
 %% a good register allocator (Chapter~\ref{ch:register-allocation}), the
 %% need to patch instructions will be relatively rare.
 
-\subsection{The dialects x86}
+\subsection{The dialects of x86}
 
-The x86$^{*}$ language, pronounced ``pseudo-x86'', extends x86 with
-variables and looser rules regarding instruction arguments. The
-x86$^{\dagger}$ language is the concrete syntax (string) for x86.
+The x86$^{*}_0$ language, pronounced ``pseudo-x86'', is the output of
+the pass \key{select-instructions}. It extends $x86_0$ with variables
+and looser rules regarding instruction arguments. The x86$^{\dagger}$
+language, the output of \key{print-x86}, is the concrete syntax for
+x86.
 
 
 \section{Uniquify Variables}
@@ -1587,7 +1593,7 @@ translate the program on the left into the program on the right. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
- (program
+ (program ()
    (let ([x 32])
      (+ (let ([x 10]) x) x)))
 \end{lstlisting}
@@ -1597,7 +1603,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program
+(program ()
   (let ([x.1 32])
     (+ (let ([x.2 10]) x.2) x.1)))
 \end{lstlisting}
@@ -1610,7 +1616,7 @@ with a \key{let} nested inside the initializing expression of another
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program
+(program ()
   (let ([x (let ([x 4])
              (+ x 1))])
     (+ x 2)))
@@ -1621,7 +1627,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program
+(program ()
   (let ([x.2 (let ([x.1 4])
                (+ x.1 1))])
     (+ x.2 2)))
@@ -1672,8 +1678,8 @@ implement the clauses for variables and for the \key{let} construct.
    (define (uniquify alist)
      (lambda (e)
        (match e
-         [`(program ,e)
-          `(program ,((uniquify-exp alist) e))]
+         [`(program ,info ,e)
+          `(program ,info ,((uniquify-exp alist) e))]
          )))
 \end{lstlisting}
 \caption{Skeleton for the \key{uniquify} pass.}
@@ -1697,21 +1703,21 @@ your \key{uniquify} pass on the example programs.
 
 \end{exercise}
 
+\section{Remove Complex Operators and Operands}
+\label{sec:remove-complex-opera-r1}
 
-\section{Flatten Expressions}
-\label{sec:flatten-r1}
-
-The \code{flatten} pass will transform $R_1$ programs into $C_0$
-programs. In particular, the purpose of the \code{flatten} pass is to
-get rid of nested expressions, such as the \code{(- 10)} in the program
-below. This can be accomplished by introducing a new variable,
-assigning the nested expression to the new variable, and then using
-the new variable in place of the nested expressions, as shown in the
-output of \code{flatten} on the right.\\
+The \code{remove-complex-opera*} pass will transform $R_1$ programs so
+that the arguments of operations are simple expressions.  Put another
+way, this pass removes complex subexpressions, such as the expression
+\code{(- 10)} in the program below. This is accomplished by
+introducing a new \key{let}-bound variable, binding the complex
+subexpression to the new variable, and then using the new variable in
+place of the complex expression, as shown in the output of
+\code{remove-complex-opera*} on the right.\\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
- (program
+ (program ()
    (+ 52 (- 10)))
 \end{lstlisting}
 \end{minipage}
@@ -1720,24 +1726,31 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program (tmp.1 tmp.2)
-  (assign tmp.1 (- 10))
-  (assign tmp.2 (+ 52 tmp.1))
-  (return tmp.2))
+(program ()
+  (let ([tmp.1 (- 10)])
+    (+ 52 tmp.1)))
 \end{lstlisting}
 \end{minipage}
 \end{tabular}
 
-The clause of \code{flatten} for \key{let} is straightforward to
-implement as it just requires the generation of an assignment
-statement for the \key{let}-bound variable. The following shows the
-result of \code{flatten} for a \key{let}. \\
+We recommend implementing this pass with two mutually recursive
+functions, \key{rco-arg} and \key{rco-exp}. The idea is to apply
+\key{rco-arg} to subexpressions that need to become simple and to
+apply \key{rco-exp} to subexpressions can stay complex.  Both
+functions take an expression in $R_1$ as input and return two things:
+the output expression and associatoin list mapping temporary variables
+to complex subexpressions.  You can return multiple things from a
+function using Racket's \key{values} form and you can receive multiple
+things from a function call using the \key{define-values} form. If you
+are not familiar with these constructs, the Racket documentation will
+be of help.  Also, the \key{for/lists} construct is useful for
+applying a function to each element of a list, in the case where the
+function returns multiple values.
+
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
- (program
-   (let ([x (+ (- 10) 11)])
-     (+ x 41)))
+(rco-exp `(+ 52 (- 10)))
 \end{lstlisting}
 \end{minipage}
 &
@@ -1745,57 +1758,16 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program (tmp.1 x tmp.2)
-  (assign tmp.1 (- 10))
-  (assign x (+ tmp.1 11))
-  (assign tmp.2 (+ x 41))
-  (return tmp.2))
+  (values `(+ 52 tmp.1)
+           `((tmp.1 . (- 10))))
 \end{lstlisting}
 \end{minipage}
 \end{tabular}
 
-We recommend implementing a helper function,
-\key{flatten-exp}, as a structurally recursive
-function that takes an expression in $R_1$ and
-returns three things: 1) the newly flattened expression,
-2) a list of assignment statements, one for each of the new variables
-introduced during the flattening the expression, and 3) a list of all
-the variables including both let-bound variables and the generated
-temporary variables.  The newly flattened expression should be an
-$\Arg$ in the $C_0$ syntax (Figure~\ref{fig:c0-syntax}), that is, it
-should be an integer or a variable. You can return multiple things
-from a function using the \key{values} form and you can receive
-multiple things from a function call using the \key{define-values}
-form. If you are not familiar with these constructs, the Racket
-documentation will be of help.
-Also, the \key{map3} function
-(Appendix~\ref{appendix:utilities}) is useful for applying a function
-to each element of a list, in the case where the function returns
-three values. The result of \key{map3} is three lists.
-
-\begin{tabular}{lll}
-\begin{minipage}{0.4\textwidth}
-\begin{lstlisting}
-(flatten-exp `(+ 52 (- 10)))
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.4\textwidth}
-\begin{lstlisting}
-  (values 'tmp.2
-  '((assign tmp.1 (- 10))
-    (assign tmp.2 (+ 52 tmp.1)))
-  '(tmp.1 tmp.2))
-\end{lstlisting}
-\end{minipage}
-\end{tabular}
-
-The clause of \key{flatten} for the \key{program} node needs to
-apply this helper function to the body of the program and the newly flattened
-expression should be placed in a \key{return} statement. Remember that
-the variable list in the \key{program} node should contain no duplicates.
+%% The clause of \key{flatten} for the \key{program} node needs to
+%% apply this helper function to the body of the program and the newly flattened
+%% expression should be placed in a \key{return} statement. Remember that
+%% the variable list in the \key{program} node should contain no duplicates.
 %% The
 %% \key{flatten} pass should also compute the list of variables used in
 %% the program.
@@ -1807,15 +1779,16 @@ the variable list in the \key{program} node should contain no duplicates.
 %% \key{program} form.
 
 
-Take special care for programs such as the following that initialize
-variables with integers or other variables. It should be translated
-to the program on the right \\
+Take special care of programs such as the following that
+\key{let}-bind variables with integers or other variables. It should
+leave them unchanged, as shown in to the program on the right \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
+(program ()
   (let ([a 42])
     (let ([b a])
-      b))
+      b)))
 \end{lstlisting}
 \end{minipage}
 &
@@ -1823,33 +1796,68 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program (a b)
-  (assign a 42)
-  (assign b a)
-  (return b))
+(program ()
+  (let ([a 42])
+    (let ([b a])
+      b)))
 \end{lstlisting}
 \end{minipage}
 \end{tabular} \\
-and not to the following, which could result from a naive
-implementation of \key{flatten}.
+and not translate them to the following, which might result from a
+careless implementation of \key{rco-exp} and \key{rco-arg}.
+
+\begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-   (program (tmp.1 a tmp.2 b)
-     (assign tmp.1 42)
-     (assign a tmp.1)
-     (assign tmp.2 a)
-     (assign b tmp.2)
-     (return b))
+   (program ()
+     (let ([tmp.1 42])
+       (let ([a tmp.1])
+         (let ([tmp.2 a])
+           (let ([b tmp.2])
+             b)))))
 \end{lstlisting}
+\end{minipage}
 
 \begin{exercise}
-\normalfont
-Implement the \key{flatten} pass and test it on all of the example
-programs that you created to test the \key{uniquify} pass and create
-three new example programs that are designed to exercise all of the
-interesting code in the \key{flatten} pass. Use the \key{interp-tests}
-function (Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to
-test your passes on the example programs.
+\normalfont Implement the \code{remove-complex-opera*} pass and test
+it on all of the example programs that you created to test the
+\key{uniquify} pass and create three new example programs that are
+designed to exercise all of the interesting code in the
+\code{remove-complex-opera*} pass. Use the \key{interp-tests} function
+(Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to test
+your passes on the example programs.
 \end{exercise}
+
+
+\section{Explicate Control}
+\label{sec:explicate-control-r1}
+
+The \code{explicate-control} pass makes the order of execution
+explicit in the syntax of the program. For $R_1$, this amounts to
+flattening \key{let} constructs into a sequence of assignment
+statements. 
+
+UNDER CONSTRUCTION
+
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(program ()
+  (let ([tmp.1 (- 10)])
+    (+ 52 tmp.1)))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(program ()
+  ((start . (seq (assign tmp.1 (- 10))
+                 (return (+ 52 tmp1))))))
+\end{lstlisting}
+\end{minipage}
+\end{tabular}
+
 
 
 \section{Select Instructions}
