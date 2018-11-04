@@ -1216,17 +1216,20 @@ $-16\key{(\%rbp)}$, etc.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
+start:
+	movq	$10, -8(%rbp)
+	negq	-8(%rbp)
+	movq	-8(%rbp), %rax
+	addq	$52, %rax
+	jmp conclusion
+
 	.globl main
 main:
 	pushq	%rbp
 	movq	%rsp, %rbp
 	subq	$16, %rsp
-
-	movq	$10, -8(%rbp)
-	negq	-8(%rbp)
-	movq	$52, %rax
-	addq	-8(%rbp), %rax
-
+	jmp start
+conclusion:
 	addq	$16, %rsp
 	popq	%rbp
 	retq
@@ -1263,25 +1266,25 @@ room for storing variables.  This program just needs one variable ($8$
 bytes) but because the frame size is required to be a multiple of 16
 bytes, it rounds to 16 bytes.
 
-The next four instructions carry out the work of computing
-$\BINOP{+}{52}{\UNIOP{-}{10} }$. The first instruction \key{movq \$10,
-  -8(\%rbp)} stores $10$ in variable $1$. The instruction \key{negq
-  -8(\%rbp)} changes variable $1$ to $-10$. The \key{movq \$52, \%rax}
-places $52$ in the register \key{rax} and \key{addq -8(\%rbp), \%rax}
-adds the contents of variable $1$ to \key{rax}, at which point
-\key{rax} contains $42$.
+The four instructions under the label \code{start} carry out the work
+of computing $\BINOP{+}{52}{\UNIOP{-}{10} }$. The first instruction
+\key{movq \$10, -8(\%rbp)} stores $10$ in variable $1$. The
+instruction \key{negq -8(\%rbp)} changes variable $1$ to $-10$. The
+\key{movq \$52, \%rax} places $52$ in the register \key{rax} and
+\key{addq -8(\%rbp), \%rax} adds the contents of variable $1$ to
+\key{rax}, at which point \key{rax} contains $42$.
 
-The last three instructions are the typical \emph{conclusion} of a
-procedure.  The first two are necessary to get the state of the
-machine back to where it was at the beginning of the procedure.  The
-\key{addq \$16, \%rsp} instruction moves the stack pointer back to
-point at the old base pointer. The amount added here needs to match
-the amount that was subtracted in the prelude of the procedure. Then
-\key{popq \%rbp} returns the old base pointer to \key{rbp} and adds
-$8$ to the stack pointer.  The final instruction, \key{retq}, jumps
-back to the procedure that called this one and adds 8 to the stack
-pointer, which returns the stack pointer to where it was prior to the
-procedure call.
+The three instructions under the label \code{conclusion} are the
+typical finale of a procedure.  The first two are necessary to get the
+state of the machine back to where it was at the beginning of the
+procedure.  The \key{addq \$16, \%rsp} instruction moves the stack
+pointer back to point at the old base pointer. The amount added here
+needs to match the amount that was subtracted in the prelude of the
+procedure. Then \key{popq \%rbp} returns the old base pointer to
+\key{rbp} and adds $8$ to the stack pointer.  The final instruction,
+\key{retq}, jumps back to the procedure that called this one and adds
+8 to the stack pointer, which returns the stack pointer to where it
+was prior to the procedure call.
 
 The compiler will need a convenient representation for manipulating
 x86 programs, so we define an abstract syntax for x86 in
@@ -1716,6 +1719,7 @@ place of the complex expression, as shown in the output of
 \code{remove-complex-opera*} on the right.\\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
+% s0_19.rkt
 \begin{lstlisting}
  (program ()
    (+ 52 (- 10)))
@@ -1734,12 +1738,14 @@ $\Rightarrow$
 \end{tabular}
 
 We recommend implementing this pass with two mutually recursive
-functions, \key{rco-arg} and \key{rco-exp}. The idea is to apply
-\key{rco-arg} to subexpressions that need to become simple and to
-apply \key{rco-exp} to subexpressions can stay complex.  Both
-functions take an expression in $R_1$ as input and return two things:
-the output expression and associatoin list mapping temporary variables
-to complex subexpressions.  You can return multiple things from a
+functions, \code{rco-arg} and \code{rco-exp}. The idea is to apply
+\code{rco-arg} to subexpressions that need to become simple and to
+apply \code{rco-exp} to subexpressions can stay complex.  
+Both functions take an expression in $R_1$ as input.
+The \code{rco-exp} function returns an expression.
+The \code{rco-arg} function returns two things:
+a simple expression and association list mapping temporary variables
+to complex subexpressions. You can return multiple things from a
 function using Racket's \key{values} form and you can receive multiple
 things from a function call using the \key{define-values} form. If you
 are not familiar with these constructs, the Racket documentation will
@@ -1750,7 +1756,7 @@ function returns multiple values.
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(rco-exp `(+ 52 (- 10)))
+(rco-arg `(- 10))
 \end{lstlisting}
 \end{minipage}
 &
@@ -1758,7 +1764,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-  (values `(+ 52 tmp.1)
+  (values `tmp.1
            `((tmp.1 . (- 10))))
 \end{lstlisting}
 \end{minipage}
@@ -1834,16 +1840,30 @@ your passes on the example programs.
 The \code{explicate-control} pass makes the order of execution
 explicit in the syntax of the program. For $R_1$, this amounts to
 flattening \key{let} constructs into a sequence of assignment
-statements. 
-
-UNDER CONSTRUCTION
-
+statements. For example, consider the following $R_1$ program.
+% s0_11.rkt
+\begin{lstlisting}
+(program ()
+  (let ([y (let ([x 20])
+	   (+ x (let ([x 22]) x)))])
+    y))
+\end{lstlisting}
+%
+The output of \code{remove-complex-opera*} is shown below, on the
+left.  The right-hand-side of a \key{let} executes before its body, so
+the order of evaluation for this program is to assign \code{20} to
+\code{x.1}, assign \code{22} to \code{x.2}, assign \code{(+ x.1 x.2)}
+to \code{y}, then return \code{y}. Indeed, the result of
+\code{explicate-control} produces code in the $C_0$ language that
+makes this explicit.\\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
 (program ()
-  (let ([tmp.1 (- 10)])
-    (+ 52 tmp.1)))
+  (let ([y (let ([x.1 20]) 
+             (let ([x.2 22])
+               (+ x.1 x.2)))])
+   y))
 \end{lstlisting}
 \end{minipage}
 &
@@ -1852,25 +1872,54 @@ $\Rightarrow$
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
 (program ()
-  ((start . (seq (assign tmp.1 (- 10))
-                 (return (+ 52 tmp1))))))
+  ((start . 
+   (seq (assign x.1 20)
+   (seq (assign x.2 22)
+   (seq (assign y (+ x.1 x.2))
+   (return y)))))))
 \end{lstlisting}
 \end{minipage}
 \end{tabular}
 
+We recommend implementing \code{explicate-control} using two mutually
+recursive functions: \code{explicate-control-tail} and
+\code{explicate-control-assign}.  The \code{explicate-control-tail}
+function should be applied to expressions in tail position, whereas
+\code{explicate-control-assign} should be applied to expressions that
+occur on the right-hand-side of a \code{let}.  The function
+\code{explicate-control-tail} takes an $R_1$ expression as input and
+produces a $C_0$ $\Tail$ (see the grammar in
+Figure~\ref{fig:c0-syntax}).  The \code{explicate-control-assign}
+function takes an $R_1$ expression, the variable that it is to be
+assigned to, and $C_0$ code (a $\Tail$) that should come after the
+assignment (e.g., the code generated for the body of the \key{let}).
 
+\section{Uncover Locals}
+\label{sec:uncover-locals-r1}
+
+The pass \code{uncover-locals} simply collects all of the variables in
+the program and places then in the $\itm{info}$ of the program
+construct. Here is the output for the example program of the last
+section.
+
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(program ((locals . (x.1 x.2 y)))
+  ((start . 
+   (seq (assign x.1 20)
+   (seq (assign x.2 22)
+   (seq (assign y (+ x.1 x.2))
+   (return y)))))))
+\end{lstlisting}
+\end{minipage}
 
 \section{Select Instructions}
-\label{sec:select-s0}
+\label{sec:select-r1}
 
 In the \key{select-instructions} pass we begin the work of translating
 from $C_0$ to x86. The target language of this pass is a pseudo-x86
 language that still uses variables, so we add an AST node of the form
-$\VAR{\itm{var}}$ to the x86 abstract syntax. Also, the \key{program}
-form should still list the variables (similar to $C_0$):
-\[
-  (\key{program}\;(\Var^{*})\;\Instr^{+})
-\]
+$\VAR{\itm{var}}$ to the x86 abstract syntax. 
 The \key{select-instructions} pass deals with the differing format of
 arithmetic operations. For example, in $C_0$ an addition operation can
 take the form below.  To translate to x86, we need to use the
@@ -1945,10 +1994,9 @@ $\Rightarrow$
 \end{minipage}
 \end{tabular} \\
 
-Regarding the \RETURN{\Arg} statement of $C_0$, we recommend treating it
-as an assignment to the \key{rax} register and let the procedure
-conclusion handle the transfer of control back to the calling
-procedure.
+Regarding the \RETURN{\Arg} statement of $C_0$, we recommend treating
+it as an assignment to the \key{rax} register followed by a jump to
+the conclusion of the program (so the conclusion needs to be labeled).
 
 \begin{exercise}
 \normalfont
@@ -1961,7 +2009,7 @@ your passes on the example programs.
 \end{exercise}
 
 \section{Assign Homes}
-\label{sec:assign-s0}
+\label{sec:assign-r1}
 
 As discussed in Section~\ref{sec:plan-s0-x86}, the
 \key{assign-homes} pass places all of the variables on the stack.
@@ -1987,12 +2035,9 @@ the \code{assign-homes} pass translates the above to
 
 In the process of assigning stack locations to variables, it is
 convenient to compute and store the size of the frame (in bytes) in
-the first field of the \key{program} node which will be needed later
-to generate the procedure conclusion.
-\[
-  (\key{program}\;\Int\;\Instr^{+})
-\]
-Some operating systems place restrictions on
+the $\itm{info}$ field of the \key{program} node, with the key
+\code{stack-space}, which will be needed later to generate the
+procedure conclusion.  Some operating systems place restrictions on
 the frame size. For example, Mac OS X requires the frame size to be a
 multiple of 16 bytes.
 
@@ -2024,6 +2069,7 @@ After \key{assign-homes} pass, the above has been translated to
    (movq (int 42) (deref rbp -8))
    (movq (deref rbp -8) (deref rbp -16))
    (movq (deref rbp -16) (reg rax))
+   (jmp conclusion)
 \end{lstlisting}
 The second \key{movq} instruction is problematic because both
 arguments are stack locations. We suggest fixing this problem by
@@ -2059,33 +2105,34 @@ regard. The main work that this step needs to perform is to create the
 conclusion, as shown in Figure~\ref{fig:p1-x86} of
 Section~\ref{sec:x86}. You need to know the number of stack-allocated
 variables, so we suggest computing it in the \key{assign-homes} pass
-(Section~\ref{sec:assign-s0}) and storing it in the $\itm{info}$ field
+(Section~\ref{sec:assign-r1}) and storing it in the $\itm{info}$ field
 of the \key{program} node.
 
-Your compiled code should print the result of the program's execution
-by using the \code{print\_int} function provided in
-\code{runtime.c}. If your compiler has been implemented correctly so
-far, this final result should be stored in the \key{rax} register.
-We'll talk more about how to perform function calls with arguments in
-general later on, but for now, place the following after the compiled
-code for the $R_1$ program but before the conclusion:
+%% Your compiled code should print the result of the program's execution
+%% by using the \code{print\_int} function provided in
+%% \code{runtime.c}. If your compiler has been implemented correctly so
+%% far, this final result should be stored in the \key{rax} register.
+%% We'll talk more about how to perform function calls with arguments in
+%% general later on, but for now, place the following after the compiled
+%% code for the $R_1$ program but before the conclusion:
 
-\begin{lstlisting}
-    movq %rax, %rdi
-    callq print_int
-\end{lstlisting}
+%% \begin{lstlisting}
+%%     movq %rax, %rdi
+%%     callq print_int
+%% \end{lstlisting}
 
-These lines move the value in \key{rax} into the \key{rdi} register, which
-stores the first argument to be passed into \key{print\_int}.
+%% These lines move the value in \key{rax} into the \key{rdi} register, which
+%% stores the first argument to be passed into \key{print\_int}.
 
 If you want your program to run on Mac OS X, your code needs to
 determine whether or not it is running on a Mac, and prefix
 underscores to labels like \key{main}.  You can determine the platform
 with the Racket call \code{(system-type 'os)}, which returns
-\code{'macosx}, \code{'unix}, or \code{'windows}.  In addition to
-placing underscores on \key{main}, you need to put them in front of
-\key{callq} labels (so \code{callq print\_int} becomes \code{callq
-  \_print\_int}).
+\code{'macosx}, \code{'unix}, or \code{'windows}.  
+%% In addition to
+%% placing underscores on \key{main}, you need to put them in front of
+%% \key{callq} labels (so \code{callq print\_int} becomes \code{callq
+%%   \_print\_int}).
 
 \begin{exercise}
 \normalfont Implement the \key{print-x86} pass and test it on all of
@@ -2868,7 +2915,7 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
   after the \code{build-interference} pass. The three new passes,
   \code{uncover-live}, \code{build-interference}, and
   \code{allocate-registers} replace the \code{assign-homes} pass of
-  Section~\ref{sec:assign-s0}.  Just like \code{assign-homes}, the
+  Section~\ref{sec:assign-r1}.  Just like \code{assign-homes}, the
   output of \code{allocate-registers} should be in the form
   \[
   (\key{program}\;\Int\;\Instr^{+})
@@ -2885,7 +2932,7 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
   Once you have obtained the coloring from \code{color-graph}, you can
   assign the variables to registers or stack locations and then reuse
   code from the \code{assign-homes} pass from
-  Section~\ref{sec:assign-s0} to replace the variables with their
+  Section~\ref{sec:assign-r1} to replace the variables with their
   assigned location.
   
   Test your updated compiler by creating new example programs that
@@ -3796,7 +3843,7 @@ discard the live after sets, as they are no longer needed.
 \subsection{Assign Homes}
 \label{sec:assign-homes-r2}
 
-The \code{assign-homes} function (Section~\ref{sec:assign-s0}) needs
+The \code{assign-homes} function (Section~\ref{sec:assign-r1}) needs
 to be updated to handle the \key{if} statement, simply by recursively
 processing the child nodes.  Hopefully your code already handles the
 other new instructions, but if not, you can generalize your code.
@@ -5361,7 +5408,7 @@ address of the \code{add1} label into the \code{rbx} register.
    leaq add1(%rip), %rbx
 \end{lstlisting}
 
-In Sections~\ref{sec:x86} and \ref{sec:select-s0} we saw the use of
+In Sections~\ref{sec:x86} and \ref{sec:select-r1} we saw the use of
 the \code{callq} instruction for jumping to a function as specified by
 a label. The use of the instruction changes slightly if the function
 is specified by an address in a register, that is, an \emph{indirect
