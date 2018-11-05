@@ -40,7 +40,6 @@
 \else
 \newcommand{\rn}[1]{}
 \newcommand{\margincomment}[1]{}
-% \newcommand{\margincomment}[1]{}
 \fi
 
 \lstset{%
@@ -2155,10 +2154,10 @@ programs.
 
 In Chapter~\ref{ch:int-exp} we simplified the generation of x86
 assembly by placing all variables on the stack. We can improve the
-performance of the generated code considerably if we instead try to
-place as many variables as possible into registers.  The CPU can
-access a register in a single cycle, whereas accessing the stack takes
-many cycles to go to cache or many more to access main memory.
+performance of the generated code considerably if we instead place as
+many variables as possible into registers.  The CPU can access a
+register in a single cycle, whereas accessing the stack takes many
+cycles to go to cache or many more to access main memory.
 Figure~\ref{fig:reg-eg} shows a program with four variables that
 serves as a running example. We show the source program and also the
 output of instruction selection. At that point the program is almost
@@ -2182,20 +2181,23 @@ $R_1$ program:
 \begin{minipage}{0.45\textwidth}
 After instruction selection:
 \begin{lstlisting}
-(program (v w x y z t.1 t.2)
-  (movq (int 1) (var v))
-  (movq (int 46) (var w))
-  (movq (var v) (var x))
-  (addq (int 7) (var x))
-  (movq (var x) (var y))
-  (addq (int 4) (var y))
-  (movq (var x) (var z))
-  (addq (var w) (var z))
-  (movq (var y) (var t.1))
-  (negq (var t.1))
-  (movq (var z) (var t.2))
-  (addq (var t.1) (var t.2))
-  (movq (var t.2) (reg rax)))
+(program
+ ((locals . (v w x y z t.1)))
+ ((start .
+   (block ()
+     (movq (int 1) (var v))
+     (movq (int 46) (var w))
+     (movq (var v) (var x))
+     (addq (int 7) (var x))
+     (movq (var x) (var y))
+     (addq (int 4) (var y))
+     (movq (var x) (var z))
+     (addq (var w) (var z))
+     (movq (var y) (var t.1))
+     (negq (var t.1))
+     (movq (var z) (reg rax))
+     (addq (var t.1) (reg rax))
+     (jmp conclusion)))))
 \end{lstlisting}
 \end{minipage}
 \caption{An example program for register allocation.}
@@ -2315,62 +2317,56 @@ $L_{\mathtt{after}}$ set to make the figure easy to read.
 \hspace{20pt}
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}[numbers=left]
-  (program (v w x y z t.1 t.2)
-    (movq (int 1) (var v))
-    (movq (int 46) (var w))
-    (movq (var v) (var x))
-    (addq (int 7) (var x))
-    (movq (var x) (var y))
-    (addq (int 4) (var y))
-    (movq (var x) (var z))
-    (addq (var w) (var z))
-    (movq (var y) (var t.1))
-    (negq (var t.1))
-    (movq (var z) (var t.2))
-    (addq (var t.1) (var t.2))
-    (movq (var t.2) (reg rax)))
+(block ()
+  (movq (int 1) (var v))
+  (movq (int 46) (var w))
+  (movq (var v) (var x))
+  (addq (int 7) (var x))
+  (movq (var x) (var y))
+  (addq (int 4) (var y))
+  (movq (var x) (var z))
+  (addq (var w) (var z))
+  (movq (var y) (var t.1))
+  (negq (var t.1))
+  (movq (var z) (reg rax))
+  (addq (var t.1) (reg rax))
+  (jmp conclusion))
 \end{lstlisting}
 \end{minipage}
 \vrule\hspace{10pt}
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-
-|$\{ v \}$|
-|$\{ v, w \}$|
-|$\{ w, x \}$|
-|$\{ w, x \}$|
-|$\{ w, x, y\}$|
-|$\{ w, x, y \}$|
-|$\{ w, y, z \}$|
-|$\{ y, z \}$|
-|$\{ t.1, z \}$|
-|$\{ t.1, z \}$|
-|$\{t.1,t.2\}$|
-|$\{t.2\}$|
+|$\{\}$|
+|$\{v \}$|
+|$\{v,w\}$|
+|$\{w,x\}$|
+|$\{w,x\}$|
+|$\{w,x,y\}$|
+|$\{w,x,y\}$|
+|$\{w,y,z\}$|
+|$\{y,z\}$|
+|$\{z,t.1\}$|
+|$\{z,t.1\}$|
+|$\{t.1\}$|
+|$\{\}$|
 |$\{\}$|
 \end{lstlisting}
 \end{minipage}
 
-\caption{An example program annotated with live-after sets.}
+\caption{An example block annotated with live-after sets.}
 \label{fig:live-eg}
 \end{figure}
 
 \begin{exercise}\normalfont
 Implement the compiler pass named \code{uncover-live} that computes
 the live-after sets. We recommend storing the live-after sets (a list
-of lists of variables) in the $\itm{info}$ field of the \key{program}
-node alongside the list of variables as follows.
-\begin{lstlisting}
-   (program (|$\Var^{*}$| |$\itm{live}$-$\itm{afters}$|) |$\Instr^{+}$|)
-\end{lstlisting}
-We recommend organizing your code to use a helper function that takes a
-list of statements and an initial live-after set (typically empty) and
-returns the list of statements and the list of live-after sets.  For
-this chapter, returning the list of statements is unnecessary, as they
-will be unchanged, but in Chapter~\ref{ch:bool-types} we introduce
-\key{if} statements and will need to annotate them with the live-after
-sets of the two branches.
-
+of lists of variables) in the $\itm{info}$ field of the \key{block}
+construct.
+%
+We recommend organizing your code to use a helper function that takes
+a list of instructions and an initial live-after set (typically empty)
+and returns the list of live-after sets.
+%
 We recommend creating helper functions to 1) compute the set of
 variables that appear in an argument (of an instruction), 2) compute
 the variables read by an instruction which corresponds to the $R$
@@ -2443,7 +2439,7 @@ Line 8: $z$ interferes with $w$ and $y$,\\
 Line 9: $z$ interferes with $y$, \\
 Line 10: $t.1$ interferes with $z$, \\
 Line 11: $t.1$ interferes with $z$, \\
-Line 12: $t.2$ interferes with $t.1$, \\
+Line 12: no interference, \\
 Line 13: no interference. \\
 Line 14: no interference.
 \end{quote}
@@ -2457,10 +2453,9 @@ Figure~\ref{fig:interfere}.
 \node (v) at (0,0)   {$v$};
 \node (w) at (2,0)   {$w$};
 \node (x) at (4,0)   {$x$};
-\node (t1) at (6,0)   {$t.1$};
+\node (t1) at (6,-2)   {$t.1$};
 \node (y) at (2,-2)  {$y$};
 \node (z) at (4,-2)  {$z$};
-\node (t2) at (6,-2) {$t.2$};
 
 \draw (v) to (w);
 \foreach \i in {w,x,y}
@@ -2473,7 +2468,6 @@ Figure~\ref{fig:interfere}.
 \draw (z) to (w);
 \draw (z) to (y);
 \draw (t1) to (z);
-\draw (t2) to (t1);
 \end{tikzpicture}
 \]
 \caption{The interference graph of the example program.}
@@ -2481,10 +2475,10 @@ Figure~\ref{fig:interfere}.
 \end{figure}
 
 Our next concern is to choose a data structure for representing the
-interference graph. There are many standard choices for how to
-represent a graph: \emph{adjacency matrix}, \emph{adjacency list}, and
-\emph{edge set}~\citep{Cormen:2001uq}. The right way to choose a data
-structure is to study the algorithm that uses the data structure,
+interference graph. There are many choices for how to represent a
+graph, for example, \emph{adjacency matrix}, \emph{adjacency list},
+and \emph{edge set}~\citep{Cormen:2001uq}. The right way to choose a
+data structure is to study the algorithm that uses the data structure,
 determine what operations need to be performed, and then choose the
 data structure that provide the most efficient implementations of
 those operations. Often times the choice of data structure can have an
@@ -2496,20 +2490,20 @@ correct choice of graph representation is that of an adjacency
 list. There are helper functions in \code{utilities.rkt} for
 representing graphs using the adjacency list representation:
 \code{make-graph}, \code{add-edge}, and \code{adjacent}
-(Appendix~\ref{appendix:utilities}).  In particular, those functions
-use a hash table to map each vertex to the set of adjacent vertices,
-and the sets are represented using Racket's \key{set}, which is also a
-hash table.
+(Appendix~\ref{appendix:utilities}).
+%
+\margincomment{\footnotesize To do: change to use the
+    Racket graph library. \\ --Jeremy}
+%
+In particular, those functions use a hash table to map each vertex to
+the set of adjacent vertices, and the sets are represented using
+Racket's \key{set}, which is also a hash table.
 
 \begin{exercise}\normalfont
 Implement the compiler pass named \code{build-interference} according
-to the algorithm suggested above.  The output of this pass should
-replace the live-after sets with the interference $\itm{graph}$ as
-follows.
-\begin{lstlisting}
-   (program (|$\Var^{*}$| |$\itm{graph}$|) |$\Instr^{+}$|)
-\end{lstlisting}
-
+to the algorithm suggested above.  The output of this pass should be
+stored in the $\itm{info}$ field of the program, under the key
+\code{conflicts}.
 \end{exercise}
 
 \section{Graph Coloring via Sudoku}
@@ -6331,6 +6325,13 @@ $\Rightarrow$
 %
 The top-level function definitions need to be updated as well to take
 an extra closure parameter.
+
+A final concern when implementing closure conversion is that we want
+to maintain efficient tail calls. To preserve the invariant needed for
+tail calls, \code{limit-functions} should be updated to handle
+\code{lambda} (as it happens before \code{convert-to-closures}), as
+well as to reserve an extra spot for the eventual closure parameter
+for all functions.
 
 \section{An Example Translation}
 \label{sec:example-lambda}
