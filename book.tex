@@ -2865,7 +2865,9 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (R1) at (0,2)  {\large $R_1$};
 \node (R1-2) at (3,2)  {\large $R_1$};
-\node (C0-1) at (3,0)  {\large $C_0$};
+\node (R1-3) at (6,2)  {\large $R_1$};
+\node (C0-1) at (6,0)  {\large $C_0$};
+\node (C0-2) at (3,0)  {\large $C_0$};
 
 \node (x86-2) at (3,-2)  {\large $\text{x86}^{*}$};
 \node (x86-3) at (6,-2)  {\large $\text{x86}^{*}$};
@@ -2876,8 +2878,10 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \node (x86-2-2) at (6,-4)  {\large $\text{x86}^{*}$};
 
 \path[->,bend left=15] (R1) edge [above] node {\ttfamily\footnotesize uniquify} (R1-2);
-\path[->,bend left=15] (R1-2) edge [right] node {\ttfamily\footnotesize flatten} (C0-1);
-\path[->,bend right=15] (C0-1) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
+\path[->,bend left=15] (R1-2) edge [above] node {\ttfamily\footnotesize remove-complex.} (R1-3);
+\path[->,bend left=15] (R1-3) edge [right] node {\ttfamily\footnotesize explicate-control} (C0-1);
+\path[->,bend right=15] (C0-1) edge [above] node {\ttfamily\footnotesize uncover-locals} (C0-2);
+\path[->,bend right=15] (C0-2) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
 \path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize\color{red} uncover-live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize\color{red} build-inter.} (x86-2-2);
 \path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize\color{red} allocate-reg.} (x86-3);
@@ -2893,11 +2897,7 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
   after the \code{build-interference} pass. The three new passes,
   \code{uncover-live}, \code{build-interference}, and
   \code{allocate-registers} replace the \code{assign-homes} pass of
-  Section~\ref{sec:assign-r1}.  Just like \code{assign-homes}, the
-  output of \code{allocate-registers} should be in the form
-  \[
-  (\key{program}\;\Int\;\Instr^{+})
-  \]
+  Section~\ref{sec:assign-r1}.
   
   We recommend that you create a helper function named
   \code{color-graph} that takes an interference graph and a list of
@@ -2930,7 +2930,7 @@ conclusion returned those values to \code{rbp} and \code{rsp}.  The
 reason for this is that our \code{main} function must adhere to the
 x86 calling conventions that we described in
 Section~\ref{sec:calling-conventions}. In addition, the \code{main}
-function needs and restore (in the conclusion) any callee-saved
+function needs to restore (in the conclusion) any callee-saved
 registers that get used during register allocation. The simplest
 approach is to save and restore all of the callee-saved registers. The
 more efficient approach is to keep track of which callee-saved
@@ -2957,39 +2957,39 @@ described in the last section, we get the following program.
 
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-  (program (v w x y z)
-    (movq (int 1) (var v))
-    (movq (int 46) (var w))
-    (movq (var v) (var x))
-    (addq (int 7) (var x))
-    (movq (var x) (var y))
-    (addq (int 4) (var y))
-    (movq (var x) (var z))
-    (addq (var w) (var z))
-    (movq (var y) (var t.1))
-    (negq (var t.1))
-    (movq (var z) (var t.2))
-    (addq (var t.1) (var t.2))
-    (movq (var t.2) (reg rax)))
+(block ()
+  (movq (int 1) (var v))
+  (movq (int 46) (var w))
+  (movq (var v) (var x))
+  (addq (int 7) (var x))
+  (movq (var x) (var y))
+  (addq (int 4) (var y))
+  (movq (var x) (var z))
+  (addq (var w) (var z))
+  (movq (var y) (var t.1))
+  (negq (var t.1))
+  (movq (var z) (reg rax))
+  (addq (var t.1) (reg rax))
+  (jmp conclusion))
 \end{lstlisting}
 \end{minipage}
 $\Rightarrow$
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-(program 0
+(block ()
   (movq (int 1) (reg rbx))
-  (movq (int 46) (reg rcx))
-  (movq (reg rbx) (reg rdx))
-  (addq (int 7) (reg rdx))
-  (movq (reg rdx) (reg rbx))
+  (movq (int 46) (reg rdx))
+  (movq (reg rbx) (reg rcx))
+  (addq (int 7) (reg rcx))
+  (movq (reg rcx) (reg rbx))
   (addq (int 4) (reg rbx))
-  (movq (reg rdx) (reg rdx))
-  (addq (reg rcx) (reg rdx))
+  (movq (reg rcx) (reg rcx))
+  (addq (reg rdx) (reg rcx))
   (movq (reg rbx) (reg rbx))
   (negq (reg rbx))
-  (movq (reg rdx) (reg rcx))
-  (addq (reg rbx) (reg rcx))
-  (movq (reg rcx) (reg rax)))
+  (movq (reg rcx) (reg rax))
+  (addq (reg rbx) (reg rax))
+  (jmp conclusion))
 \end{lstlisting}
 \end{minipage}
 
@@ -2999,8 +2999,8 @@ if they had been placed in the same register, then the move from
 \key{v} to \key{x} could be removed.
 
 We say that two variables $p$ and $q$ are \emph{move related} if they
-participate together in a \key{movq} instruction, that is, \key{movq
-  p, q} or \key{movq q, p}. When the register allocator chooses a
+participate together in a \key{movq} instruction, that is, \key{movq}
+  $p$, $q$ or \key{movq} $q$, $p$. When the register allocator chooses a
 color for a variable, it should prefer a color that has already been
 used for a move-related variable (assuming that they do not
 interfere). Of course, this preference should not override the
@@ -3018,30 +3018,26 @@ similar to how we represented interference.  The following is the
 \node (x) at (6,0)    {$x$};
 \node (y) at (3,-1.5) {$y$};
 \node (z) at (6,-1.5) {$z$};
-\node (t1) at (9,0)   {$t.1$};
-\node (t2) at (9,-1.5) {$t.2$};
-\draw (t1) to (y);
-\draw (t2) to (z);
-\draw[bend left=20] (v) to (x);
+\node (t1) at (9,-1.5)   {$t.1$};
+\draw[bend left=15] (t1) to (y);
+\draw[bend left=15] (v) to (x);
 \draw (x) to (y);
 \draw (x) to (z);
 \end{tikzpicture}
 \]
 
-Now we replay the graph coloring, pausing to see the coloring of $z$
-and $v$. So we have the following coloring so far and the most
-saturated vertex is $z$.
+Now we replay the graph coloring, pausing to see the coloring of $x$
+and $v$. So we have the following coloring and the most saturated
+vertex is $x$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (v) at (0,0)    {$v:-,\{1\}$};
-\node (w) at (3,0)    {$w:1,\{0,2\}$};
-\node (x) at (6,0)    {$x:2,\{0,1\}$};
-\node (y) at (3,-1.5) {$y:0,\{1,2\}$};
-\node (z) at (6,-1.5) {$z:-,\{0,1\}$};
-\node (t1) at (9,0)   {$t.1:-,\{\}$};
-\node (t2) at (9,-1.5) {$t.2:-,\{\}$};
+\node (v) at (0,0)   {$v:-,\{2\}$};
+\node (w) at (3,0)   {$w:2,\{0,1\}$};
+\node (x) at (6,0)   {$x:-,\{0,2\}$};
+\node (y) at (3,-1.5)  {$y:0,\{1,2\}$};
+\node (z) at (6,-1.5)  {$z:1,\{0,2\}$};
+\node (t1) at (9,-1.5)   {$t.1:0,\{\}$};
 \draw (t1) to (z);
-\draw (t2) to (t1);
 \draw (v) to (w);
 \foreach \i in {w,x,y}
 {
@@ -3054,24 +3050,24 @@ saturated vertex is $z$.
 \draw (z) to (y);
 \end{tikzpicture}
 \]
-Last time we chose to color $z$ with $2$, which so happens to be the
-color of $x$, and $z$ is move related to $x$. This was rather lucky,
-and if the program had been a little different, and say $x$ had been
-already assigned to $3$, then $z$ would still get $2$ and our luck
-would have run out. With move biasing, we use the fact that $z$ and
-$x$ are move related to influence the choice of color for $z$, in this
-case choosing $2$ because that's the color of $x$.
+Last time we chose to color $x$ with $1$,
+%
+which so happens to be the color of $z$, and $x$ is move related to
+$z$. This was rather lucky, and if the program had been a little
+different, and say $z$ had been already assigned to $2$, then $x$
+would still get $1$ and our luck would have run out. With move
+biasing, we use the fact that $x$ and $z$ are move related to
+influence the choice of color for $x$, in this case choosing $1$
+because that's the color of $z$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (v) at (0,0)    {$v:-,\{1\}$};
-\node (w) at (3,0)    {$w:1,\{0,2\}$};
-\node (x) at (6,0)    {$x:2,\{0,1\}$};
-\node (y) at (3,-1.5) {$y:0,\{1,2\}$};
-\node (z) at (6,-1.5) {$z:2,\{0,1\}$};
-\node (t1) at (9,0)   {$t.1:-,\{2\}$};
-\node (t2) at (9,-1.5) {$t.2:-,\{\}$};
+\node (v) at (0,0)   {$v:-,\{2\}$};
+\node (w) at (3,0)   {$w:2,\{0,\mathbf{1}\}$};
+\node (x) at (6,0)   {$x:\mathbf{1},\{0,2\}$};
+\node (y) at (3,-1.5)  {$y:0,\{\mathbf{1},2\}$};
+\node (z) at (6,-1.5)  {$z:1,\{0,2\}$};
+\node (t1) at (9,-1.5)   {$t.1:0,\{\}$};
 \draw (t1) to (z);
-\draw (t2) to (t1);
 \draw (v) to (w);
 \foreach \i in {w,x,y}
 {
@@ -3086,20 +3082,18 @@ case choosing $2$ because that's the color of $x$.
 \]
 
 Next we consider coloring the variable $v$, and we just need to avoid
-choosing $1$ because of the interference with $w$. Last time we choose
+choosing $2$ because of the interference with $w$. Last time we choose
 the color $0$, simply because it was the lowest, but this time we know
-that $v$ is move related to $x$, so we choose the color $2$.
+that $v$ is move related to $x$, so we choose the color $1$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (v) at (0,0)    {$v:2,\{1\}$};
-\node (w) at (3,0)    {$w:1,\{0,2\}$};
-\node (x) at (6,0)    {$x:2,\{0,1\}$};
-\node (y) at (3,-1.5) {$y:0,\{1,2\}$};
-\node (z) at (6,-1.5) {$z:2,\{0,1\}$};
-\node (t1) at (9,0)   {$t.1:-,\{2\}$};
-\node (t2) at (9,-1.5) {$t.2:-,\{\}$};
+\node (v) at (0,0)   {$v:\mathbf{1},\{2\}$};
+\node (w) at (3,0)   {$w:2,\{0,\mathbf{1}\}$};
+\node (x) at (6,0)   {$x:1,\{0,2\}$};
+\node (y) at (3,-1.5)  {$y:0,\{1,2\}$};
+\node (z) at (6,-1.5)  {$z:1,\{0,2\}$};
+\node (t1) at (9,-1.5)   {$t.1:0,\{\}$};
 \draw (t1) to (z);
-\draw (t2) to (t1);
 \draw (v) to (w);
 \foreach \i in {w,x,y}
 {
@@ -3118,58 +3112,62 @@ to obtain the code on right.
 
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-  (program (v w x y z)
-    (movq (int 1) (var v))
-    (movq (int 46) (var w))
-    (movq (var v) (var x))
-    (addq (int 7) (var x))
-    (movq (var x) (var y))
-    (addq (int 4) (var y))
-    (movq (var x) (var z))
-    (addq (var w) (var z))
-    (movq (var y) (var t.1))
-    (negq (var t.1))
-    (movq (var z) (var t.2))
-    (addq (var t.1) (var t.2))
-    (movq (var t.2) (reg rax)))
+(block ()
+  (movq (int 1) (var v))
+  (movq (int 46) (var w))
+  (movq (var v) (var x))
+  (addq (int 7) (var x))
+  (movq (var x) (var y))
+  (addq (int 4) (var y))
+  (movq (var x) (var z))
+  (addq (var w) (var z))
+  (movq (var y) (var t.1))
+  (negq (var t.1))
+  (movq (var z) (reg rax))
+  (addq (var t.1) (reg rax))
+  (jmp conclusion))
 \end{lstlisting}
 \end{minipage}
 $\Rightarrow$
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-(program 0
-  (movq (int 1) (reg rdx))
-  (movq (int 46) (reg rcx))
-  (movq (reg rdx) (reg rdx))
-  (addq (int 7) (reg rdx))
-  (movq (reg rdx) (reg rbx))
-  (addq (int 4) (reg rbx))
-  (movq (reg rdx) (reg rdx))
-  (addq (reg rcx) (reg rdx))
-  (movq (reg rbx) (reg rbx))
-  (negq (reg rbx))
-  (movq (reg rdx) (reg rcx))
+(block ()
+  (movq (int 1) (reg rcx))
+  (movq (int 46) (reg rbx))
+  (movq (reg rcx) (reg rcx))
+  (addq (int 7) (reg rcx))
+  (movq (reg rcx) (reg rdx))
+  (addq (int 4) (reg rdx))
+  (movq (reg rcx) (reg rcx))
   (addq (reg rbx) (reg rcx))
-  (movq (reg rcx) (reg rax)))
+  (movq (reg rdx) (reg rbx))
+  (negq (reg rbx))
+  (movq (reg rcx) (reg rax))
+  (addq (reg rbx) (reg rax))
+  (jmp conclusion))
 \end{lstlisting}
 \end{minipage}
 
 The \code{patch-instructions} then removes the trivial moves from
-\key{v} to \key{x}, from \key{x} to \key{z}, and from \key{y} to
-\key{t.1}, to obtain the following result.
-\begin{lstlisting}
-(program 0
-  (movq (int 1) (reg rdx))
-  (movq (int 46) (reg rcx))
-  (addq (int 7) (reg rdx))
-  (movq (reg rdx) (reg rbx))
-  (addq (int 4) (reg rbx))
-  (addq (reg rcx) (reg rdx))
-  (negq (reg rbx))
-  (movq (reg rdx) (reg rcx))
+\key{v} to \key{x} and from \key{x} to \key{z} to obtain the following
+result.
+
+\begin{minipage}{0.45\textwidth}
+  \begin{lstlisting}
+(block ()
+  (movq (int 1) (reg rcx))
+  (movq (int 46) (reg rbx))
+  (addq (int 7) (reg rcx))
+  (movq (reg rcx) (reg rdx))
+  (addq (int 4) (reg rdx))
   (addq (reg rbx) (reg rcx))
-  (movq (reg rcx) (reg rax)))
+  (movq (reg rdx) (reg rbx))
+  (negq (reg rbx))
+  (movq (reg rcx) (reg rax))
+  (addq (reg rbx) (reg rax))
+  (jmp conclusion))
 \end{lstlisting}
+\end{minipage}
 
 \begin{exercise}\normalfont
 Change your implementation of \code{allocate-registers} to take move
