@@ -3449,22 +3449,20 @@ for a program, then interpreting that program should not encounter an
 error.  If it does, there is something wrong with your type checker.
 \end{exercise}
 
-\section{The $C_1$ Language}
+\section{The $C_1$ Intermediate Language}
 \label{sec:c1}
 
-UNDER CONSTRUCTION
-
-The $R_2$ language adds Booleans and conditional expressions to $R_1$.
-As with $R_1$, we shall compile to a C-like intermediate language, but
-we need to grow that intermediate language to handle the new features
-in $R_2$. Figure~\ref{fig:c1-syntax} shows the new features of $C_1$;
-we add logic and comparison operators to the $\Exp$ non-terminal, the
+As with $R_1$, we shall compile $R_2$ to a C-like intermediate
+language, but we need to grow that intermediate language to handle the
+new features in $R_2$: Booleans and conditional expressions.
+Figure~\ref{fig:c1-syntax} shows the new features of $C_1$; we add
+logic and comparison operators to the $\Exp$ non-terminal, the
 literals \key{\#t} and \key{\#f} to the $\Arg$ non-terminal, and we
 add an \key{if} statement. The \key{if} statement of $C_1$ includes a
 built-in comparison (unlike the $C$ language), which is needed for
 improving code generation in Section~\ref{sec:opt-if}.  We do not
 include \key{and} in $C_1$ because it is not needed in the translation
-of the \key{and} of $R_2$.
+of $R_2$'s \key{and} construct.
 
 \begin{figure}[tp]
 \fbox{
@@ -3476,8 +3474,9 @@ of the \key{and} of $R_2$.
 \Exp &::= & \gray{\Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)}
       \mid (\key{not}\;\Arg) \mid (\itm{cmp}\;\Arg\;\Arg) \\
 \Stmt &::=& \gray{\ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg}} \\
-      &\mid& \IF{(\itm{cmp}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} \\
-C_1 & ::= & (\key{program}\;(\Var^{*})\;(\key{type}\;\textit{type})\;\Stmt^{+})
+\Tail &::= & \gray{\RETURN{\Arg} \mid (\key{seq}\;\Stmt\;\Tail)} \\
+      &\mid& (\key{goto}\,\itm{label}) \mid \IF{(\itm{cmp}\, \Arg\,\Arg)}{(\key{goto}\,\itm{label})}{(\key{goto}\,\itm{label})} \\
+C_1 & ::= & (\key{program}\;\itm{info}\; ((\itm{label}\,\key{.}\,\Tail)^{+}))
 \end{array}
 \]
 \end{minipage}
@@ -3486,13 +3485,14 @@ C_1 & ::= & (\key{program}\;(\Var^{*})\;(\key{type}\;\textit{type})\;\Stmt^{+})
 \label{fig:c1-syntax}
 \end{figure}
 
-\section{Flatten Expressions}
+\section{Remove Complex Operators and Operands}
 \label{sec:flatten-r2}
 
-We expand the \code{flatten} pass to handle the Boolean literals
-\key{\#t} and \key{\#f}, the new logic and comparison operations, and
-\key{if} expressions. We shall start with a simple example of
-translating a \key{if} expression, shown below on the left. \\
+We expand the \code{remove-complex-opera*} pass to handle the Boolean
+literals \key{\#t} and \key{\#f}, the new logic and comparison
+operations, and \key{if} expressions. We shall start with a simple
+example of translating a \key{if} expression, shown below on the
+left. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
