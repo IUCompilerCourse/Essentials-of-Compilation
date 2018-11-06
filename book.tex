@@ -3210,8 +3210,8 @@ The Typed Racket language makes similar design choices as Racket,
 except much of the error detection happens at compile time instead of
 run time. Like Racket, Typed Racket accepts and runs \code{(not 1)},
 producing \code{\#f}. But in the case of \code{(car 1)}, Typed Racket
-reports a compile-time error because the type of the argument is
-expected to be of the form \code{(Listof T)} or \code{(Pairof T1 T2)}.
+reports a compile-time error because Typed Racket expects the type of
+the argument to be of the form \code{(Listof T)} or \code{(Pairof T1 T2)}.
 
 For the $R_2$ language we choose to be more like Typed Racket in that
 we shall perform type checking during compilation. In
@@ -3238,8 +3238,8 @@ conditional control flow.
 The syntax of the $R_2$ language is defined in
 Figure~\ref{fig:r2-syntax}. It includes all of $R_1$ (shown in gray) ,
 the Boolean literals \code{\#t} and \code{\#f}, and the conditional
-\code{if} expression. Also, we expand the operators to include the
-\key{and} and \key{not} on Booleans, the \key{eq?}  operations for
+\code{if} expression. Also, we expand the operators to include 
+\key{and} and \key{not}, the \key{eq?} operations for
 comparing two integers or two Booleans, and the \key{<}, \key{<=},
 \key{>}, and \key{>=} operations for comparing integers.
 
@@ -3255,7 +3255,7 @@ comparing two integers or two Booleans, and the \key{<}, \key{<=},
      &\mid& \key{\#t} \mid \key{\#f} \mid
       (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp) \\
       &\mid& (\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp} \\
-  R_2 &::=& (\key{program} \; \Exp)
+  R_2 &::=& (\key{program} \; \itm{info}\; \Exp)
 \end{array}
 \]
 \end{minipage}
@@ -3344,7 +3344,7 @@ the order of evaluation of its arguments.
 \section{Type Checking $R_2$ Programs}
 \label{sec:type-check-r2}
 
-It is helpful to think about type checking into two complementary
+It is helpful to think about type checking in two complementary
 ways. A type checker predicts the \emph{type} of value that will be
 produced by each expression in the program.  For $R_2$, we have just
 two types, \key{Integer} and \key{Boolean}. So a type checker should
@@ -3370,7 +3370,7 @@ expression because, as we have seen above, the expression \code{(+ 10
 
 The type checker for $R_2$ is best implemented as a structurally
 recursive function over the AST. Figure~\ref{fig:type-check-R2} shows
-many of the clauses for the \code{typecheck-R2} function.  Given an
+many of the clauses for the \code{type-check-exp} function.  Given an
 input expression \code{e}, the type checker either returns the type
 (\key{Integer} or \key{Boolean}) or it signals an error.  Of course,
 the type of an integer literal is \code{Integer} and the type of a
@@ -3380,7 +3380,7 @@ this case the association list maps variables to types instead of
 values. Consider the clause for \key{let}.  We type check the
 initializing expression to obtain its type \key{T} and then associate
 type \code{T} with the variable \code{x}. When the type checker
-encounters the use of a variable, it can lookup its type in the
+encounters the use of a variable, it can find its type in the
 association list.
 
 \begin{figure}[tbp]
@@ -3391,14 +3391,15 @@ association list.
        (match e
          [(? fixnum?)  'Integer]
          [(? boolean?) 'Boolean]
-         [(? symbol?)  (lookup e env)]
+         [(? symbol? x) (dict-ref env x)]
          [`(read)      'Integer]
-         [`(let ([,x ,(app recur T)]) ,body)
+         [`(let ([,x ,e]) ,body)
+          (define T (recur e))
           (define new-env (cons (cons x T) env))
           (type-check-exp new-env body)]
          ...
-         [`(not ,(app recur T))
-          (match T
+         [`(not ,e)
+          (match (recur e)
             ['Boolean 'Boolean]
             [else (error 'type-check-exp "'not' expects a Boolean" e)])]
          ...
@@ -3416,24 +3417,24 @@ association list.
 \label{fig:type-check-R2}
 \end{figure}
 
-To print the resulting value correctly, the overall type of the
-program must be threaded through the remainder of the passes. We can
-store the type within the \key{program} form as shown in Figure
-\ref{fig:type-check-R2}. Let $R^\dagger_2$ be the name for the
-intermediate language produced by the type checker, which we define as
-follows: \\[1ex]
-\fbox{
-\begin{minipage}{0.87\textwidth}
-\[
-\begin{array}{lcl}
-  R^\dagger_2 &::=& (\key{program}\;(\key{type}\;\itm{type})\; \Exp)
-\end{array}
-\]
-\end{minipage}
-}
+%% To print the resulting value correctly, the overall type of the
+%% program must be threaded through the remainder of the passes. We can
+%% store the type within the \key{program} form as shown in Figure
+%% \ref{fig:type-check-R2}. Let $R^\dagger_2$ be the name for the
+%% intermediate language produced by the type checker, which we define as
+%% follows: \\[1ex]
+%% \fbox{
+%% \begin{minipage}{0.87\textwidth}
+%% \[
+%% \begin{array}{lcl}
+%%   R^\dagger_2 &::=& (\key{program}\;(\key{type}\;\itm{type})\; \Exp)
+%% \end{array}
+%% \]
+%% \end{minipage}
+%% }
 
 \begin{exercise}\normalfont
-Complete the implementation of \code{typecheck-R2} and test it on 10
+Complete the implementation of \code{type-check-R2} and test it on 10
 new example programs in $R_2$ that you choose based on how thoroughly
 they test the type checking algorithm. Half of the example programs
 should have a type error, to make sure that your type checker properly
