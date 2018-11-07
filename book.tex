@@ -997,7 +997,7 @@ performed before the \key{read} for \code{y}. Given the input
 \code{-42}).
 \begin{lstlisting}
    (program ()
-     (let ([x (read)]) (let ([y (read)]) (- x y))))
+     (let ([x (read)]) (let ([y (read)]) (+ x (- y)))))
 \end{lstlisting}
 
 Figure~\ref{fig:interp-R1} shows the interpreter for the $R_1$
@@ -3250,10 +3250,11 @@ comparing two integers or two Booleans, and the \key{<}, \key{<=},
 \[
 \begin{array}{lcl}
   \itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
-  \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)}  \\
+  \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)}  \mid (\key{-}\;\Exp\;\Exp) \\
      &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp}} \\
-     &\mid& \key{\#t} \mid \key{\#f} \mid
-      (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp) \\
+     &\mid& \key{\#t} \mid \key{\#f} 
+      \mid (\key{and}\;\Exp\;\Exp) \mid (\key{or}\;\Exp\;\Exp)
+      \mid (\key{not}\;\Exp) \\
       &\mid& (\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp} \\
   R_2 &::=& (\key{program} \; \itm{info}\; \Exp)
 \end{array}
@@ -3298,8 +3299,7 @@ the order of evaluation of its arguments.
        ['not (lambda (v) (match v [#t #f] [#f #t]))]
        ['eq? (lambda (v1 v2)
                (cond [(or (and (fixnum? v1) (fixnum? v2))
-                          (and (boolean? v1) (boolean? v2))
-                          (and (vector? v1) (vector? v2)))
+                          (and (boolean? v1) (boolean? v2)))
                       (eq? v1 v2)]))]
        ['< (lambda (v1 v2)
              (cond [(and (fixnum? v1) (fixnum? v2)) (< v1 v2)]))]
@@ -3449,6 +3449,17 @@ for a program, then interpreting that program should not encounter an
 error.  If it does, there is something wrong with your type checker.
 \end{exercise}
 
+\section{Shrink}
+\label{sec:shrink-r2}
+
+
+UNDER CONSTRUCTION
+
+\section{Remove Complex Operators and Operands}
+\label{sec:rco-r2}
+
+UNDER CONSTRUCTION
+
 \section{The $C_1$ Intermediate Language}
 \label{sec:c1}
 
@@ -3485,107 +3496,109 @@ C_1 & ::= & (\key{program}\;\itm{info}\; ((\itm{label}\,\key{.}\,\Tail)^{+}))
 \label{fig:c1-syntax}
 \end{figure}
 
-\section{Remove Complex Operators and Operands}
-\label{sec:flatten-r2}
 
-We expand the \code{remove-complex-opera*} pass to handle the Boolean
-literals \key{\#t} and \key{\#f}, the new logic and comparison
-operations, and \key{if} expressions. We shall start with a simple
-example of translating a \key{if} expression, shown below on the
-left. \\
-\begin{tabular}{lll}
-\begin{minipage}{0.4\textwidth}
-\begin{lstlisting}
- (program (if #f 0 42))
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.4\textwidth}
-\begin{lstlisting}
-(program (if.1)
-  (if (eq? #t #f)
-    ((assign if.1 0))
-    ((assign if.1 42)))
-  (return if.1))
-\end{lstlisting}
-\end{minipage}
-\end{tabular} \\
-The value of the \key{if} expression is the value of the branch that
-is selected. Recall that in the \code{flatten} pass we need to replace
-arbitrary expressions with $\Arg$'s (variables or literals). In the
-translation above, on the right, we have replaced the \key{if}
-expression with a new variable \key{if.1}, inside \code{(return
-  if.1)}, and we have produced code that will assign the appropriate
-value to \key{if.1} using an \code{if} statement prior to the
-\code{return}.  For $R_1$, the \code{flatten} pass returned a list of
-assignment statements. Here, for $R_2$, we return a list of statements
-that can include both \key{if} statements and assignment statements.
+%% We expand the \code{remove-complex-opera*} pass to handle the Boolean
+%% literals \key{\#t} and \key{\#f}, the new logic and comparison
+%% operations, and \key{if} expressions. We shall start with a simple
+%% example of translating a \key{if} expression, shown below on the
+%% left. \\
+%% \begin{tabular}{lll}
+%% \begin{minipage}{0.4\textwidth}
+%% \begin{lstlisting}
+%%  (program (if #f 0 42))
+%% \end{lstlisting}
+%% \end{minipage}
+%% &
+%% $\Rightarrow$
+%% &
+%% \begin{minipage}{0.4\textwidth}
+%% \begin{lstlisting}
+%% (program (if.1)
+%%   (if (eq? #t #f)
+%%     ((assign if.1 0))
+%%     ((assign if.1 42)))
+%%   (return if.1))
+%% \end{lstlisting}
+%% \end{minipage}
+%% \end{tabular} \\
+%% The value of the \key{if} expression is the value of the branch that
+%% is selected. Recall that in the \code{flatten} pass we need to replace
+%% arbitrary expressions with $\Arg$'s (variables or literals). In the
+%% translation above, on the right, we have replaced the \key{if}
+%% expression with a new variable \key{if.1}, inside \code{(return
+%%   if.1)}, and we have produced code that will assign the appropriate
+%% value to \key{if.1} using an \code{if} statement prior to the
+%% \code{return}.  For $R_1$, the \code{flatten} pass returned a list of
+%% assignment statements. Here, for $R_2$, we return a list of statements
+%% that can include both \key{if} statements and assignment statements.
 
-The next example is a bit more involved, showing what happens when
-there are complex expressions (not variables or literals) in the
-condition and branch expressions of an \key{if}, including nested
-\key{if} expressions.
+%% The next example is a bit more involved, showing what happens when
+%% there are complex expressions (not variables or literals) in the
+%% condition and branch expressions of an \key{if}, including nested
+%% \key{if} expressions.
 
-\begin{tabular}{lll}
-\begin{minipage}{0.4\textwidth}
-\begin{lstlisting}
-(program
-  (if (eq? (read) 0)
-      777
-      (+ 2 (if (eq? (read) 0)
-               40
-               444))))
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.4\textwidth}
-\begin{lstlisting}
-(program (t.1 t.2 if.1 t.3 t.4
-           if.2 t.5)
-  (assign t.1 (read))
-  (assign t.2 (eq? t.1 0))
-  (if (eq? #t t.2)
-    ((assign if.1 777))
-    ((assign t.3 (read))
-     (assign t.4 (eq? t.3 0))
-     (if (eq? #t t.4)
-       ((assign if.2 40))
-       ((assign if.2 444)))
-     (assign t.5 (+ 2 if.2))
-     (assign if.1 t.5)))
-  (return if.1))
-\end{lstlisting}
-\end{minipage}
-\end{tabular} \\
+%% \begin{tabular}{lll}
+%% \begin{minipage}{0.4\textwidth}
+%% \begin{lstlisting}
+%% (program
+%%   (if (eq? (read) 0)
+%%       777
+%%       (+ 2 (if (eq? (read) 0)
+%%                40
+%%                444))))
+%% \end{lstlisting}
+%% \end{minipage}
+%% &
+%% $\Rightarrow$
+%% &
+%% \begin{minipage}{0.4\textwidth}
+%% \begin{lstlisting}
+%% (program (t.1 t.2 if.1 t.3 t.4
+%%            if.2 t.5)
+%%   (assign t.1 (read))
+%%   (assign t.2 (eq? t.1 0))
+%%   (if (eq? #t t.2)
+%%     ((assign if.1 777))
+%%     ((assign t.3 (read))
+%%      (assign t.4 (eq? t.3 0))
+%%      (if (eq? #t t.4)
+%%        ((assign if.2 40))
+%%        ((assign if.2 444)))
+%%      (assign t.5 (+ 2 if.2))
+%%      (assign if.1 t.5)))
+%%   (return if.1))
+%% \end{lstlisting}
+%% \end{minipage}
+%% \end{tabular} \\
 
-The \code{flatten} clauses for the Boolean literals and the operations
-\key{not} and \key{eq?} are straightforward.  However, the
-\code{flatten} clause for \key{and} requires some care to properly
-imitate the order of evaluation of the interpreter for $R_2$
-(Figure~\ref{fig:interp-R2}). We recommend using an \key{if} statement
-in the code you generate for \key{and}.
+%% The \code{flatten} clauses for the Boolean literals and the operations
+%% \key{not} and \key{eq?} are straightforward.  However, the
+%% \code{flatten} clause for \key{and} requires some care to properly
+%% imitate the order of evaluation of the interpreter for $R_2$
+%% (Figure~\ref{fig:interp-R2}). We recommend using an \key{if} statement
+%% in the code you generate for \key{and}.
 
-The \code{flatten} clause for \key{if} also requires some care because
-the condition of the \key{if} can be an arbitrary expression in $R_2$,
-but in $C_1$ the condition must be an equality predicate. For now we
-recommend flattening the condition into an $\Arg$ and then comparing
-it with \code{\#t}. We discuss a more efficient approach in
-Section~\ref{sec:opt-if}.
+%% The \code{flatten} clause for \key{if} also requires some care because
+%% the condition of the \key{if} can be an arbitrary expression in $R_2$,
+%% but in $C_1$ the condition must be an equality predicate. For now we
+%% recommend flattening the condition into an $\Arg$ and then comparing
+%% it with \code{\#t}. We discuss a more efficient approach in
+%% Section~\ref{sec:opt-if}.
 
 
-\begin{exercise}\normalfont
-Expand your \code{flatten} pass to handle $R_2$, that is, handle the
-Boolean literals, the new logic and comparison operations, and the
-\key{if} expressions. Create 4 more test cases that expose whether
-your flattening code is correct. Test your \code{flatten} pass by
-running the output programs with \code{interp-C}
-(Appendix~\ref{appendix:interp}).
-\end{exercise}
+%% \begin{exercise}\normalfont
+%% Expand your \code{flatten} pass to handle $R_2$, that is, handle the
+%% Boolean literals, the new logic and comparison operations, and the
+%% \key{if} expressions. Create 4 more test cases that expose whether
+%% your flattening code is correct. Test your \code{flatten} pass by
+%% running the output programs with \code{interp-C}
+%% (Appendix~\ref{appendix:interp}).
+%% \end{exercise}
 
+\section{Explicate Control}
+\label{sec:explicate-control-r2}
+
+UNDER CONSTRUCTION
 
 \section{XOR, Comparisons, and Control Flow in x86}
 \label{sec:x86-1}
@@ -3835,51 +3848,51 @@ created programs on the \code{interp-x86} interpreter
 \end{exercise}
 
 
-\section{Lower Conditionals (New Pass)}
-\label{sec:lower-conditionals}
+%% \section{Lower Conditionals (New Pass)}
+%% \label{sec:lower-conditionals}
 
-In the \code{select-instructions} pass we decided to procrastinate in
-the lowering of the \key{if} statement, thereby making liveness
-analysis easier. Now we need to make up for that and turn the \key{if}
-statement into the appropriate instruction sequence.  The following
-translation gives the general idea. If the condition is true, we need
-to execute the $\itm{thns}$ branch and otherwise we need to execute
-the $\itm{elss}$ branch. So we use \key{cmpq} and do a conditional
-jump to the $\itm{thenlabel}$, choosing the condition code $cc$ that
-is appropriate for the comparison operator \itm{cmp}.  If the
-condition is false, we fall through to the $\itm{elss}$ branch. At the
-end of the $\itm{elss}$ branch we need to take care to not fall
-through to the $\itm{thns}$ branch. So we jump to the
-$\itm{endlabel}$. All of the labels in the generated code should be
-created with \code{gensym}.
+%% In the \code{select-instructions} pass we decided to procrastinate in
+%% the lowering of the \key{if} statement, thereby making liveness
+%% analysis easier. Now we need to make up for that and turn the \key{if}
+%% statement into the appropriate instruction sequence.  The following
+%% translation gives the general idea. If the condition is true, we need
+%% to execute the $\itm{thns}$ branch and otherwise we need to execute
+%% the $\itm{elss}$ branch. So we use \key{cmpq} and do a conditional
+%% jump to the $\itm{thenlabel}$, choosing the condition code $cc$ that
+%% is appropriate for the comparison operator \itm{cmp}.  If the
+%% condition is false, we fall through to the $\itm{elss}$ branch. At the
+%% end of the $\itm{elss}$ branch we need to take care to not fall
+%% through to the $\itm{thns}$ branch. So we jump to the
+%% $\itm{endlabel}$. All of the labels in the generated code should be
+%% created with \code{gensym}.
 
-\begin{tabular}{lll}
-\begin{minipage}{0.4\textwidth}
-\begin{lstlisting}
- (if (|\itm{cmp}| |$\Arg_1$| |$\Arg_2$|) |$\itm{thns}$| |$\itm{elss}$|)
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.4\textwidth}
-\begin{lstlisting}
- (cmpq |$\Arg_2$| |$\Arg_1$|)
- (jmp-if |$cc$| |$\itm{thenlabel}$|)
- |$\itm{elss}$|
- (jmp |$\itm{endlabel}$|)
- (label |$\itm{thenlabel}$|)
- |$\itm{thns}$|
- (label |$\itm{endlabel}$|)
-\end{lstlisting}
-\end{minipage}
-\end{tabular}
+%% \begin{tabular}{lll}
+%% \begin{minipage}{0.4\textwidth}
+%% \begin{lstlisting}
+%%  (if (|\itm{cmp}| |$\Arg_1$| |$\Arg_2$|) |$\itm{thns}$| |$\itm{elss}$|)
+%% \end{lstlisting}
+%% \end{minipage}
+%% &
+%% $\Rightarrow$
+%% &
+%% \begin{minipage}{0.4\textwidth}
+%% \begin{lstlisting}
+%%  (cmpq |$\Arg_2$| |$\Arg_1$|)
+%%  (jmp-if |$cc$| |$\itm{thenlabel}$|)
+%%  |$\itm{elss}$|
+%%  (jmp |$\itm{endlabel}$|)
+%%  (label |$\itm{thenlabel}$|)
+%%  |$\itm{thns}$|
+%%  (label |$\itm{endlabel}$|)
+%% \end{lstlisting}
+%% \end{minipage}
+%% \end{tabular}
 
-\begin{exercise}\normalfont
-Implement the \code{lower-conditionals} pass. Test your compiler using
-your previously created programs on the \code{interp-x86} interpreter
-(Appendix~\ref{appendix:interp}).
-\end{exercise}
+%% \begin{exercise}\normalfont
+%% Implement the \code{lower-conditionals} pass. Test your compiler using
+%% your previously created programs on the \code{interp-x86} interpreter
+%% (Appendix~\ref{appendix:interp}).
+%% \end{exercise}
 
 \section{Patch Instructions}
 
@@ -4015,132 +4028,135 @@ if_end21289:
 Figure~\ref{fig:R2-passes} gives an overview of all the passes needed
 for the compilation of $R_2$.
 
-
-\section{Challenge: Optimizing Conditions$^{*}$}
-\label{sec:opt-if}
-
-A close inspection of the x86 code generated in
-Figure~\ref{fig:if-example-x86} reveals some redundant computation
-regarding the condition of the \key{if}. We compare \key{rcx} to $1$
-twice using \key{cmpq} as follows.
-
-% Wierd LaTeX bug if I remove the following. -Jeremy
-% Does it have to do with page breaks?
-\begin{lstlisting}
-\end{lstlisting}
-
-\begin{lstlisting}
-	cmpq	$1, %rcx
-	sete	%al
-	movzbq	%al, %rcx
-	cmpq	$1, %rcx
-	je then21288
-\end{lstlisting}
+\section{Challenge: Optimizing Jumps$^{*}$}
+\label{sec:opt-jumps}
 
 
-The reason for this non-optimal code has to do with the \code{flatten}
-pass earlier in this Chapter. We recommended flattening the condition
-to an $\Arg$ and then comparing with \code{\#t}. But if the condition
-is already an \code{eq?} test, then we would like to use that
-directly. In fact, for many of the expressions of Boolean type, we can
-generate more optimized code. For example, if the condition is
-\code{\#t} or \code{\#f}, we do not need to generate an \code{if} at
-all. If the condition is a \code{let}, we can optimize based on the
-form of its body. If the condition is a \code{not}, then we can flip
-the two branches.
-%
-\margincomment{\tiny We could do even better by converting to basic
-  blocks.\\ --Jeremy}
-%
-On the other hand, if the condition is a \code{and}
-or another \code{if}, we should flatten them into an $\Arg$ to avoid
-code duplication.
+%% \section{Challenge: Optimizing Conditions$^{*}$}
+%% \label{sec:opt-if}
 
-Figure~\ref{fig:opt-if} shows an example program and the result of
-applying the above suggested optimizations.
+%% A close inspection of the x86 code generated in
+%% Figure~\ref{fig:if-example-x86} reveals some redundant computation
+%% regarding the condition of the \key{if}. We compare \key{rcx} to $1$
+%% twice using \key{cmpq} as follows.
 
-\begin{exercise}\normalfont
-  Change the \code{flatten} pass to improve the code that gets
-  generated for \code{if} expressions. We recommend writing a helper
-  function that recursively traverses the condition of the \code{if}.
-\end{exercise}
+%% % Wierd LaTeX bug if I remove the following. -Jeremy
+%% % Does it have to do with page breaks?
+%% \begin{lstlisting}
+%% \end{lstlisting}
 
-\begin{figure}[tbp]
-\begin{tabular}{lll}
-\begin{minipage}{0.5\textwidth}
-\begin{lstlisting}
-(program
-  (if (let ([x 1])
-        (not (eq? x (read))))
-    777
-    42))
-\end{lstlisting}
-$\Downarrow$
-\begin{lstlisting}
-(program (x.1 if.2 tmp.3)
-  (type Integer)
-  (assign x.1 1)
-  (assign tmp.3 (read))
-  (if (eq? x.1 tmp.3)
-    ((assign if.2 42))
-    ((assign if.2 777)))
-  (return if.2))
-\end{lstlisting}
-$\Downarrow$
-\begin{lstlisting}
-(program (x.1 if.2 tmp.3)
-  (type Integer)
-  (movq (int 1) (var x.1))
-  (callq read_int)
-  (movq (reg rax) (var tmp.3))
-  (if (eq? (var x.1) (var tmp.3))
-    ((movq (int 42) (var if.2)))
-    ((movq (int 777) (var if.2))))
-  (movq (var if.2) (reg rax)))
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-\begin{minipage}{0.4\textwidth}
-\begin{lstlisting}
-	.globl _main
-_main:
-	pushq	%rbp
-	movq	%rsp, %rbp
-	pushq	%r13
-	pushq	%r14
-	pushq	%r12
-	pushq	%rbx
-	subq	$0, %rsp
+%% \begin{lstlisting}
+%% 	cmpq	$1, %rcx
+%% 	sete	%al
+%% 	movzbq	%al, %rcx
+%% 	cmpq	$1, %rcx
+%% 	je then21288
+%% \end{lstlisting}
 
-	movq	$1, %rbx
-	callq	_read_int
-	movq	%rax, %rcx
-	cmpq	%rcx, %rbx
-	je then35989
-	movq	$777, %rbx
-	jmp if_end35990
-then35989:
-	movq	$42, %rbx
-if_end35990:
-	movq	%rbx, %rax
 
-	movq	%rax, %rdi
-	callq	_print_int
-	movq	$0, %rax
-	addq	$0, %rsp
-	popq	%rbx
-	popq	%r12
-	popq	%r14
-	popq	%r13
-	popq	%rbp
-	retq
-\end{lstlisting}
-\end{minipage}
-\end{tabular}
-\caption{Example program with optimized conditionals.}
-\label{fig:opt-if}
-\end{figure}
+%% The reason for this non-optimal code has to do with the \code{flatten}
+%% pass earlier in this Chapter. We recommended flattening the condition
+%% to an $\Arg$ and then comparing with \code{\#t}. But if the condition
+%% is already an \code{eq?} test, then we would like to use that
+%% directly. In fact, for many of the expressions of Boolean type, we can
+%% generate more optimized code. For example, if the condition is
+%% \code{\#t} or \code{\#f}, we do not need to generate an \code{if} at
+%% all. If the condition is a \code{let}, we can optimize based on the
+%% form of its body. If the condition is a \code{not}, then we can flip
+%% the two branches.
+%% %
+%% \margincomment{\tiny We could do even better by converting to basic
+%%   blocks.\\ --Jeremy}
+%% %
+%% On the other hand, if the condition is a \code{and}
+%% or another \code{if}, we should flatten them into an $\Arg$ to avoid
+%% code duplication.
+
+%% Figure~\ref{fig:opt-if} shows an example program and the result of
+%% applying the above suggested optimizations.
+
+%% \begin{exercise}\normalfont
+%%   Change the \code{flatten} pass to improve the code that gets
+%%   generated for \code{if} expressions. We recommend writing a helper
+%%   function that recursively traverses the condition of the \code{if}.
+%% \end{exercise}
+
+%% \begin{figure}[tbp]
+%% \begin{tabular}{lll}
+%% \begin{minipage}{0.5\textwidth}
+%% \begin{lstlisting}
+%% (program
+%%   (if (let ([x 1])
+%%         (not (eq? x (read))))
+%%     777
+%%     42))
+%% \end{lstlisting}
+%% $\Downarrow$
+%% \begin{lstlisting}
+%% (program (x.1 if.2 tmp.3)
+%%   (type Integer)
+%%   (assign x.1 1)
+%%   (assign tmp.3 (read))
+%%   (if (eq? x.1 tmp.3)
+%%     ((assign if.2 42))
+%%     ((assign if.2 777)))
+%%   (return if.2))
+%% \end{lstlisting}
+%% $\Downarrow$
+%% \begin{lstlisting}
+%% (program (x.1 if.2 tmp.3)
+%%   (type Integer)
+%%   (movq (int 1) (var x.1))
+%%   (callq read_int)
+%%   (movq (reg rax) (var tmp.3))
+%%   (if (eq? (var x.1) (var tmp.3))
+%%     ((movq (int 42) (var if.2)))
+%%     ((movq (int 777) (var if.2))))
+%%   (movq (var if.2) (reg rax)))
+%% \end{lstlisting}
+%% \end{minipage}
+%% &
+%% $\Rightarrow$
+%% \begin{minipage}{0.4\textwidth}
+%% \begin{lstlisting}
+%% 	.globl _main
+%% _main:
+%% 	pushq	%rbp
+%% 	movq	%rsp, %rbp
+%% 	pushq	%r13
+%% 	pushq	%r14
+%% 	pushq	%r12
+%% 	pushq	%rbx
+%% 	subq	$0, %rsp
+
+%% 	movq	$1, %rbx
+%% 	callq	_read_int
+%% 	movq	%rax, %rcx
+%% 	cmpq	%rcx, %rbx
+%% 	je then35989
+%% 	movq	$777, %rbx
+%% 	jmp if_end35990
+%% then35989:
+%% 	movq	$42, %rbx
+%% if_end35990:
+%% 	movq	%rbx, %rax
+
+%% 	movq	%rax, %rdi
+%% 	callq	_print_int
+%% 	movq	$0, %rax
+%% 	addq	$0, %rsp
+%% 	popq	%rbx
+%% 	popq	%r12
+%% 	popq	%r14
+%% 	popq	%r13
+%% 	popq	%rbp
+%% 	retq
+%% \end{lstlisting}
+%% \end{minipage}
+%% \end{tabular}
+%% \caption{Example program with optimized conditionals.}
+%% \label{fig:opt-if}
+%% \end{figure}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Tuples and Garbage Collection}
