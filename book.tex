@@ -3182,7 +3182,7 @@ programs to make sure that your move biasing is working properly.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{Booleans, Control Flow, and Type Checking}
+\chapter{Booleans and Control Flow}
 \label{ch:bool-types}
 
 The $R_0$ and $R_1$ languages only had a single kind of value, the
@@ -3283,11 +3283,9 @@ With the addition of the comparison operations, there are quite a few
 primitive operations and the interpreter code for them is somewhat
 repetitive. In Figure~\ref{fig:interp-R2} we factor out the different
 parts into the \code{interp-op} function and the similar parts into
-the one match clause shown in Figure~\ref{fig:interp-R2}. It is
-important for that match clause to come last because it matches
-\emph{any} compound S-expression.  We do not use \code{interp-op} for
-the \code{and} operation because of the short-circuiting behavior in
-the order of evaluation of its arguments.
+the one match clause shown in Figure~\ref{fig:interp-R2}. We do not
+use \code{interp-op} for the \code{and} operation because of the
+short-circuiting behavior in the order of evaluation of its arguments.
 
 
 \begin{figure}[tbp]
@@ -3409,9 +3407,9 @@ association list.
    (define (type-check-R2 env)
      (lambda (e)
        (match e
-         [`(program ,body)
+         [`(program ,info ,body)
           (define ty ((type-check-exp '()) body))
-          `(program (type ,ty) ,body)]
+          `(program ,info ,body)]
          )))
 \end{lstlisting}
 \caption{Skeleton of a type checker for the $R_2$ language.}
@@ -3450,16 +3448,31 @@ for a program, then interpreting that program should not encounter an
 error.  If it does, there is something wrong with your type checker.
 \end{exercise}
 
-\section{Shrink}
+\section{Shrink the $R_2$ Language}
 \label{sec:shrink-r2}
 
+The $R_2$ language includes several operators that are easily
+expressible in terms of other operators. For example, subtraction is
+expressible in terms of addition and negation
+\[
+ (\key{-}\; e_1 \; e_2) \quad \Rightarrow \quad (\key{+} \; e_1 \; (\key{-} \; e_2))
+\]
+and several of the comparison operations are expressible in terms of
+less-than and logical negation.
+\[
+  (\key{<=}\; e_1 \; e_2) \quad \Rightarrow \quad (\key{not}\;(\key{<}\;e_2\;e_1))
+\]
+By performing these translations near the front-end of the compiler,
+the later passes of the compiler will not need to deal with these
+constructs, making those passes shorter.
 
-UNDER CONSTRUCTION
-
-\section{Remove Complex Operators and Operands}
-\label{sec:rco-r2}
-
-UNDER CONSTRUCTION
+\begin{exercise}\normalfont
+  Implement the pass \code{shrink} that removes subtraction,
+  \key{and}, \key{or}, \key{<=}, \key{>}, and \key{>=} from the language
+  by translating them to other constructs in $R_2$.  Create tests to
+  make sure that the behavior of all of these constructs stays the
+  same after translation.
+\end{exercise}
 
 \section{The $C_1$ Intermediate Language}
 \label{sec:c1}
@@ -3469,12 +3482,12 @@ language, but we need to grow that intermediate language to handle the
 new features in $R_2$: Booleans and conditional expressions.
 Figure~\ref{fig:c1-syntax} shows the new features of $C_1$; we add
 logic and comparison operators to the $\Exp$ non-terminal, the
-literals \key{\#t} and \key{\#f} to the $\Arg$ non-terminal, and we
-add an \key{if} statement. The \key{if} statement of $C_1$ includes a
-built-in comparison (unlike the $C$ language), which is needed for
-improving code generation in Section~\ref{sec:opt-if}.  We do not
-include \key{and} in $C_1$ because it is not needed in the translation
-of $R_2$'s \key{and} construct.
+literals \key{\#t} and \key{\#f} to the $\Arg$ non-terminal.
+Regarding control flow, $C_1$ differs considerably from $R_2$.
+Instead of \key{if} expressions, it has goto's and conditional goto's
+in the grammar for $\Tail$. This means that basic blocks may now end
+with a goto (to another block), or a conditional goto, which jumps to
+one of two other blocks depending on the outcome of the comparison.
 
 \begin{figure}[tp]
 \fbox{
@@ -3482,7 +3495,7 @@ of $R_2$'s \key{and} construct.
 \[
 \begin{array}{lcl}
 \Arg &::=& \gray{\Int \mid \Var} \mid \key{\#t} \mid \key{\#f} \\
-\itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
+\itm{cmp} &::= & \key{eq?} \mid \key{<}  \\
 \Exp &::= & \gray{\Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)}
       \mid (\key{not}\;\Arg) \mid (\itm{cmp}\;\Arg\;\Arg) \\
 \Stmt &::=& \gray{\ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg}} \\
@@ -3596,11 +3609,6 @@ C_1 & ::= & (\key{program}\;\itm{info}\; ((\itm{label}\,\key{.}\,\Tail)^{+}))
 %% (Appendix~\ref{appendix:interp}).
 %% \end{exercise}
 
-\section{Explicate Control}
-\label{sec:explicate-control-r2}
-
-UNDER CONSTRUCTION
-
 \section{XOR, Comparisons, and Control Flow in x86}
 \label{sec:x86-1}
 
@@ -3689,10 +3697,129 @@ counter to point to the instruction after the indicated label.  The
 instruction after the indicated label depending on whether the result
 in the EFLAGS register matches the condition code \itm{cc}, otherwise
 the \key{jmp-if} instruction falls through to the next
-instruction. Our abstract syntax for \key{jmp-if} differs from the
-concrete syntax for x86 to separate the instruction name from the
-condition code. For example, \code{(jmp-if le foo)} corresponds to
-\code{jle foo}.
+instruction. Because the \key{jmp-if} instruction relies on the EFLAGS
+register, it is quite common for the \key{jmp-if} to be immediately
+preceeded by a \key{cmpq} instruction, to set the EFLAGS regsiter.
+Our abstract syntax for \key{jmp-if} differs from the concrete syntax
+for x86 to separate the instruction name from the condition code. For
+example, \code{(jmp-if le foo)} corresponds to \code{jle foo}.
+
+
+\section{Explicate Control}
+\label{sec:explicate-control-r2}
+
+Recall that the purpose of \code{explicate-control} is to make the
+order of evaluation explicit in the syntax of the program.  With the
+addition of \key{if} in $R_2$, things get more interesting.
+
+As a motivating example, consider the following program that has an
+\key{if} expression nested in the predicate of another \key{if}.
+% s1_38.rkt
+\begin{lstlisting}
+(program ()
+  (if (if (eq? (read) 1)
+          (eq? (read) 0)
+          (eq? (read) 2))
+      (+ 10 32)
+      (+ 700 77)))
+\end{lstlisting}
+%
+The naive way to compile \key{if} and \key{eq?} would be to handle
+each of them in isolation, regardless of their context.  Each
+\key{eq?} would be translated into a \key{cmpq} instruction (and a
+couple more instructions, as we shall see in
+Section~\ref{sec:select-r2}), and each \key{if} would be translated
+into the combination of a \key{cmpq} and \key{jmp-if}.  However, if we
+take context into account we can do better and reduce the use of
+\key{cmpq} and other instructions.
+
+Another thought is to try and reorganize the code at the level of
+$R_2$, pushing the outer \key{if} inside the inner one. This would
+yield the following code.
+\begin{lstlisting}
+(if (eq? (read) 1)
+    (if (eq? (read) 0)
+            (+ 10 32)
+            (+ 700 77))
+        (if (eq? (read) 2))
+            (+ 10 32)
+            (+ 700 77))
+\end{lstlisting}
+Unfortunately, this approach forced us to duplicate the two branches,
+and a compiler must never duplicate code.
+
+We need a way to perform the above transformation, but without
+duplicating code. The solution to this problem is straightforward if
+we instead think at the level of x86 assembly: we just need to label
+the code for the two branches and insert jumps to those labels. Put
+another way, we need to move away from abstract syntax \emph{trees}
+and instead use \emph{graphs}. In particular, we shall use a standard
+program representation called a \emph{control flow graph} (CFG).  Each
+vertex is a labeled sequence of code, called a \emph{basic block}, and
+each edge represents a jump to a label. Now we are in a position to
+appreciate the \key{program} form of $C_0$ and $C_1$, which includes
+an association list mapping labels to basic blocks.
+
+Recall that in Section~\ref{sec:explicate-control-r1} we implemented
+this pass for $R_1$ in terms of the mutually recursive
+\code{explicate-control-tail} and \code{explicate-control-assign}
+functions.  The former function translated expressions in tail
+position whereas the later function translated expressions on the
+right-hand-side of a \key{let}. With the addition of \key{if} we have
+a new kind of context: the predicate position of the \key{if}. So we
+shall need another function, \code{explicate-control-pred}, that takes
+an $R_2$ expression and two pieces of $C_1$ code (two $\Tail$'s) for
+the then-branch and else-branch. The output of
+\code{explicate-control-pred} is a $C_1$ $\Tail$.  However, these
+three functions also need to contruct the control-flow graph, which we
+recommend they do via updates to a global variable.
+
+
+UNDER CONSTRUCTION
+
+\begin{tabular}{lll}
+\begin{minipage}{0.35\textwidth}
+\begin{lstlisting}
+(program ()
+  (if (if (eq? (read) 1)
+          (eq? (read) 0)
+          (eq? (read) 2))
+      (+ 10 32)
+      (+ 700 77)))  
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.55\textwidth}
+\begin{lstlisting}
+(program ()
+  ((block62 .
+     (seq (assign tmp54 (read))
+          (if (eq? tmp54 2)
+              (goto block59)
+              (goto block60))))
+   (block61 .
+     (seq (assign tmp53 (read))
+          (if (eq? tmp53 0)
+               (goto block57)
+               (goto block58))))
+   (block60 . (goto block56))
+   (block59 . (goto block55))
+   (block58 . (goto block56))
+   (block57 . (goto block55))
+   (block56 . (return (+ 700 77)))
+   (block55 . (return (+ 10 32)))
+   (start . 
+     (seq (assign tmp52 (read))
+          (if (eq? tmp52 1)
+               (goto block61)
+               (goto block62))))))
+\end{lstlisting}
+\end{minipage}
+\end{tabular} \\
+
+
 
 \section{Select Instructions}
 \label{sec:select-r2}
@@ -4008,14 +4135,13 @@ if_end21289:
 \node (x86-2) at (3,-2)  {\large $\text{x86}^{*}$};
 \node (x86-3) at (6,-2)  {\large $\text{x86}^{*}$};
 \node (x86-4) at (9,-2) {\large $\text{x86}^{*}$};
-\node (x86-5) at (12,-2) {\large $\text{x86}$};
-\node (x86-6) at (12,-4) {\large $\text{x86}^{\dagger}$};
+\node (x86-5) at (12,-2) {\large $\text{x86}^{\dagger}$};
 
 \node (x86-2-1) at (3,-4)  {\large $\text{x86}^{*}$};
 \node (x86-2-2) at (6,-4)  {\large $\text{x86}^{*}$};
 
 \path[->,bend left=15] (R2) edge [above] node {\ttfamily\footnotesize\color{red} typecheck} (R2-2);
-\path[->,bend left=15] (R2-2) edge [above] node {\ttfamily\footnotesize shrink} (R2-3);
+\path[->,bend left=15] (R2-2) edge [above] node {\ttfamily\footnotesize\color{red} shrink} (R2-3);
 \path[->,bend left=15] (R2-3) edge [above] node {\ttfamily\footnotesize uniquify} (R2-4);
 \path[->,bend left=15] (R2-4) edge [above] node {\ttfamily\footnotesize remove-complex.} (R2-5);
 \path[->,bend left=15] (R2-5) edge [right] node {\ttfamily\footnotesize\color{red} explicate-control} (C1-1);
@@ -4024,9 +4150,8 @@ if_end21289:
 \path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize\color{red} uncover-live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build-inter.} (x86-2-2);
 \path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate-reg.} (x86-3);
-\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize\color{red} lower-cond.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize\color{red} patch-instr.} (x86-5);
-\path[->,bend right=15] (x86-5) edge [left] node {\ttfamily\footnotesize print-x86} (x86-6);
+\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize\color{red} patch-instr.} (x86-4);
+\path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize\color{red} print-x86 } (x86-5);
 \end{tikzpicture}
 \caption{Diagram of the passes for $R_2$, a language with conditionals.}
  \label{fig:R2-passes}
@@ -4035,8 +4160,10 @@ if_end21289:
 Figure~\ref{fig:R2-passes} gives an overview of all the passes needed
 for the compilation of $R_2$.
 
-\section{Challenge: Optimizing Jumps$^{*}$}
+\section{Challenge: Optimize Jumps$^{*}$}
 \label{sec:opt-jumps}
+
+UNDER CONSTRUCTION
 
 
 %% \section{Challenge: Optimizing Conditions$^{*}$}
