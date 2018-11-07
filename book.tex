@@ -1541,7 +1541,7 @@ becomes initialized on its first assignment.
 \Arg &::=& \Int \mid \Var \\
 \Exp &::=& \Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)\\
 \Stmt &::=& \ASSIGN{\Var}{\Exp} \\
-\Tail &::= & \RETURN{\Arg} \mid (\key{seq}\; \Stmt\; \Tail) \\
+\Tail &::= & \RETURN{\Exp} \mid (\key{seq}\; \Stmt\; \Tail) \\
 C_0 & ::= & (\key{program}\;\itm{info}\;((\itm{label}\,\key{.}\,\Tail)^{+}))
 \end{array}
 \]
@@ -1993,7 +1993,7 @@ $\Rightarrow$
 \end{minipage}
 \end{tabular} \\
 
-Regarding the \RETURN{\Arg} statement of $C_0$, we recommend treating
+Regarding the \RETURN{\Exp} statement of $C_0$, we recommend treating
 it as an assignment to the \key{rax} register followed by a jump to
 the conclusion of the program (so the conclusion needs to be labeled).
 
@@ -3484,10 +3484,11 @@ Figure~\ref{fig:c1-syntax} shows the new features of $C_1$; we add
 logic and comparison operators to the $\Exp$ non-terminal, the
 literals \key{\#t} and \key{\#f} to the $\Arg$ non-terminal.
 Regarding control flow, $C_1$ differs considerably from $R_2$.
-Instead of \key{if} expressions, it has goto's and conditional goto's
-in the grammar for $\Tail$. This means that basic blocks may now end
-with a goto (to another block), or a conditional goto, which jumps to
-one of two other blocks depending on the outcome of the comparison.
+Instead of \key{if} expressions, $C_1$ has goto's and conditional
+goto's in the grammar for $\Tail$. This means that a sequence of
+statements may now end with a goto or a conditional goto, which jumps
+to one of two labeled pieces of code depending on the outcome of the
+comparison.
 
 \begin{figure}[tp]
 \fbox{
@@ -3498,8 +3499,8 @@ one of two other blocks depending on the outcome of the comparison.
 \itm{cmp} &::= & \key{eq?} \mid \key{<}  \\
 \Exp &::= & \gray{\Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)}
       \mid (\key{not}\;\Arg) \mid (\itm{cmp}\;\Arg\;\Arg) \\
-\Stmt &::=& \gray{\ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg}} \\
-\Tail &::= & \gray{\RETURN{\Arg} \mid (\key{seq}\;\Stmt\;\Tail)} \\
+\Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} } \\
+\Tail &::= & \gray{\RETURN{\Exp} \mid (\key{seq}\;\Stmt\;\Tail)} \\
       &\mid& (\key{goto}\,\itm{label}) \mid \IF{(\itm{cmp}\, \Arg\,\Arg)}{(\key{goto}\,\itm{label})}{(\key{goto}\,\itm{label})} \\
 C_1 & ::= & (\key{program}\;\itm{info}\; ((\itm{label}\,\key{.}\,\Tail)^{+}))
 \end{array}
@@ -3757,10 +3758,11 @@ and instead use \emph{graphs}. In particular, we shall use a standard
 program representation called a \emph{control flow graph} (CFG).  Each
 vertex is a labeled sequence of code, called a \emph{basic block}, and
 each edge represents a jump to a label. Now we are in a position to
-appreciate the \key{program} form of $C_0$ and $C_1$, which includes
-an association list mapping labels to basic blocks.
+appreciate the \key{program} construct of $C_0$ and $C_1$, which
+includes an association list mapping labels to basic blocks
+(represented by the $\Tail$ non-terminal).
 
-Recall that in Section~\ref{sec:explicate-control-r1} we implemented
+Recall that in Section~\ref{sec:explicate-control-r1} we implement
 this pass for $R_1$ in terms of the mutually recursive
 \code{explicate-control-tail} and \code{explicate-control-assign}
 functions.  The former function translated expressions in tail
@@ -3774,9 +3776,25 @@ the then-branch and else-branch. The output of
 three functions also need to contruct the control-flow graph, which we
 recommend they do via updates to a global variable.
 
+Figure~\ref{fig:explicate-control-s1-38} shows the output of
+\code{remove-complex-opera*} and \code{explicate-control} on the
+example program. We shall walk through the output program in detail.
+%
+Following the order of evaluation in the output of
+\code{remove-complex-opera*}, we first have the \code{(read)} and
+comparison to \code{1} from the predicate of the inner \key{if}.  In
+the output of \code{explicate-control}, in the \code{start} block,
+this becomes a \code{(read)} followed by a conditional goto to either
+\code{block61} or \code{block62}. Each of these contains the
+translations of the code \code{(eq? (read) 0)} and \code{(eq? (read)
+  1)}, respectively. Regarding \code{block61}, we start with the
+\code{(read)} and comparison to \code{0} and then have a conditional
+goto, either to \code{block59} or \code{block60}, which indirectly
+take us to \code{block55} and \code{block56}, the two branches of the
+outer \key{if}, i.e., \code{(+ 10 32)} and \code{(+ 700 77)} The story
+for \code{block62} is similar but has the comparison to \code{2}.
 
-UNDER CONSTRUCTION
-
+\begin{figure}[tbp]
 \begin{tabular}{lll}
 \begin{minipage}{0.35\textwidth}
 \begin{lstlisting}
@@ -3786,6 +3804,15 @@ UNDER CONSTRUCTION
           (eq? (read) 2))
       (+ 10 32)
       (+ 700 77)))  
+\end{lstlisting}
+$\Downarrow$
+\begin{lstlisting}
+(program ()
+  (if (if (let ([tmp52 (read)]) (eq? tmp52 1))
+          (let ([tmp53 (read)]) (eq? tmp53 0))
+          (let ([tmp54 (read)]) (eq? tmp54 2)))
+   (+ 10 32)
+   (+ 700 77)))
 \end{lstlisting}
 \end{minipage}
 &
@@ -3817,9 +3844,20 @@ $\Rightarrow$
                (goto block62))))))
 \end{lstlisting}
 \end{minipage}
-\end{tabular} \\
+\end{tabular} 
 
+\caption{Example translation from $R_2$ to $C_1$
+  via the \code{explicate-control}.}
+\label{fig:explicate-control-s1-38}
+\end{figure}
 
+The nice thing about the output of \code{explicate-control} is that
+there are no unnecessary uses of \code{eq?}, and all uses of
+\code{eq?} are tied to a conditional jump. The one down-side of this
+output is, as you may have noticed, we sometimes produce trivial
+blocks, such as \code{block57} through \code{block60}, that only jump
+to another block. In Section~\ref{sec:opt-jumps} we discuss a solution
+to this problem.
 
 \section{Select Instructions}
 \label{sec:select-r2}
@@ -4921,7 +4959,7 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
    \mid (\key{vector-ref}\, \Arg\, \Int)  \\
    &\mid& (\key{vector-set!}\,\Arg\,\Int\,\Arg)
     \mid (\key{global-value} \,\itm{name}) \mid (\key{void}) \\
-\Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg} } \\
+\Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Exp} } \\
       &\mid& \gray{ \IF{(\itm{cmp}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} } \\
       &\mid& (\key{collect} \,\itm{int}) \\
 C_2 & ::= & (\key{program}\;((\Var \key{.} \itm{type})^{*})\;(\key{type}\;\textit{type})\;\Stmt^{+})
@@ -5784,7 +5822,7 @@ defines the syntax for $C_3$, the output of \key{flatten}.
    \mid (\key{vector-ref}\, \Arg\, \Int)  } \\
    &\mid& \gray{  (\key{vector-set!}\,\Arg\,\Int\,\Arg)  } \\
    &\mid& (\key{app} \,\Arg\,\Arg^{*}) \\
-\Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Arg} } \\
+\Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Exp} } \\
       &\mid& \gray{ \IF{(\itm{cmp}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} } \\
       &\mid& \gray{ (\key{initialize}\,\itm{int}\,\itm{int}) }\\
       &\mid& \gray{ \IF{(\key{collection-needed?}\,\itm{int})}{\Stmt^{*}}{\Stmt^{*}} } \\
