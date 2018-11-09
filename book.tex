@@ -202,7 +202,7 @@ simplifications to reduce complexity.  In this way, this book leans
 more towards pedagogy than towards the absolute efficiency of the
 generated code. Also, the book differs in places where we saw the
 opportunity to make the topics more fun, such as in relating register
-allocation to Sudoku (Chapter~\ref{ch:register-allocation}).
+allocation to Sudoku (Chapter~\ref{ch:register-allocation-r1}).
 
 \section*{Prerequisites}
 
@@ -1561,7 +1561,7 @@ C_0 & ::= & (\key{program}\;\itm{info}\;((\itm{label}\,\key{.}\,\Tail)^{+}))
 
 %% In this Chapter we shall take the easy road to implementing
 %% \key{assign-homes} and simply map all variables to stack locations.
-%% The topic of Chapter~\ref{ch:register-allocation} is implementing a
+%% The topic of Chapter~\ref{ch:register-allocation-r1} is implementing a
 %% smarter approach in which we make a best-effort to map variables to
 %% registers, resorting to the stack only when necessary.
 
@@ -1574,7 +1574,7 @@ C_0 & ::= & (\key{program}\;\itm{info}\;((\itm{label}\,\key{.}\,\Tail)^{+}))
 %% purpose of the \key{patch-instructions} pass is to fix this problem by
 %% replacing every violating instruction with a short sequence of
 %% instructions that use the \key{rax} register. Once we have implemented
-%% a good register allocator (Chapter~\ref{ch:register-allocation}), the
+%% a good register allocator (Chapter~\ref{ch:register-allocation-r1}), the
 %% need to patch instructions will be relatively rare.
 
 \subsection{The dialects of x86}
@@ -2161,7 +2161,7 @@ programs.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Register Allocation}
-\label{ch:register-allocation}
+\label{ch:register-allocation-r1}
 
 In Chapter~\ref{ch:int-exp} we simplified the generation of x86
 assembly by placing all variables on the stack. We can improve the
@@ -2225,7 +2225,7 @@ variables \code{x} and \code{y} in Figure~\ref{fig:reg-eg}.  After the
 variable \code{x} is moved to \code{z} it is no longer needed.
 Variable \code{y}, on the other hand, is used only after this point,
 so \code{x} and \code{y} could share the same register. The topic of
-Section~\ref{sec:liveness-analysis} is how we compute where a variable
+Section~\ref{sec:liveness-analysis-r1} is how we compute where a variable
 is needed.  Once we have that information, we compute which variables
 are needed at the same time, i.e., which ones \emph{interfere}, and
 represent this relation as graph whose vertices are variables and
@@ -2272,7 +2272,7 @@ restoring the value from the stack.
 
 
 \section{Liveness Analysis}
-\label{sec:liveness-analysis}
+\label{sec:liveness-analysis-r1}
 
 A variable is \emph{live} if the variable is used at some later point
 in the program and there is not an intervening assignment to the
@@ -2513,7 +2513,7 @@ Figure~\ref{fig:interfere}.
 \begin{exercise}\normalfont
 Implement the compiler pass named \code{build-interference} according
 to the algorithm suggested above. We recommend using the Racket
-\code{graph} library to create and inspect the interference graph.
+\code{graph} package to create and inspect the interference graph.
 The output graph of this pass should be stored in the $\itm{info}$
 field of the program, under the key \code{conflicts}.
 \end{exercise}
@@ -3959,8 +3959,6 @@ the output using the \code{interp-x86} interpreter
 \section{Register Allocation}
 \label{sec:register-allocation-r2}
 
-UNDER CONSTRUCTION
-
 The changes required for $R_2$ affect the liveness analysis, building
 the interference graph, and assigning homes, but the graph coloring
 algorithm itself does not need to change.
@@ -3968,43 +3966,41 @@ algorithm itself does not need to change.
 \subsection{Liveness Analysis}
 \label{sec:liveness-analysis-r2}
 
-The addition of \key{if} statements brings up an interesting issue in
-liveness analysis. Recall that liveness analysis works backwards
-through the program, for each instruction it computes the variables
-that are live before the instruction based on which variables are live
-after the instruction. Now consider the situation for \code{(\key{if}
-  (\key{eq?} $e_1$ $e_2$) $\itm{thns}$ $\itm{elss}$)}, where we know
-the $L_{\mathsf{after}}$ set and we need to produce the
-$L_{\mathsf{before}}$ set.  We can recursively perform liveness
-analysis on the $\itm{thns}$ and $\itm{elss}$ branches, using
-$L_{\mathsf{after}}$ as the starting point, to obtain
-$L^{\mathsf{thns}}_{\mathsf{before}}$ and
-$L^{\mathsf{elss}}_{\mathsf{before}}$ respectively. However, we do not
-know, during compilation, which way the branch will go, so we do not
-know whether to use $L^{\mathsf{thns}}_{\mathsf{before}}$ or
-$L^{\mathsf{elss}}_{\mathsf{before}}$ as the $L_{\mathsf{before}}$ for
-the entire \key{if} statement. The solution comes from the observation
-that there is no harm in identifying more variables as live than
-absolutely necessary. Thus, we can take the union of the live
-variables from the two branches to be the live set for the whole
-\key{if}, as shown below. Of course, we also need to include the
-variables that are read in $e_1$ and $e_2$.
-\[
-  L_{\mathsf{before}} = L^{\mathsf{thns}}_{\mathsf{before}} \cup
-  L^{\mathsf{elss}}_{\mathsf{before}} \cup
-  \mathit{Vars}(e_1) \cup \mathit{Vars}(e_2)
-\]
-We need the live-after sets for all the instructions in both branches
-of the \key{if} when we build the interference graph, so I recommend
-storing that data in the \key{if} statement AST as follows:
-\begin{lstlisting}
-   (if (eq? |$e_1$| |$e_2$|) |$\itm{thns}$| |$\itm{thn{-}lives}$| |$\itm{elss}$| |$\itm{els{-}lives}$|)
-\end{lstlisting}
+Recall that for $R_1$ we implemented liveness analysis for a single
+basic block (Section~\ref{sec:liveness-analysis-r1}). With the
+addition of \key{if} expressions to $R_2$, \code{explicate-control}
+now produces many basic blocks arranged in a control-flow graph. The
+first question we need to consider is in what order should we process
+the basic blocks? Recall that to perform liveness analysis, we need to
+know the live-after set. If a basic block has no successor blocks,
+then it has an empty live-after set and we can immediately apply
+liveness analysis to it. If a basic block has some successors, then we
+need to complete liveness analysis on those blocks first.
+Furthermore, we know that the control flow graph does not contain any
+cycles (it is a DAG, that is, a directed acyclic graph)\footnote{If we
+  were to add loops to the language, then the CFG could contain cycles
+  and we would instead need to use the classic worklist algorithm for
+  computing the fixed point of the liveness
+  analysis~\citep{Aho:1986qf}.}. What all this amounts to is that we
+need to process the basic blocks in reverse topological order. We
+recommend using the \code{tsort} and \code{transpose} functions of the
+Racket \code{graph} package to obtain this ordering.
 
-If you wrote helper functions for computing the variables in an
-instruction's argument and for computing the variables read-from ($R$)
-or written-to ($W$) by an instruction, you need to update them to
-handle the new kinds of arguments and instructions in x86$_1$.
+The next question is how to compute the live-after set of a block
+given the live-before sets of all its successor blocks.  During
+compilation we do not know which way the branch will go, so we do not
+know which of the successor's live-before set to use.  The solution
+comes from the observation that there is no harm in identifying more
+variables as live than absolutely necessary. Thus, we can take the
+union of the live-after sets from all the successors to be the
+live-after set for the block. Once we have computed the live-after
+set, we can proceed to perform liveness analysis on the block just as
+we did in Section~\ref{sec:liveness-analysis-r1}.
+
+The helper functions for computing the variables in an instruction's
+argument and for computing the variables read-from ($R$) or written-to
+($W$) by an instruction need to be updated to handle the new kinds of
+arguments and instructions in x86$_1$.
 
 \subsection{Build Interference}
 \label{sec:build-interference-r2}
