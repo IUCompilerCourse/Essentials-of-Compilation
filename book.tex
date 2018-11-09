@@ -4005,30 +4005,25 @@ arguments and instructions in x86$_1$.
 \subsection{Build Interference}
 \label{sec:build-interference-r2}
 
-Many of the new instructions, such as the logical operations, can be
-handled in the same way as the arithmetic instructions. Thus, if your
-code was already quite general, it will not need to be changed to
-handle the logical operations. If not, I recommend that you change
-your code to be more general. The \key{movzbq} instruction should be
-handled like the \key{movq} instruction. The \key{if} statement is
-straightforward to handle because we stored the live-after sets for
-the two branches in the AST node as described above. Here we just need
-to recursively process the two branches. The output of this pass can
-discard the live after sets, as they are no longer needed.
+Many of the new instructions in x86$_1$ can be handled in the same way
+as the instructions in x86$_0$. Thus, if your code was already quite
+general, it will not need to be changed to handle the new
+instructions. If not, I recommend that you change your code to be more
+general. The \key{movzbq} instruction should be handled like the
+\key{movq} instruction.
 
-\subsection{Assign Homes}
-\label{sec:assign-homes-r2}
+%% \subsection{Assign Homes}
+%% \label{sec:assign-homes-r2}
 
-The \code{assign-homes} function (Section~\ref{sec:assign-r1}) needs
-to be updated to handle the \key{if} statement, simply by recursively
-processing the child nodes.  Hopefully your code already handles the
-other new instructions, but if not, you can generalize your code.
+%% The \code{assign-homes} function (Section~\ref{sec:assign-r1}) needs
+%% to be updated to handle the \key{if} statement, simply by recursively
+%% processing the child nodes.  Hopefully your code already handles the
+%% other new instructions, but if not, you can generalize your code.
 
 \begin{exercise}\normalfont
-Implement the additions to the \code{register-allocation} pass so that
-it works for $R_2$ and test your compiler using your previously
-created programs on the \code{interp-x86} interpreter
-(Appendix~\ref{appendix:interp}).
+Update the \code{register-allocation} pass so that it works for $R_2$
+and test your compiler using your previously created programs on the
+\code{interp-x86} interpreter (Appendix~\ref{appendix:interp}).
 \end{exercise}
 
 
@@ -4096,78 +4091,83 @@ Test your compiler using your previously created programs on the
 
 \section{An Example Translation}
 
-
 Figure~\ref{fig:if-example-x86} shows a simple example program in
-$R_2$ translated to x86, showing the results of \code{flatten},
-\code{select-instructions}, and the final x86 assembly.
+$R_2$ translated to x86, showing the results of
+\code{explicate-control}, \code{select-instructions}, and the final
+x86 assembly code.
 
 \begin{figure}[tbp]
 \begin{tabular}{lll}
 \begin{minipage}{0.5\textwidth}
+% s1_20.rkt
 \begin{lstlisting}
-(program
+(program ()
   (if (eq? (read) 1) 42 0))
 \end{lstlisting}
 $\Downarrow$
 \begin{lstlisting}
-(program (t.1 t.2 if.1)
-  (assign t.1 (read))
-  (assign t.2 (eq? t.1 1))
-  (if (eq? #t t.2)
-    ((assign if.1 42))
-    ((assign if.1 0)))
-  (return if.1))
+(program ()
+ ((block32 . (return 0))
+  (block31 . (return 42))
+  (start .
+     (seq (assign tmp30 (read))
+          (if (eq? tmp30 1)
+              (goto block31)
+              (goto block32))))))
 \end{lstlisting}
 $\Downarrow$
 \begin{lstlisting}
-(program (t.1 t.2 if.1)
-  (callq read_int)
-  (movq (reg rax) (var t.1))
-  (cmpq (int 1) (var t.1))
-  (set e (byte-reg al))
-  (movzbq (byte-reg al) (var t.2))
-  (if (eq? (int 1) (var t.2))
-    ((movq (int 42) (var if.1)))
-    ((movq (int 0) (var if.1))))
-  (movq (var if.1) (reg rax)))
+(program ((locals . (tmp30)))
+ ((block32 .
+    (block ()
+      (movq (int 0) (reg rax))
+      (jmp conclusion)))
+  (block31 .
+    (block () 
+      (movq (int 42) (reg rax))
+      (jmp conclusion)))
+  (start .
+    (block ()
+      (callq read_int)
+      (movq (reg rax) (var tmp30))
+      (cmpq (int 1) (var tmp30))
+      (jmp-if e block31)
+      (jmp block32)))))
 \end{lstlisting}
 \end{minipage}
 &
 $\Rightarrow$
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
+_block31:
+	movq	$42, %rax
+	jmp _conclusion
+_block32:
+	movq	$0, %rax
+	jmp _conclusion
+_start:
+	callq	_read_int
+	movq	%rax, %rcx
+	cmpq	$1, %rcx
+	je _block31
+	jmp _block32
+
 	.globl _main
 _main:
 	pushq	%rbp
 	movq	%rsp, %rbp
-	pushq	%r15
-	pushq	%r14
-	pushq	%r13
 	pushq	%r12
 	pushq	%rbx
-	subq	$8, %rsp
-	callq	_read_int
-	movq	%rax, %rcx
-	cmpq	$1, %rcx
-	sete	%al
-	movzbq	%al, %rcx
-	cmpq	$1, %rcx
-	je then21288
-	movq	$0, %rbx
-	jmp if_end21289
-then21288:
-	movq	$42, %rbx
-if_end21289:
-	movq	%rbx, %rax
-	movq	%rax, %rdi
-	callq	_print_int
-	movq	$0, %rax
-	addq	$8, %rsp
+	pushq	%r13
+	pushq	%r14
+	subq	$0, %rsp
+	jmp _start
+_conclusion:
+	addq	$0, %rsp
+	popq	%r14
+	popq	%r13
 	popq	%rbx
 	popq	%r12
-	popq	%r13
-	popq	%r14
-	popq	%r15
 	popq	%rbp
 	retq
 \end{lstlisting}
@@ -4213,8 +4213,8 @@ if_end21289:
  \label{fig:R2-passes}
 \end{figure}
 
-Figure~\ref{fig:R2-passes} gives an overview of all the passes needed
-for the compilation of $R_2$.
+Figure~\ref{fig:R2-passes} lists all the passes needed for the
+compilation of $R_2$.
 
 \section{Challenge: Optimize Jumps$^{*}$}
 \label{sec:opt-jumps}
