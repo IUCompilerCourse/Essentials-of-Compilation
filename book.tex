@@ -1915,11 +1915,19 @@ section.
 \section{Select Instructions}
 \label{sec:select-r1}
 
-In the \key{select-instructions} pass we begin the work of translating
-from $C_0$ to x86. The target language of this pass is a pseudo-x86
-language that still uses variables, so we add an AST node of the form
-$\VAR{\itm{var}}$ to the x86 abstract syntax. 
-The \key{select-instructions} pass deals with the differing format of
+In the \code{select-instructions} pass we begin the work of
+translating from $C_0$ to x86. The target language of this pass is a
+pseudo-x86 language that still uses variables, so we add an AST node
+of the form $\VAR{\itm{var}}$ to the x86 abstract syntax.  We
+recommend implementing the \code{select-instructions} in terms of
+three auxilliary functions, one for each of the non-terminals of
+$C_0$: $\Arg$, $\Stmt$, and $\Tail$.
+
+The cases for $\itm{arg}$ are straightforward, simply putting
+variables and integer literals into the s-expression format expected
+of pseudo-x86, \code{(var $x$)} and \code{(int $n$)}, respectively.
+
+Next we discuss some of the cases for $\itm{stmt}$, starting with
 arithmetic operations. For example, in $C_0$ an addition operation can
 take the form below.  To translate to x86, we need to use the
 \key{addq} instruction which does an in-place update. So we must first
@@ -1940,7 +1948,7 @@ $\Rightarrow$
 \end{lstlisting}
 \end{minipage}
 \end{tabular} \\
-
+%
 There are some cases that require special care to avoid generating
 needlessly complicated code. If one of the arguments is the same as
 the left-hand side of the assignment, then there is no need for the
@@ -1993,9 +2001,12 @@ $\Rightarrow$
 \end{minipage}
 \end{tabular} \\
 
-Regarding the \RETURN{\Exp} statement of $C_0$, we recommend treating
-it as an assignment to the \key{rax} register followed by a jump to
-the conclusion of the program (so the conclusion needs to be labeled).
+There are two cases for the $\Tail$ non-terminal: \key{return} and
+\key{seq}. Regarding \RETURN{e}, we recommend treating it as an
+assignment to the \key{rax} register followed by a jump to the
+conclusion of the program (so the conclusion needs to be labeled).
+For $(\key{seq}\,s\,t)$, we simply process the statement $s$ and tail
+$t$ recursively and append the resulting instructions.
 
 \begin{exercise}
 \normalfont
@@ -3643,9 +3654,9 @@ be translated into the combination of a \key{cmpq} and \key{jmp-if}.
 However, if we take context into account we can do better and reduce
 the use of \key{cmpq} and EFLAG-accessing instructions.
 
-One possible solution is to try and reorganize the code at the level
-of $R_2$, pushing the outer \key{if} inside the inner one. This would
-yield the following code.
+One idea is to try and reorganize the code at the level of $R_2$,
+pushing the outer \key{if} inside the inner one. This would yield the
+following code.
 \begin{lstlisting}
     (if (eq? (read) 1)
         (if (eq? (read) 0)
@@ -3660,23 +3671,22 @@ compiler must never duplicate code!
 
 We need a way to perform the above transformation, but without
 duplicating code. The solution is straightforward if we think at the
-level of x86 assembly: we can label the code for each branches and
-insert \key{goto}'s in all the places that need to execute the
+level of x86 assembly: we can label the code for each of the branches
+and insert \key{goto}'s in all the places that need to execute the
 branches. Put another way, we need to move away from abstract syntax
 \emph{trees} and instead use \emph{graphs}. In particular, we shall
 use a standard program representation called a \emph{control flow
   graph} (CFG), due to Frances Elizabeth \citet{Allen:1970uq}.  Each
 vertex is a labeled sequence of code, called a \emph{basic block}, and
-each edge represents a jump to a label. The \key{program} construct of
-$C_0$ and $C_1$ represents a control flow graph as an association list
-mapping labels to basic blocks (which each block is represented by the
-$\Tail$ non-terminal).
+each edge represents a jump to another block. The \key{program}
+construct of $C_0$ and $C_1$ represents a control flow graph as an
+association list mapping labels to basic blocks. Each block is
+represented by the $\Tail$ non-terminal.
 
 Figure~\ref{fig:explicate-control-s1-38} shows the output of the
 \code{remove-complex-opera*} pass and then the
 \code{explicate-control} pass on the example program. We shall walk
-through the output program in detail and then discuss the algorithm
-for \code{explicate-control}.
+through the output program and then discuss the algorithm.
 %
 Following the order of evaluation in the output of
 \code{remove-complex-opera*}, we first have the \code{(read)} and
@@ -3753,12 +3763,11 @@ $\Rightarrow$
 \end{figure}
 
 The nice thing about the output of \code{explicate-control} is that
-there are no unnecessary uses of \code{eq?}, and all uses of
-\code{eq?} are tied to a conditional jump. The one down-side of the
-output is, as you may have noticed, it sometimes includes trivial
-blocks, such as \code{block57} through \code{block60}, that only jump
-to another block. We discuss a solution to this problem in
-Section~\ref{sec:opt-jumps}.
+there are no unnecessary uses of \code{eq?} and every use of
+\code{eq?} is part of a conditional jump. The down-side of this output
+is that it includes trivial blocks, such as \code{block57} through
+\code{block60}, that only jump to another block. We discuss a solution
+to this problem in Section~\ref{sec:opt-jumps}.
 
 Recall that in Section~\ref{sec:explicate-control-r1} we implement the
 \code{explicate-control} pass for $R_1$ using two mutually recursive
@@ -3773,34 +3782,124 @@ expression and two pieces of $C_1$ code (two $\Tail$'s) for the
 then-branch and else-branch. The output of
 \code{explicate-control-pred} is a $C_1$ $\Tail$.  However, these
 three functions also need to contruct the control-flow graph, which we
-recommend they do via updates to a global variable.
+recommend they do via updates to a global variable. Next we consider
+the specific additions to the tail and assign functions, and some of
+cases for the pred function.
 
+The \code{explicate-control-tail} function needs an additional case
+for \key{if}. The branches of the \key{if} inherit the current
+context, so they are in tail position.  Let $B_1$ be the result of
+\code{explicate-control-tail} on the $\itm{thn}$ branch and $B_2$ be
+the result of apply \code{explicate-control-tail} to the $\itm{else}$
+branch. Then the \key{if} translates to the block $B_3$ which is the
+result of applying \code{explicate-control-pred} to the predicate
+$\itm{cnd}$ and the blocks $B_1$ and $B_2$.
+\[
+    (\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els}) \quad\Rightarrow\quad B_3
+\]
+
+Next we consider the case for \key{if} in the
+\code{explicate-control-assign} function. So the context of the
+\key{if} is an assignment to some variable $x$ and then the control
+continues to some block $B_1$.  The code that we generate for both the
+$\itm{thn}$ and $\itm{els}$ branches shall both need to continue to
+$B_1$, so we add $B_1$ to the control flow graph with a fresh label
+$\ell_1$.  Again, the branches of the \key{if} inherit the current
+context, so that are in assignment positions.  Let $B_2$ be the result
+of applying \code{explicate-control-assign} to the $\itm{thn}$ branch,
+variable $x$, and the block \code{(goto $\ell_1$)}.  Let $B_3$ be the
+result of applying \code{explicate-control-assign} to the $\itm{else}$
+branch, variable $x$, and the block \code{(goto $\ell_1$)}. The
+\key{if} translates to the block $B_4$ which is the result of applying
+\code{explicate-control-pred} to the predicate $\itm{cnd}$ and the
+blocks $B_2$ and $B_3$.
+\[
+(\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els}) \quad\Rightarrow\quad B_4
+\]
+
+The function \code{explicate-control-pred} will need a case for every
+expression that can have type \code{Boolean}. We detail a few cases
+here and leave the rest for the reader. The input to this function is
+an expression and two blocks, $B_1$ and $B_2$, for the branches of the
+enclosing \key{if}. One of the base cases of this function is when the
+expression is a less-than comparision. We translate it to a
+conditional \code{goto}. We need labels for the two branches $B_1$ and
+$B_2$, so we add them to the control flow graph and obtain some labels
+$\ell_1$ and $\ell_2$. The translation of the less-than comparison is
+as follows.
+\[
+(\key{<}\;e_1\;e_2) \quad\Rightarrow\quad
+(\key{if}\;(\key{<}\;e_1\;e_2)\;(\key{goto}\;\ell_1)\;(\key{goto}\;\ell_2))
+\]
+
+The case for \key{if} in \code{explicate-control-pred} is particularly
+illuminating, as it deals with the challenges that we discussed above
+regarding the example of the nested \key{if} expressions.  Again, we
+add the two input branches $B_1$ and $B_2$ to the control flow graph
+and obtain the labels $\ell_1$ and $\ell_2$.  The branches $\itm{thn}$
+and $\itm{els}$ of the current \key{if} inherit their context from the
+current one, i.e., predicate context. So we apply
+\code{explicate-control-pred} to $\itm{thn}$ with the two blocks
+\code{(goto $\ell_1$)} and \code{(goto $\ell_2$)}, to obtain $B_3$.
+Similarly for the $\itm{els}$ branch, to obtain $B_4$.
+Finally, we apply \code{explicate-control-pred} to
+the predicate $\itm{cnd}$ and the blocks $B_3$ and $B_4$
+to obtain the result $B_5$.
+\[
+(\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els})
+\quad\Rightarrow\quad
+B_5
+\]
+
+\begin{exercise}\normalfont
+  Implement the pass \code{explicate-code} by adding the cases for
+  \key{if} to the functions for tail and assignment contexts, and
+  implement the function for predicate contexts. Create test cases
+  that exercise all of the new cases in the code for this pass.
+\end{exercise}
 
 
 \section{Select Instructions}
 \label{sec:select-r2}
 
-The \code{select-instructions} pass lowers from $C_1$ to another
-intermediate representation suitable for conducting register
-allocation, that is, a language close to x86$_1$.
+Recall that the \code{select-instructions} pass lowers from our
+$C$-like intermediate representation to the pseudo-x86 language, which
+is suitable for conducting register allocation. The pass is
+implemented using three auxilliary functions, one for each of the
+non-terminals $\Arg$, $\Stmt$, and $\Tail$.
 
-We can take the usual approach of encoding Booleans as integers, with
-true as 1 and false as 0.
+For $\Arg$, we have new cases for the Booleans.  We take the usual
+approach of encoding them as integers, with true as 1 and false as 0.
 \[
 \key{\#t} \Rightarrow \key{1}
 \qquad
 \key{\#f} \Rightarrow \key{0}
 \]
-The \code{not} operation can be implemented in terms of \code{xorq}
-as we discussed at the beginning of this section.
-%% Can you think of a bit pattern that, when XOR'd with the bit
-%% representation of 0 produces 1, and when XOR'd with the bit
-%% representation of 1 produces 0?
 
-Translating the \code{eq?} and the other comparison operations to x86
-is slightly involved due to the unusual nature of the \key{cmpq}
-instruction discussed above.  We recommend translating an assignment
-from \code{eq?} into the following sequence of three instructions. \\
+For $\Stmt$, we discuss a couple cases.  The \code{not} operation can
+be implemented in terms of \code{xorq} as we discussed at the
+beginning of this section. Given an assignment \code{(assign
+  $\itm{lhs}$ (not $\Arg$))}, if the left-hand side $\itm{lhs}$ is
+the same as $\Arg$, then just the \code{xorq} suffices:
+\[
+(\key{assign}\; x\; (\key{not}\; x))
+\quad\Rightarrow\quad
+((\key{xorq}\;(\key{int}\;1)\;x'))
+\]
+Otherwise, a \key{movq} is needed to adapt to the update-in-place
+semantics of x86. Let $\Arg'$ be the result of recursively processing
+$\Arg$. Then we have
+\[
+(\key{assign}\; \itm{lhs}\; (\key{not}\; \Arg))
+\quad\Rightarrow\quad
+((\key{movq}\; \Arg'\; \itm{lhs}') \; (\key{xorq}\;(\key{int}\;1)\;\itm{lhs}'))
+\]
+
+Next consider the cases for \code{eq?} and less-than comparison.
+Translating these operations to x86 is slightly involved due to the
+unusual nature of the \key{cmpq} instruction discussed above.  We
+recommend translating an assignment from \code{eq?} into the following
+sequence of three instructions. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -3812,45 +3911,48 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(cmpq |$\Arg_2$| |$\Arg_1$|)
+(cmpq |$\Arg'_2$| |$\Arg'_1$|)
 (set e (byte-reg al))
-(movzbq (byte-reg al) |$\itm{lhs}$|)
+(movzbq (byte-reg al) |$\itm{lhs}'$|)
 \end{lstlisting}
 \end{minipage}
 \end{tabular}  \\
 
-
-% The translation of the \code{not} operator is not quite as simple
-% as it seems. Recall that \key{notq} is a bitwise operator, not a boolean
-% one. For example, the following program performs bitwise negation on
-% the integer 1:
-%
-% \begin{tabular}{lll}
-% \begin{minipage}{0.4\textwidth}
-% \begin{lstlisting}
-%  (movq (int 1) (reg rax))
-%  (notq (reg rax))
-% \end{lstlisting}
-% \end{minipage}
-% \end{tabular}
-%
-% After the program is run, \key{rax} does not contain 0, as you might
-% hope -- it contains the binary value $111\ldots10$, which is the
-% two's complement representation of $-2$. We recommend implementing boolean
-% not by using \key{notq} and then masking the upper bits of the result with
-% the \key{andq} instruction.
-
-Regarding \key{if} statements, we recommend delaying when they are
-lowered until the \code{patch-instructions} pass.  The reason is that
-for purposes of liveness analysis, \key{if} statements are easier to
-deal with than jump instructions.
+Regarding the $\Tail$ non-terminal, we have two new cases, for
+\key{goto} and conditional \key{goto}. Both are straightforward
+to handle. A \key{goto} becomes a jump instruction.
+\[
+(\key{goto}\; \ell) \quad \Rightarrow \quad ((\key{jmp} \;\ell))
+\]
+A conditional \key{goto} becomes a compare instruction followed
+by a conditional jump (for ``then'') and the fall-through is
+to a regular jump (for ``else'').\\
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+  (if (eq? |$\Arg_1$| |$\Arg_2$|)
+      (goto |$\ell_1$|)
+      (goto |$\ell_2$|))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+((cmpq |$\Arg'_2$| |$\Arg'_1$|)
+ (jmp-if e |$\ell_1$|)
+ (jmp |$\ell_2$|))
+\end{lstlisting}
+\end{minipage}
+\end{tabular}  \\
 
 \begin{exercise}\normalfont
 Expand your \code{select-instructions} pass to handle the new features
 of the $R_2$ language. Test the pass on all the examples you have
 created and make sure that you have some test programs that use the
-\code{eq?} operator, creating some if necessary. Test the output of
-\code{select-instructions} using the \code{interp-x86} interpreter
+\code{eq?} and \code{<} operators, creating some if necessary. Test
+the output using the \code{interp-x86} interpreter
 (Appendix~\ref{appendix:interp}).
 \end{exercise}
 
