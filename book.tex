@@ -3453,18 +3453,23 @@ error.  If it does, there is something wrong with your type checker.
 
 The $R_2$ language includes several operators that are easily
 expressible in terms of other operators. For example, subtraction is
-expressible in terms of addition and negation
+expressible in terms of addition and negation.
 \[
  (\key{-}\; e_1 \; e_2) \quad \Rightarrow \quad (\key{+} \; e_1 \; (\key{-} \; e_2))
 \]
-and several of the comparison operations are expressible in terms of
+Several of the comparison operations are expressible in terms of
 less-than and logical negation.
 \[
   (\key{<=}\; e_1 \; e_2) \quad \Rightarrow \quad (\key{not}\;(\key{<}\;e_2\;e_1))
 \]
 By performing these translations near the front-end of the compiler,
 the later passes of the compiler will not need to deal with these
-constructs, making those passes shorter.
+constructs, making those passes shorter. On the other hand, sometimes
+these translations make it more difficult to generate the most
+efficient code with respect to the number of instructions. However,
+these differences typically do not affect the number of accesses to
+memory, which is the primary factor that determines execution time on
+modern computer architectures.
 
 \begin{exercise}\normalfont
   Implement the pass \code{shrink} that removes subtraction,
@@ -3474,147 +3479,12 @@ constructs, making those passes shorter.
   same after translation.
 \end{exercise}
 
-\section{The $C_1$ Intermediate Language}
-\label{sec:c1}
-
-As with $R_1$, we shall compile $R_2$ to a C-like intermediate
-language, but we need to grow that intermediate language to handle the
-new features in $R_2$: Booleans and conditional expressions.
-Figure~\ref{fig:c1-syntax} shows the new features of $C_1$; we add
-logic and comparison operators to the $\Exp$ non-terminal, the
-literals \key{\#t} and \key{\#f} to the $\Arg$ non-terminal.
-Regarding control flow, $C_1$ differs considerably from $R_2$.
-Instead of \key{if} expressions, $C_1$ has goto's and conditional
-goto's in the grammar for $\Tail$. This means that a sequence of
-statements may now end with a goto or a conditional goto, which jumps
-to one of two labeled pieces of code depending on the outcome of the
-comparison.
-
-\begin{figure}[tp]
-\fbox{
-\begin{minipage}{0.96\textwidth}
-\[
-\begin{array}{lcl}
-\Arg &::=& \gray{\Int \mid \Var} \mid \key{\#t} \mid \key{\#f} \\
-\itm{cmp} &::= & \key{eq?} \mid \key{<}  \\
-\Exp &::= & \gray{\Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)}
-      \mid (\key{not}\;\Arg) \mid (\itm{cmp}\;\Arg\;\Arg) \\
-\Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} } \\
-\Tail &::= & \gray{\RETURN{\Exp} \mid (\key{seq}\;\Stmt\;\Tail)} \\
-      &\mid& (\key{goto}\,\itm{label}) \mid \IF{(\itm{cmp}\, \Arg\,\Arg)}{(\key{goto}\,\itm{label})}{(\key{goto}\,\itm{label})} \\
-C_1 & ::= & (\key{program}\;\itm{info}\; ((\itm{label}\,\key{.}\,\Tail)^{+}))
-\end{array}
-\]
-\end{minipage}
-}
-\caption{The $C_1$ language, extending $C_0$ with Booleans and conditionals.}
-\label{fig:c1-syntax}
-\end{figure}
-
-
-%% We expand the \code{remove-complex-opera*} pass to handle the Boolean
-%% literals \key{\#t} and \key{\#f}, the new logic and comparison
-%% operations, and \key{if} expressions. We shall start with a simple
-%% example of translating a \key{if} expression, shown below on the
-%% left. \\
-%% \begin{tabular}{lll}
-%% \begin{minipage}{0.4\textwidth}
-%% \begin{lstlisting}
-%%  (program (if #f 0 42))
-%% \end{lstlisting}
-%% \end{minipage}
-%% &
-%% $\Rightarrow$
-%% &
-%% \begin{minipage}{0.4\textwidth}
-%% \begin{lstlisting}
-%% (program (if.1)
-%%   (if (eq? #t #f)
-%%     ((assign if.1 0))
-%%     ((assign if.1 42)))
-%%   (return if.1))
-%% \end{lstlisting}
-%% \end{minipage}
-%% \end{tabular} \\
-%% The value of the \key{if} expression is the value of the branch that
-%% is selected. Recall that in the \code{flatten} pass we need to replace
-%% arbitrary expressions with $\Arg$'s (variables or literals). In the
-%% translation above, on the right, we have replaced the \key{if}
-%% expression with a new variable \key{if.1}, inside \code{(return
-%%   if.1)}, and we have produced code that will assign the appropriate
-%% value to \key{if.1} using an \code{if} statement prior to the
-%% \code{return}.  For $R_1$, the \code{flatten} pass returned a list of
-%% assignment statements. Here, for $R_2$, we return a list of statements
-%% that can include both \key{if} statements and assignment statements.
-
-%% The next example is a bit more involved, showing what happens when
-%% there are complex expressions (not variables or literals) in the
-%% condition and branch expressions of an \key{if}, including nested
-%% \key{if} expressions.
-
-%% \begin{tabular}{lll}
-%% \begin{minipage}{0.4\textwidth}
-%% \begin{lstlisting}
-%% (program
-%%   (if (eq? (read) 0)
-%%       777
-%%       (+ 2 (if (eq? (read) 0)
-%%                40
-%%                444))))
-%% \end{lstlisting}
-%% \end{minipage}
-%% &
-%% $\Rightarrow$
-%% &
-%% \begin{minipage}{0.4\textwidth}
-%% \begin{lstlisting}
-%% (program (t.1 t.2 if.1 t.3 t.4
-%%            if.2 t.5)
-%%   (assign t.1 (read))
-%%   (assign t.2 (eq? t.1 0))
-%%   (if (eq? #t t.2)
-%%     ((assign if.1 777))
-%%     ((assign t.3 (read))
-%%      (assign t.4 (eq? t.3 0))
-%%      (if (eq? #t t.4)
-%%        ((assign if.2 40))
-%%        ((assign if.2 444)))
-%%      (assign t.5 (+ 2 if.2))
-%%      (assign if.1 t.5)))
-%%   (return if.1))
-%% \end{lstlisting}
-%% \end{minipage}
-%% \end{tabular} \\
-
-%% The \code{flatten} clauses for the Boolean literals and the operations
-%% \key{not} and \key{eq?} are straightforward.  However, the
-%% \code{flatten} clause for \key{and} requires some care to properly
-%% imitate the order of evaluation of the interpreter for $R_2$
-%% (Figure~\ref{fig:interp-R2}). We recommend using an \key{if} statement
-%% in the code you generate for \key{and}.
-
-%% The \code{flatten} clause for \key{if} also requires some care because
-%% the condition of the \key{if} can be an arbitrary expression in $R_2$,
-%% but in $C_1$ the condition must be an equality predicate. For now we
-%% recommend flattening the condition into an $\Arg$ and then comparing
-%% it with \code{\#t}. We discuss a more efficient approach in
-%% Section~\ref{sec:opt-if}.
-
-
-%% \begin{exercise}\normalfont
-%% Expand your \code{flatten} pass to handle $R_2$, that is, handle the
-%% Boolean literals, the new logic and comparison operations, and the
-%% \key{if} expressions. Create 4 more test cases that expose whether
-%% your flattening code is correct. Test your \code{flatten} pass by
-%% running the output programs with \code{interp-C}
-%% (Appendix~\ref{appendix:interp}).
-%% \end{exercise}
 
 \section{XOR, Comparisons, and Control Flow in x86}
 \label{sec:x86-1}
 
 To implement the new logical operations, the comparison operations,
-and the \key{if} statement, we need to delve further into the x86
+and the \key{if} expression, we need to delve further into the x86
 language. Figure~\ref{fig:x86-1} defines the abstract syntax for a
 larger subset of x86 that includes instructions for logical
 operations, comparisons, and jumps.
@@ -3705,6 +3575,45 @@ Our abstract syntax for \key{jmp-if} differs from the concrete syntax
 for x86 to separate the instruction name from the condition code. For
 example, \code{(jmp-if le foo)} corresponds to \code{jle foo}.
 
+\section{The $C_1$ Intermediate Language}
+\label{sec:c1}
+
+As with $R_1$, we shall compile $R_2$ to a C-like intermediate
+language, but we need to grow that intermediate language to handle the
+new features in $R_2$: Booleans and conditional expressions.
+Figure~\ref{fig:c1-syntax} shows the new features of $C_1$; we add
+logic and comparison operators to the $\Exp$ non-terminal, the
+literals \key{\#t} and \key{\#f} to the $\Arg$ non-terminal.
+Regarding control flow, $C_1$ differs considerably from $R_2$.
+Instead of \key{if} expressions, $C_1$ has goto's and conditional
+goto's in the grammar for $\Tail$. This means that a sequence of
+statements may now end with a \code{goto} or a conditional
+\code{goto}, which jumps to one of two labeled pieces of code
+depending on the outcome of the comparison. In
+Section~\ref{sec:explicate-control-r2} we discuss how to translate
+from $R_2$ to $C_1$, bridging this gap between \key{if} expressions
+and \key{goto}'s.
+
+\begin{figure}[tp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{lcl}
+\Arg &::=& \gray{\Int \mid \Var} \mid \key{\#t} \mid \key{\#f} \\
+\itm{cmp} &::= & \key{eq?} \mid \key{<}  \\
+\Exp &::= & \gray{\Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)}
+      \mid (\key{not}\;\Arg) \mid (\itm{cmp}\;\Arg\;\Arg) \\
+\Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} } \\
+\Tail &::= & \gray{\RETURN{\Exp} \mid (\key{seq}\;\Stmt\;\Tail)} \\
+      &\mid& (\key{goto}\,\itm{label}) \mid \IF{(\itm{cmp}\, \Arg\,\Arg)}{(\key{goto}\,\itm{label})}{(\key{goto}\,\itm{label})} \\
+C_1 & ::= & (\key{program}\;\itm{info}\; ((\itm{label}\,\key{.}\,\Tail)^{+}))
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The $C_1$ language, extending $C_0$ with Booleans and conditionals.}
+\label{fig:c1-syntax}
+\end{figure}
 
 \section{Explicate Control}
 \label{sec:explicate-control-r2}
@@ -3717,12 +3626,12 @@ As a motivating example, consider the following program that has an
 \key{if} expression nested in the predicate of another \key{if}.
 % s1_38.rkt
 \begin{lstlisting}
-(program ()
-  (if (if (eq? (read) 1)
-          (eq? (read) 0)
-          (eq? (read) 2))
-      (+ 10 32)
-      (+ 700 77)))
+    (program ()
+      (if (if (eq? (read) 1)
+              (eq? (read) 0)
+              (eq? (read) 2))
+          (+ 10 32)
+          (+ 700 77)))
 \end{lstlisting}
 %
 The naive way to compile \key{if} and \key{eq?} would be to handle
