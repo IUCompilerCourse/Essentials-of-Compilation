@@ -3672,23 +3672,11 @@ $C_0$ and $C_1$ represents a control flow graph as an association list
 mapping labels to basic blocks (which each block is represented by the
 $\Tail$ non-terminal).
 
-Recall that in Section~\ref{sec:explicate-control-r1} we implement
-this pass for $R_1$ in terms of the mutually recursive
-\code{explicate-control-tail} and \code{explicate-control-assign}
-functions.  The former function translated expressions in tail
-position whereas the later function translated expressions on the
-right-hand-side of a \key{let}. With the addition of \key{if} we have
-a new kind of context: the predicate position of the \key{if}. So we
-shall need another function, \code{explicate-control-pred}, that takes
-an $R_2$ expression and two pieces of $C_1$ code (two $\Tail$'s) for
-the then-branch and else-branch. The output of
-\code{explicate-control-pred} is a $C_1$ $\Tail$.  However, these
-three functions also need to contruct the control-flow graph, which we
-recommend they do via updates to a global variable.
-
-Figure~\ref{fig:explicate-control-s1-38} shows the output of
-\code{remove-complex-opera*} and \code{explicate-control} on the
-example program. We shall walk through the output program in detail.
+Figure~\ref{fig:explicate-control-s1-38} shows the output of the
+\code{remove-complex-opera*} pass and then the
+\code{explicate-control} pass on the example program. We shall walk
+through the output program in detail and then discuss the algorithm
+for \code{explicate-control}.
 %
 Following the order of evaluation in the output of
 \code{remove-complex-opera*}, we first have the \code{(read)} and
@@ -3701,12 +3689,12 @@ translations of the code \code{(eq? (read) 0)} and \code{(eq? (read)
 \code{(read)} and comparison to \code{0} and then have a conditional
 goto, either to \code{block59} or \code{block60}, which indirectly
 take us to \code{block55} and \code{block56}, the two branches of the
-outer \key{if}, i.e., \code{(+ 10 32)} and \code{(+ 700 77)} The story
-for \code{block62} is similar but has the comparison to \code{2}.
+outer \key{if}, i.e., \code{(+ 10 32)} and \code{(+ 700 77)}. The
+story for \code{block62} is similar.
 
 \begin{figure}[tbp]
 \begin{tabular}{lll}
-\begin{minipage}{0.35\textwidth}
+\begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
 (program ()
   (if (if (eq? (read) 1)
@@ -3715,12 +3703,15 @@ for \code{block62} is similar but has the comparison to \code{2}.
       (+ 10 32)
       (+ 700 77)))  
 \end{lstlisting}
-$\Downarrow$
+\hspace{40pt}$\Downarrow$
 \begin{lstlisting}
 (program ()
-  (if (if (let ([tmp52 (read)]) (eq? tmp52 1))
-          (let ([tmp53 (read)]) (eq? tmp53 0))
-          (let ([tmp54 (read)]) (eq? tmp54 2)))
+  (if (if (let ([tmp52 (read)])
+            (eq? tmp52 1))
+          (let ([tmp53 (read)]) 
+            (eq? tmp53 0))
+          (let ([tmp54 (read)]) 
+            (eq? tmp54 2)))
    (+ 10 32)
    (+ 700 77)))
 \end{lstlisting}
@@ -3763,11 +3754,28 @@ $\Rightarrow$
 
 The nice thing about the output of \code{explicate-control} is that
 there are no unnecessary uses of \code{eq?}, and all uses of
-\code{eq?} are tied to a conditional jump. The one down-side of this
-output is, as you may have noticed, we sometimes produce trivial
+\code{eq?} are tied to a conditional jump. The one down-side of the
+output is, as you may have noticed, it sometimes includes trivial
 blocks, such as \code{block57} through \code{block60}, that only jump
-to another block. In Section~\ref{sec:opt-jumps} we discuss a solution
-to this problem.
+to another block. We discuss a solution to this problem in
+Section~\ref{sec:opt-jumps}.
+
+Recall that in Section~\ref{sec:explicate-control-r1} we implement the
+\code{explicate-control} pass for $R_1$ using two mutually recursive
+functions, \code{explicate-control-tail} and
+\code{explicate-control-assign}.  The former function translated
+expressions in tail position whereas the later function translated
+expressions on the right-hand-side of a \key{let}. With the addition
+of \key{if} expression in $R_2$ we have a new kind of context to deal
+with: the predicate position of the \key{if}. So we shall need another
+function, \code{explicate-control-pred}, that takes an $R_2$
+expression and two pieces of $C_1$ code (two $\Tail$'s) for the
+then-branch and else-branch. The output of
+\code{explicate-control-pred} is a $C_1$ $\Tail$.  However, these
+three functions also need to contruct the control-flow graph, which we
+recommend they do via updates to a global variable.
+
+
 
 \section{Select Instructions}
 \label{sec:select-r2}
