@@ -3636,40 +3636,41 @@ As a motivating example, consider the following program that has an
 %
 The naive way to compile \key{if} and \key{eq?} would be to handle
 each of them in isolation, regardless of their context.  Each
-\key{eq?} would be translated into a \key{cmpq} instruction (and a
-couple more instructions, as we shall see in
-Section~\ref{sec:select-r2}), and each \key{if} would be translated
-into the combination of a \key{cmpq} and \key{jmp-if}.  However, if we
-take context into account we can do better and reduce the use of
-\key{cmpq} and other instructions.
+\key{eq?} would be translated into a \key{cmpq} instruction followed
+by a couple instructions to move the result from the EFLAGS register
+into a general purpose register or stack location. Each \key{if} would
+be translated into the combination of a \key{cmpq} and \key{jmp-if}.
+However, if we take context into account we can do better and reduce
+the use of \key{cmpq} and EFLAG-accessing instructions.
 
-Another thought is to try and reorganize the code at the level of
-$R_2$, pushing the outer \key{if} inside the inner one. This would
+One possible solution is to try and reorganize the code at the level
+of $R_2$, pushing the outer \key{if} inside the inner one. This would
 yield the following code.
 \begin{lstlisting}
-(if (eq? (read) 1)
-    (if (eq? (read) 0)
-            (+ 10 32)
-            (+ 700 77))
-        (if (eq? (read) 2))
-            (+ 10 32)
-            (+ 700 77))
+    (if (eq? (read) 1)
+        (if (eq? (read) 0)
+                (+ 10 32)
+                (+ 700 77))
+            (if (eq? (read) 2))
+                (+ 10 32)
+                (+ 700 77))
 \end{lstlisting}
-Unfortunately, this approach forced us to duplicate the two branches,
-and a compiler must never duplicate code.
+Unfortunately, this approach duplicates the two branches, and a
+compiler must never duplicate code!
 
 We need a way to perform the above transformation, but without
-duplicating code. The solution to this problem is straightforward if
-we instead think at the level of x86 assembly: we just need to label
-the code for the two branches and insert jumps to those labels. Put
-another way, we need to move away from abstract syntax \emph{trees}
-and instead use \emph{graphs}. In particular, we shall use a standard
-program representation called a \emph{control flow graph} (CFG).  Each
+duplicating code. The solution is straightforward if we think at the
+level of x86 assembly: we can label the code for each branches and
+insert \key{goto}'s in all the places that need to execute the
+branches. Put another way, we need to move away from abstract syntax
+\emph{trees} and instead use \emph{graphs}. In particular, we shall
+use a standard program representation called a \emph{control flow
+  graph} (CFG), due to Frances Elizabeth \citet{Allen:1970uq}.  Each
 vertex is a labeled sequence of code, called a \emph{basic block}, and
-each edge represents a jump to a label. Now we are in a position to
-appreciate the \key{program} construct of $C_0$ and $C_1$, which
-includes an association list mapping labels to basic blocks
-(represented by the $\Tail$ non-terminal).
+each edge represents a jump to a label. The \key{program} construct of
+$C_0$ and $C_1$ represents a control flow graph as an association list
+mapping labels to basic blocks (which each block is represented by the
+$\Tail$ non-terminal).
 
 Recall that in Section~\ref{sec:explicate-control-r1} we implement
 this pass for $R_1$ in terms of the mutually recursive
