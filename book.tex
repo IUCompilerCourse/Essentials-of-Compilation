@@ -5528,11 +5528,16 @@ that does what its name suggests. The program then applies
 \end{figure}
 
 The definitional interpreter for $R_4$ is in
-Figure~\ref{fig:interp-R4}. The case for the
-\code{program} form 
-
-UNDER CONSTRUCTION
-
+Figure~\ref{fig:interp-R4}. The case for the \code{program} form is
+responsible for setting up the mutual recursion between the top-level
+function definitions. We use the classic backpatching approach that
+uses mutable variables and makes two passes over the function
+definitions~\citep{Kelsey:1998di}.  In the first pass we set up the
+top-level environment using a mutable cons cell for each function
+definition. Note that the \code{lambda} value for each function is
+incomplete; it does not yet include the environment.  Once the
+top-level environment is constructed, we then iterate over it and
+update the \code{lambda} value's to use the top-level environment.
 
 \begin{figure}[tp]
 \begin{lstlisting}
@@ -5563,10 +5568,9 @@ UNDER CONSTRUCTION
     [`(program ,ds ... ,body)
      (let ([top-level (map interp-def ds)])
        (for/list ([b top-level])
-         (set-mcdr! b
-                    (match (mcdr b)
-                      [`(lambda ,xs ,body ())
-                       `(lambda ,xs ,body ,top-level)])))
+         (set-mcdr! b (match (mcdr b)
+                        [`(lambda ,xs ,body ())
+                         `(lambda ,xs ,body ,top-level)])))
        ((interp-exp top-level) body))]
     ))
 \end{lstlisting}
