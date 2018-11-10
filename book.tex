@@ -4842,8 +4842,8 @@ succeed.
 \end{exercise}
 
 
-\section{Compiler Passes}
-\label{sec:code-generation-gc}
+%% \section{Compiler Passes}
+%% \label{sec:code-generation-gc}
 
 The introduction of garbage collection has a non-trivial impact on our
 compiler passes. We introduce one new compiler pass called
@@ -4856,14 +4856,14 @@ accesses the element in the inner tuple tuple via two vector
 references.
 % tests/s2_17.rkt
 \begin{lstlisting}
-   (vector-ref (vector-ref (vector (vector 42)) 0) 0))
+    (vector-ref (vector-ref (vector (vector 42)) 0) 0))
 \end{lstlisting}
 
-We already discuss the changes to \code{type-check} in
-Section~\ref{sec:r3}, including the addition of \code{has-type}, so we
-proceed to discuss the new \code{expose-allocation} pass.
+We discussed the changes to \code{type-check} in Section~\ref{sec:r3},
+including the addition of \code{has-type}, so we proceed to discuss
+the new \code{expose-allocation} pass.
 
-\subsection{Expose Allocation (New)}
+\section{Expose Allocation (New)}
 \label{sec:expose-allocation}
 
 The pass \code{expose-allocation} lowers the \code{vector} creation
@@ -4926,29 +4926,27 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(program (type Integer)
+(program ()
  (vector-ref
   (vector-ref
-   (let ((vecinit32990
-	  (let ([vecinit32986 42])
-	    (let ((collectret32988
-		   (if (< (+ (global-value free_ptr) 16)
-			  (global-value fromspace_end))
-		       (void)
-		       (collect 16))))
-	      (let ([alloc32985
-		     (allocate 1 (Vector Integer))])
-		(let ([initret32987
-		       (vector-set! alloc32985 0 vecinit32986)])
-		  alloc32985))))))
-     (let ([collectret32992
-	    (if (< (+ (global-value free_ptr) 16)
-                   (global-value fromspace_end))
-                (void)
-                (collect 16))])
-       (let ([alloc32989 (allocate 1 (Vector (Vector Integer)))])
-	 (let ([initret32991 (vector-set! alloc32989 0 vecinit32990)])
-	   alloc32989))))
+   (let ((vecinit48
+          (let ((vecinit44 42))
+            (let ((collectret46
+                   (if (<
+                        (+ (global-value free_ptr) 16)
+                        (global-value fromspace_end))
+                     (void)
+                     (collect 16))))
+              (let ((alloc43 (allocate 1 (Vector Integer))))
+                (let ((initret45 (vector-set! alloc43 0 vecinit44)))
+                  alloc43))))))
+     (let ((collectret50
+            (if (< (+ (global-value free_ptr) 16) (global-value fromspace_end))
+              (void)
+              (collect 16))))
+       (let ((alloc47 (allocate 1 (Vector (Vector Integer)))))
+         (let ((initret49 (vector-set! alloc47 0 vecinit48)))
+           alloc47))))
    0)
   0))
 \end{lstlisting}
@@ -4960,8 +4958,8 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
 
 \clearpage
 
-\subsection{Flatten and the $C_2$ intermediate language}
-\label{sec:flatten-gc}
+\section{Explicate Control and the $C_2$ intermediate language}
+\label{sec:explicate-control-r3}
 
 \begin{figure}[tp]
 \fbox{
@@ -4969,95 +4967,88 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
 \[
 \begin{array}{lcl}
 \Arg &::=& \gray{ \Int \mid \Var \mid \key{\#t} \mid \key{\#f} }\\
-\itm{cmp} &::= & \gray{  \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=}  } \\
+\itm{cmp} &::= & \gray{  \key{eq?} \mid \key{<} } \\
 \Exp &::= & \gray{ \Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)
       \mid (\key{not}\;\Arg) \mid (\itm{cmp}\;\Arg\;\Arg)  } \\
    &\mid& (\key{allocate} \,\itm{int}\,\itm{type})
    \mid (\key{vector-ref}\, \Arg\, \Int)  \\
    &\mid& (\key{vector-set!}\,\Arg\,\Int\,\Arg)
     \mid (\key{global-value} \,\itm{name}) \mid (\key{void}) \\
-\Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Exp} } \\
-      &\mid& \gray{ \IF{(\itm{cmp}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} } \\
-      &\mid& (\key{collect} \,\itm{int}) \\
-C_2 & ::= & (\key{program}\;((\Var \key{.} \itm{type})^{*})\;(\key{type}\;\textit{type})\;\Stmt^{+})
+\Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Exp} } 
+       \mid (\key{collect} \,\itm{int}) \\
+\Tail &::= & \gray{\RETURN{\Exp} \mid (\key{seq}\;\Stmt\;\Tail)} \\
+      &\mid& \gray{(\key{goto}\,\itm{label}) \mid \IF{(\itm{cmp}\, \Arg\,\Arg)}{(\key{goto}\,\itm{label})}{(\key{goto}\,\itm{label})}} \\
+C_2 & ::= & (\key{program}\;\itm{info}\; ((\itm{label}\,\key{.}\,\Tail)^{+}))
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The $C_2$ language, extending $C_1$ with support for tuples.}
+\caption{The $C_2$ language, extending $C_1$
+  (Figure~\ref{fig:c1-syntax}) with vectors.}
 \label{fig:c2-syntax}
 \end{figure}
 
-The output of \code{flatten} is a program in the intermediate language
-$C_2$, whose syntax is defined in Figure~\ref{fig:c2-syntax}.  The new
-forms of $C_2$ include the expressions \key{allocate},
-\key{vector-ref}, and \key{vector-set!}, and \key{global-value} and
-the statement \code{collect}.  The \code{flatten} pass can treat these
-new forms much like the other forms.
+The output of \code{explicate-control} is a program in the
+intermediate language $C_2$, whose syntax is defined in
+Figure~\ref{fig:c2-syntax}.  The new forms of $C_2$ include the
+\key{allocate}, \key{vector-ref}, and \key{vector-set!}, and
+\key{global-value} expressions and the \code{collect} statement.  The
+\code{explicate-control} pass can treat these new forms much like the
+other forms.
 
-Recall that the \code{flatten} function collects all of the local
-variables so that it can decorate the \code{program} form with
-them. Also recall that we need to know the types of all the local
-variables for purposes of identifying the root set for the garbage
-collector.  Thus, we change \code{flatten} to collect not just the
-variables, but the variables and their types in the form of an
-association list.  Thanks to the \code{has-type} forms, the types are
-readily available.  For example, consider the translation of the
-\code{let} form.
-\begin{lstlisting}
-  (let ([|$x$| (has-type |\itm{rhs}| |\itm{type}|)]) |\itm{body}|)
-|$\Longrightarrow$|
-  (values |\itm{body'}|
-          (|\itm{ss_1}| (assign |$x$| |\itm{rhs'}|)  |\itm{ss_2}|)
-          ((|$x$| . |\itm{type}|) |\itm{xt_1}| |\itm{xt_2}|))
-\end{lstlisting}
-where \itm{rhs'}, \itm{ss_1}, and \itm{xs_1} are the results of
-recursively flattening \itm{rhs} and \itm{body'}, \itm{ss_2}, and
-\itm{xs_2} are the results of recursively flattening \itm{body}.  The
-output on our running example is shown in Figure~\ref{fig:flatten-gc}.
+
+\section{Uncover Locals}
+\label{sec:uncover-locals-r3}
+
+Recall that the \code{uncover-locals} function collects all of the
+local variables so that it can store them in the $\itm{info}$ field of
+the \code{program} form. Also recall that we need to know the types of
+all the local variables for purposes of identifying the root set for
+the garbage collector.  Thus, we change \code{uncover-locals} to
+collect not just the variables, but the variables and their types in
+the form of an association list. Thanks to the \code{has-type} forms,
+the types are readily available. Figure~\ref{fig:uncover-locals-r3}
+lists the output of the \code{uncover-locals} pass on the running
+example.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-'(program
-  ((tmp02 . Integer) (tmp01 Vector Integer) (tmp90 Vector Integer)
-   (tmp86 . Integer) (tmp88 . Void) (tmp96 . Void)
-   (tmp94 . Integer) (tmp93 . Integer) (tmp95 . Integer)
-   (tmp85 Vector Integer) (tmp87 . Void) (tmp92 . Void)
-   (tmp00 . Void) (tmp98 . Integer) (tmp97 . Integer)
-   (tmp99 . Integer) (tmp89 Vector (Vector Integer))
-   (tmp91 . Void))
-  (type Integer)
-  (assign tmp86 42)
-  (assign tmp93 (global-value free_ptr))
-  (assign tmp94 (+ tmp93 16))
-  (assign tmp95 (global-value fromspace_end))
-  (if (< tmp94 tmp95)
-    ((assign tmp96 (void)))
-    ((collect 16) (assign tmp96 (void))))
-  (assign tmp88 tmp96)
-  (assign tmp85 (allocate 1 (Vector Integer)))
-  (assign tmp87 (vector-set! tmp85 0 tmp86))
-  (assign tmp90 tmp85)
-  (assign tmp97 (global-value free_ptr))
-  (assign tmp98 (+ tmp97 16))
-  (assign tmp99 (global-value fromspace_end))
-  (if (< tmp98 tmp99)
-    ((assign tmp00 (void)))
-    ((collect 16) (assign tmp00 (void))))
-  (assign tmp92 tmp00)
-  (assign tmp89 (allocate 1 (Vector (Vector Integer))))
-  (assign tmp91 (vector-set! tmp89 0 tmp90))
-  (assign tmp01 (vector-ref tmp89 0))
-  (assign tmp02 (vector-ref tmp01 0))
-  (return tmp02))
+(program
+ ((locals . ((tmp54 . Integer) (tmp51 . Integer) (tmp53 . Integer)
+             (alloc43 . (Vector Integer)) (tmp55 . Integer)
+             (initret45 . Void) (alloc47 . (Vector (Vector Integer)))
+             (collectret46 . Void) (vecinit48 . (Vector Integer))
+             (tmp52 . Integer) (tmp57 . (Vector Integer))
+             (vecinit44 . Integer) (tmp56 . Integer) (initret49 . Void)
+             (collectret50 . Void))))
+ ((block63 . (seq (collect 16) (goto block61)))
+  (block62 . (seq (assign collectret46 (void)) (goto block61)))
+  (block61 . (seq (assign alloc43 (allocate 1 (Vector Integer)))
+               (seq (assign initret45 (vector-set! alloc43 0 vecinit44))
+               (seq (assign vecinit48 alloc43)
+               (seq (assign tmp54 (global-value free_ptr))
+               (seq (assign tmp55 (+ tmp54 16))
+               (seq (assign tmp56 (global-value fromspace_end))
+               (if (< tmp55 tmp56) (goto block59) (goto block60)))))))))
+  (block60 . (seq (collect 16) (goto block58)))
+  (block59 . (seq (assign collectret50 (void)) (goto block58)))
+  (block58 . (seq (assign alloc47 (allocate 1 (Vector (Vector Integer))))
+               (seq (assign initret49 (vector-set! alloc47 0 vecinit48))
+               (seq (assign tmp57 (vector-ref alloc47 0))
+               (return (vector-ref tmp57 0))))))
+  (start . (seq (assign vecinit44 42)
+           (seq (assign tmp51 (global-value free_ptr))
+           (seq (assign tmp52 (+ tmp51 16))
+           (seq (assign tmp53 (global-value fromspace_end))
+           (if (< tmp52 tmp53) (goto block62) (goto block63)))))))))
 \end{lstlisting}
-\caption{Output of \code{flatten} for the running example.}
-\label{fig:flatten-gc}
+\caption{Output of \code{uncover-locals} for the running example.}
+\label{fig:uncover-locals-r3}
 \end{figure}
 
 \clearpage
 
-\subsection{Select Instructions}
+\section{Select Instructions}
 \label{sec:select-instructions-gc}
 
 %% void (rep as zero)
@@ -5171,57 +5162,66 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
 \begin{figure}[tbp]
 \centering
 \begin{minipage}{0.75\textwidth}
-\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
 (program
-  ((tmp02 . Integer) (tmp01 Vector Integer) (tmp90 Vector Integer)
-   (tmp86 . Integer) (tmp88 . Void) (tmp96 . Void) (tmp94 . Integer)
-   (tmp93 . Integer) (tmp95 . Integer) (tmp85 Vector Integer)
-   (tmp87 . Void) (tmp92 . Void) (tmp00 . Void) (tmp98 . Integer)
-   (tmp97 . Integer) (tmp99 . Integer) (tmp89 Vector (Vector Integer))
-   (tmp91 . Void)) (type Integer)
-  (movq (int 42) (var tmp86))
-  (movq (global-value free_ptr) (var tmp93))
-  (movq (var tmp93) (var tmp94))
-  (addq (int 16) (var tmp94))
-  (movq (global-value fromspace_end) (var tmp95))
-  (if (< (var tmp94) (var tmp95))
-    ((movq (int 0) (var tmp96)))
-    ((movq (reg r15) (reg rdi))
-     (movq (int 16) (reg rsi))
-     (callq collect)
-     (movq (int 0) (var tmp96))))
-  (movq (var tmp96) (var tmp88))
-  (movq (global-value free_ptr) (var tmp85))
-  (addq (int 16) (global-value free_ptr))
-  (movq (var tmp85) (reg r11))
-  (movq (int 3) (deref r11 0))
-  (movq (var tmp85) (reg r11))
-  (movq (var tmp86) (deref r11 8))
-  (movq (int 0) (var tmp87))
-  (movq (var tmp85) (var tmp90))
-  (movq (global-value free_ptr) (var tmp97))
-  (movq (var tmp97) (var tmp98))
-  (addq (int 16) (var tmp98))
-  (movq (global-value fromspace_end) (var tmp99))
-  (if (< (var tmp98) (var tmp99))
-    ((movq (int 0) (var tmp00)))
-    ((movq (reg r15) (reg rdi))
-     (movq (int 16) (reg rsi))
-     (callq collect)
-     (movq (int 0) (var tmp00))))
-  (movq (var tmp00) (var tmp92))
-  (movq (global-value free_ptr) (var tmp89))
-  (addq (int 16) (global-value free_ptr))
-  (movq (var tmp89) (reg r11))
-  (movq (int 131) (deref r11 0))
-  (movq (var tmp89) (reg r11))
-  (movq (var tmp90) (deref r11 8))
-  (movq (int 0) (var tmp91))
-  (movq (var tmp89) (reg r11))
-  (movq (deref r11 8) (var tmp01))
-  (movq (var tmp01) (reg r11))
-  (movq (deref r11 8) (var tmp02))
-  (movq (var tmp02) (reg rax)))
+ ((locals . ((tmp54 . Integer) (tmp51 . Integer) (tmp53 . Integer)
+             (alloc43 . (Vector Integer)) (tmp55 . Integer)
+             (initret45 . Void) (alloc47 . (Vector (Vector Integer)))
+             (collectret46 . Void) (vecinit48 . (Vector Integer))
+             (tmp52 . Integer) (tmp57 Vector Integer) (vecinit44 . Integer)
+             (tmp56 . Integer) (initret49 . Void) (collectret50 . Void))))
+ ((block63 . (block ()
+               (movq (reg r15) (reg rdi))
+               (movq (int 16) (reg rsi))
+               (callq collect)
+               (jmp block61)))
+  (block62 . (block () (movq (int 0) (var collectret46)) (jmp block61)))
+  (block61 . (block ()
+               (movq (global-value free_ptr) (var alloc43))
+               (addq (int 16) (global-value free_ptr))
+               (movq (var alloc43) (reg r11))
+               (movq (int 3) (deref r11 0))
+               (movq (var alloc43) (reg r11))
+               (movq (var vecinit44) (deref r11 8))
+               (movq (int 0) (var initret45))
+               (movq (var alloc43) (var vecinit48))
+               (movq (global-value free_ptr) (var tmp54))
+               (movq (var tmp54) (var tmp55))
+               (addq (int 16) (var tmp55))
+               (movq (global-value fromspace_end) (var tmp56))
+               (cmpq (var tmp56) (var tmp55))
+               (jmp-if l block59)
+               (jmp block60)))
+  (block60 . (block ()
+               (movq (reg r15) (reg rdi))
+               (movq (int 16) (reg rsi))
+               (callq collect)
+               (jmp block58))
+  (block59 . (block () 
+               (movq (int 0) (var collectret50)) 
+               (jmp block58)))
+  (block58 . (block ()
+               (movq (global-value free_ptr) (var alloc47))
+               (addq (int 16) (global-value free_ptr))
+               (movq (var alloc47) (reg r11))
+               (movq (int 131) (deref r11 0))
+               (movq (var alloc47) (reg r11))
+               (movq (var vecinit48) (deref r11 8))
+               (movq (int 0) (var initret49))
+               (movq (var alloc47) (reg r11))
+               (movq (deref r11 8) (var tmp57))
+               (movq (var tmp57) (reg r11))
+               (movq (deref r11 8) (reg rax))
+               (jmp conclusion)))
+  (start . (block ()
+             (movq (int 42) (var vecinit44))
+             (movq (global-value free_ptr) (var tmp51))
+             (movq (var tmp51) (var tmp52))
+             (addq (int 16) (var tmp52))
+             (movq (global-value fromspace_end) (var tmp53))
+             (cmpq (var tmp53) (var tmp52))
+             (jmp-if l block62)
+             (jmp block63))))))
 \end{lstlisting}
 \end{minipage}
 \caption{Output of the \code{select-instructions} pass.}
@@ -5230,7 +5230,7 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
 
 \clearpage
 
-\subsection{Register Allocation}
+\section{Register Allocation}
 \label{sec:reg-alloc-gc}
 
 As discussed earlier in this chapter, the garbage collector needs to
@@ -5257,12 +5257,6 @@ handled after graph coloring, when choosing how to assign the colors
 (integers) to registers and stack locations. The \code{program} output
 of this pass changes to also record the number of spills to the root
 stack.
-\[
-\begin{array}{lcl}
-x86_2 &::= & (\key{program} \;(\itm{stackSpills} \; \itm{rootstackSpills}) \;(\key{type}\;\itm{type})\; \Instr^{+})
-\end{array}
-\]
-
 
 % build-interference
 %
@@ -5277,7 +5271,7 @@ x86_2 &::= & (\key{program} \;(\itm{stackSpills} \; \itm{rootstackSpills}) \;(\k
 
 
 
-\subsection{Print x86}
+\section{Print x86}
 \label{sec:print-x86-gc}
 
 
@@ -5309,14 +5303,72 @@ if it is null prior to dereferencing it.
 \begin{figure}[htbp]
 \begin{minipage}[t]{0.5\textwidth}
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+_block58:
+	movq	_free_ptr(%rip), %rcx
+	addq	$16, _free_ptr(%rip)
+	movq	%rcx, %r11
+	movq	$131, 0(%r11)
+	movq	%rcx, %r11
+	movq	-8(%r15), %rax
+	movq	%rax, 8(%r11)
+	movq	$0, %rdx
+	movq	%rcx, %r11
+	movq	8(%r11), %rcx
+	movq	%rcx, %r11
+	movq	8(%r11), %rax
+	jmp _conclusion
+_block59:
+	movq	$0, %rcx
+	jmp _block58
+_block62:
+	movq	$0, %rcx
+	jmp _block61
+_block60:
+	movq	%r15, %rdi
+	movq	$16, %rsi
+	callq	_collect
+	jmp _block58
+_block63:
+	movq	%r15, %rdi
+	movq	$16, %rsi
+	callq	_collect
+	jmp _block61
+_start:
+	movq	$42, %rbx
+	movq	_free_ptr(%rip), %rdx
+	addq	$16, %rdx
+	movq	_fromspace_end(%rip), %rcx
+	cmpq	%rcx, %rdx
+	jl _block62
+	jmp _block63
+\end{lstlisting}
+\end{minipage}
+\begin{minipage}[t]{0.45\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+_block61:
+	movq	_free_ptr(%rip), %rcx
+	addq	$16, _free_ptr(%rip)
+	movq	%rcx, %r11
+	movq	$3, 0(%r11)
+	movq	%rcx, %r11
+	movq	%rbx, 8(%r11)
+	movq	$0, %rdx
+	movq	%rcx, -8(%r15)
+	movq	_free_ptr(%rip), %rcx
+	addq	$16, %rcx
+	movq	_fromspace_end(%rip), %rdx
+	cmpq	%rdx, %rcx
+	jl _block59
+	jmp _block60
+
 	.globl _main
 _main:
 	pushq	%rbp
 	movq	%rsp, %rbp
-	pushq	%r14
-	pushq	%r13
 	pushq	%r12
 	pushq	%rbx
+	pushq	%r13
+	pushq	%r14
 	subq	$0, %rsp
 	movq $16384, %rdi
 	movq $16, %rsi
@@ -5324,70 +5376,14 @@ _main:
 	movq _rootstack_begin(%rip), %r15
 	movq $0, (%r15)
 	addq $8, %r15
-
-	movq	$42, %rbx
-	movq	_free_ptr(%rip), %rcx
-	addq	$16, %rcx
-	movq	_fromspace_end(%rip), %rdx
-	cmpq	%rdx, %rcx
-	jl then33131
-	movq	%r15, %rdi
-	movq	$16, %rsi
-	callq	_collect
-	movq	$0, %rcx
-	jmp if_end33132
-then33131:
-	movq	$0, %rcx
-if_end33132:
-	movq	_free_ptr(%rip), %rcx
-	addq	$16, _free_ptr(%rip)
-	movq	%rcx, %r11
-	movq	$3, 0(%r11)
-	movq	%rcx, %r11
-	movq	%rbx, 8(%r11)
-	movq	$0, %rbx
-	movq	%rcx, -8(%r15)
-	movq	_free_ptr(%rip), %rbx
-	movq	%rbx, %rcx
-	addq	$16, %rcx
-	movq	_fromspace_end(%rip), %rbx
-	cmpq	%rbx, %rcx
-	jl then33133
-	movq	%r15, %rdi
-	movq	$16, %rsi
-	callq	_collect
-	movq	$0, %rbx
-	jmp if_end33134
-\end{lstlisting}
-\end{minipage}
-\begin{minipage}[t]{0.45\textwidth}
-\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-then33133:
-	movq	$0, %rbx
-if_end33134:
-	movq	_free_ptr(%rip), %rbx
-	addq	$16, _free_ptr(%rip)
-	movq	%rbx, %r11
-	movq	$131, 0(%r11)
-	movq	%rbx, %r11
-	movq	-8(%r15), %rax
-	movq	%rax, 8(%r11)
-	movq	$0, %rcx
-	movq	%rbx, %r11
-	movq	8(%r11), %rbx
-	movq	%rbx, %r11
-	movq	8(%r11), %rbx
-	movq	%rbx, %rax
-
-	movq	%rax, %rdi
-	callq	_print_int
-	movq	$0, %rax
+	jmp _start
+_conclusion:
 	subq $8, %r15
 	addq	$0, %rsp
+	popq	%r14
+	popq	%r13
 	popq	%rbx
 	popq	%r12
-	popq	%r13
-	popq	%r14
 	popq	%rbp
 	retq
 \end{lstlisting}
