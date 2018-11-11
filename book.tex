@@ -4970,7 +4970,8 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
 \Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Exp} } 
        \mid (\key{collect} \,\itm{int}) \\
 \Tail &::= & \gray{\RETURN{\Exp} \mid (\key{seq}\;\Stmt\;\Tail)} \\
-      &\mid& \gray{(\key{goto}\,\itm{label}) \mid \IF{(\itm{cmp}\, \Arg\,\Arg)}{(\key{goto}\,\itm{label})}{(\key{goto}\,\itm{label})}} \\
+      &\mid& \gray{(\key{goto}\,\itm{label})
+       \mid \IF{(\itm{cmp}\, \Arg\,\Arg)}{(\key{goto}\,\itm{label})}{(\key{goto}\,\itm{label})}} \\
 C_2 & ::= & (\key{program}\;\itm{info}\; ((\itm{label}\,\key{.}\,\Tail)^{+}))
 \end{array}
 \]
@@ -5768,49 +5769,30 @@ preceeding ``conclusion'' overwrites just about everything else.
    jmp *%rax
 \end{lstlisting}
 
-\section{The compilation of functions}
-\label{sec:compile-functions}
+%% Now that we have a good understanding of functions as they appear in
+%% $R_4$ and the support for functions in x86, we need to plan the
+%% changes to our compiler, that is, do we need any new passes and/or do
+%% we need to change any existing passes? Also, do we need to add new
+%% kinds of AST nodes to any of the intermediate languages?
 
-\margincomment{\scriptsize To do: discuss the need to push and
-  pop call-live pointers (vectors and functions)
-  to the root stack \\ --Jeremy}
+\section{Reveal Functions}
+\label{sec:reveal-functions-r4}
 
-Now that we have a good understanding of functions as they appear in
-$R_4$ and the support for functions in x86, we need to plan the
-changes to our compiler, that is, do we need any new passes and/or do
-we need to change any existing passes? Also, do we need to add new
-kinds of AST nodes to any of the intermediate languages?
-
-First, we need to transform functions to operate on at most five
-arguments.  There are a total of six registers for passing arguments
-used in the convention previously mentioned, and we will reserve one
-for future use with higher-order functions (as explained in
-Chapter~\ref{ch:lambdas}). A simple strategy for imposing an argument
-limit of length $n$ is to take all arguments $i$ where $i \geq n$ and
-pack them into a vector, making that subsequent vector the $n$th
-argument.
-
-\begin{tabular}{lll}
-\begin{minipage}{0.2\textwidth}
-\begin{lstlisting}
-  (|$f$| |$x_1$| |$\ldots$| |$x_n$|) 
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.4\textwidth}
-\begin{lstlisting}
-(|$f$| |$x_1$| |$\ldots$| |$x_5$| (vector |$x_6$| |$\ldots$| |$x_n$|))
-\end{lstlisting}
-\end{minipage}
-\end{tabular}
-
-Additionally, all occurrances of the $i$th argument (where $i>5$) in
-the body must be replaced with a projection from the vector. A pass
-that limits function arguments like this (which we will name
-\code{limit-functions}), can operate directly on $R_4$.
-
+Going forward, the syntax of $R_4$ is inconvenient for purposes of
+compilation because it conflates the use of function names and local
+variables and it conflates the application of primitive operations and
+the application of functions. This is a problem because we need to
+compile the use of a function name differently than the use of a local
+variable; we need to use \code{leaq} to move the function name to a
+register. Similarly, the application of a function is going to require
+a complex sequence of instructions, unlike the primitive
+operations. Thus, it is a good idea to create a new pass that changes
+function references from just a symbol $f$ to \code{(function-ref
+  $f$)} and that changes function application from \code{($e_0$ $e_1$
+  $\ldots$ $e_n$)} to the explicitly tagged AST \code{(app $e_0$ $e_1$
+  $\ldots$ $e_n$)} or \code{(tailcall $e_0$ $e_1$ $\ldots$ $e_n$)}. A
+good name for this pass is \code{reveal-functions} and the output
+language, $F_1$, is defined in Figure~\ref{fig:f1-syntax}.
 
 \begin{figure}[tp]
 \centering
@@ -5841,37 +5823,55 @@ that limits function arguments like this (which we will name
 \label{fig:f1-syntax}
 \end{figure}
 
-Going forward, the syntax of $R_4$ is inconvenient for purposes of
-compilation because it conflates the use of function names and local
-variables and it conflates the application of primitive operations and
-the application of functions. This is a problem because we need to
-compile the use of a function name differently than the use of a local
-variable; we need to use \code{leaq} to move the function name to a
-register. Similarly, the application of a function is going to require
-a complex sequence of instructions, unlike the primitive
-operations. Thus, it is a good idea to create a new pass that changes
-function references from just a symbol $f$ to \code{(function-ref
-  $f$)} and that changes function application from \code{($e_0$ $e_1$
-  $\ldots$ $e_n$)} to the explicitly tagged AST \code{(app $e_0$ $e_1$
-  $\ldots$ $e_n$)} or \code{(tailcall $e_0$ $e_1$ $\ldots$ $e_n$)}. A
-good name for this pass is \code{reveal-functions} and the output
-language, $F_1$, is defined in Figure~\ref{fig:f1-syntax}.
-
 Distinguishing between calls in tail position and non-tail position
-requires the pass to have some notion of context. We recommend the
-function take an additional boolean argument which represents whether
-the expression it is considering is in tail position. For example,
-when handling a conditional expression \code{(if $e_1$ $e_2$ $e_3$)}
-in tail position, both $e_2$ and $e_3$ are also in tail position,
-while $e_1$ is not.
+requires the pass to have some notion of context. We recommend using
+two mutually recursive functions, one for processing expressions in
+tail position and another for the rest. 
 
 Placing this pass after \code{uniquify} is a good idea, because it
 will make sure that there are no local variables and functions that
 share the same name. On the other hand, \code{reveal-functions} needs
-to come before the \code{flatten} pass because \code{flatten} will
-help us compile \code{function-ref}.  Figure~\ref{fig:c3-syntax}
-defines the syntax for $C_3$, the output of \key{flatten}.
+to come before the \code{explicate-control} pass because that pass
+will help us compile \code{function-ref} into assignment statements.
 
+\section{Limit Functions}
+\label{sec:limit-functions-r4}
+
+This pass transforms functions so that they have at most six
+parameters and transforms all function calls so that they pass at most
+six arguments.  A simple strategy for imposing an argument limit of
+length $n$ is to take all arguments $i$ where $i \geq n$ and pack them
+into a vector, making that subsequent vector the $n$th argument.
+
+\begin{tabular}{lll}
+\begin{minipage}{0.2\textwidth}
+\begin{lstlisting}
+  (|$f$| |$x_1$| |$\ldots$| |$x_n$|) 
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(|$f$| |$x_1$| |$\ldots$| |$x_5$| (vector |$x_6$| |$\ldots$| |$x_n$|))
+\end{lstlisting}
+\end{minipage}
+\end{tabular}
+
+In the body of the function, all occurrances of the $i$th argument
+(where $i>5$) must be replaced with a \code{vector-ref}.
+
+
+\section{Explicate Control and $C_3$}
+
+
+
+
+Figure~\ref{fig:c3-syntax} defines the syntax for $C_3$, the output of
+\key{explicate-control}.
+
+UNDER CONSTRUCTION
 
 \begin{figure}[tp]
 \fbox{
@@ -5880,30 +5880,38 @@ defines the syntax for $C_3$, the output of \key{flatten}.
 \begin{array}{lcl}
 \Arg &::=& \gray{ \Int \mid \Var \mid \key{\#t} \mid \key{\#f} }
   \mid (\key{function-ref}\,\itm{label})\\
-\itm{cmp} &::= & \gray{  \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=}  } \\
+\itm{cmp} &::= & \gray{  \key{eq?} \mid \key{<} } \\
 \Exp &::= & \gray{ \Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)
       \mid (\key{not}\;\Arg) \mid (\itm{cmp}\;\Arg\;\Arg)  } \\
-   &\mid& \gray{  (\key{vector}\, \Arg^{+})
+   &\mid& \gray{  (\key{allocate}\,\Int\,\Type)
    \mid (\key{vector-ref}\, \Arg\, \Int)  } \\
-   &\mid& \gray{  (\key{vector-set!}\,\Arg\,\Int\,\Arg)  } \\
+   &\mid& \gray{  (\key{vector-set!}\,\Arg\,\Int\,\Arg) \mid (\key{global-value} \,\itm{name}) \mid (\key{void}) } \\
    &\mid& (\key{app} \,\Arg\,\Arg^{*}) \\
 \Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Exp} } \\
-      &\mid& \gray{ \IF{(\itm{cmp}\, \Arg\,\Arg)}{\Stmt^{*}}{\Stmt^{*}} } \\
-      &\mid& \gray{ (\key{initialize}\,\itm{int}\,\itm{int}) }\\
-      &\mid& \gray{ \IF{(\key{collection-needed?}\,\itm{int})}{\Stmt^{*}}{\Stmt^{*}} } \\
-      &\mid& \gray{ (\key{collect} \,\itm{int}) }
-       \mid \gray{ (\key{allocate} \,\itm{int}) }\\
-      &\mid& \gray{ (\key{call-live-roots}\,(\Var^{*}) \,\Stmt^{*}) } \\
+      &\mid& \gray{ (\key{initialize}\,\itm{int}\,\itm{int}) 
+      \mid (\key{collect} \,\itm{int}) }\\
+\Tail &::= & \gray{\RETURN{\Exp} \mid (\key{seq}\;\Stmt\;\Tail)} \\
+      &\mid& \gray{(\key{goto}\,\itm{label})
+       \mid \IF{(\itm{cmp}\, \Arg\,\Arg)}{(\key{goto}\,\itm{label})}{(\key{goto}\,\itm{label})}} \\
       &\mid& (\key{tailcall} \,\Arg\,\Arg^{*}) \\
-  \Def &::=& (\key{define}\; (\itm{label} \; [\Var \key{:} \Type]^{*}) \key{:} \Type \; \Stmt^{+}) \\
-C_3 & ::= & (\key{program}\;(\Var^{*})\;(\key{type}\;\textit{type})\;(\key{defines}\,\Def^{*})\;\Stmt^{+})
+  \Def &::=& (\key{define}\; (\itm{label} \; [\Var \key{:} \Type]^{*}) \key{:} \Type \; ((\itm{label}\,\key{.}\,\Tail)^{+})) \\
+C_3 & ::= & (\key{program}\;\itm{info}\;\Def^{*})
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The $C_3$ language, extending $C_2$ with functions.}
+\caption{The $C_3$ language, extending $C_2$ (Figure~\ref{fig:c2-syntax}) with functions.}
 \label{fig:c3-syntax}
 \end{figure}
+
+
+\section{Select Instructions}
+\label{sec:select-r4}
+
+
+\margincomment{\scriptsize To do: discuss the need to push and
+  pop call-live pointers (vectors and functions)
+  to the root stack \\ --Jeremy}
 
 
 Because each \code{function-ref} needs to eventually become an
