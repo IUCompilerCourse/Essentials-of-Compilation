@@ -1077,18 +1077,18 @@ following instruction in memory.  Each instruction may refer to integer
 constants (called \emph{immediate values}), variables called \emph{registers},
 and instructions may load and store values into memory.  For our purposes, we
 can think of the computer's memory as a mapping of 64-bit addresses to 64-bit
-%
-values\footnote{This simple story doesn't fully cover contemporary x86
-  processors, which combine multiple processing cores per silicon chip, together
-  with hardware memory caches.  The result is that, at some instants in real
-  time, different threads of program execution may hold conflicting
-  cached values for a given memory address.}.
+values%
+\footnote{This simple story suffices for describing how sequential
+  programs access memory but is not sufficient for multi-threaded
+  programs. However, multi-threaded execution is beyond the scope of
+  this book.}.
 %
 Figure~\ref{fig:x86-a} defines the syntax for the
 subset of the x86 assembly language needed for this chapter.
 %
-(We use the AT\&T syntax expected by the GNU assembler that comes with the C
-compiler that we use in this course: \key{gcc}.)
+We use the AT\&T syntax expected by the GNU assembler, which comes
+with the \key{gcc} compiler that we use for compiling assembly code to
+machine code.
 %
 Also, Appendix~\ref{sec:x86-quick-reference} includes a quick-reference of all
 the x86 instructions used in this book and a short explanation of what they do.
@@ -1183,13 +1183,8 @@ main:
 Unfortunately, x86 varies in a couple ways depending on what operating
 system it is assembled in. The code examples shown here are correct on
 Linux and most Unix-like platforms, but when assembled on Mac OS X,
-labels like \key{main} must be prefixed with an underscore.  So the
-correct output for the above program on Mac would begin with:
-\begin{lstlisting}
-	.globl _main
-_main:
-	...
-\end{lstlisting}
+labels like \key{main} must be prefixed with an underscore, as in
+\key{\_main}.
 
 We exhibit the use of memory for storing intermediate results in the
 next example.  Figure~\ref{fig:p1-x86} lists an x86 program that is
@@ -1280,7 +1275,7 @@ procedure.  The \key{addq \$16, \%rsp} instruction moves the stack
 pointer back to point at the old base pointer. The amount added here
 needs to match the amount that was subtracted in the prelude of the
 procedure. Then \key{popq \%rbp} returns the old base pointer to
-\key{rbp} and adds $8$ to the stack pointer.  The final instruction,
+\key{rbp} and adds $8$ to the stack pointer.  The last instruction,
 \key{retq}, jumps back to the procedure that called this one and adds
 8 to the stack pointer, which returns the stack pointer to where it
 was prior to the procedure call.
@@ -4387,10 +4382,9 @@ copying live objects back and forth between two halves of the
 heap. The garbage collector requires coordination with the compiler so
 that it can see all of the \emph{root} pointers, that is, pointers in
 registers or on the procedure call stack.
-Section~\ref{sec:code-generation-gc} discusses all the necessary
-changes and additions to the compiler passes, including type checking,
-instruction selection, register allocation, and a new compiler pass
-named \code{expose-allocation}.
+Sections~\ref{sec:expose-allocation} through \ref{sec:print-x86-gc}
+discuss all the necessary changes and additions to the compiler
+passes, including a new compiler pass named \code{expose-allocation}.
 
 \section{The $R_3$ Language}
 \label{sec:r3}
@@ -4859,9 +4853,7 @@ references.
     (vector-ref (vector-ref (vector (vector 42)) 0) 0))
 \end{lstlisting}
 
-We discussed the changes to \code{type-check} in Section~\ref{sec:r3},
-including the addition of \code{has-type}, so we proceed to discuss
-the new \code{expose-allocation} pass.
+Next we proceed to discuss the new \code{expose-allocation} pass.
 
 \section{Expose Allocation (New)}
 \label{sec:expose-allocation}
@@ -4941,7 +4933,8 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
                 (let ((initret45 (vector-set! alloc43 0 vecinit44)))
                   alloc43))))))
      (let ((collectret50
-            (if (< (+ (global-value free_ptr) 16) (global-value fromspace_end))
+            (if (< (+ (global-value free_ptr) 16)
+                   (global-value fromspace_end))
               (void)
               (collect 16))))
        (let ((alloc47 (allocate 1 (Vector (Vector Integer)))))
@@ -4956,9 +4949,9 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
 \end{figure}
 
 
-\clearpage
+%\clearpage
 
-\section{Explicate Control and the $C_2$ intermediate language}
+\section{Explicate Control and the $C_2$ language}
 \label{sec:explicate-control-r3}
 
 \begin{figure}[tp]
@@ -5600,34 +5593,99 @@ address of the \code{add1} label into the \code{rbx} register.
    leaq add1(%rip), %rbx
 \end{lstlisting}
 
-In Sections~\ref{sec:x86} and \ref{sec:select-r1} we saw the use of
-the \code{callq} instruction for jumping to a function as specified by
-a label. The use of the instruction changes slightly if the function
-is specified by an address in a register, that is, an \emph{indirect
+In Section~\ref{sec:x86} we saw the use of the \code{callq}
+instruction for jumping to a function whose location is given by a
+label. Here we instead will be jumping to a function whose location is
+given by an address, that is, we need to make an \emph{indirect
   function call}. The x86 syntax is to give the register name prefixed
 with an asterisk.
 \begin{lstlisting}
    callq *%rbx
 \end{lstlisting}
 
-Because the x86 architecture does not have any direct support for
-passing arguments to functions, compiler implementers typically adopt
-a \emph{convention} to follow for how arguments are passed to
-functions. The convention for C compilers such as \code{gcc} (as
-described in \cite{Matz:2013aa}), uses a combination of registers and
-stack locations for passing arguments. Up to six arguments may be
-passed in registers, using the registers \code{rdi}, \code{rsi},
-\code{rdx}, \code{rcx}, \code{r8}, and \code{r9}, in that order.  If
-there are more than six arguments, then the rest are placed on the
-stack.  The register \code{rax} is for the return value of the
-function.
 
-We will be using a modification of this convention. For reasons that
-will be explained in subsequent paragraphs, we will not make use of
-the stack for passing arguments, and instead use the heap when there
-are more than six arguments. In particular, functions of more than six
-arguments will be transformed to pass the additional arguments in a
-vector.
+\subsection{Calling Conventions}
+
+The \code{callq} instruction provides partial support for implementing
+functions, but it does not handle (1) parameter passing, (2) saving
+and restoring frames on the procedure call stack, or (3) determining
+how registers are shared by different functions. These issues require
+coordination between the caller and the callee, which is often
+assembly code written by different programmers or generated by
+different compilers. As a result, people have developed
+\emph{conventions} that govern how functions calls are performed.
+Here we shall use the same conventions used by the \code{gcc}
+compiler~\citep{Matz:2013aa}.
+
+Regarding (1) parameter passing, the convention is to use the
+following six registers: \code{rdi}, \code{rsi}, \code{rdx},
+\code{rcx}, \code{r8}, and \code{r9}, in that order. If there are more
+than six arguments, then the convention is to use space on the frame
+of the caller for the rest of the arguments. However, to ease the
+implementation of efficient tail calls (Section~\ref{sec:tail-call}),
+we shall arrange to never have more than six arguments.
+%
+The register \code{rax} is for the return value of the function.
+
+Regarding (2) frames and the procedure call stack, the convention is
+that the stack grows down, with each function call using a chunk of
+space called a frame. The caller sets the stack pointer, register
+\code{rsp}, to the last data item in its frame. The callee must not
+change anything in the caller's frame, that is, anything that is at or
+above the stack pointer. The callee is free to use locations that are
+below the stack pointer. 
+
+Regarding (3) the sharing of registers between different functions,
+recall from Section~\ref{sec:calling-conventions} that the registers
+are divided into two groups, the caller-saved registers and the
+callee-saved registers. The caller should assume that all the
+caller-saved registers get overwritten with arbitrary values by the
+callee. Thus, the caller should either 1) not put values that are live
+across a call in caller-saved registers, or 2) save and restore values
+that are live across calls. We shall recommend option 1).  On the flip
+side, if the callee wants to use a callee-saved register, the callee
+must save the contents of those registers on their stack frame and
+then put them back prior to returning to the caller.  The base
+pointer, register \code{rbp}, is used as a point-of-reference within a
+frame, so that each local variable can be accessed at a fixed offset
+from the base pointer.
+%
+Figure~\ref{fig:call-frames} shows the layout of the caller and callee
+frames.
+%% If we were to use stack arguments, they would be between the
+%% caller locals and the callee return address. 
+
+
+
+\begin{figure}[tbp]
+\centering
+\begin{tabular}{r|r|l|l} \hline
+Caller View & Callee View & Contents       & Frame \\ \hline
+8(\key{\%rbp})  & & return address & \multirow{5}{*}{Caller}\\
+0(\key{\%rbp})  &  & old \key{rbp} \\
+-8(\key{\%rbp}) &  & callee-saved $1$ \\
+\ldots & & \ldots \\
+$-8j$(\key{\%rbp}) &  & callee-saved $j$ \\
+$-8(j+1)$(\key{\%rbp}) &  & local $1$ \\
+\ldots & & \ldots \\
+$-8(j+k)$(\key{\%rbp}) &  & local $k$ \\
+ %% & &  \\
+%% $8n-8$\key{(\%rsp)} & $8n+8$(\key{\%rbp})& argument $n$ \\
+%% & \ldots           & \ldots \\
+%% 0\key{(\%rsp)} & 16(\key{\%rbp})  & argument $1$   & \\
+\hline
+& 8(\key{\%rbp})   & return address & \multirow{5}{*}{Callee}\\
+& 0(\key{\%rbp})   & old \key{rbp} \\
+& -8(\key{\%rbp}) & callee-saved $1$ \\
+& \ldots & \ldots \\
+& $-8n$(\key{\%rbp})  & callee-saved $n$ \\
+& $-8(n+1)$(\key{\%rbp})  & local $1$ \\
+&  \ldots          & \ldots \\
+& $-8(n+m)$(\key{\%rsp})   & local $m$\\ \hline
+\end{tabular}
+\caption{Memory layout of caller and callee frames.}
+\label{fig:call-frames}
+\end{figure}
 
 %% Recall from Section~\ref{sec:x86} that the stack is also used for
 %% local variables and for storing the values of callee-saved registers
@@ -5657,79 +5715,61 @@ vector.
 %% function calls; if that number is too small then the arguments and
 %% local variables will smash into each other!
 
-As discussed in Section~\ref{sec:print-x86-reg-alloc}, an x86 function
-is responsible for following conventions regarding the use of
-registers: the caller should assume that all the caller-saved
-registers get overwritten with arbitrary values by the callee. Thus,
-the caller should either 1) not put values that are live across a call
-in caller-saved registers, or 2) save and restore values that are live
-across calls. We shall recommend option 1).  On the flip side, if the
-callee wants to use a callee-saved register, the callee must arrange
-to put the original value back in the register prior to returning to
-the caller.
+\subsection{Efficient Tail Calls}
+\label{sec:tail-call}
 
-Figure~\ref{fig:call-frames} shows the layout of the caller and callee
-frames. If we were to use stack arguments, they would be between the
-caller locals and the callee return address. A function call will
-place a new frame onto the stack, growing downward. There are cases,
-however, where we can \emph{replace} the current frame on the stack in
-a function call, rather than add a new frame.
+In general, the amount of stack space used by a program is determined
+by the longest chain of nested function calls. That is, if function
+$f_1$ calls $f_2$, $f_2$ calls $f_3$, $\ldots$, and $f_{n-1}$ calls
+$f_n$, then the amount of stack space is bounded by $O(n)$.  The depth
+$n$ can grow quite large in the case of recursive or mutually
+recursive functions. However, in some cases we can arrange to use only
+constant space, i.e. $O(1)$, instead of $O(n)$.
 
-If a call is the last action in a function body, then that call is
-said to be a \emph{tail call}. In the case of a tail call, whatever
-the callee returns will be immediately returned by the caller, so the
-call can be optimized into a \code{jmp} instruction---the caller will
-jump to the new function, maintaining the same frame and return
-address. Like the indirect function call, we write an indirect
-jump with a register prefixed with an asterisk.
+If a function call is the last action in a function body, then that
+call is said to be a \emph{tail call}. In such situations, the frame
+of the caller is no longer needed, so we can pop the caller's frame
+before making the tail call. With this approach, a recursive function
+that only makes tail calls will only use $O(1)$ stack space.
+Functional languages like Racket typically rely heavily on recursive
+functions, so they typically guarantee that all tail calls will be
+optimized in this way.
 
+However, some care is needed with regards to argument passing in tail
+calls.  As mentioned above, for arguments beyond the sixth, the
+convention is to use space in the caller's frame for passing
+arguments.  But here we've popped the caller's frame and can no longer
+use it.  Another alternative is to use space in the callee's frame for
+passing arguments. However, this option is also problematic because
+the caller and callee's frame overlap in memory.  As we begin to copy
+the arguments from their sources in the caller's frame, the target
+locations in the callee's frame might overlap with the sources for
+later arguments! We solve this problem by not using the stack for
+paramter passing but instead use the heap, as we describe in the next
+section.
+
+As briefly mentioned above, for a tail call we pop the caller's frame
+prior to making the tail call. The instructions for popping a frame
+are the instructions that we usually place in the conclusion of a
+function. Thus, we also need to place such code immediately before
+each tail call.
+
+One last note regarding which instruction to use to make the tail
+call. When the callee is finished, it should not return to the current
+function, but it should return to the function that called the current
+one. Thus, the return address that is already on the stack is the
+right one, and we should not use \key{callq} to make the tail call, as
+that would unnecessarily overwrite the return address. Instead we can
+simply use the \key{jmp} instruction. Like the indirect function call,
+we write an indirect jump with a register prefixed with an asterisk.
+We recommend using \code{rax} to hold the jump target because the
+preceeding ``conclusion'' overwrites just about everything else.
 \begin{lstlisting}
    jmp *%rax
 \end{lstlisting}
 
-A common use case for this optimization is \emph{tail recursion}: a
-function that calls itself in the tail position is essentially a loop,
-and if it does not grow the stack on each call it can act like
-one. Functional languages like Racket and Scheme typically rely
-heavily on function calls, and so they typically guarantee that
-\emph{all} tail calls will be optimized in this way, not just
-functions that call themselves.
-
-\margincomment{\scriptsize To do: better motivate guaranteed tail calls? -mv}
-
-If we were to stick to the calling convention used by C compilers like
-\code{gcc}, it would be awkward to optimize tail calls that require
-stack arguments, so we simplify the process by imposing an invariant
-that no function passes arguments that way. With this invariant,
-space-efficient tail calls are straightforward to implement.
-
-\begin{figure}[tbp]
-\centering
-\begin{tabular}{r|r|l|l} \hline
-Caller View & Callee View & Contents       & Frame \\ \hline
-8(\key{\%rbp})  & & return address & \multirow{5}{*}{Caller}\\
-0(\key{\%rbp})  &  & old \key{rbp} \\
--8(\key{\%rbp}) &  & local $1$ \\
-\ldots & & \ldots \\
-$-8k$(\key{\%rbp}) &  & local $k$ \\
- %% & &  \\
-%% $8n-8$\key{(\%rsp)} & $8n+8$(\key{\%rbp})& argument $n$ \\
-%% & \ldots           & \ldots \\
-%% 0\key{(\%rsp)} & 16(\key{\%rbp})  & argument $1$   & \\
-\hline
-& 8(\key{\%rbp})   & return address & \multirow{5}{*}{Callee}\\
-& 0(\key{\%rbp})   & old \key{rbp} \\
-& -8(\key{\%rbp})  & local $1$ \\
-&  \ldots          & \ldots \\
-& $-8m$(\key{\%rsp})   & local $m$\\ \hline
-\end{tabular}
-
-\caption{Memory layout of caller and callee frames.}
-\label{fig:call-frames}
-\end{figure}
-
-
 \section{The compilation of functions}
+\label{sec:compile-functions}
 
 \margincomment{\scriptsize To do: discuss the need to push and
   pop call-live pointers (vectors and functions)
