@@ -5753,7 +5753,9 @@ As briefly mentioned above, for a tail call we pop the caller's frame
 prior to making the tail call. The instructions for popping a frame
 are the instructions that we usually place in the conclusion of a
 function. Thus, we also need to place such code immediately before
-each tail call.
+each tail call. These instructions include restoring the callee-saved
+registers, so it is good that the argument passing registers are all
+caller-saved registers.
 
 One last note regarding which instruction to use to make the tail
 call. When the callee is finished, it should not return to the current
@@ -5775,24 +5777,57 @@ preceeding ``conclusion'' overwrites just about everything else.
 %% we need to change any existing passes? Also, do we need to add new
 %% kinds of AST nodes to any of the intermediate languages?
 
+\section{Shrink $R_4$}
+\label{sec:shrink-r4}
+
+The \code{shrink} pass performs a couple minor modifications to the
+grammar to ease the later passes. This pass adds an empty $\itm{info}$
+field to each function definition:
+\begin{lstlisting}
+    (define (|$f$| [|$x_1 : \Type_1$| ...) : |$\Type_r$| |$\Exp$|)
+|$\Rightarrow$|  (define (|$f$| [|$x_1 : \Type_1$| ...) : |$\Type_r$| () |$\Exp$|)
+\end{lstlisting}
+and introduces an explicit \code{main} function.\\
+\begin{tabular}{lll}
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+    (program |$\itm{info}$| |$ds$| ... |$\Exp$|)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+    (program |$\itm{info}$| |$ds'$| |$\itm{mainDef}$|)
+\end{lstlisting}
+\end{minipage}
+\end{tabular}  \\
+where $\itm{mainDef}$ is
+\begin{lstlisting}
+    (define (main) : Integer () |$\Exp'$|)
+\end{lstlisting}
+
+
 \section{Reveal Functions}
 \label{sec:reveal-functions-r4}
 
 Going forward, the syntax of $R_4$ is inconvenient for purposes of
 compilation because it conflates the use of function names and local
 variables and it conflates the application of primitive operations and
-the application of functions. This is a problem because we need to
-compile the use of a function name differently than the use of a local
-variable; we need to use \code{leaq} to move the function name to a
-register. Similarly, the application of a function is going to require
-a complex sequence of instructions, unlike the primitive
-operations. Thus, it is a good idea to create a new pass that changes
-function references from just a symbol $f$ to \code{(function-ref
-  $f$)} and that changes function application from \code{($e_0$ $e_1$
-  $\ldots$ $e_n$)} to the explicitly tagged AST \code{(app $e_0$ $e_1$
-  $\ldots$ $e_n$)} or \code{(tailcall $e_0$ $e_1$ $\ldots$ $e_n$)}. A
-good name for this pass is \code{reveal-functions} and the output
-language, $F_1$, is defined in Figure~\ref{fig:f1-syntax}.
+the application of functions. The former is a problem because we need
+to compile the use of a function name differently than the use of a
+local variable; we need to use \code{leaq} to convert the function
+name (a label in x86) to an address in a register. Similarly, the
+application of a function is going to require a complex sequence of
+instructions, unlike the primitive operations. Thus, it is a good idea
+to create a new pass that changes function references from just a
+symbol $f$ to \code{(function-ref $f$)} and that changes function
+application from \code{($e_0$ $e_1$ $\ldots$ $e_n$)} to the explicitly
+tagged AST \code{(app $e_0$ $e_1$ $\ldots$ $e_n$)} or \code{(tailcall
+  $e_0$ $e_1$ $\ldots$ $e_n$)}. A good name for this pass is
+\code{reveal-functions} and the output language, $F_1$, is defined in
+Figure~\ref{fig:f1-syntax}.
 
 \begin{figure}[tp]
 \centering
@@ -5803,17 +5838,15 @@ language, $F_1$, is defined in Figure~\ref{fig:f1-syntax}.
   \Type &::=& \gray{ \key{Integer} \mid \key{Boolean}
          \mid (\key{Vector}\;\Type^{+}) \mid \key{Void}  } \mid (\Type^{*} \; \key{->}\; \Type) \\
   \Exp &::=& \gray{ \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)}  \\
-     &\mid&  (\key{function-ref}\, \itm{label})
-     \mid \gray{ \Var \mid \LET{\Var}{\Exp}{\Exp} }\\
+     &\mid&  \gray{ \Var \mid \LET{\Var}{\Exp}{\Exp} }\\
   &\mid& \gray{ \key{\#t} \mid \key{\#f} \mid
-      (\key{and}\;\Exp\;\Exp) \mid (\key{not}\;\Exp)} \\
-      &\mid& \gray{(\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
+      (\key{not}\;\Exp)} \mid \gray{(\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
   &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid
     (\key{vector-ref}\;\Exp\;\Int)} \\
   &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})} \\
-      &\mid& (\key{app}\, \Exp \; \Exp^{*}) \mid (\key{tailcall}\, \Exp \; \Exp^{*}) \\
+      &\mid& (\key{function-ref}\, \itm{label}) \mid (\key{app}\, \Exp \; \Exp^{*}) \mid (\key{tailcall}\, \Exp \; \Exp^{*}) \\
   \Def &::=& (\key{define}\; (\itm{label} \; [\Var \key{:} \Type]^{*}) \key{:} \Type \; \Exp) \\
-  F_1 &::=& (\key{program} \; \Def^{*} \; \Exp)
+  F_1 &::=& (\key{program}\;\itm{info} \; \Def^{*})
 \end{array}
 \]
 \end{minipage}
@@ -5859,14 +5892,12 @@ $\Rightarrow$
 \end{minipage}
 \end{tabular}
 
-In the body of the function, all occurrances of the $i$th argument
-(where $i>5$) must be replaced with a \code{vector-ref}.
+In the body of the function, all occurrances of the $i$th argument in
+which $i>5$ must be replaced with a \code{vector-ref}.
 
 
-\section{Explicate Control and $C_3$}
-
-
-
+\section{Explicate Control and the $C_3$ language}
+\label{sec:explicate-control-r4}
 
 Figure~\ref{fig:c3-syntax} defines the syntax for $C_3$, the output of
 \key{explicate-control}.
@@ -5887,9 +5918,8 @@ UNDER CONSTRUCTION
    \mid (\key{vector-ref}\, \Arg\, \Int)  } \\
    &\mid& \gray{  (\key{vector-set!}\,\Arg\,\Int\,\Arg) \mid (\key{global-value} \,\itm{name}) \mid (\key{void}) } \\
    &\mid& (\key{app} \,\Arg\,\Arg^{*}) \\
-\Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Exp} } \\
-      &\mid& \gray{ (\key{initialize}\,\itm{int}\,\itm{int}) 
-      \mid (\key{collect} \,\itm{int}) }\\
+\Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Exp} 
+       \mid (\key{collect} \,\itm{int}) }\\
 \Tail &::= & \gray{\RETURN{\Exp} \mid (\key{seq}\;\Stmt\;\Tail)} \\
       &\mid& \gray{(\key{goto}\,\itm{label})
        \mid \IF{(\itm{cmp}\, \Arg\,\Arg)}{(\key{goto}\,\itm{label})}{(\key{goto}\,\itm{label})}} \\
