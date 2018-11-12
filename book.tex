@@ -1669,7 +1669,7 @@ implement the clauses for variables and for the \key{let} construct.
          [(? integer?) e]
          [`(let ([,x ,e]) ,body) ___]
          [`(,op ,es ...)
-          `(,op ,@(map (uniquify-exp alist) es))]
+          `(,op ,@(for/list ([e es]) ((uniquify-exp alist) e)))]
          )))
 
    (define (uniquify alist)
@@ -5541,7 +5541,7 @@ update the \code{lambda} value's to use the top-level environment.
     (match e
       ...
       [`(,fun ,args ...)
-       (define arg-vals (map recur args))
+       (define arg-vals (for/list ([e args]) (recur e)))
        (define fun-val (recur fun))
        (match fun-val
 	 [`(lambda (,xs ...) ,body ,fun-env)
@@ -5560,7 +5560,7 @@ update the \code{lambda} value's to use the top-level environment.
 (define (interp-R4 p)
   (match p
     [`(program ,ds ... ,body)
-     (let ([top-level (map interp-def ds)])
+     (let ([top-level (for/list ([d ds]) (interp-def d))])
        (for/list ([b top-level])
          (set-mcdr! b (match (mcdr b)
                         [`(lambda ,xs ,body ())
@@ -5814,18 +5814,12 @@ where $\itm{mainDef}$ is
 
 Going forward, the syntax of $R_4$ is inconvenient for purposes of
 compilation because it conflates the use of function names and local
-variables and it conflates the application of primitive operations and
-the application of functions. The former is a problem because we need
-to compile the use of a function name differently than the use of a
-local variable; we need to use \code{leaq} to convert the function
-name (a label in x86) to an address in a register. Similarly, the
-application of a function is going to require a complex sequence of
-instructions, unlike the primitive operations. Thus, it is a good idea
-to create a new pass that changes function references from just a
-symbol $f$ to \code{(function-ref $f$)} and that changes function
-application from \code{($e_0$ $e_1$ $\ldots$ $e_n$)} to the explicitly
-tagged AST \code{(app $e_0$ $e_1$ $\ldots$ $e_n$)} or \code{(tailcall
-  $e_0$ $e_1$ $\ldots$ $e_n$)}. A good name for this pass is
+variables. This is a problem because we need to compile the use of a
+function name differently than the use of a local variable; we need to
+use \code{leaq} to convert the function name (a label in x86) to an
+address in a register.  Thus, it is a good idea to create a new pass
+that changes function references from just a symbol $f$ to
+\code{(function-ref $f$)}. A good name for this pass is
 \code{reveal-functions} and the output language, $F_1$, is defined in
 Figure~\ref{fig:f1-syntax}.
 
@@ -5836,30 +5830,30 @@ Figure~\ref{fig:f1-syntax}.
 \[
 \begin{array}{lcl}
   \Type &::=& \gray{ \key{Integer} \mid \key{Boolean}
-         \mid (\key{Vector}\;\Type^{+}) \mid \key{Void}  } \mid (\Type^{*} \; \key{->}\; \Type) \\
+         \mid (\key{Vector}\;\Type^{+}) \mid \key{Void}  \mid (\Type^{*} \; \key{->}\; \Type)} \\
   \Exp &::=& \gray{ \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)}  \\
      &\mid&  \gray{ \Var \mid \LET{\Var}{\Exp}{\Exp} }\\
   &\mid& \gray{ \key{\#t} \mid \key{\#f} \mid
       (\key{not}\;\Exp)} \mid \gray{(\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
   &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid
     (\key{vector-ref}\;\Exp\;\Int)} \\
-  &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})} \\
-      &\mid& (\key{function-ref}\, \itm{label}) \mid (\key{app}\, \Exp \; \Exp^{*}) \mid (\key{tailcall}\, \Exp \; \Exp^{*}) \\
-  \Def &::=& (\key{define}\; (\itm{label} \; [\Var \key{:} \Type]^{*}) \key{:} \Type \; \Exp) \\
-  F_1 &::=& (\key{program}\;\itm{info} \; \Def^{*})
+  &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void}) \mid (\Exp \; \Exp^{*})} \\
+      &\mid& (\key{function-ref}\, \itm{label}) \\
+  \Def &::=& \gray{(\key{define}\; (\itm{label} \; [\Var \key{:} \Type]^{*}) \key{:} \Type \; \Exp)} \\
+  F_1 &::=& \gray{(\key{program}\;\itm{info} \; \Def^{*})}
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The $F_1$ language, an extension of $R_3$
-  (Figure~\ref{fig:r3-syntax}).}
+\caption{The $F_1$ language, an extension of $R_4$
+  (Figure~\ref{fig:r4-syntax}).}
 \label{fig:f1-syntax}
 \end{figure}
 
-Distinguishing between calls in tail position and non-tail position
-requires the pass to have some notion of context. We recommend using
-two mutually recursive functions, one for processing expressions in
-tail position and another for the rest. 
+%% Distinguishing between calls in tail position and non-tail position
+%% requires the pass to have some notion of context. We recommend using
+%% two mutually recursive functions, one for processing expressions in
+%% tail position and another for the rest. 
 
 Placing this pass after \code{uniquify} is a good idea, because it
 will make sure that there are no local variables and functions that
@@ -6469,7 +6463,7 @@ top-level environment.
   (lambda (p)
     (match p
       [`(program ,defs ... ,body)
-       (let ([top-level (map (interp-def '()) defs)])
+       (let ([top-level (for/list ([d defs]) ((interp-def '()) d))])
 	 (for/list ([b top-level])
 		   (set-mcdr! b (match (mcdr b)
 				  [`(lambda ,xs ,body)
@@ -6999,7 +6993,7 @@ Figure~\ref{fig:interp-R7}.
       [`(define (,f ,xs ...) ,body)
        (mcons f `(lambda ,xs ,body))]
       [`(program ,ds ... ,body)
-       (let ([top-level (map (interp-r7 '()) ds)])
+       (let ([top-level (for/list ([d ds]) ((interp-r7 '()) d))])
          (for/list ([b top-level])
            (set-mcdr! b (match (mcdr b)
                           [`(lambda ,xs ,body)
@@ -7019,7 +7013,7 @@ Figure~\ref{fig:interp-R7}.
       [`(let ([,x ,(app recur v)]) ,body)
        ((interp-r7 (cons (cons x v) env)) body)]
       [`(,op ,es ...) #:when (valid-op? op)
-       (interp-r7-op op (map recur es))]
+       (interp-r7-op op (for/list ([e es]) (recur e)))]
       [`(eq? ,(app recur l) ,(app recur r))
        `(inject ,(equal? l r) Boolean)]
       [`(if ,(app recur q) ,t ,f)
