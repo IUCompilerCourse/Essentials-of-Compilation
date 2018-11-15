@@ -3322,23 +3322,27 @@ short-circuiting behavior in the order of evaluation of its arguments.
        (match e
          ...
          [(? boolean?) e]
-         [`(if ,(app recur cnd) ,thn ,els)
-          (match cnd
+         [`(if ,cnd ,thn ,els)
+          (define b (recur cnd))
+          (match b
             [#t (recur thn)]
             [#f (recur els)])]
-         [`(and ,(app recur v1) ,e2)
+         [`(and ,e1 ,e2)
+          (define v1 (recur e1))
           (match v1
             [#t (match (recur e2) [#t #t] [#f #f])]
             [#f #f])]
-         [`(has-type ,(app recur v) ,t) v]
-         [`(,op ,(app recur args) ...)
+         [`(has-type ,e ,t)
+          (recur e)]
+         [`(,op ,args ...)
           #:when (set-member? primitives op)
-          (apply (interp-op op) args)])))
+          (apply (interp-op op) (for/list ([e args]) (recur e)))]
+         )))
 
    (define (interp-R2 env)
      (lambda (p)
        (match p
-        [(or `(program ,_ ,e) `(program ,e))
+        [`(program ,info ,e)
          ((interp-exp '()) e)])))
 \end{lstlisting}
 \caption{Interpreter for the $R_2$ language.}
@@ -5452,7 +5456,11 @@ in Figure~\ref{fig:r4-syntax}, where we define the $R_4$ language.
 Programs in $R_4$ start with zero or more function definitions.  The
 function names from these definitions are in-scope for the entire
 program, including all other function definitions (so the ordering of
-function definitions does not matter).
+function definitions does not matter). The syntax for function
+application does not include an explicit keyword, which is error prone
+when using \code{match}. To alleviate this problem, we change the
+syntax from $(\Exp \; \Exp^{*})$ to $(\key{app}\; \Exp \; \Exp^{*})$
+during type checking.
 
 Functions are first-class in the sense that a function pointer is data
 and can be stored in memory or passed as a parameter to another
@@ -5837,7 +5845,8 @@ Figure~\ref{fig:f1-syntax}.
       (\key{not}\;\Exp)} \mid \gray{(\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
   &\mid& \gray{(\key{vector}\;\Exp^{+}) \mid
     (\key{vector-ref}\;\Exp\;\Int)} \\
-  &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void}) \mid (\Exp \; \Exp^{*})} \\
+  &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void}) \mid
+         (\key{app}\; \Exp \; \Exp^{*})} \\
       &\mid& (\key{function-ref}\, \itm{label}) \\
   \Def &::=& \gray{(\key{define}\; (\itm{label} \; [\Var \key{:} \Type]^{*}) \key{:} \Type \; \Exp)} \\
   F_1 &::=& \gray{(\key{program}\;\itm{info} \; \Def^{*})}
@@ -5911,7 +5920,7 @@ UNDER CONSTRUCTION
    &\mid& \gray{  (\key{allocate}\,\Int\,\Type)
    \mid (\key{vector-ref}\, \Arg\, \Int)  } \\
    &\mid& \gray{  (\key{vector-set!}\,\Arg\,\Int\,\Arg) \mid (\key{global-value} \,\itm{name}) \mid (\key{void}) } \\
-   &\mid& (\key{app} \,\Arg\,\Arg^{*}) \\
+   &\mid& (\key{call} \,\Arg\,\Arg^{*}) \\
 \Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Exp} 
        \mid (\key{collect} \,\itm{int}) }\\
 \Tail &::= & \gray{\RETURN{\Exp} \mid (\key{seq}\;\Stmt\;\Tail)} \\
@@ -5963,8 +5972,8 @@ $\Rightarrow$
 %
 Note that in the syntax for $C_3$, tail calls are statements, not
 expressions. Once we perform a tail call, we do not ever expect it to
-return a value to us, and \code{flatten} therefore should handle
-\code{app} and \code{tailcall} forms differently.
+return a value to us, and \code{select-instructions} therefore should
+handle \code{call} and \code{tailcall} forms differently.
 
 The output of select instructions is a program in the x86$_3$
 language, whose syntax is defined in Figure~\ref{fig:x86-3}.
@@ -6041,7 +6050,7 @@ appropriate register to the appropriate variable from \itm{xs}.
 Next, consider the compilation of non-tail function applications, which have
 the following form at the start of \code{select-instructions}.
 \begin{lstlisting}
-  (assign |\itm{lhs}| (app |\itm{fun}| |\itm{args}| |$\ldots$|))
+  (assign |\itm{lhs}| (call |\itm{fun}| |\itm{args}| |$\ldots$|))
 \end{lstlisting}
 In the mirror image of handling the parameters of function
 definitions, the arguments \itm{args} need to be moved to the
