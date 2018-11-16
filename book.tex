@@ -6266,14 +6266,12 @@ _mainconclusion:
 \label{fig:add-fun}
 \end{figure}
 
-
-
 \begin{exercise}\normalfont
 Expand your compiler to handle $R_4$ as outlined in this section.
 Create 5 new programs that use functions, including examples that pass
-functions and return functions from other functions, and test your
-compiler on these new programs and all of your previously created test
-programs.
+functions and return functions from other functions and including
+recursive functions. Test your compiler on these new programs and all
+of your previously created test programs.
 \end{exercise}
 
 \begin{figure}[p]
@@ -6331,6 +6329,7 @@ programs.
 Figure~\ref{fig:R4-passes} gives an overview of the passes needed for
 the compilation of $R_4$.
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Lexically Scoped Functions}
 \label{ch:lambdas}
@@ -6357,6 +6356,7 @@ different functions because they use different values for
 the result of this program is \code{42}.
 
 \begin{figure}[btp]
+% s4_6.rkt
 \begin{lstlisting}
    (define (f [x : Integer]) : (Integer -> Integer)
       (let ([y 4])
@@ -6412,13 +6412,13 @@ $R_3$).
 \label{fig:r5-syntax}
 \end{figure}
 
-We shall describe how to compile $R_5$ to $R_4$, replacing anonymous
-functions with top-level function definitions.  However, our compiler
-must provide special treatment to variable occurences such as \code{x}
-and \code{y} in the body of the \code{lambda} of
-Figure~\ref{fig:lexical-scoping}, for the functions of $R_4$ may not
-refer to variables defined outside the function. To identify such
-variable occurences, we review the standard notion of free variable.
+To compile lexically-scoped functions to top-level function
+definitions, the compiler will need to provide special treatment to
+variable occurences such as \code{x} and \code{y} in the body of the
+\code{lambda} of Figure~\ref{fig:lexical-scoping}, for the functions
+of $R_4$ may not refer to variables defined outside the function. To
+identify such variable occurences, we review the standard notion of
+free variable.
 
 \begin{definition}
 A variable is \emph{free with respect to an expression} $e$ if the
@@ -6465,17 +6465,12 @@ the same code but differ in the values for free variable \code{x}.
 \section{Interpreting $R_5$}
 
 Figure~\ref{fig:interp-R5} shows the definitional interpreter for
-$R_5$. There are several things to worth noting. First, and most
-importantly, the match clause for \key{lambda} saves the current
-environment inside the returned \key{lambda}. Then the clause for
-\key{app} uses the environment from the \key{lambda}, the
-\code{lam-env}, when interpreting the body of the \key{lambda}.  Of
-course, the \code{lam-env} environment is extending with the mapping
-parameters to argument values. To enable mutual recursion and allow a
-unified handling of functions created with \key{lambda} and with
-\key{define}, the match clause for \key{program} includes a second
-pass over the top-level functions to set their environments to be the
-top-level environment.
+$R_5$. The clause for \key{lambda} saves the current environment
+inside the returned \key{lambda}. Then the clause for \key{app} uses
+the environment from the \key{lambda}, the \code{lam-env}, when
+interpreting the body of the \key{lambda}.  The \code{lam-env}
+environment is extended with the mapping of parameters to argument
+values.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -6486,26 +6481,15 @@ top-level environment.
       ...
       [`(lambda: ([,xs : ,Ts] ...) : ,rT ,body)
        `(lambda ,xs ,body ,env)]
+      [`(app ,fun ,args ...)
+       (define fun-val ((interp-exp env) fun))
+       (define arg-vals (map (interp-exp env) args))
+       (match fun-val
+	 [`(lambda (,xs ...) ,body ,lam-env)
+	  (define new-env (append (map cons xs arg-vals) lam-env))
+	  ((interp-exp new-env) body)]
+	 [else (error "interp-exp, expected function, not" fun-val)])]
       [else (error 'interp-exp "unrecognized expression")]
-      )))
-
-(define (interp-def env)
-  (lambda (d)
-    (match d
-      [`(define (,f [,xs : ,ps] ...) : ,rt ,body)
-       (mcons f `(lambda ,xs ,body))]
-      )))
-
-(define (interp-R5 env)
-  (lambda (p)
-    (match p
-      [`(program ,defs ... ,body)
-       (let ([top-level (for/list ([d defs]) ((interp-def '()) d))])
-	 (for/list ([b top-level])
-		   (set-mcdr! b (match (mcdr b)
-				  [`(lambda ,xs ,body)
-				   `(lambda ,xs ,body ,top-level)])))
-	 ((interp-exp top-level) body))]
       )))
 \end{lstlisting}
 \caption{Interpreter for $R_5$.}
@@ -6542,19 +6526,18 @@ require the body's type to match the declared return type.
 
 \section{Closure Conversion}
 
-The compiling of lexically-scoped functions into C-style functions is
-accomplished in the pass \code{convert-to-closures} that comes after
-\code{reveal-functions} and before flatten. This pass needs to treat
-regular function calls differently from applying primitive operators,
-and \code{reveal-functions} differentiates those two cases for us.
+The compiling of lexically-scoped functions into top-level function
+definitions is accomplished in the pass \code{convert-to-closures}
+that comes after \code{reveal-functions} and before
+\code{limit-functions}. 
 
 As usual, we shall implement the pass as a recursive function over the
 AST. All of the action is in the clauses for \key{lambda} and
-\key{app} (function application). We transform a \key{lambda}
-expression into an expression that creates a closure, that is, creates
-a vector whose first element is a function pointer and the rest of the
-elements are the free variables of the \key{lambda}.  The \itm{name}
-is a unique symbol generated to identify the function.
+\key{app}. We transform a \key{lambda} expression into an expression
+that creates a closure, that is, creates a vector whose first element
+is a function pointer and the rest of the elements are the free
+variables of the \key{lambda}.  The \itm{name} is a unique symbol
+generated to identify the function.
 
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
@@ -6584,13 +6567,13 @@ shown below.\\
           |\itm{body'}|)...))
 \end{lstlisting}
 \end{minipage}\\
-The \code{clos} parameter refers to the closure whereas $\itm{ps}$ are
-the normal parameters of the \key{lambda}. The types $\itm{fvts}$ are
-the types of the free variables in the lambda and the underscore is a
-dummy type because it is rather difficult to give a type to the
-function in the closure's type, and it does not matter.  The sequence
-of \key{let} forms being the free variables to their values obtained
-from the closure.
+The \code{clos} parameter refers to the closure. The $\itm{ps}$
+parameters are the normal parameters of the \key{lambda}. The types
+$\itm{fvts}$ are the types of the free variables in the lambda and the
+underscore is a dummy type because it is rather difficult to give a
+type to the function in the closure's type, and it does not matter.
+The sequence of \key{let} forms bind the free variables to their
+values obtained from the closure.
 
 We transform function application into code that retreives the
 function pointer from the closure and then calls the function, passing
@@ -6636,13 +6619,6 @@ $\Rightarrow$
 %
 The top-level function definitions need to be updated as well to take
 an extra closure parameter.
-
-A final concern when implementing closure conversion is that we want
-to maintain efficient tail calls. To preserve the invariant needed for
-tail calls, \code{limit-functions} should be updated to handle
-\code{lambda} (as it happens before \code{convert-to-closures}), as
-well as to reserve an extra spot for the eventual closure parameter
-for all functions.
 
 \section{An Example Translation}
 \label{sec:example-lambda}
@@ -6702,38 +6678,56 @@ $\Downarrow$
 
 \begin{figure}[p]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (R5) at (0,2)  {\large $R_5$};
-\node (R5-2) at (3,2)  {\large $R_5$};
-\node (R5-3) at (6,2)  {\large $R_5$};
-\node (F2) at (6,0)  {\large $F_2$};
-\node (F1-1) at (3,0)  {\large $F_1$};
-\node (F1-2) at (0,0)  {\large $F_1$};
-\node (C2-3) at (3,-2)  {\large $C_2$};
+\node (R4) at (0,2)  {\large $R_4$};
+\node (R4-2) at (3,2)  {\large $R_4$};
+\node (R4-3) at (6,2)  {\large $R_4$};
+\node (F1-1) at (12,0)  {\large $F_1$};
+\node (F1-2) at (9,0)  {\large $F_1$};
+\node (F1-3) at (6,0)  {\large $F_1$};
+\node (F1-4) at (3,0)  {\large $F_1$};
+\node (F1-5) at (0,0)  {\large $F_1$};
+\node (C3-1) at (6,-2)  {\large $C_3$};
+\node (C3-2) at (3,-2)  {\large $C_3$};
 
 \node (x86-2) at (3,-4)  {\large $\text{x86}^{*}_3$};
 \node (x86-3) at (6,-4)  {\large $\text{x86}^{*}_3$};
 \node (x86-4) at (9,-4) {\large $\text{x86}^{*}_3$};
-\node (x86-5) at (12,-4) {\large $\text{x86}_3$};
-\node (x86-6) at (12,-6) {\large $\text{x86}^{\dagger}_3$};
+\node (x86-5) at (9,-6) {\large $\text{x86}^{\dagger}_3$};
 
 \node (x86-2-1) at (3,-6)  {\large $\text{x86}^{*}_3$};
 \node (x86-2-2) at (6,-6)  {\large $\text{x86}^{*}_3$};
 
-\path[->,bend left=15] (R5) edge [above] node {\ttfamily\footnotesize\color{red} typecheck} (R5-2);
-\path[->,bend left=15] (R5-2) edge [above] node {\ttfamily\footnotesize uniquify} (R5-3);
-\path[->,bend left=15] (R5-3) edge [right] node {\ttfamily\footnotesize reveal-functions} (F2);
-\path[->,bend left=15] (F2) edge [below] node {\ttfamily\footnotesize\color{red} convert-to-clos.} (F1-1);
-\path[->,bend right=15] (F1-1) edge [above] node {\ttfamily\footnotesize expose-alloc.} (F1-2);
-\path[->,bend right=15] (F1-2) edge [left] node {\ttfamily\footnotesize flatten} (C2-3);
-\path[->,bend right=15] (C2-3) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
-\path[->,bend left=15] (x86-2) edge [left] node {\ttfamily\footnotesize uncover-live} (x86-2-1);
-\path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build-inter.} (x86-2-2);
-\path[->,bend right=15] (x86-2-2) edge [left] node {\ttfamily\footnotesize allocate-reg.} (x86-3);
-\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize lower-cond.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-5);
-\path[->,bend right=15] (x86-5) edge [left] node {\ttfamily\footnotesize  print-x86} (x86-6);
+\path[->,bend left=15] (R4) edge [above] node
+     {\ttfamily\footnotesize\color{red} typecheck} (R4-2);
+\path[->,bend left=15] (R4-2) edge [above] node
+     {\ttfamily\footnotesize uniquify} (R4-3);
+\path[->] (R4-3) edge [right] node
+     {\ttfamily\footnotesize reveal-functions} (F1-1);
+\path[->,bend left=15] (F1-1) edge [below] node
+     {\ttfamily\footnotesize\color{red} convert-to-clos.} (F1-2);
+\path[->,bend right=15] (F1-2) edge [above] node
+     {\ttfamily\footnotesize limit-functions} (F1-3);
+\path[->,bend right=15] (F1-3) edge [above] node
+     {\ttfamily\footnotesize expose-alloc.} (F1-4);
+\path[->,bend right=15] (F1-4) edge [above] node
+     {\ttfamily\footnotesize remove-complex.} (F1-5);
+\path[->] (F1-5) edge [left] node
+     {\ttfamily\footnotesize explicate-control} (C3-1);
+\path[->,bend left=15] (C3-1) edge [below] node
+     {\ttfamily\footnotesize uncover-locals} (C3-2);
+\path[->,bend right=15] (C3-2) edge [left] node
+     {\ttfamily\footnotesize select-instr.} (x86-2);
+\path[->,bend left=15] (x86-2) edge [left] node
+     {\ttfamily\footnotesize uncover-live} (x86-2-1);
+\path[->,bend right=15] (x86-2-1) edge [below] node 
+     {\ttfamily\footnotesize build-inter.} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [left] node
+     {\ttfamily\footnotesize allocate-reg.} (x86-3);
+\path[->,bend left=15] (x86-3) edge [above] node
+     {\ttfamily\footnotesize patch-instr.} (x86-4);
+\path[->,bend right=15] (x86-4) edge [left] node {\ttfamily\footnotesize print-x86} (x86-5);
 \end{tikzpicture}
-\caption{Diagram of the passes for $R_5$, a language with lexically-scoped
+  \caption{Diagram of the passes for $R_5$, a language with lexically-scoped
   functions.}
 \label{fig:R5-passes}
 \end{figure}
