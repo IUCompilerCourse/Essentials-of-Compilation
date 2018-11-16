@@ -6742,19 +6742,22 @@ for the compilation of $R_5$.
 \label{ch:type-dynamic}
 
 In this chapter we discuss the compilation of a dynamically typed
-language, named $R_7$, that is a subset of the Racket language. (In
-the previous chapters we have studied subsets of the \emph{Typed}
-Racket language.) In dynamically typed languages, an expression may
-produce values of differing type. Consider the following example with
-a conditional expression that may return a Boolean or an integer
-depending on the input to the program.
+language, named $R_7$, that is a subset of the Racket
+language. (Recall that in the previous chapters we have studied
+subsets of the \emph{Typed} Racket language.) In dynamically typed
+languages, an expression may produce values of differing
+type. Consider the following example with a conditional expression
+that may return a Boolean or an integer depending on the input to the
+program.
 \begin{lstlisting}
    (not (if (eq? (read) 1) #f 0))
 \end{lstlisting}
 Languages that allow expressions to produce different kinds of values
-are called \emph{polymorphic}, and there are many kinds of
-polymorphism, such as subtype polymorphism~\citep{Cardelli:1985kx} and
-parametric polymorphism (Chapter~\ref{ch:parametric-polymorphism}).
+are called \emph{polymorphic}. There are many kinds of polymorphism,
+such as subtype polymorphism and parametric
+polymorphism~\citep{Cardelli:1985kx}. The kind of polymorphism are
+talking about here does not have a special name, but it is the usual
+kind that arrises in dynamically typed languages.
 
 Another characteristic of dynamically typed languages is that
 primitive operations, such as \code{not}, are often defined to operate
@@ -6769,14 +6772,14 @@ reference results in a run-time contract violation.
    (vector-ref (vector 42) #t)
 \end{lstlisting}
 
-Let us consider how we might compile untyped Racket to x86, thinking
-about the first example above. Our bit-level representation of the
-Boolean \code{\#f} is zero and similarly for the integer \code{0}.
-However, \code{(not \#f)} should produce \code{\#t} whereas \code{(not
-  0)} should produce \code{\#f}. Furthermore, the behavior of
-\code{not}, in general, cannot be determined at compile time, but
-depends on the runtime type of its input, as in the example above that
-depends on the result of \code{(read)}.
+Let us consider how we might compile Racket to x86, thinking about the
+first example above. Our bit-level representation of the Boolean
+\code{\#f} is zero and similarly for the integer \code{0}.  However,
+\code{(not \#f)} should produce \code{\#t} whereas \code{(not 0)}
+should produce \code{\#f}. Furthermore, the behavior of \code{not}, in
+general, cannot be determined at compile time, but depends on the
+runtime type of its input, as in the example above that depends on the
+result of \code{(read)}.
 
 The way around this problem is to include information about a value's
 runtime type in the value itself, so that this information can be
@@ -6807,10 +6810,10 @@ original address.
 In some sense, these tagged values are a new kind of value.  Indeed,
 we can extend our \emph{typed} language with tagged values by adding a
 new type to classify them, called \key{Any}, and with operations for
-creating and using tagged values, creating the $R_6$ language defined
-in Section~\ref{sec:r6-lang}. Thus, $R_6$ provides the fundamental
-support for polymorphism and runtime types that we need to support
-dynamic typing.
+creating and using tagged values, yielding the $R_6$ language that we
+define in Section~\ref{sec:r6-lang}. The $R_6$ language provides the
+fundamental support for polymorphism and runtime types that we need to
+support dynamic typing.
 
 We shall implement our untyped language $R_7$ by compiling it to
 $R_6$. We define $R_7$ in Section~\ref{sec:r7-lang} and describe the
@@ -7064,11 +7067,48 @@ Figure~\ref{fig:interp-R7}.
 
 
 
-\section{Compiling $R_6$}
-\label{sec:compile-r6}
+%% \section{Compiling $R_6$}
+%% \label{sec:compile-r6}
 
-Most of the compiler passes only require straightforward changes.  The
-interesting part is in instruction selection.
+%% Most of the compiler passes only require straightforward changes.  The
+%% interesting part is in instruction selection.
+
+\section{Shrink}
+\label{sec:shrink-r6}
+
+In the \code{shrink} pass we recommend compiling \code{project} into
+an explicit \code{if} expression that uses three new operations:
+\code{tag-of-any}, \code{value-of-any}, and \code{exit}.  The
+\code{tag-of-any} operation retrieves the type tag from a tagged value
+of type \code{Any}.  The \code{value-of-any} retrieves the underlying
+value from a tagged value.
+
+\code{exit}...
+
+
+\begin{tabular}{lll}
+\begin{minipage}{0.3\textwidth}
+\begin{lstlisting}
+   (project |$e$| |$\Type$|)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}
+(let ([|$\itm{tmp}$| |$e'$|])
+  (if (eq? (tag-of-any |$\itm{tmp}$|) |$\itm{tag}$|)
+      (value-of-any |$\itm{tmp}$|)
+      (exit)))
+\end{lstlisting}
+\end{minipage}
+\end{tabular}  \\
+
+
+
+\section{Instruction Selection}
+\label{sec:select-r6}
 
 \paragraph{Inject}
 
