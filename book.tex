@@ -1764,21 +1764,6 @@ $\Rightarrow$
 \end{minipage}
 \end{tabular}
 
-%% The clause of \key{flatten} for the \key{program} node needs to
-%% apply this helper function to the body of the program and the newly flattened
-%% expression should be placed in a \key{return} statement. Remember that
-%% the variable list in the \key{program} node should contain no duplicates.
-%% The
-%% \key{flatten} pass should also compute the list of variables used in
-%% the program.
-%% I recommend traversing the statements in the body of the
-%% program (after it has been flattened) and collect all variables that
-%% appear on the left-hand-side of an assignment.
-%% Note that each variable
-%% should only occur once in the list of variables that you place in the
-%% \key{program} form.
-
-
 Take special care of programs such as the following that
 \key{let}-bind variables with integers or other variables. It should
 leave them unchanged, as shown in to the program on the right \\
@@ -4361,6 +4346,8 @@ UNDER CONSTRUCTION
 \margincomment{\scriptsize Introduce has-type, but after flatten, remove it,
   but keep type annotations on vector creation and local variables, function
   parameters, etc. \\ --Jeremy}
+\margincomment{\scriptsize Be more explicit about how to deal with
+  the root stack. \\ --Jeremy}
 
 In this chapter we study the implementation of mutable tuples (called
 ``vectors'' in Racket). This language feature is the first to use the
@@ -4442,7 +4429,6 @@ $40$, to which we add the $2$, the element at index $0$ of the
 \caption{The syntax of $R_3$, extending $R_2$ with tuples.}
 \label{fig:r3-syntax}
 \end{figure}
-
 
 Tuples are our first encounter with heap-allocated data, which raises
 several interesting issues. First, variable binding performs a
@@ -4859,7 +4845,7 @@ references.
 
 Next we proceed to discuss the new \code{expose-allocation} pass.
 
-\section{Expose Allocation (New)}
+\section{Expose Allocation}
 \label{sec:expose-allocation}
 
 The pass \code{expose-allocation} lowers the \code{vector} creation
@@ -5410,8 +5396,7 @@ _conclusion:
 \node (x86-2) at (3,-2)  {\large $\text{x86}^{*}_2$};
 \node (x86-3) at (6,-2)  {\large $\text{x86}^{*}_2$};
 \node (x86-4) at (9,-2) {\large $\text{x86}^{*}_2$};
-\node (x86-5) at (12,-2) {\large $\text{x86}_2$};
-\node (x86-6) at (12,-4) {\large $\text{x86}^{\dagger}_2$};
+\node (x86-5) at (9,-4) {\large $\text{x86}^{\dagger}_2$};
 
 \node (x86-2-1) at (3,-4)  {\large $\text{x86}^{*}_2$};
 \node (x86-2-2) at (6,-4)  {\large $\text{x86}^{*}_2$};
@@ -5425,10 +5410,9 @@ _conclusion:
 \path[->,bend right=15] (C2-4) edge [left] node {\ttfamily\footnotesize\color{red} select-instr.} (x86-2);
 \path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize uncover-live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize \color{red}build-inter.} (x86-2-2);
-\path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize\color{red} allocate-reg.} (x86-3);
-\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize lower-cond.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-5);
-\path[->,bend right=15] (x86-5) edge [left] node {\ttfamily\footnotesize\color{red} print-x86} (x86-6);
+\path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate-reg.} (x86-3);
+\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-4);
+\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize\color{red} print-x86} (x86-5);
 \end{tikzpicture}
 \caption{Diagram of the passes for $R_3$, a language with tuples.}
 \label{fig:R3-passes}
@@ -5966,7 +5950,7 @@ The function for processing $\Tail$ should be updated with a case for
 \code{tailcall}. We also recommend creating a new function for
 processing function definitions. Each function definition in $C_3$ has
 its own set of local variables, so the code for function definitions
-should be similar to the case for \code{program} in $C_2$.
+should be similar to the case for the \code{program} form in $C_2$.
 
 \section{Select Instructions}
 \label{sec:select-r4}
@@ -6062,9 +6046,23 @@ calls: generate instructions to move the arguments into to the
 argument passing registers.  After that we need to pop the frame from
 the procedure call stack.  However, we do not yet know how big the
 frame is; that gets determined during register allocation. So instead
-of generating those instructions here, we make up a new instruction
-that means ``pop the frame and then indirect jump'', which we name
-\code{tail-jmp}.
+of generating those instructions here, we invent a new instruction
+that means ``pop the frame and then do an indirect jump'', which we
+name \code{tail-jmp}.
+
+Recall that in Section~\ref{sec:explicate-control-r1} we recommended
+using the label \code{start} for the initial block of a program, and
+in Section~\ref{sec:select-r1} we recommended labelling the conclusion
+of the program with \code{conclusion}, so that $(\key{return}\;\Arg)$
+can be compiled to an assignment to \code{rax} followed by a jump to
+\code{conclusion}. With the addition of function definitions, we will
+have a starting block and conclusion for each function, but their
+labels need to be unique. We recommend prepending the function's name
+to \code{start} and \code{conclusion}, respectively, to obtain unique
+labels. (Alternatively, one could \code{gensym} labels for the start
+and conclusion and store them in the $\itm{info}$ field of the
+function definition.)
+
 
 \section{Uncover Live}
 
@@ -6078,60 +6076,52 @@ including all the caller-saved registers, which will have the affect
 of making sure that no caller-saved register actually needs to be
 saved.
 
+\section{Build Interference Graph}
+
+With the addition of function definitions, we compute an interference
+graph for each function (not just one for the whole program).
+
 Recall that in Section~\ref{sec:reg-alloc-gc} we discussed the need to
 spill vector-typed variables that are live during a call to the
-collector.  With the addition of functions to our language, we need to
-revisit this issue. Many functions will perform allocation and
+\code{collect}.  With the addition of functions to our language, we
+need to revisit this issue. Many functions will perform allocation and
 therefore have calls to the collector inside of them. Thus, we should
-not only spill a vector-type variable when it is live during a call to
-\code{collect}, but we shold spill the variable if it is live during
-any function call.
+not only spill a vector-typed variable when it is live during a call
+to \code{collect}, but we should spill the variable if it is live
+during any function call. Thus, in the \code{build-interference} pass,
+we recommend adding interference edges between call-live vector-typed
+variables and the callee-saved registers (in addition to the usual
+addition of edges between call-live variables and the caller-saved
+registers).
 
 \section{Patch Instructions}
 
 In \code{patch-instructions}, you should deal with the x86
 idiosyncrasy that the destination argument of \code{leaq} must be a
-register. Additionally, \code{patch-instructions} should ensure that
-the argument of \code{tail-jmp} is \itm{rax}, our reserved
-register---this is to make code generation more convenient, because we
-will be trampling many registers before the tail call (as explained
-below).
+register. Additionally, you should ensure that the argument of
+\code{tail-jmp} is \itm{rax}, our reserved register---this is to make
+code generation more convenient, because we will be trampling many
+registers before the tail call (as explained below).
 
 \section{Print x86}
-
 
 For the \code{print-x86} pass, we recommend the following translations:
 \begin{lstlisting}
   (fun-ref |\itm{label}|) |$\Rightarrow$| |\itm{label}|(%rip)
   (indirect-callq |\itm{arg}|) |$\Rightarrow$| callq *|\itm{arg}|
 \end{lstlisting}
-Handling \code{tail-jmp} requires a bit more care. A
-straightforward translation of \code{tail-jmp} would be \code{jmp
-  *$\itm{arg}$}, which is what we will want to do, but \emph{before}
-this jump we need to pop the saved registers and reset the frame
-pointer. Basically, we want to restore the state of the registers to
-the point they were at when the current function was called, since we
-are about to jump to the beginning of a \emph{new} function.
-
-%% This is why it was convenient to ensure the \code{jmp} argument was
-%% \itm{rax}. A sufficiently clever compiler could determine that a
-%% function body always ends in a tail call, and thus avoid generating
-%% code to restore registers and return via \code{ret}, but for
-%% simplicity we do not need to do this.
-
-%% \margincomment{\footnotesize The reason we can't easily optimize
-%%   this is because the details of function prologue and epilogue
-%%   are not exposed in the AST, and just emitted as strings in
-%%   \code{print-x86}.}
+Handling \code{tail-jmp} requires a bit more care. A straightforward
+translation of \code{tail-jmp} would be \code{jmp *$\itm{arg}$}, which
+is what we will want to do, but before the jump we need to pop the
+current frame. So we need to restore the state of the registers to the
+point they were at when the current function was called.  This
+sequence of instructions is the same as the code for the conclusion of
+a function.
 
 Note that your \code{print-x86} pass needs to add the code for saving
 and restoring callee-saved registers, if you have not already
 implemented that. This is necessary when generating code for function
 definitions.
-
-%% For function definitions, the \code{print-x86} pass should add the
-%% code for saving and restoring the callee-saved registers, if you
-%% haven't already done that.
 
 \section{An Example Translation}
 
@@ -6291,39 +6281,55 @@ programs.
 \node (R4) at (0,2)  {\large $R_4$};
 \node (R4-2) at (3,2)  {\large $R_4$};
 \node (R4-3) at (6,2)  {\large $R_4$};
-\node (F1-1) at (6,0)  {\large $F_1$};
-\node (F1-2) at (3,0)  {\large $F_1$};
-\node (C3-3) at (3,-2)  {\large $C_3$};
+\node (F1-1) at (12,0)  {\large $F_1$};
+\node (F1-2) at (9,0)  {\large $F_1$};
+\node (F1-3) at (6,0)  {\large $F_1$};
+\node (F1-4) at (3,0)  {\large $F_1$};
+\node (C3-1) at (6,-2)  {\large $C_3$};
+\node (C3-2) at (3,-2)  {\large $C_3$};
 
 \node (x86-2) at (3,-4)  {\large $\text{x86}^{*}_3$};
 \node (x86-3) at (6,-4)  {\large $\text{x86}^{*}_3$};
 \node (x86-4) at (9,-4) {\large $\text{x86}^{*}_3$};
-\node (x86-5) at (12,-4) {\large $\text{x86}_3$};
-\node (x86-6) at (12,-6) {\large $\text{x86}^{\dagger}_3$};
+\node (x86-5) at (9,-6) {\large $\text{x86}^{\dagger}_3$};
 
 \node (x86-2-1) at (3,-6)  {\large $\text{x86}^{*}_3$};
 \node (x86-2-2) at (6,-6)  {\large $\text{x86}^{*}_3$};
 
-\path[->,bend left=15] (R4) edge [above] node {\ttfamily\footnotesize\color{red} typecheck} (R4-2);
-\path[->,bend left=15] (R4-2) edge [above] node {\ttfamily\footnotesize uniquify} (R4-3);
-\path[->,bend left=15] (R4-3) edge [right] node {\ttfamily\footnotesize\color{red} reveal-functions} (F1-1);
-\path[->,bend left=15] (F1-1) edge [below] node {\ttfamily\footnotesize expose-alloc.} (F1-2);
-\path[->,bend left=15] (F1-2) edge [left] node {\ttfamily\footnotesize flatten} (C3-3);
-\path[->,bend right=15] (C3-3) edge [left] node {\ttfamily\footnotesize\color{red} select-instr.} (x86-2);
-\path[->,bend left=15] (x86-2) edge [left] node {\ttfamily\footnotesize\color{red} uncover-live} (x86-2-1);
-\path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize \color{red}build-inter.} (x86-2-2);
-\path[->,bend right=15] (x86-2-2) edge [left] node {\ttfamily\footnotesize\color{red} allocate-reg.} (x86-3);
-\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize lower-cond.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-5);
-\path[->,bend right=15] (x86-5) edge [left] node {\ttfamily\footnotesize\color{red} print-x86} (x86-6);
+\path[->,bend left=15] (R4) edge [above] node
+     {\ttfamily\footnotesize\color{red} typecheck} (R4-2);
+\path[->,bend left=15] (R4-2) edge [above] node
+     {\ttfamily\footnotesize uniquify} (R4-3);
+\path[->,bend left=15] (R4-3) edge [right] node
+     {\ttfamily\footnotesize\color{red} reveal-functions} (F1-1);
+\path[->,bend left=15] (F1-1) edge [below] node
+     {\ttfamily\footnotesize\color{red} limit-functions} (F1-2);
+\path[->,bend right=15] (F1-2) edge [above] node
+     {\ttfamily\footnotesize expose-alloc.} (F1-3);
+\path[->,bend right=15] (F1-3) edge [above] node
+     {\ttfamily\footnotesize\color{red} remove-complex.} (F1-4);
+\path[->,bend left=15] (F1-4) edge [right] node
+     {\ttfamily\footnotesize\color{red} explicate-control} (C3-1);
+\path[->,bend left=15] (C3-1) edge [below] node
+     {\ttfamily\footnotesize\color{red} uncover-locals} (C3-2);
+\path[->,bend right=15] (C3-2) edge [left] node
+     {\ttfamily\footnotesize\color{red} select-instr.} (x86-2);
+\path[->,bend left=15] (x86-2) edge [left] node
+     {\ttfamily\footnotesize\color{red} uncover-live} (x86-2-1);
+\path[->,bend right=15] (x86-2-1) edge [below] node 
+     {\ttfamily\footnotesize \color{red}build-inter.} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [left] node
+     {\ttfamily\footnotesize allocate-reg.} (x86-3);
+\path[->,bend left=15] (x86-3) edge [above] node
+     {\ttfamily\footnotesize\color{red} patch-instr.} (x86-4);
+\path[->,bend right=15] (x86-4) edge [left] node {\ttfamily\footnotesize\color{red} print-x86} (x86-5);
 \end{tikzpicture}
-\caption{Diagram of the passes for $R_4$, a language with functions.
-  UPDATE ME -Jeremy}
+\caption{Diagram of the passes for $R_4$, a language with functions.}
 \label{fig:R4-passes}
 \end{figure}
 
-Figure~\ref{fig:R4-passes} gives an overview of all the passes needed
-for the compilation of $R_4$.
+Figure~\ref{fig:R4-passes} gives an overview of the passes needed for
+the compilation of $R_4$.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Lexically Scoped Functions}
