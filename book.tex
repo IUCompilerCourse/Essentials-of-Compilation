@@ -6870,8 +6870,12 @@ needed for compiling untyped Racket. The type predicates,
 $(\key{boolean?}\,e)$ etc., expect a tagged value and return \key{\#t}
 if the tag corresponds to the predicate, and return \key{\#t}
 otherwise.
-%
-The type checker for $R_6$ is given in Figure~\ref{fig:typecheck-R6}.
+
+
+The type checker for $R_6$ is given in Figure~\ref{fig:typecheck-R6}
+and the definitional interpreter for $R_6$ is in
+Figure~\ref{fig:interp-R6}
+
 
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
@@ -6935,8 +6939,6 @@ The type checker for $R_6$ is given in Figure~\ref{fig:typecheck-R6}.
 
 %Also, \key{eq?} is extended to operate on values of type \key{Any}.
 
-Figure~\ref{fig:interp-R6} shows the definitional interpreter
-for $R_6$.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -7012,59 +7014,59 @@ Figure~\ref{fig:interp-R7}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define (get-tagged-type v) (match v [`(tagged ,v1 ,ty) ty]))
+(define (tag-of-any e)
+  (match e
+    [`(tagged ,v ,ty) ty]
+    [else (error 'tag-of-any "expected a tagged value, not ~a" e)]
+    ))
 
-(define (valid-op? op) (member op '(+ - and or not)))
+(define (value-of-any e)
+  (match e
+    [`(tagged ,v ,ty) v]
+    [else (error 'value-of-any "expected a tagged value, not ~a" e)]))
 
-(define (interp-r7 env)
+(define (tag-value v)
+  (cond [(boolean? v) `(tagged ,v Boolean)]
+        [(fixnum? v) `(tagged ,v Integer)]
+        [(procedure? v)
+         (define n (procedure-arity v))
+         `(tagged ,v (,@(for/list ([_ (range 0 n)]) 'Any) -> Any))]
+        ...))
+
+(define (interp-R7-exp env)
   (lambda (ast)
-    (define recur (interp-r7 env))
+    (vomit "interp-R7-exp" ast env)
+    (define recur (interp-R7-exp env))
     (match ast
-      [(? symbol?) (lookup ast env)]
-      [(? integer?) `(inject ,ast Integer)]
-      [#t `(inject #t Boolean)]
-      [#f `(inject #f Boolean)]
-      [`(read) `(inject ,(read-fixnum) Integer)]
+      ...
+      [(? integer?) `(tagged ,ast Integer)]
+      [#t `(tagged #t Boolean)]
       [`(lambda (,xs ...) ,body)
-       `(inject (lambda ,xs ,body ,env) (,@(map (lambda (x) 'Any) xs) -> Any))]
-      [`(define (,f ,xs ...) ,body)
-       (mcons f `(lambda ,xs ,body))]
-      [`(program ,ds ... ,body)
-       (let ([top-level (for/list ([d ds]) ((interp-r7 '()) d))])
-         (for/list ([b top-level])
-           (set-mcdr! b (match (mcdr b)
-                          [`(lambda ,xs ,body)
-                           `(inject (lambda ,xs ,body ,top-level)
-                                    (,@(map (lambda (x) 'Any) xs) -> Any))])))
-         ((interp-r7 top-level) body))]
-      [`(vector ,(app recur elts) ...)
-       (define tys (map get-tagged-type elts))
-       `(inject ,(apply vector elts) (Vector ,@tys))]
-      [`(vector-set! ,(app recur v1) ,n ,(app recur v2))
-         (match v1
-           [`(inject ,vec ,ty)
-             (vector-set! vec n v2)
-            `(inject (void) Void)])]
-      [`(vector-ref ,(app recur v) ,n)
-       (match v [`(inject ,vec ,ty) (vector-ref vec n)])]
-      [`(let ([,x ,(app recur v)]) ,body)
-       ((interp-r7 (cons (cons x v) env)) body)]
-      [`(,op ,es ...) #:when (valid-op? op)
-       (interp-r7-op op (for/list ([e es]) (recur e)))]
-      [`(eq? ,(app recur l) ,(app recur r))
-       `(inject ,(equal? l r) Boolean)]
-      [`(if ,(app recur q) ,t ,f)
-       (match q
-         [`(inject #f Boolean) (recur f)]
+       `(tagged (lambda ,xs ,body ,env) (,@(for/list ([x xs]) 'Any) -> Any))]
+      [`(vector-ref ,e1 ,n)
+       (define vec (value-of-any (recur e1)))
+       (define i (value-of-any (recur n)))
+       (vector-ref vec i)]
+      [`(if ,q ,t ,f)
+       (match (value-of-any (recur q))
+         [#f (recur f)]
          [else (recur t)])]
-      [`(,(app recur f-val) ,(app recur vs) ...)
-       (match f-val
-         [`(inject (lambda (,xs ...) ,body ,lam-env) ,ty)
-          (define new-env (append (map cons xs vs) lam-env))
-          ((interp-r7 new-env) body)]
-         [else (error "interp-r7, expected function, not" f-val)])])))
+      [`(,op ,es ...)
+       #:when (set-member? primitives op)
+       (tag-value
+        (apply (interp-op op) (for/list ([e es]) (value-of-any (recur e)))))]
+      [(or `(app ,f ,es ...) `(,f ,es ...))
+       (define new-args (map recur es))
+       (let ([f-val (value-of-any (recur f))])
+         (match f-val 
+           [`(lambda (,xs ...) ,body ,lam-env)
+            (define new-env (append (map cons xs new-args) lam-env))
+            ((interp-R7-exp new-env) body)]
+           [else (error "interp-R7-exp, expected function, not" f-val)]))]
+      )))
+...
 \end{lstlisting}
-\caption{Interpreter for the $R_7$ language. UPDATE ME -Jeremy}
+\caption{Selections from the interpreter for the $R_7$ language.}
 \label{fig:interp-R7}
 \end{figure}
 
@@ -7119,10 +7121,10 @@ Similarly, we recommend translating the type predicates
 
 We recommend compiling an \key{inject} as follows if the type is
 \key{Integer} or \key{Boolean}.  The \key{salq} instruction shifts the
-destination to the left by the number of bits specified by the source
-($2$) and it preserves the sign of the integer. We use the \key{orq}
-instruction to combine the tag and the value to form the tagged value.
-\\
+destination to the left by the number of bits specified its source
+argument (in this case $3$, the length of the tag) and it preserves
+the sign of the integer. We use the \key{orq} instruction to combine
+the tag and the value to form the tagged value.  \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -7135,16 +7137,15 @@ $\Rightarrow$
 \begin{minipage}{0.5\textwidth}
 \begin{lstlisting}
 (movq |$e'$| |\itm{lhs}'|)
-(salq (int 2) |\itm{lhs}'|)
+(salq (int 3) |\itm{lhs}'|)
 (orq (int |$\itm{tagof}(T)$|) |\itm{lhs}'|)
 \end{lstlisting}
 \end{minipage}
 \end{tabular}  \\
 The instruction selection for vectors and procedures is different
 because their is no need to shift them to the left. The rightmost 3
-bits are already zeros as described above. So we combine the value and
-the tag using
-\key{orq}.  \\
+bits are already zeros as described above. So we just combine the
+value and the tag using \key{orq}.  \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -7160,19 +7161,39 @@ $\Rightarrow$
 (orq (int |$\itm{tagof}(T)$|) |\itm{lhs}'|)
 \end{lstlisting}
 \end{minipage}
-\end{tabular}  \\
+\end{tabular} 
 
-\paragraph{Project}
+\paragraph{Tag of Any}
 
+Recall that the \code{tag-of-any} operation extracts the type tag from
+a value of type \code{Any}. The type tag is the bottom three bits, so
+we obtain the tag by taking the bitwise-and of the value with $111$
+($7$ in decimal).
 
-The instruction selection for \key{project} is a bit more involved.
-Like \key{inject}, the instructions are different depending on whether
-the type $T$ is a pointer (vector or procedure) or not (Integer or
-Boolean). The following shows the instruction selection for Integer
-and Boolean.  We first check to see if the tag on the tagged value
-matches the tag of the target type $T$. If not, we halt the program by
-calling the \code{exit} function. If we have a match, we need to
-produce an untagged value by shifting it to the right by 2 bits.
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+(assign |\itm{lhs}| (tag-of-any |$e$|))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}
+(movq |$e'$| |\itm{lhs}'|)
+(andq (int 7) |\itm{lhs}'|)
+\end{lstlisting}
+\end{minipage}
+\end{tabular}  
+
+\paragraph{Value of Any}
+
+Like \key{inject}, the instructions for \key{value-of-any} are
+different depending on whether the type $T$ is a pointer (vector or
+procedure) or not (Integer or Boolean). The following shows the
+instruction selection for Integer and Boolean.  We produce an untagged
+value by shifting it to the right by 3 bits.
 %
 \\
 \begin{tabular}{lll}
@@ -7187,23 +7208,17 @@ $\Rightarrow$
 \begin{minipage}{0.5\textwidth}
 \begin{lstlisting}
 (movq |$e'$| |\itm{lhs}'|)
-(andq (int 3) |\itm{lhs}'|)
-(if (eq? |\itm{lhs}'| (int |$\itm{tagof}(T)$|))
-    ((movq |$e'$| |\itm{lhs}'|)
-     (sarq (int 2) |\itm{lhs}'|))
-    ((callq exit)))
+(sarq (int 3) |\itm{lhs}'|)
 \end{lstlisting}
 \end{minipage}
 \end{tabular}  \\
 %
-The case for vectors and procedures begins in a similar way, checking
-that the runtime tag matches the target type $T$ and exiting if there
-is a mismatch. However, the way in which we convert the tagged value
-to a value is different, as there is no need to shift. Instead we need
-to zero-out the rightmost 2 bits. We accomplish this by creating the
-bit pattern $\ldots 0011$, applying \code{notq} to obtain $\ldots
-1100$, and then applying \code{andq} with the tagged value get the
-desired result. \\
+In the case for vectors and procedures, there is no need to
+shift. Instead we just need to zero-out the rightmost 3 bits. We
+accomplish this by creating the bit pattern $\ldots 0111$ ($7$ in
+decimal) and apply \code{bitwise-not} to obtain $\ldots 1000$ which we
+\code{movq} into the destination $\itm{lhs}$.  We then generate
+\code{andq} with the tagged value to get the desired result. \\
 %
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
@@ -7216,20 +7231,15 @@ $\Rightarrow$
 &
 \begin{minipage}{0.5\textwidth}
 \begin{lstlisting}
-(movq |$e'$| |\itm{lhs}'|)
-(andq (int 3) |\itm{lhs}'|)
-(if (eq? |\itm{lhs}'| (int |$\itm{tagof}(T)$|))
-    ((movq (int 3) |\itm{lhs}'|)
-     (notq |\itm{lhs}'|)
-     (andq |$e'$| |\itm{lhs}'|))
-    ((callq exit)))
+(movq (int |$\ldots 1000$|) |\itm{lhs}'|)
+(andq |$e'$| |\itm{lhs}'|)
 \end{lstlisting}
 \end{minipage}
-\end{tabular}  \\
+\end{tabular}  
 
-\paragraph{Type Predicates} We leave it to the reader to
-devise a sequence of instructions to implement the type predicates
-\key{boolean?}, \key{integer?}, \key{vector?}, and \key{procedure?}.
+%% \paragraph{Type Predicates} We leave it to the reader to
+%% devise a sequence of instructions to implement the type predicates
+%% \key{boolean?}, \key{integer?}, \key{vector?}, and \key{procedure?}.
 
 \section{Compiling $R_7$ to $R_6$}
 \label{sec:compile-r7}
@@ -7249,18 +7259,17 @@ before the addition can be performed.
 %
 The compilation of \key{lambda} (third row of
 Figure~\ref{fig:compile-r7-r6}) shows what happens when we need to
-produce type annotations, we simply use \key{Any}.
+produce type annotations: we simply use \key{Any}.
 %
-The compilation of \code{if}, \code{eq?}, and \code{and} all
-demonstrate how this pass has to account for some differences in
-behavior between $R_7$ and $R_6$. The $R_7$ language is more
-permissive than $R_6$ regarding what kind of values can be used in
-various places. For example, the condition of an \key{if} does not
-have to be a Boolean. Similarly, the arguments of \key{and} do not
-need to be Boolean. For \key{eq?}, the arguments need not be of the
-same type.
+The compilation of \code{if} and \code{eq?}  demonstrate how this pass
+has to account for some differences in behavior between $R_7$ and
+$R_6$. The $R_7$ language is more permissive than $R_6$ regarding what
+kind of values can be used in various places. For example, the
+condition of an \key{if} does not have to be a Boolean. For \key{eq?},
+the arguments need not be of the same type (but in that case, the
+result will be \code{#f}).
 
-\begin{figure}[tbp]
+\begin{figure}[btp]
 \centering
 \begin{tabular}{|lll|} \hline
 \begin{minipage}{0.25\textwidth}
@@ -7370,23 +7379,7 @@ $\Rightarrow$
 \end{lstlisting}
 \end{minipage}
 \\[2ex]\hline
-\begin{minipage}{0.25\textwidth}
-\begin{lstlisting}
-(and |$e_1$| |$e_2$|)
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.6\textwidth}
-\begin{lstlisting}
-(let ([tmp |$e'_1$|])
-   (if (eq? tmp (inject #f Boolean))
-      tmp
-      |$e'_2$|))
-\end{lstlisting}
-\end{minipage} \\\hline
-\end{tabular}  \\
+\end{tabular} 
 
 \caption{Compiling $R_7$ to $R_6$.}
 \label{fig:compile-r7-r6}
