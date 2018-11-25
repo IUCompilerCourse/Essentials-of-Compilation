@@ -2,6 +2,10 @@
 
 %% Student project ideas:
 %%   * high-level optimizations like procedure inlining, etc.
+%%   * closure optimization
+%%   * adding letrec to the language
+%%     (Thought: in the book and regular course, replace top-level defines
+%%      with letrec.)
 %%   * alternative back ends (ARM, LLVM)
 %%   * alternative calling convention (a la Dybvig)
 %%   * lazy evaluation
@@ -12,16 +16,17 @@
 %%   * I/O
 %%   * foreign function interface
 %%   * quasi-quote and unquote
-%%   * macros (perhaps too difficult?)
+%%   * macros (too difficult?)
 %%   * alternative garbage collector
 %%   * alternative register allocator
 %%   * parametric polymorphism
-%%   * type classes (perhaps too difficulty?)
+%%   * type classes (too difficulty?)
 %%   * loops (too easy? combine with something else?)
-%%   * loop optimization
+%%   * loop optimization (fusion, etc.)
+%%   * deforestation
 %%   * records and subtyping
 %%   * object-oriented features
-%%     - objects, object types, and structural subtyping (e.g. Abadi and Cardelli)
+%%     - objects, object types, and structural subtyping (e.g. Abadi & Cardelli)
 %%     - class-based objects and nominal subtyping (e.g. Featherweight Java)
 %%   * multi-threading, fork join, futures, implicit parallelism
 %%   * dataflow analysis, type analysis and specialization
@@ -6964,8 +6969,8 @@ extend our compiler to handle the new features of $R_6$
   \Type &::=& \gray{\key{Integer} \mid \key{Boolean}
      \mid (\key{Vector}\;\Type^{+}) \mid (\key{Vectorof}\;\Type) \mid \key{Void}} \\
     &\mid& \gray{(\Type^{*} \; \key{->}\; \Type)} \mid \key{Any} \\
-  \FType &::=& \key{Integer} \mid \key{Boolean} \mid (\key{Vectorof}\;\key{Any})
-     \mid (\key{Any}^{*} \; \key{->}\; \key{Any})\\
+  \FType &::=& \key{Integer} \mid \key{Boolean} \mid \key{Void} \mid (\key{Vectorof}\;\key{Any}) \mid (\key{Vector}\; \key{Any}^{*}) \\
+    &\mid& (\key{Any}^{*} \; \key{->}\; \key{Any})\\
   \itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
   \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp)
      \mid (\key{+} \; \Exp\;\Exp) \mid (\key{-} \; \Exp\;\Exp)}  \\
@@ -6999,7 +7004,11 @@ $(\key{inject}\; e\; T)$ form converts the value produced by
 expression $e$ of type $T$ into a tagged value.  The
 $(\key{project}\;e\;T)$ form converts the tagged value produced by
 expression $e$ into a value of type $T$ or else halts the program if
-the type tag does not match $T$. Note that in both \key{inject} and
+the type tag is equivalent to $T$. We treat
+$(\key{Vectorof}\;\key{Any})$ as equivalent to
+$(\key{Vector}\;\key{Any}\;\ldots)$.
+
+Note that in both \key{inject} and
 \key{project}, the type $T$ is restricted to the flat types $\FType$,
 which simplifies the implementation and corresponds with what is
 needed for compiling untyped Racket. The type predicates,
@@ -7013,11 +7022,15 @@ $R_6$ is in Figure~\ref{fig:interp-R6}.
 
 \begin{figure}[btp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+(define (flat-ty? ty) ...)
+
 (define (typecheck-R6 env)
   (lambda (e)
     (define recur (typecheck-R6 env))
     (match e
        [`(inject ,e ,ty)
+        (unless (flat-ty? ty)
+          (error "may only inject a value of flat type, not ~a" ty))
         (define-values (new-e e-ty) (recur e))
         (cond
          [(equal? e-ty ty)
@@ -7025,6 +7038,8 @@ $R_6$ is in Figure~\ref{fig:interp-R6}.
          [else
           (error "inject expected ~a to have type ~a" e ty)])]
        [`(project ,e ,ty)
+        (unless (flat-ty? ty)
+          (error "may only project to a flat type, not ~a" ty))
         (define-values (new-e e-ty) (recur e))
         (cond
          [(equal? e-ty 'Any)
@@ -7050,7 +7065,7 @@ $R_6$ is in Figure~\ref{fig:interp-R6}.
 % to do: add rules for vector-ref, etc. for Vectorof
 %Also, \key{eq?} is extended to operate on values of type \key{Any}.
 
-\begin{figure}[tbp]
+\begin{figure}[btp]
 \begin{lstlisting}
 (define primitives (set 'boolean? ...))
 
@@ -7062,6 +7077,15 @@ $R_6$ is in Figure~\ref{fig:interp-R6}.
                      [else #f]))]
      ...))
 
+;; Equavalence of flat types
+(define (tyeq? t1 t2)
+  (match `(,t1 ,t2)
+    [`((Vectorof Any) (Vector ,t2s ...))
+     (for/and ([t2 t2s]) (eq? t2 'Any))]
+    [`((Vector ,t1s ...) (Vectorof Any))
+     (for/and ([t1 t1s]) (eq? t1 'Any))]
+    [else (equal? t1 t2)]))
+
 (define (interp-R6 env)
   (lambda (ast)
     (match ast
@@ -7071,7 +7095,7 @@ $R_6$ is in Figure~\ref{fig:interp-R6}.
         (define v ((interp-R6 env) e))
         (match v
            [`(tagged ,v1 ,t1)
-            (cond [(equal? t1 t2)
+            (cond [(tyeq? t1 t2)
                    v1]
                   [else
                    (error "in project, type mismatch" t1 t2)])]
