@@ -6952,10 +6952,28 @@ define in Section~\ref{sec:r6-lang}. The $R_6$ language provides the
 fundamental support for polymorphism and runtime types that we need to
 support dynamic typing.
 
+There is an interesting interaction between tagged values and garbage
+collection.  A variable of type \code{Any} might refer to a vector and
+therefore it might be a root that needs to be inspected and copied
+during garbage collection. Thus, we need to treat variables of type
+\code{Any} in a similar way to variables of type \code{Vector} for
+purposes of register allocation, which we discuss in
+Section~\ref{sec:register-allocation-r6}. One concern is that, if a
+variable of type \code{Any} is spilled, it must be spilled to the root
+stack.  But this means that the garbage collector needs to be able to
+differentiate between (1) plain old pointers to tuples, (2) a tagged
+value that points to a tuple, and (3) a tagged value that is not a
+tuple. We enable this differentiation by choosing not to use the tag
+$000$. Instead, that bit pattern is reserved for identifying plain old
+pointers to tuples. On the other hand, if one of the first three bits
+is set, then we have a tagged value, and inspecting the tag can
+differentiation between vectors ($010$) and the other kinds of values.
+
 We shall implement our untyped language $R_7$ by compiling it to $R_6$
 (Section~\ref{sec:compile-r7}), but first we describe the how to
 extend our compiler to handle the new features of $R_6$
-(Sections~\ref{sec:shrink-r6} and \ref{sec:select-r6}).
+(Sections~\ref{sec:shrink-r6}, \ref{sec:select-r6}, and
+\ref{sec:register-allocation-r6}).
 
 \section{The $R_6$ Language: Typed Racket $+$ \key{Any}}
 \label{sec:r6-lang}
@@ -7017,8 +7035,8 @@ if the tag corresponds to the predicate, and return \key{\#t}
 otherwise.
 %
 Selections from the type checker for $R_6$ are shown in
-Figure~\ref{fig:typecheck-R6} and the definitional interpreter for
-$R_6$ is in Figure~\ref{fig:interp-R6}.
+Figure~\ref{fig:typecheck-R6} and the interpreter for $R_6$ is in
+Figure~\ref{fig:interp-R6}.
 
 \begin{figure}[btp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
@@ -7107,7 +7125,7 @@ $R_6$ is in Figure~\ref{fig:interp-R6}.
 \label{fig:interp-R6}
 \end{figure}
 
-\clearpage
+%\clearpage
 
 \section{Shrinking $R_6$}
 \label{sec:shrink-r6}
@@ -7271,6 +7289,24 @@ $\Rightarrow$
 %% \paragraph{Type Predicates} We leave it to the reader to
 %% devise a sequence of instructions to implement the type predicates
 %% \key{boolean?}, \key{integer?}, \key{vector?}, and \key{procedure?}.
+
+\section{Register Allocation for $R_6$}
+\label{sec:register-allocation-r6}
+
+As mentioned above, a variable of type \code{Any} might refer to a
+vector. Thus, the register allocator for $R_6$ needs to treat variable
+of type \code{Any} in the same way that it treats variables of type
+\code{Vector} for purposes of garbage collection. In particular,
+\begin{itemize}
+\item If a variable of type \code{Any} is live during a function call,
+  then it must be spilled. One way to accomplish this is to augment
+  the pass \code{build-interference} to mark all variables that are
+  live after a \code{callq} as interfering with all the registers.
+
+\item If avariable of type \code{Any} is spilled, it must be spilled
+  to the root stack instead of the normal procedure call stack.
+\end{itemize}
+
 
 \section{Compiling $R_7$ to $R_6$}
 \label{sec:compile-r7}
