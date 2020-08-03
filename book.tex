@@ -416,9 +416,9 @@ programs), so one cannot simply describe a language by listing all of
 the programs in the language. Instead we write down a set of rules, a
 \emph{grammar}, for building programs. We shall write our rules in a
 variant of Backus-Naur Form (BNF)~\citep{Backus:1960aa,Knuth:1964aa}.
-As an example, we describe a small language, named $R_0$, of
-integers and arithmetic operations. The first rule says that any
-integer is an expression, $\Exp$, in the language:
+As an example, we describe a small language, named $R_0$, that
+consists of integers and arithmetic operations. The first grammar rule
+says that any integer ($\Int$) is an expression ($\Exp$):
 \begin{equation}
 \Exp ::= \Int  \label{eq:arith-int}
 \end{equation}
@@ -431,9 +431,8 @@ according to the left-hand-side.
 A name such as $\Exp$ that is
 defined by the grammar rules is a \emph{non-terminal}.
 %
-The name $\Int$ is a also a non-terminal, however,
-we do not define $\Int$ because the
-reader already knows what an integer is.
+The name $\Int$ is a also a non-terminal, however, we do not define
+$\Int$ because the reader already knows what an integer is.
 %
 Further, we make the simplifying design decision that all of the languages in
 this book only handle machine-representable integers.  On most modern machines
@@ -454,9 +453,9 @@ $\Exp$ node by negating it.
 \begin{equation}
   \Exp ::= (\key{-} \; \Exp)  \label{eq:arith-neg}
 \end{equation}
-Symbols such as \key{-} in typewriter font are \emph{terminal} symbols
-and must literally appear in the program for the rule to be
-applicable.
+Symbols in typewriter font such as \key{-} and \key{read} are
+\emph{terminal} symbols and must literally appear in the program for
+the rule to be applicable.
 
 We can apply the rules to build ASTs in the $R_0$
 language. For example, by rule \eqref{eq:arith-int}, \texttt{8} is an
@@ -481,11 +480,11 @@ an $\Exp$.
 \end{minipage}
 \end{center}
 
-The following grammar rule defines addition expressions:
+The next grammar rule defines addition expressions:
 \begin{equation}
   \Exp ::= (\key{+} \; \Exp \; \Exp) \label{eq:arith-add}
 \end{equation}
-Now we can see that the AST \eqref{eq:arith-prog} is an $\Exp$ in
+We can now see that the AST \eqref{eq:arith-prog} is an $\Exp$ in
 $R_0$.  We know that \lstinline{(read)} is an $\Exp$ by rule
 \eqref{eq:arith-read} and we have shown that \texttt{(- 8)} is an
 $\Exp$, so we can apply rule \eqref{eq:arith-add} to show that
@@ -495,9 +494,8 @@ If you have an AST for which the above rules do not apply, then the
 AST is not in $R_0$. For example, the AST \texttt{(- (read) (+ 8))} is
 not in $R_0$ because there are no rules for \key{+} with only one
 argument, nor for \key{-} with two arguments.  Whenever we define a
-language with a grammar, we implicitly mean for the language to be the
-smallest set of programs that are justified by the rules. That is, the
-language only includes those programs that the rules allow.
+language with a grammar, we mean for the language to only include
+those programs that are justified by the rules.
 
 The last grammar rule for $R_0$ states that there is a \key{program}
 node to mark the top of the whole program:
@@ -541,11 +539,10 @@ R_0  &::=& (\key{program} \; \Exp)
 \section{Pattern Matching}
 \label{sec:pattern-matching}
 
-As mentioned above, one of the operations that a compiler needs to
-perform on an AST is to access the children of a node.  Racket
-provides the \texttt{match} form to access the parts of an
-S-expression. Consider the following example and the output on the
-right.
+As mentioned above, compilers often need to access the children of an
+AST node. Racket provides the \texttt{match} form to access the parts
+of an S-expression. Consider the following example and the output on
+the right.
 \begin{center}
 \begin{minipage}{0.5\textwidth}
 \begin{lstlisting}
@@ -571,24 +568,23 @@ The \texttt{match} form takes AST \eqref{eq:arith-prog} and binds its
 parts to the three variables \texttt{op}, \texttt{child1}, and
 \texttt{child2}. In general, a match clause consists of a
 \emph{pattern} and a \emph{body}. The pattern is a quoted S-expression
-that may contain pattern-variables (each one preceded by a comma).
+that may also contain pattern-variables (each one preceded by a comma).
 %
 The pattern is not the same thing as a quasiquote expression used to
-\emph{construct} ASTs, however, the similarity is intentional: constructing and
-deconstructing ASTs uses similar syntax.
+\emph{construct} ASTs, however, the similarity is intentional:
+constructing and deconstructing ASTs uses similar syntax.
 %
-While the pattern uses a restricted syntax,
-the body of the match clause may contain any Racket code whatsoever.
+While the pattern uses a restricted syntax, the body of the match
+clause may contain any Racket code whatsoever.
 
-
-A \texttt{match} form may contain several clauses, as in the following
-function \texttt{leaf?} that recognizes when an $R_0$ node is
-a leaf. The \texttt{match} proceeds through the clauses in order,
+A \code{match} form may contain several clauses, as in the following
+function \code{leaf?} that recognizes when an $R_0$ node is
+a leaf. The \code{match} proceeds through the clauses in order,
 checking whether the pattern can match the input S-expression. The
 body of the first clause that matches is executed. The output of
-\texttt{leaf?} for several S-expressions is shown on the right. In the
-below \texttt{match}, we see another form of pattern: the \texttt{(?
-  fixnum?)} applies the predicate \texttt{fixnum?} to the input
+\code{leaf?} for several S-expressions is shown on the right. In the
+below \code{match}, we see another form of pattern: the
+pattern \code{(? fixnum?)} applies the predicate \code{fixnum?} to the input
 S-expression to see if it is a machine-representable integer.
 \begin{center}
 \begin{minipage}{0.5\textwidth}
@@ -623,24 +619,45 @@ S-expression to see if it is a machine-representable integer.
 \end{center}
 
 
+When writing a \code{match}, we always refer to the grammar definition
+for the language and identify which non-terminal we're expecting to
+match against, then we make sure that 1) we have one clause for each
+alternative of that non-terminal and 2) that the pattern in each
+clause corresponds to the corresponding right-hand side of a grammar
+rule. For the \code{match} in the \code{leaf?} function, we refer to
+the grammar for $R\_0$ in Figure~\ref{fig:r0-syntax}. The $\Exp$
+non-terminal has 4 alternatives, so the \code{match} has 4 clauses.
+The pattern in each clause corresponds to the right-hand side of a
+grammar rule. For example, the pattern \code{`(+ ,c1 ,c2)} corresponds
+to the right-hand side $(\key{+} \; \Exp \; \Exp)$. When translating
+from grammars to patterns, replace non-terminals such as $\Exp$ with
+pattern variables (a comma followed by a variable name of your
+choice).
+
+
 \section{Recursion}
 \label{sec:recursion}
 
-Programs are inherently recursive in that an $R_0$ expression ($\Exp$)
-is made up of smaller expressions. Thus, the natural way to process an
-entire program is with a recursive function.  As a first example of
-such a function, we define \texttt{exp?} below, which takes an
-arbitrary S-expression, {\tt sexp}, and determines whether or not {\tt
-  sexp} is an $R_0$ expression. Note that each match clause
-corresponds to one grammar rule the body of each clause makes a
-recursive call for each child node. This pattern of recursive function
-is so common that it has a name, \emph{structural recursion}.  In
-general, when a recursive function is defined using a sequence of
-match clauses that correspond to a grammar, and each clause body makes
-a recursive call on each child node, then we say the function is
-defined by structural recursion. Below we also define a second
-function, named \code{R0?}, determines whether an S-expression is an
-$R_0$ program.
+Programs are inherently recursive. For example, an $R_0$ expression
+($\Exp$) is often made of smaller expressions. Thus, the natural way
+to process an entire program is with a recursive function.  As a first
+example of such a recursive function, we define \texttt{exp?} below,
+which takes an arbitrary S-expression, {\tt sexp}, and determines
+whether or not {\tt sexp} is an $R_0$ expression. As discussed in the
+previous section, each match clause corresponds to one grammar rule.
+The body of each clause makes a recursive call for each child
+node. This kind of recursive function is so common that it has a name:
+\emph{structural recursion}.  In general, when a recursive function is
+defined using a sequence of match clauses that correspond to a
+grammar, and the body of each clause makes a recursive call on each
+child node, then we say the function is defined by structural
+recursion\footnote{This principle of structuring code according to the
+  data definition is advocated in the book \emph{How to Design
+    Programs}
+  \url{http://www.ccs.neu.edu/home/matthias/HtDP2e/}.}. Below we also
+define a second function, named \code{R0?}, that determines whether an
+S-expression is an $R_0$ program.  In general we can expect to write
+one recursive function to handle each non-terminal in the grammar.
 %
 \begin{center}
 \begin{minipage}{0.7\textwidth}
@@ -686,14 +703,8 @@ $R_0$ program.
 \end{minipage}
 \end{center}
 
-Indeed, the structural recursion follows the grammar itself.  We can
-generally expect to write a recursive function to handle each
-non-terminal in the grammar.\footnote{This principle of structuring
-  code according to the data definition is advocated in the book
-  \emph{How to Design Programs}
-  \url{http://www.ccs.neu.edu/home/matthias/HtDP2e/}.}
 
-You may be tempted to write the program with just one function, like this:
+You may be tempted to merge the two functions into one, like this:
 \begin{center}
 \begin{minipage}{0.5\textwidth}
 \begin{lstlisting}
