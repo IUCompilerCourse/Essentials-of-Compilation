@@ -162,7 +162,7 @@ University.
 
 The tradition of compiler writing at Indiana University goes back to
 research and courses about programming languages by Daniel Friedman in
-the 1970's and 1980's. Dan had conducted research on lazy
+the 1970's and 1980's. Dan conducted research on lazy
 evaluation~\citep{Friedman:1976aa} in the context of
 Lisp~\citep{McCarthy:1960dz} and then studied
 continuations~\citep{Felleisen:kx} and
@@ -189,16 +189,16 @@ student in this compiler course in the early 2000's, as part of his
 Ph.D. studies at Indiana University. Needless to say, Jeremy enjoyed
 the course immensely!
 
-One of Jeremy's classmates, Abdulaziz Ghuloum, observed that the
-front-to-back organization of the course made it difficult for
-students to understand the rationale for the compiler
+During that time, another student named Abdulaziz Ghuloum observed
+that the front-to-back organization of the course made it difficult
+for students to understand the rationale for the compiler
 design. Abdulaziz proposed an incremental approach in which the
 students build the compiler in stages; they start by implementing a
-complete compiler for a very small subset of the input language, then
-in each subsequent stage they add a feature to the input language and
-add or modify passes to handle the new feature~\citep{Ghuloum:2006bh}.
-In this way, the students see how the language features motivate
-aspects of the compiler design.
+complete compiler for a very small subset of the input language and in
+each subsequent stage they add a language feature and add or modify
+passes to handle the new feature~\citep{Ghuloum:2006bh}.  In this way,
+the students see how the language features motivate aspects of the
+compiler design.
 
 After graduating from Indiana University in 2005, Jeremy went on to
 teach at the University of Colorado. He adapted the nano pass and
@@ -226,11 +226,11 @@ first open textbook for an Indiana compiler course.  With this book we
 hope to make the Indiana compiler course available to people that have
 not had the chance to study in Bloomington in person.  Many of the
 compiler design decisions in this book are drawn from the assignment
-descriptions of \cite{Dybvig:2010aa}. We have captured what we think are
-the most important topics from \cite{Dybvig:2010aa} but we have omitted
-topics that we think are less interesting conceptually and we have made
-simplifications to reduce complexity.  In this way, this book leans
-more towards pedagogy than towards the absolute efficiency of the
+descriptions of \cite{Dybvig:2010aa}. We have captured what we think
+are the most important topics from \cite{Dybvig:2010aa} but we have
+omitted topics that we think are less interesting conceptually and we
+have made simplifications to reduce complexity.  In this way, this
+book leans more towards pedagogy than towards the efficiency of the
 generated code. Also, the book differs in places where we saw the
 opportunity to make the topics more fun, such as in relating register
 allocation to Sudoku (Chapter~\ref{ch:register-allocation-r1}).
@@ -245,10 +245,10 @@ languages.
 The book uses the Racket language both for the implementation of the
 compiler and for the language that is compiled, so a student should be
 proficient with Racket (or Scheme) prior to reading this book. There
-are many other excellent resources for learning Scheme and
+are many excellent resources for learning Scheme and
 Racket~\citep{Dybvig:1987aa,Abelson:1996uq,Friedman:1996aa,Felleisen:2001aa,Felleisen:2013aa,Flatt:2014aa}. It
 is helpful but not necessary for the student to have prior exposure to
-x86 (or x86-64) assembly language~\citep{Intel:2015aa}, as one might
+the x86 (or x86-64) assembly language~\citep{Intel:2015aa}, as one might
 obtain from a computer systems
 course~\citep{Bryant:2005aa,Bryant:2010aa}.  This book introduces the
 parts of x86-64 assembly language that are needed.
@@ -293,31 +293,32 @@ following people.
 \chapter{Preliminaries}
 \label{ch:trees-recur}
 
-In this chapter, we review the basic tools that are needed for implementing a
-compiler. We use abstract syntax trees (ASTs), which refer to data structures in
-the compilers memory, rather than programs as they are stored on disk, in
-\emph{concrete syntax}.
+In this chapter we review the basic tools that are needed to implement
+a compiler. We use \emph{abstract syntax trees} (ASTs), which are data
+structures in computer memory, rather than programs as they are
+typically stored in text files on disk, as \emph{concrete syntax}.
 %
 ASTs can be represented in many different ways, depending on the programming
 language used to write the compiler.
 %
 Because this book uses Racket (\url{http://racket-lang.org}), a
-descendant of Lisp, we use S-expressions to represent programs
-(Section~\ref{sec:ast}). We use grammars to defined programming languages
-(Section~\ref{sec:grammar}) and pattern matching to inspect
-individual nodes in an AST (Section~\ref{sec:pattern-matching}).  We
-use recursion to construct and deconstruct entire ASTs
-(Section~\ref{sec:recursion}).  This chapter provides an brief
-introduction to these ideas.
+descendant of Lisp, we use S-expressions to conveniently represent
+ASTs (Section~\ref{sec:ast}). We use grammars to defined the abstract
+syntax of programming languages (Section~\ref{sec:grammar}) and
+pattern matching to inspect individual nodes in an AST
+(Section~\ref{sec:pattern-matching}).  We use recursion to construct
+and deconstruct entire ASTs (Section~\ref{sec:recursion}).  This
+chapter provides an brief introduction to these ideas.
 
 \section{Abstract Syntax Trees and S-expressions}
 \label{sec:ast}
 
 The primary data structure that is commonly used for representing
 programs is the \emph{abstract syntax tree} (AST). When considering
-some part of a program, a compiler needs to ask what kind of part it
-is and what sub-parts it has. For example, the program on the left,
-represented by an S-expression, corresponds to the AST on the right.
+some part of a program, a compiler needs to ask what kind of thing it
+is and what sub-parts it contains. For example, the program on the
+left, represented by an S-expression, corresponds to the AST on the
+right.
 \begin{center}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -353,13 +354,12 @@ Recall that an \emph{symbolic expression} (S-expression) is either
 \item a pair of two S-expressions, written $(e_1 \key{.} e_2)$,
     where $e_1$ and $e_2$ are each an S-expression.
 \end{enumerate}
-An \emph{atom} can be a symbol, such as \code{`hello}, a number, the null
-value \code{'()}, etc.
-We can create an S-expression in Racket simply by writing a backquote
-(called a quasi-quote in Racket).
-followed by the textual representation of the S-expression.
-It is quite common to use S-expressions
-to represent a list, such as $a, b ,c$ in the following way:
+An \emph{atom} can be a symbol, such as \code{`hello}, a number, the
+null value \code{'()}, etc.  We can create an S-expression in Racket
+simply by writing a backquote (called a quasi-quote in Racket)
+followed by the textual representation of the S-expression.  It is
+quite common to use S-expressions to represent a list, such as $a, b
+,c$ in the following way:
 \begin{lstlisting}
     `(a . (b . (c . ())))
 \end{lstlisting}
@@ -371,9 +371,8 @@ and so many parenthesis:
 \begin{lstlisting}
     `(a b c)
 \end{lstlisting}
-For another example,
-an S-expression to represent the AST \eqref{eq:arith-prog} is created
-by the following Racket expression:
+The following expression creates an S-expression that represents AST
+\eqref{eq:arith-prog}.
 \begin{center}
 \texttt{`(+ (read) (- 8))}
 \end{center}
@@ -396,15 +395,14 @@ S-expression.
    (define ast1.1 `(+ (read) ,ast1.4))
 \end{lstlisting}
 In general, the Racket expression that follows the comma (splice)
-can be any expression that computes an S-expression.
-
+can be any expression that produces an S-expression.
 
 When deciding how to compile program \eqref{eq:arith-prog}, we need to
 know that the operation associated with the root node is addition and
 that it has two children: \texttt{read} and a negation. The AST data
 structure directly supports these queries, as we shall see in
 Section~\ref{sec:pattern-matching}, and hence is a good choice for use
-in compilers. In this book, we will often write down the S-expression
+in compilers. In this book, we often write down the S-expression
 representation of a program even when we really have in mind the AST
 because the S-expression is more concise.  We recommend that, in your
 mind, you always think of programs as abstract syntax trees.
