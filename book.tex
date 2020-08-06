@@ -638,22 +638,21 @@ choice).
 \section{Recursion}
 \label{sec:recursion}
 
-Programs are inherently recursive. For example, an $R_0$ expression
-($\Exp$) is often made of smaller expressions. Thus, the natural way
-to process an entire program is with a recursive function.  As a first
-example of such a recursive function, we define \texttt{exp?} below,
-which takes an arbitrary S-expression, {\tt sexp}, and determines
-whether or not {\tt sexp} is an $R_0$ expression. As discussed in the
-previous section, each match clause corresponds to one grammar rule.
-The body of each clause makes a recursive call for each child
-node. This kind of recursive function is so common that it has a name:
-\emph{structural recursion}.  In general, when a recursive function is
-defined using a sequence of match clauses that correspond to a
-grammar, and the body of each clause makes a recursive call on each
-child node, then we say the function is defined by structural
-recursion\footnote{This principle of structuring code according to the
-  data definition is advocated in the book \emph{How to Design
-    Programs}
+Programs are inherently recursive. For example, an $R_0$ expression is
+often made of smaller expressions. Thus, the natural way to process an
+entire program is with a recursive function.  As a first example of
+such a recursive function, we define \texttt{exp?} below, which takes
+an arbitrary S-expression and determines whether or not it is an $R_0$
+expression. As discussed in the previous section, each match clause
+corresponds to one grammar rule.  The body of each clause makes a
+recursive call for each child node. This kind of recursive function is
+so common that it has a name: \emph{structural recursion}.  In
+general, when a recursive function is defined using a sequence of
+match clauses that correspond to a grammar, and the body of each
+clause makes a recursive call on each child node, then we say the
+function is defined by structural recursion\footnote{This principle of
+  structuring code according to the data definition is advocated in
+  the book \emph{How to Design Programs}
   \url{http://www.ccs.neu.edu/home/matthias/HtDP2e/}.}. Below we also
 define a second function, named \code{R0?}, that determines whether an
 S-expression is an $R_0$ program.  In general we can expect to write
@@ -740,13 +739,15 @@ defined in the report by \cite{SPERBER:2009aa}. The Racket language is
 defined in its reference manual~\citep{plt-tr}. In this book we use an
 interpreter to define the meaning of each language that we consider,
 following Reynolds' advice in this
-regard~\citep{reynolds72:_def_interp}. Here we warm up by writing an
-interpreter for the $R_0$ language, which serves as a second example
-of structural recursion. The \texttt{interp-R0} function is defined in
-Figure~\ref{fig:interp-R0}. The body of the function is a match on the
-input program \texttt{p} and then a call to the \lstinline{interp-exp}
-helper function, which in turn has one match clause per grammar rule
-for $R_0$ expressions.
+regard~\citep{reynolds72:_def_interp}. An interpreter that is
+designated (by some people) as the definition of a language is called
+a \emph{definitional interpreter}.  Here we warm up by creating a
+definitional interpreter for the $R_0$ language, which serves as a
+second example of structural recursion. The \texttt{interp-R0}
+function is defined in Figure~\ref{fig:interp-R0}. The body of the
+function is a match on the input program followed by a call to the
+\lstinline{interp-exp} helper function, which in turn has one match
+clause per grammar rule for $R_0$ expressions.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -770,13 +771,12 @@ for $R_0$ expressions.
 \end{figure}
 
 Let us consider the result of interpreting a few $R_0$ programs. The
-following program simply adds two integers.
+following program adds two integers.
 \begin{lstlisting}
    (+ 10 32)
 \end{lstlisting}
-The result is \key{42}, as you might have expected.  Here we have written the
-program in concrete syntax, whereas the parsed abstract syntax would be the
-slightly different: \lstinline{(program (+ 10 32))}.
+The result is \key{42}.  (We wrote the above program in concrete syntax,
+whereas the parsed abstract syntax is \lstinline{(program (+ 10 32))}.)
 
 The next example demonstrates that expressions may be nested within
 each other, in this case nesting several additions and negations.
@@ -785,10 +785,10 @@ each other, in this case nesting several additions and negations.
 \end{lstlisting}
 What is the result of the above program?
 
-As mentioned previously, the $R0$ language does not support
+As mentioned previously, the $R_0$ language does not support
 arbitrarily-large integers, but only $63$-bit integers, so we
-interpret the arithmetic operations of $R0$ using fixnum arithmetic.
-What happens when we run the following program?
+interpret the arithmetic operations of $R_0$ using fixnum arithmetic
+in Racket.  What happens when we run the following program?
 \begin{lstlisting}
    (define large 999999999999999999)
    (interp-R0 `(program (+ (+ (+ ,large ,large) (+ ,large ,large))
@@ -798,16 +798,20 @@ It produces an error:
 \begin{lstlisting}
    fx+: result is not a fixnum
 \end{lstlisting}
-We shall use the convention that if the interpreter for a language
-produces an error when run on a program, then the meaning of the
-program is unspecified. The compiler for the language is under no
-obligation for such a program; it can produce an executable that does
-anything.
+We establish the convention that if running the definitional
+interpreter on a program produces an error, then the meaning of the
+program is \emph{unspecified}. That means the compiler for the
+language is under no obligation for such a program; it may or may not
+produce an executable, and if it does, that executable can do
+anything. This convention applies to the languages defined in this
+book, as a way to simplify the student's task of implementing them,
+but this convention does not generally hold for real programming
+languages.
 
-\noindent
-Moving on, the \key{read} operation prompts the user of the program
-for an integer. If we interpret the AST \eqref{eq:arith-prog} and give
-it the input \texttt{50}
+Moving on to the next feature of the $R_0$ language, the \key{read}
+operation prompts the user of the program for an integer. If we
+interpret the AST \eqref{eq:arith-prog} and give it the input
+\texttt{50}
 \begin{lstlisting}
    (interp-R0 ast1.1)
 \end{lstlisting}
@@ -1325,7 +1329,7 @@ x86 programs, so we define an abstract syntax for x86 in
 Figure~\ref{fig:x86-ast-a}. We refer to this language as $x86_0$ with
 a subscript $0$ because later we introduce extended versions of this
 assembly language. The main difference compared to the concrete syntax
-of x86 (Figure~\ref{fig:x86-a}) is that it does nto allow labelled
+of x86 (Figure~\ref{fig:x86-a}) is that it does not allow labeled
 instructions to appear anywhere, but instead organizes instructions
 into groups called \emph{blocks} and a label is associated with every
 block, which is why the \key{program} form includes an association
@@ -1561,7 +1565,7 @@ having to change the syntax of the program construct in
 Chapter~\ref{ch:bool-types}.  For now there will be just one label,
 \key{start}, and the whole program will be it's tail.
 %
-The $\itm{info}$ field of the program construt, after the
+The $\itm{info}$ field of the program construct, after the
 \key{uncover-locals} pass, will contain a mapping from the symbol
 \key{locals} to a list of variables, that is, a list of all the
 variables used in the program. At the start of the program, these
@@ -1940,7 +1944,7 @@ translating from $C_0$ to x86. The target language of this pass is a
 pseudo-x86 language that still uses variables, so we add an AST node
 of the form $\VAR{\itm{var}}$ to the x86 abstract syntax.  We
 recommend implementing the \code{select-instructions} in terms of
-three auxilliary functions, one for each of the non-terminals of
+three auxiliary functions, one for each of the non-terminals of
 $C_0$: $\Arg$, $\Stmt$, and $\Tail$.
 
 The cases for $\itm{arg}$ are straightforward, simply putting
@@ -2249,7 +2253,7 @@ Section~\ref{sec:liveness-analysis-r1} is how we compute where a variable
 is needed.  Once we have that information, we compute which variables
 are needed at the same time, i.e., which ones \emph{interfere}, and
 represent this relation as graph whose vertices are variables and
-edges indicate when two variables interfere with eachother
+edges indicate when two variables interfere with each other
 (Section~\ref{sec:build-interference}). We then model register
 allocation as a graph coloring problem, which we discuss in
 Section~\ref{sec:graph-coloring}.
@@ -3604,7 +3608,7 @@ in the EFLAGS register matches the condition code \itm{cc}, otherwise
 the \key{jmp-if} instruction falls through to the next
 instruction. Because the \key{jmp-if} instruction relies on the EFLAGS
 register, it is quite common for the \key{jmp-if} to be immediately
-preceeded by a \key{cmpq} instruction, to set the EFLAGS regsiter.
+preceded by a \key{cmpq} instruction, to set the EFLAGS register.
 Our abstract syntax for \key{jmp-if} differs from the concrete syntax
 for x86 to separate the instruction name from the condition code. For
 example, \code{(jmp-if le foo)} corresponds to \code{jle foo}.
@@ -3804,7 +3808,7 @@ function, \code{explicate-control-pred}, that takes an $R_2$
 expression and two pieces of $C_1$ code (two $\Tail$'s) for the
 then-branch and else-branch. The output of
 \code{explicate-control-pred} is a $C_1$ $\Tail$.  However, these
-three functions also need to contruct the control-flow graph, which we
+three functions also need to construct the control-flow graph, which we
 recommend they do via updates to a global variable. Next we consider
 the specific additions to the tail and assign functions, and some of
 cases for the pred function.
@@ -3845,7 +3849,7 @@ expression that can have type \code{Boolean}. We detail a few cases
 here and leave the rest for the reader. The input to this function is
 an expression and two blocks, $B_1$ and $B_2$, for the branches of the
 enclosing \key{if}. One of the base cases of this function is when the
-expression is a less-than comparision. We translate it to a
+expression is a less-than comparison. We translate it to a
 conditional \code{goto}. We need labels for the two branches $B_1$ and
 $B_2$, so we add them to the control flow graph and obtain some labels
 $\ell_1$ and $\ell_2$. The translation of the less-than comparison is
@@ -3888,7 +3892,7 @@ B_5
 Recall that the \code{select-instructions} pass lowers from our
 $C$-like intermediate representation to the pseudo-x86 language, which
 is suitable for conducting register allocation. The pass is
-implemented using three auxilliary functions, one for each of the
+implemented using three auxiliary functions, one for each of the
 non-terminals $\Arg$, $\Stmt$, and $\Tail$.
 
 For $\Arg$, we have new cases for the Booleans.  We take the usual
@@ -4392,7 +4396,7 @@ In this chapter we study the implementation of mutable tuples (called
 ``vectors'' in Racket). This language feature is the first to use the
 computer's \emph{heap} because the lifetime of a Racket tuple is
 indefinite, that is, a tuple lives forever from the programmer's
-viewpoint. Of course, from an implementor's viewpoint, it is important
+viewpoint. Of course, from an implementer's viewpoint, it is important
 to reclaim the space associated with a tuple when it is no longer
 needed, which is why we also study \emph{garbage collection}
 techniques in this chapter.
@@ -4608,7 +4612,7 @@ garbage collector goes to work to make more room.
 
 The garbage collector must be careful not to reclaim tuples that will
 be used by the program in the future. Of course, it is impossible in
-general to predict what a program will do, but we can overapproximate
+general to predict what a program will do, but we can over approximate
 the will-be-used tuples by preserving all tuples that could be
 accessed by \emph{any} program given the current computer state.  A
 program could access any tuple whose address is in a register or on
@@ -4637,7 +4641,7 @@ pointer relationships. For example, the pointer in the register still
 points to a 2-tuple whose first element is a 3-tuple and second
 element is a 2-tuple.  There are four tuples that are not reachable
 from the root set and therefore do not get copied into the ToSpace.
-(The sitation in Figure~\ref{fig:copying-collector}, with a
+(The situation in Figure~\ref{fig:copying-collector}, with a
 cycle, cannot be created by a well-typed program in $R_3$. However,
 creating cycles will be possible once we get to $R_6$.  We design
 the garbage collector to deal with cycles to begin with, so we will
@@ -4772,7 +4776,7 @@ in on the tags for two of the tuples in the example from
 Figure~\ref{fig:copying-collector}. Note that we have drawn the bits
 in a big-endian way, from right-to-left, with bit location 0 (the
 least significant bit) on the far right, which corresponds to the
-directionality of the x86 shifting instructions \key{salq} (shift
+directional of the x86 shifting instructions \key{salq} (shift
 left) and \key{sarq} (shift right). Part of each tag is dedicated to
 specifying which elements of the tuple are pointers, the part labeled
 ``pointer mask''. Within the pointer mask, a 1 bit indicates there is
@@ -4898,7 +4902,7 @@ before \code{flatten} because \code{expose-allocation} introduces new
 variables, which can be done locally with \code{let}, but \code{let}
 is gone after \code{flatten}.  In the following, we show the
 transformation for the \code{vector} form into let-bindings for the
-intializing expressions, by a conditional \code{collect}, an
+initializing expressions, by a conditional \code{collect}, an
 \code{allocate}, and the initialization of the vector.
 (The \itm{len} is the length of the vector and \itm{bytes} is how many
 total bytes need to be allocated for the vector, which is 8 for the
@@ -5121,7 +5125,7 @@ bytes (64 bits) and we use 8 bytes for the tag. Last but not least, we
 initialize the \itm{tag}. Refer to Figure~\ref{fig:tuple-rep} to see
 how the tag is organized. We recommend using the Racket operations
 \code{bitwise-ior} and \code{arithmetic-shift} to compute the tag.
-The type annoation in the \code{vector} form is used to determine the
+The type annotation in the \code{vector} form is used to determine the
 pointer mask region of the tag.
 \begin{lstlisting}
    (assign |$\itm{lhs}$| (allocate |$\itm{len}$| (Vector |$\itm{type} \ldots$|)))
@@ -5317,7 +5321,7 @@ bytes. In the conclusion we decrement \code{r15} by 8 bytes.
 One issue that deserves special care is that there may be a call to
 \code{collect} prior to the initializing assignments for all the
 variables in the root stack. We do not want the garbage collector to
-accidentaly think that some uninitialized variable is a pointer that
+accidentally think that some uninitialized variable is a pointer that
 needs to be followed. Thus, we zero-out all locations on the root
 stack in the prelude of \code{main}. In
 Figure~\ref{fig:print-x86-output-gc}, the instruction
@@ -5562,7 +5566,7 @@ that does what its name suggests. The program then applies
 The definitional interpreter for $R_4$ is in
 Figure~\ref{fig:interp-R4}. The case for the \code{program} form is
 responsible for setting up the mutual recursion between the top-level
-function definitions. We use the classic backpatching approach that
+function definitions. We use the classic back-patching approach that
 uses mutable variables and makes two passes over the function
 definitions~\citep{Kelsey:1998di}.  In the first pass we set up the
 top-level environment using a mutable cons cell for each function
@@ -5804,7 +5808,7 @@ that would unnecessarily overwrite the return address. Instead we can
 simply use the \key{jmp} instruction. Like the indirect function call,
 we write an indirect jump with a register prefixed with an asterisk.
 We recommend using \code{rax} to hold the jump target because the
-preceeding ``conclusion'' overwrites just about everything else.
+preceding ``conclusion'' overwrites just about everything else.
 \begin{lstlisting}
    jmp *%rax
 \end{lstlisting}
@@ -5925,7 +5929,7 @@ $\Rightarrow$
 \end{minipage}
 \end{tabular}
 
-In the body of the function, all occurrances of the $i$th argument in
+In the body of the function, all occurrences of the $i$th argument in
 which $i>5$ must be replaced with a \code{vector-ref}.
 
 \section{Remove Complex Operators and Operands}
@@ -6098,7 +6102,7 @@ name \code{tail-jmp}.
 
 Recall that in Section~\ref{sec:explicate-control-r1} we recommended
 using the label \code{start} for the initial block of a program, and
-in Section~\ref{sec:select-r1} we recommended labelling the conclusion
+in Section~\ref{sec:select-r1} we recommended labeling the conclusion
 of the program with \code{conclusion}, so that $(\key{return}\;\Arg)$
 can be compiled to an assignment to \code{rax} followed by a jump to
 \code{conclusion}. With the addition of function definitions, we will
@@ -6174,7 +6178,7 @@ definitions.
 Figure~\ref{fig:add-fun} shows an example translation of a simple
 function in $R_4$ to x86. The figure also includes the results of the
 \code{explicate-control} and \code{select-instructions} passes.  We
-have ommited the \code{has-type} AST nodes for readability.  Can you
+have omitted the \code{has-type} AST nodes for readability.  Can you
 see any ways to improve the translation?
 
 \begin{figure}[tbp]
@@ -6423,7 +6427,7 @@ the result of this program is \code{42}.
 The syntax for this language with anonymous functions and lexical
 scoping, $R_5$, is defined in Figure~\ref{fig:r5-syntax}. It adds the
 \key{lambda} form to the grammar for $R_4$, which already has syntax
-for function application.  In this chapter we shall descibe how to
+for function application.  In this chapter we shall describe how to
 compile $R_5$ back into $R_4$, compiling lexically-scoped functions
 into a combination of functions (as in $R_4$) and tuples (as in
 $R_3$).
@@ -6463,10 +6467,10 @@ $R_3$).
 
 To compile lexically-scoped functions to top-level function
 definitions, the compiler will need to provide special treatment to
-variable occurences such as \code{x} and \code{y} in the body of the
+variable occurrences such as \code{x} and \code{y} in the body of the
 \code{lambda} of Figure~\ref{fig:lexical-scoping}, for the functions
 of $R_4$ may not refer to variables defined outside the function. To
-identify such variable occurences, we review the standard notion of
+identify such variable occurrences, we review the standard notion of
 free variable.
 
 \begin{definition}
@@ -6478,7 +6482,7 @@ $e$.
 For example, the variables \code{x}, \code{y}, and \code{z} are all
 free with respect to the expression \code{(+ x (+ y z))}.  On the
 other hand, only \code{x} and \code{y} are free with respect to the
-following expression becuase \code{z} is bound by the \code{lambda}.
+following expression because \code{z} is bound by the \code{lambda}.
 \begin{lstlisting}
    (lambda: ([z : Integer]) : Integer
       (+ x (+ y z)))
@@ -6626,7 +6630,7 @@ type to the function in the closure's type, and it does not matter.
 The sequence of \key{let} forms bind the free variables to their
 values obtained from the closure.
 
-We transform function application into code that retreives the
+We transform function application into code that retrieves the
 function pointer from the closure and then calls the function, passing
 in the closure as the first argument. We bind $e'$ to a temporary
 variable to avoid code duplication.
@@ -6808,7 +6812,7 @@ are called \emph{polymorphic}. There are many kinds of polymorphism,
 such as subtype polymorphism and parametric
 polymorphism~\citep{Cardelli:1985kx}. The kind of polymorphism are
 talking about here does not have a special name, but it is the usual
-kind that arrises in dynamically typed languages.
+kind that arises in dynamically typed languages.
 
 Another characteristic of dynamically typed languages is that
 primitive operations, such as \code{not}, are often defined to operate
@@ -6935,7 +6939,7 @@ steal the 3 right-most bits from our 64-bit values to encode the
 runtime type.  We shall use $001$ to identify integers, $100$ for
 Booleans, $010$ for vectors, $011$ for procedures, and $101$ for the
 void value. We shall refer to these 3 bits as the \emph{tag} and we
-define the following auxilliary function.
+define the following auxiliary function.
 \begin{align*}
 \itm{tagof}(\key{Integer}) &= 001 \\
 \itm{tagof}(\key{Boolean}) &= 100 \\
@@ -7105,7 +7109,7 @@ Figure~\ref{fig:interp-R6}.
                      [else #f]))]
      ...))
 
-;; Equavalence of flat types
+;; Equivalence of flat types
 (define (tyeq? t1 t2)
   (match `(,t1 ,t2)
     [`((Vectorof Any) (Vector ,t2s ...))
@@ -7148,7 +7152,7 @@ of type \code{Any}.  The \code{value-of-any} retrieves the underlying
 value from a tagged value. Finally, the \code{exit} operation ends the
 execution of the program by invoking the operating system's
 \code{exit} function. So the translation for \code{project} is as
-follows. (We have ommitted the \code{has-type} AST nodes to make this
+follows. (We have omitted the \code{has-type} AST nodes to make this
 output more readable.)
 
 \begin{tabular}{lll}
@@ -7313,7 +7317,7 @@ of type \code{Any} in the same way that it treats variables of type
   the pass \code{build-interference} to mark all variables that are
   live after a \code{callq} as interfering with all the registers.
 
-\item If avariable of type \code{Any} is spilled, it must be spilled
+\item If a variable of type \code{Any} is spilled, it must be spilled
   to the root stack instead of the normal procedure call stack.
 \end{itemize}
 
@@ -7521,7 +7525,7 @@ The \key{lookup} function takes a key and an association list (a list
 of key-value pairs), and returns the first value that is associated
 with the given key, if there is one. If not, an error is triggered.
 The association list may contain both immutable pairs (built with
-\key{cons}) and mutable mapirs (built with \key{mcons}).
+\key{cons}) and mutable pairs (built with \key{mcons}).
 
 The \key{map2} function ...
 
@@ -7678,4 +7682,15 @@ registers.
 %%  LocalWords:  arg bitwise XOR'd thenlabel immediates optimizations
 %%  LocalWords:  deallocating Ungar Detlefs Tene kx FromSpace ToSpace
 %%  LocalWords:  Appel Diwan Siebert ptr  fromspace rootstack typedef
-%%  LocalWords:  len prev rootlen heaplen setl lt
+%%  LocalWords:  len prev rootlen heaplen setl lt Kohlbecker dk multi
+% LocalWords:  Bloomington Wollowski definitional whitespace deref JM
+% LocalWords:  subexpression subexpressions iteratively ANF Danvy rco
+% LocalWords:  goto stmt JS ly cmp ty le ge jle goto's EFLAG CFG pred
+% LocalWords:  acyclic worklist Aho qf tsort implementer's hj Shidal
+% LocalWords:  nonnegative Shahriyar endian salq sarq uint cheney ior
+% LocalWords:  tospace vecinit collectret alloc initret decrement jl
+% LocalWords:  dereferencing GC di vals ps mcons ds mcdr callee's th
+% LocalWords:  mainDef tailcall prepending mainstart num params rT qb
+% LocalWords:  mainconclusion Cardelli bodyT fvs clos fvts subtype uj
+% LocalWords:  polymorphism untyped elts tys tagof Vectorof tyeq orq
+% LocalWords:  andq untagged Shao inlining ebp jge setle setg setge
