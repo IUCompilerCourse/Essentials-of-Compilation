@@ -128,17 +128,18 @@ moredelim=[is][\color{red}]{~}{~}
 \title{\Huge \textbf{Essentials of Compilation} \\
   \huge An Incremental Approach}
 
-\author{\textsc{Jeremy G. Siek, Ryan R. Newton} \\
+\author{\textsc{Jeremy G. Siek} \\
 %\thanks{\url{http://homes.soic.indiana.edu/jsiek/}} \\
   Indiana University \\
   \\
   with contributions from: \\
   Carl Factora \\
   Andre Kuhlenschmidt \\
-  Michael M. Vitousek \\
-  Michael Vollmer \\
+  Ryan R. Newton \\
   Ryan Scott \\
-  Cameron Swords
+  Cameron Swords \\
+  Michael M. Vitousek \\
+  Michael Vollmer 
    }
 
 \begin{document}
@@ -238,9 +239,7 @@ allocation to Sudoku (Chapter~\ref{ch:register-allocation-r1}).
 \section*{Prerequisites}
 
 The material in this book is challenging but rewarding. It is meant to
-prepare students for a lifelong career in programming languages.  We do
-not recommend this book for students who want to dabble in programming
-languages.
+prepare students for a lifelong career in programming languages.
 
 The book uses the Racket language both for the implementation of the
 compiler and for the language that is compiled, so a student should be
@@ -295,14 +294,14 @@ following people.
 
 In this chapter we review the basic tools that are needed to implement
 a compiler. We use \emph{abstract syntax trees} (ASTs), which are data
-structures in computer memory, rather than programs as they are
+structures in computer memory, in contrast to how programs are
 typically stored in text files on disk, as \emph{concrete syntax}.
 %
 ASTs can be represented in many different ways, depending on the programming
 language used to write the compiler.
 %
 Because this book uses Racket (\url{http://racket-lang.org}), a
-descendant of Lisp, we use S-expressions to conveniently represent
+descendant of Lisp, we can use S-expressions to conveniently represent
 ASTs (Section~\ref{sec:ast}). We use grammars to defined the abstract
 syntax of programming languages (Section~\ref{sec:grammar}) and
 pattern matching to inspect individual nodes in an AST
@@ -361,7 +360,7 @@ followed by the textual representation of the S-expression.  It is
 quite common to use S-expressions to represent a list, such as $a, b
 ,c$ in the following way:
 \begin{lstlisting}
-    `(a . (b . (c . ())))
+`(a . (b . (c . ())))
 \end{lstlisting}
 Each element of the list is in the first slot of a pair, and the
 second slot is either the rest of the list or the null value, to mark
@@ -369,13 +368,13 @@ the end of the list. Such lists are so common that Racket provides
 special notation for them that removes the need for the periods
 and so many parenthesis:
 \begin{lstlisting}
-    `(a b c)
+`(a b c)
 \end{lstlisting}
 The following expression creates an S-expression that represents AST
 \eqref{eq:arith-prog}.
-\begin{center}
-\texttt{`(+ (read) (- 8))}
-\end{center}
+\begin{lstlisting}
+`(+ (read) (- 8))
+\end{lstlisting}
 When using S-expressions to represent ASTs, the convention is to
 represent each AST node as a list and to put the operation symbol at
 the front of the list. The rest of the list contains the children.  So
@@ -391,8 +390,8 @@ we could have first created an S-expression for AST
 \eqref{eq:arith-neg8} and then spliced that into the addition
 S-expression.
 \begin{lstlisting}
-   (define ast1.4 `(- 8))
-   (define ast1.1 `(+ (read) ,ast1.4))
+(define ast1.4 `(- 8))
+(define ast1.1 `(+ (read) ,ast1.4))
 \end{lstlisting}
 In general, the Racket expression that follows the comma (splice)
 can be any expression that produces an S-expression.
@@ -418,7 +417,7 @@ the programs in the language. Instead we write down a set of rules, a
 variant of Backus-Naur Form (BNF)~\citep{Backus:1960aa,Knuth:1964aa}.
 As an example, we describe a small language, named $R_0$, that
 consists of integers and arithmetic operations. The first grammar rule
-says that any integer ($\Int$) is an expression ($\Exp$):
+says that any integer is an expression:
 \begin{equation}
 \Exp ::= \Int  \label{eq:arith-int}
 \end{equation}
@@ -751,20 +750,20 @@ clause per grammar rule for $R_0$ expressions.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-   (define (interp-exp e)
-     (match e
-       [(? fixnum?) e]
-       [`(read)
-        (let ([r (read)])
-          (cond [(fixnum? r) r]
-                [else (error 'interp-R0 "input not an integer" r)]))]
-       [`(- ,e1)     (fx- 0 (interp-exp e1))]
-       [`(+ ,e1 ,e2) (fx+ (interp-exp e1) (interp-exp e2))]
-       ))
+(define (interp-exp e)
+  (match e
+    [(? fixnum?) e]
+    [`(read)
+     (let ([r (read)])
+       (cond [(fixnum? r) r]
+             [else (error 'interp-R0 "input not an integer" r)]))]
+    [`(- ,e1)     (fx- 0 (interp-exp e1))]
+    [`(+ ,e1 ,e2) (fx+ (interp-exp e1) (interp-exp e2))]
+    ))
 
-   (define (interp-R0 p)
-     (match p
-       [`(program ,e) (interp-exp e)]))
+(define (interp-R0 p)
+  (match p
+    [`(program ,e) (interp-exp e)]))
 \end{lstlisting}
 \caption{Interpreter for the $R_0$ language.}
 \label{fig:interp-R0}
@@ -773,7 +772,7 @@ clause per grammar rule for $R_0$ expressions.
 Let us consider the result of interpreting a few $R_0$ programs. The
 following program adds two integers.
 \begin{lstlisting}
-   (+ 10 32)
+(+ 10 32)
 \end{lstlisting}
 The result is \key{42}.  (We wrote the above program in concrete syntax,
 whereas the parsed abstract syntax is \lstinline{(program (+ 10 32))}.)
@@ -781,7 +780,7 @@ whereas the parsed abstract syntax is \lstinline{(program (+ 10 32))}.)
 The next example demonstrates that expressions may be nested within
 each other, in this case nesting several additions and negations.
 \begin{lstlisting}
-   (+ 10 (- (+ 12 20)))
+(+ 10 (- (+ 12 20)))
 \end{lstlisting}
 What is the result of the above program?
 
@@ -790,13 +789,13 @@ arbitrarily-large integers, but only $63$-bit integers, so we
 interpret the arithmetic operations of $R_0$ using fixnum arithmetic
 in Racket.  What happens when we run the following program?
 \begin{lstlisting}
-   (define large 999999999999999999)
-   (interp-R0 `(program (+ (+ (+ ,large ,large) (+ ,large ,large))
-                           (+ (+ ,large ,large) (+ ,large ,large)))))
+(define large 999999999999999999)
+(interp-R0 `(program (+ (+ (+ ,large ,large) (+ ,large ,large))
+                        (+ (+ ,large ,large) (+ ,large ,large)))))
 \end{lstlisting}
 It produces an error:
 \begin{lstlisting}
-   fx+: result is not a fixnum
+fx+: result is not a fixnum
 \end{lstlisting}
 We establish the convention that if running the definitional
 interpreter on a program produces an error, then the meaning of that
@@ -812,7 +811,7 @@ operation prompts the user of the program for an integer.  Recall that
 program \eqref{eq:arith-prog} performs a \key{read} and then subtracts
 \code{8}. So if we run
 \begin{lstlisting}
-   (interp-R0 ast1.1)
+(interp-R0 ast1.1)
 \end{lstlisting}
 and the input the integer \code{50} we get the answer to life, the
 universe, and everything: \code{42}.
@@ -856,89 +855,92 @@ this compiler is an optimizer. Our optimizer will accomplish this by
 trying to eagerly compute the parts of the program that do not depend
 on any inputs. For example, given the following program
 \begin{lstlisting}
-   (+ (read) (- (+ 5 3)))
+(+ (read) (- (+ 5 3)))
 \end{lstlisting}
 our compiler will translate it into the program
 \begin{lstlisting}
-   (+ (read) -8)
+(+ (read) -8)
 \end{lstlisting}
 
 Figure~\ref{fig:pe-arith} gives the code for a simple partial
 evaluator for the $R_0$ language. The output of the partial evaluator
-is an $R_0$ program. In Figure~\ref{fig:pe-arith}, the normal
-structural recursion is captured in the main \texttt{pe-arith}
-function whereas the code for partially evaluating negation and
-addition is factored into two separate helper functions:
-\texttt{pe-neg} and \texttt{pe-add}. The input to these helper
-functions is the output of partially evaluating the children nodes.
+is an $R_0$ program. In Figure~\ref{fig:pe-arith}, the structural
+recursion over $\Exp$ is captured in the \code{pe-exp} function
+whereas the code for partially evaluating the negation and addition
+operations is factored into two separate helper functions:
+\code{pe-neg} and \code{pe-add}. The input to these helper
+functions is the output of partially evaluating the children.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-   (define (pe-neg r)
-     (cond [(fixnum? r) (fx- 0 r)]
-           [else `(- ,r)]))
+(define (pe-neg r)
+  (cond [(fixnum? r) (fx- 0 r)]
+        [else `(- ,r)]))
 
-   (define (pe-add r1 r2)
-     (cond [(and (fixnum? r1) (fixnum? r2)) (fx+ r1 r2)]
-           [else `(+ ,r1 ,r2)]))
+(define (pe-add r1 r2)
+  (cond [(and (fixnum? r1) (fixnum? r2)) (fx+ r1 r2)]
+        [else `(+ ,r1 ,r2)]))
 
-   (define (pe-arith e)
-     (match e
-       [(? fixnum?) e]
-       [`(read) `(read)]
-       [`(- ,e1)
-         (pe-neg (pe-arith e1))]
-       [`(+ ,e1 ,e2)
-         (pe-add (pe-arith e1) (pe-arith e2))]))
+(define (pe-exp e)
+  (match e
+    [(? fixnum?) e]
+    [`(read) `(read)]
+    [`(- ,e1) (pe-neg (pe-exp e1))]
+    [`(+ ,e1 ,e2) (pe-add (pe-exp e1) (pe-exp e2))]
+    ))
+
+(define (pe-R0 p)
+  (match p
+    [`(program ,e) `(program ,(pe-exp e))]
+    ))
 \end{lstlisting}
 \caption{A partial evaluator for $R_0$ expressions.}
 \label{fig:pe-arith}
 \end{figure}
 
-Our code for \texttt{pe-neg} and \texttt{pe-add} implements the simple
-idea of checking whether their arguments are integers and if they are,
-to go ahead and perform the arithmetic.  Otherwise, we use quasiquote
-to create an AST node for the appropriate operation (either negation
-or addition) and use comma to splice in the child nodes.
+The \texttt{pe-neg} and \texttt{pe-add} functions check whether their
+arguments are integers and if they are, perform the appropriate
+arithmetic.  Otherwise, they use quasiquote to create an AST node for
+the operation (either negation or addition) and use comma to splice in
+the children.
 
 To gain some confidence that the partial evaluator is correct, we can
 test whether it produces programs that get the same result as the
-input program. That is, we can test whether it satisfies Diagram
+input programs. That is, we can test whether it satisfies Diagram
 \eqref{eq:compile-correct}. The following code runs the partial
 evaluator on several examples and tests the output program.  The
 \texttt{assert} function is defined in Appendix~\ref{appendix:utilities}.
 \begin{lstlisting}
 (define (test-pe p)
-  (assert "testing pe-arith"
-     (equal? (interp-R0 p) (interp-R0 (pe-arith p)))))
+  (assert "testing pe-R0"
+     (equal? (interp-R0 p) (interp-R0 (pe-R0 p)))))
 
 (test-pe `(+ (read) (- (+ 5 3))))
 (test-pe `(+ 1 (+ (read) 1)))
 (test-pe `(- (+ (read) (- 5))))
 \end{lstlisting}
 
-\rn{Do we like the explicit whitespace?  I've never been fond of it, in part
-  because it breaks copy/pasting.  But, then again, so do most of the quotes.}
-
 \begin{exercise}
-\normalfont % I don't like the italics for exercises. -Jeremy
-We challenge the reader to improve on the simple partial evaluator in
-Figure~\ref{fig:pe-arith} by replacing the \texttt{pe-neg} and
-\texttt{pe-add} helper functions with functions that know more about
-arithmetic. For example, your partial evaluator should translate
+\normalfont
+% I don't like the italics for exercises. -Jeremy
+Improve on the partial evaluator in Figure~\ref{fig:pe-arith} by
+replacing the \texttt{pe-neg} and \texttt{pe-add} helper functions
+with functions that know more about arithmetic. For example, your
+partial evaluator should translate
 \begin{lstlisting}
-   (+ 1 (+ (read) 1))
+(+ 1 (+ (read) 1))
 \end{lstlisting}
 into
 \begin{lstlisting}
-   (+ 2 (read))
+(+ 2 (read))
 \end{lstlisting}
 To accomplish this, we recommend that your partial evaluator produce
-output that takes the form of the $\itm{residual}$ non-terminal in the
+output in the form of the $\itm{residual}$ non-terminal of the
 following grammar.
 \[
 \begin{array}{lcl}
-\Exp &::=& \Int \mid (\key{read}) \mid (\key{-} \;(\key{read})) \mid (\key{+} \; \Exp \; \Exp)\\
+\Exp &::=& \Int \mid (\key{read}) \mid (\key{-} \;(\key{read}))
+      \mid (\key{+} \; \Exp \; \Exp)\\
 \itm{residual} &::=& \Int \mid (\key{+}\; \Int\; \Exp) \mid \Exp
 \end{array}
 \]
@@ -949,22 +951,25 @@ following grammar.
 \chapter{Integers and Variables}
 \label{ch:int-exp}
 
-This chapter concerns the challenge of compiling a subset of Racket
-that includes integer arithmetic and local variable binding, which we
-name $R_1$, to x86-64 assembly code~\citep{Intel:2015aa}.  Henceforth
-we shall refer to x86-64 simply as x86.  The chapter begins with a
-description of the $R_1$ language (Section~\ref{sec:s0}) followed by a
-description of x86 (Section~\ref{sec:x86}). The x86 assembly language
-is quite large, so we only discuss what is needed for compiling
-$R_1$. We introduce more of x86 in later chapters. Once we have
-introduced $R_1$ and x86, we reflect on their differences and come up
-with a plan to break down the translation from $R_1$ to x86 into a
-handful of steps (Section~\ref{sec:plan-s0-x86}).  The rest of the
-sections in this Chapter give detailed hints regarding each step
+This chapter is about compiling the subset of Racket that includes
+integer arithmetic and local variable binding, which we name $R_1$, to
+x86-64 assembly code~\citep{Intel:2015aa}.  Henceforth we shall refer
+to x86-64 simply as x86.  The chapter begins with a description of the
+$R_1$ language (Section~\ref{sec:s0}) followed by a description of x86
+(Section~\ref{sec:x86}). The x86 assembly language is quite large, so
+we discuss only what is needed for compiling $R_1$. We introduce more
+of x86 in later chapters. Once we have introduced $R_1$ and x86, we
+reflect on their differences and come up with a plan to break down the
+translation from $R_1$ to x86 into a handful of steps
+(Section~\ref{sec:plan-s0-x86}).  The rest of the sections in this
+Chapter give detailed hints regarding each step
 (Sections~\ref{sec:uniquify-s0} through \ref{sec:patch-s0}).  We hope
-to give enough hints that the well-prepared reader can implement a
-compiler from $R_1$ to x86 while at the same time leaving room for
-some fun and creativity.
+to give enough hints that the well-prepared reader, together with some
+friends, can implement a compiler from $R_1$ to x86 in a couple weeks
+while at the same time leaving room for some fun and creativity.  To
+give the reader a feeling for the scale of this first compiler, the
+instructor solution for the $R_1$ compiler is approximately 500 lines
+of code.
 
 \section{The $R_1$ Language}
 \label{sec:s0}
@@ -976,17 +981,11 @@ Figure~\ref{fig:r1-syntax}.  The non-terminal \Var{} may be any Racket
 identifier. As in $R_0$, \key{read} is a nullary operator, \key{-} is
 a unary operator, and \key{+} is a binary operator.  Similar to $R_0$,
 the $R_1$ language includes the \key{program} construct to mark the
-top of the program, which is helpful in parts of the compiler.  The
-$\itm{info}$ field of the \key{program} construct contains an
+top of the program, which is helpful in some of the compiler passes.
+The $\itm{info}$ field of the \key{program} construct contains an
 association list that is used to communicate auxiliary data from one
-step of the compiler to the next.
-
-The $R_1$ language is rich enough to exhibit several compilation
-techniques but simple enough so that the reader, together with couple
-friends, can implement a compiler for it in a week or two of part-time
-work.  To give the reader a feeling for the scale of this first
-compiler, the instructor solution for the $R_1$ compiler is less than
-500 lines of code.
+compiler pass the next. Despite the simplicity of the $R_1$ language,
+it is rich enough to exhibit several compilation techniques.
 
 \begin{figure}[btp]
 \centering
@@ -1005,30 +1004,30 @@ R_1  &::=& (\key{program} \;\itm{info}\; \Exp)
 \label{fig:r1-syntax}
 \end{figure}
 
-Let us dive into the description of the $R_1$ language.  The \key{let}
-construct defines a variable for use within its body and initializes
-the variable with the value of an expression.  So the following
-program initializes \code{x} to \code{32} and then evaluates the body
-\code{(+ 10 x)}, producing \code{42}.
+Let us dive further into the syntax and semantics of the $R_1$
+language.  The \key{let} construct defines a variable for use within
+its body and initializes the variable with the value of an expression.
+So the following program initializes \code{x} to \code{32} and then
+evaluates the body \code{(+ 10 x)}, producing \code{42}.
 \begin{lstlisting}
-   (program ()
-      (let ([x (+ 12 20)]) (+ 10 x)))
+(program ()
+   (let ([x (+ 12 20)]) (+ 10 x)))
 \end{lstlisting}
 When there are multiple \key{let}'s for the same variable, the closest
 enclosing \key{let} is used. That is, variable definitions overshadow
 prior definitions. Consider the following program with two \key{let}'s
 that define variables named \code{x}. Can you figure out the result?
 \begin{lstlisting}
-   (program ()
-      (let ([x 32]) (+ (let ([x 10]) x) x)))
+(program ()
+   (let ([x 32]) (+ (let ([x 10]) x) x)))
 \end{lstlisting}
 For the purposes of showing which variable uses correspond to which
 definitions, the following shows the \code{x}'s annotated with subscripts
 to distinguish them. Double check that your answer for the above is
 the same as your answer for this annotated version of the program.
 \begin{lstlisting}
-   (program ()
-      (let ([x|$_1$| 32]) (+ (let ([x|$_2$| 10]) x|$_2$|) x|$_1$|)))
+(program ()
+   (let ([x|$_1$| 32]) (+ (let ([x|$_2$| 10]) x|$_2$|) x|$_1$|)))
 \end{lstlisting}
 The initializing expression is always evaluated before the body of the
 \key{let}, so in the following, the \key{read} for \code{x} is
@@ -1036,24 +1035,24 @@ performed before the \key{read} for \code{y}. Given the input
 \code{52} then \code{10}, the following produces \code{42} (and not
 \code{-42}).
 \begin{lstlisting}
-   (program ()
-     (let ([x (read)]) (let ([y (read)]) (+ x (- y)))))
+(program ()
+  (let ([x (read)]) (let ([y (read)]) (+ x (- y)))))
 \end{lstlisting}
 
-Figure~\ref{fig:interp-R1} shows the interpreter for the $R_1$
-language. It extends the interpreter for $R_0$ with two new
+Figure~\ref{fig:interp-R1} shows the definitional interpreter for the
+$R_1$ language. It extends the interpreter for $R_0$ with two new
 \key{match} clauses for variables and for \key{let}.  For \key{let},
-we will need a way to communicate the initializing value of a variable
-to all the uses of a variable. To accomplish this, we maintain a
-mapping from variables to values, which is traditionally called an
-\emph{environment}. For simplicity, here we use an association list to
-represent the environment. The \code{interp-R1} function takes the
-current environment, \code{env}, as an extra parameter.  When the
-interpreter encounters a variable, it finds the corresponding value
-using the \code{lookup} function (Appendix~\ref{appendix:utilities}).
-When the interpreter encounters a \key{let}, it evaluates the
-initializing expression, extends the environment with the result bound
-to the variable, then evaluates the body of the \key{let}.
+we need a way to communicate the value of a variable to all the uses
+of a variable. To accomplish this, we maintain a mapping from
+variables to values, which is called an \emph{environment}. For
+simplicity, here we use an association list to represent the
+environment. The \code{interp-R1} function takes the current
+environment, \code{env}, as an extra parameter.  When the interpreter
+encounters a variable, it finds the corresponding value using the
+\code{lookup} function (Appendix~\ref{appendix:utilities}).  When the
+interpreter encounters a \key{let}, it evaluates the initializing
+expression, extends the environment with the result value bound to the
+variable, then evaluates the body of the \key{let}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -1088,10 +1087,11 @@ to the variable, then evaluates the body of the \key{let}.
 \end{figure}
 
 The goal for this chapter is to implement a compiler that translates
-any program $P_1$ in the $R_1$ language into an x86 assembly
-program $P_2$ such that $P_2$ exhibits the same behavior on an x86
-computer as the $R_1$ program running in a Racket implementation.
-That is, they both output the same integer $n$.
+any program $P_1$ written in the $R_1$ language into an x86 assembly
+program $P_2$ such that $P_2$ exhibits the same behavior when run on a
+computer as the $P_1$ program interpreted by \code{interp-R1}.  That
+is, they both output the same integer $n$. We depict this correctness
+criteria in the following diagram.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
  \node (p1) at (0,  0)   {$P_1$};
@@ -1109,29 +1109,33 @@ language to compile $R_1$.
 \section{The x86 Assembly Language}
 \label{sec:x86}
 
-An x86 program is a sequence of instructions. The program is stored in the
-computer's memory and the \emph{program counter} points to the address of the
-next instruction to be executed. For most instructions, once the instruction is
-executed, the program counter is incremented to point to the immediately
-following instruction in memory.  Each instruction may refer to integer
-constants (called \emph{immediate values}), variables called \emph{registers},
-and instructions may load and store values into memory.  For our purposes, we
-can think of the computer's memory as a mapping of 64-bit addresses to 64-bit
-values%
+Figure~\ref{fig:x86-a} defines the syntax for the
+subset of the x86 assembly language needed for this chapter.
+%
+An x86 program is a sequence of instructions. The program is stored in
+the computer's memory and the computer has a \emph{program counter}
+that points to the address of the next instruction to be executed. For
+most instructions, once the instruction is executed, the program
+counter is incremented to point to the immediately following
+instruction in memory. Most x86 instructions take two operands, where
+each operand is either an integer constant (called \emph{immediate
+  value}), a \emph{register}, or a \emph{memory} location.  A register
+is a special kind of variable. Each one holds a 64-bit value; there
+are 16 registers in the computer and their names are given in
+Figure~\ref{fig:x86-a}. The computer's memory as a mapping of 64-bit
+addresses to 64-bit values%
 \footnote{This simple story suffices for describing how sequential
   programs access memory but is not sufficient for multi-threaded
   programs. However, multi-threaded execution is beyond the scope of
   this book.}.
 %
-Figure~\ref{fig:x86-a} defines the syntax for the
-subset of the x86 assembly language needed for this chapter.
-%
 We use the AT\&T syntax expected by the GNU assembler, which comes
 with the \key{gcc} compiler that we use for compiling assembly code to
 machine code.
 %
-Also, Appendix~\ref{sec:x86-quick-reference} includes a quick-reference of all
-the x86 instructions used in this book and a short explanation of what they do.
+Appendix~\ref{sec:x86-quick-reference} is a quick-reference of all the
+x86 instructions used in this book with a short explanation of what
+they do.
 
 
 % to do: finish treatment of imulq
@@ -1172,21 +1176,21 @@ A register is written with a \key{\%} followed by the register name,
 such as \key{\%rax}.
 %
 An access to memory is specified using the syntax $n(\key{\%}r)$,
-which obtains the address stored in register $r$ and then
-offsets the address by $n$ bytes
-(8 bits). The address is then used to either load or store to memory
-depending on whether it occurs as a source or destination argument of
-an instruction.
+which obtains the address stored in register $r$ and then adds $n$
+bytes to the address. The resulting address is used to either load or
+store to memory depending on whether it occurs as a source or
+destination argument of an instruction.
 
-An arithmetic instruction, such as $\key{addq}\,s,\,d$, reads from the
+An arithmetic instruction such as $\key{addq}\,s,\,d$ reads from the
 source $s$ and destination $d$, applies the arithmetic operation, then
-writes the result in $d$.
+writes the result back to the destination $d$.
 %
-The move instruction, $\key{movq}\,s\,d$ reads from $s$ and stores the
+The move instruction $\key{movq}\,s\,d$ reads from $s$ and stores the
 result in $d$.
 %
 The $\key{callq}\,\mathit{label}$ instruction executes the procedure
-specified by the label.
+specified by the label. We discuss procedure calls in more detail
+later in this chapter and in Chapter~\ref{ch:functions}.
 
 Figure~\ref{fig:p0-x86} depicts an x86 program that is equivalent
 to \code{(+ 10 32)}. The \key{globl} directive says that the
@@ -1198,7 +1202,7 @@ the operating system starts executing this program.  The instruction
 following instruction \lstinline{addq $32, %rax} adds $32$ to the
 $10$ in \key{rax} and puts the result, $42$, back into
   \key{rax}.
-
+%
 The last instruction, \key{retq}, finishes the \key{main} function by
 returning the integer in \key{rax} to the operating system. The
 operating system interprets this integer as the program's exit
@@ -1237,10 +1241,10 @@ shown in Figure~\ref{fig:frame}.  The register \key{rsp} is called the
 stack. The stack grows downward in memory, so we increase the size of
 the stack by subtracting from the stack pointer. The frame size is
 required to be a multiple of 16 bytes. In the context of a procedure
-call, the \emph{return address} is the next instruction on the caller
-side that comes after the call instruction. During a function call,
-the return address is pushed onto the stack.  The register \key{rbp}
-is the \emph{base pointer} which serves two purposes: 1) it saves the
+call, the \emph{return address} is the next instruction after the call
+instruction on the caller side. During a function call, the return
+address is pushed onto the stack.  The register \key{rbp} is the
+\emph{base pointer} which serves two purposes: 1) it saves the
 location of the stack pointer for the calling procedure and 2) it is
 used to access variables associated with the current procedure.  The
 base pointer of the calling procedure is pushed onto the stack after
@@ -1292,33 +1296,33 @@ Position & Contents \\ \hline
 Getting back to the program in Figure~\ref{fig:p1-x86}, the first
 three instructions are the typical \emph{prelude} for a procedure.
 The instruction \key{pushq \%rbp} saves the base pointer for the
-procedure that called the current one onto the stack and subtracts $8$
-from the stack pointer. The second instruction \key{movq \%rsp, \%rbp}
-changes the base pointer to the top of the stack. The instruction
-\key{subq \$16, \%rsp} moves the stack pointer down to make enough
-room for storing variables.  This program just needs one variable ($8$
-bytes) but because the frame size is required to be a multiple of 16
-bytes, it rounds to 16 bytes.
+caller onto the stack and subtracts $8$ from the stack pointer. The
+second instruction \key{movq \%rsp, \%rbp} changes the base pointer to
+the top of the stack. The instruction \key{subq \$16, \%rsp} moves the
+stack pointer down to make enough room for storing variables.  This
+program needs one variable ($8$ bytes) but because the frame size is
+required to be a multiple of 16 bytes, the space for variables is
+rounded to 16 bytes.
 
 The four instructions under the label \code{start} carry out the work
 of computing $\BINOP{+}{52}{\UNIOP{-}{10} }$. The first instruction
 \key{movq \$10, -8(\%rbp)} stores $10$ in variable $1$. The
 instruction \key{negq -8(\%rbp)} changes variable $1$ to $-10$. The
-\key{movq \$52, \%rax} places $52$ in the register \key{rax} and
-\key{addq -8(\%rbp), \%rax} adds the contents of variable $1$ to
+instruction \key{movq \$52, \%rax} places $52$ in the register \key{rax} and
+finally \key{addq -8(\%rbp), \%rax} adds the contents of variable $1$ to
 \key{rax}, at which point \key{rax} contains $42$.
 
 The three instructions under the label \code{conclusion} are the
-typical finale of a procedure.  The first two are necessary to get the
-state of the machine back to where it was at the beginning of the
-procedure.  The \key{addq \$16, \%rsp} instruction moves the stack
-pointer back to point at the old base pointer. The amount added here
-needs to match the amount that was subtracted in the prelude of the
-procedure. Then \key{popq \%rbp} returns the old base pointer to
-\key{rbp} and adds $8$ to the stack pointer.  The last instruction,
-\key{retq}, jumps back to the procedure that called this one and adds
-8 to the stack pointer, which returns the stack pointer to where it
-was prior to the procedure call.
+typical \emph{finale} of a procedure.  The first two instructions are
+necessary to get the state of the machine back to where it was at the
+beginning of the procedure.  The instruction \key{addq \$16, \%rsp}
+moves the stack pointer back to point at the old base pointer. The
+amount added here needs to match the amount that was subtracted in the
+prelude of the procedure. Then \key{popq \%rbp} returns the old base
+pointer to \key{rbp} and adds $8$ to the stack pointer.  The last
+instruction, \key{retq}, jumps back to the procedure that called this
+one and adds 8 to the stack pointer, which returns the stack pointer
+to where it was prior to the procedure call.
 
 The compiler will need a convenient representation for manipulating
 x86 programs, so we define an abstract syntax for x86 in
@@ -1327,7 +1331,7 @@ a subscript $0$ because later we introduce extended versions of this
 assembly language. The main difference compared to the concrete syntax
 of x86 (Figure~\ref{fig:x86-a}) is that it does not allow labeled
 instructions to appear anywhere, but instead organizes instructions
-into groups called \emph{blocks} and a label is associated with every
+into groups called \emph{blocks} and associates a label with every
 block, which is why the \key{program} form includes an association
 list mapping labels to blocks. The reason for this organization
 becomes apparent in Chapter~\ref{ch:bool-types}.
@@ -1363,8 +1367,8 @@ x86_0 &::= & (\key{program} \;\itm{info} \; ((\itm{label} \,\key{.}\, \Block)^{+
 
 To compile one language to another it helps to focus on the
 differences between the two languages because the compiler will need
-to bridge them. What are the differences between $R_1$ and x86
-assembly? Here we list some of the most important ones.
+to bridge those differences. What are the differences between $R_1$
+and x86 assembly? Here we list some of the most important ones.
 
 \begin{enumerate}
 \item[(a)] x86 arithmetic instructions typically have two arguments
@@ -1375,14 +1379,13 @@ assembly? Here we list some of the most important ones.
   arguments.
 
 \item[(b)] An argument to an $R_1$ operator can be any expression,
-  whereas x86 instructions restrict their arguments to be \emph{simple
-    expressions} like integers, registers, and memory locations.  (All
-  the other kinds are called \emph{complex expressions}.)
+  whereas x86 instructions restrict their arguments to be integers
+  constants, registers, and memory locations.
 
 \item[(c)] The order of execution in x86 is explicit in the syntax: a
   sequence of instructions and jumps to labeled positions, whereas in
-  $R_1$ it is a left-to-right depth-first traversal of the abstract
-  syntax tree.
+  $R_1$ the order of evaluation is a left-to-right depth-first
+  traversal of the abstract syntax tree.
 
 \item[(d)] An $R_1$ program can have any number of variables whereas
   x86 has 16 registers and the procedure calls stack.
@@ -1397,15 +1400,15 @@ the problem into several steps, dealing with the above differences one
 at a time.  Each of these steps is called a \emph{pass} of the
 compiler, because step traverses (passes over) the AST of the program.
 %
-We begin by giving a sketch about how we might implement each pass,
-and give them names.  We shall then figure out an ordering of the
-passes and the input/output language for each pass. The very first
-pass has $R_1$ as its input language and the last pass has x86 as its
-output language. In between we can choose whichever language is most
+We begin by sketching how we might implement each pass, and give them
+names.  We then figure out an ordering of the passes and the
+input/output language for each pass. The very first pass has $R_1$ as
+its input language and the last pass has x86 as its output
+language. In between we can choose whichever language is most
 convenient for expressing the output of each pass, whether that be
 $R_1$, x86, or new \emph{intermediate languages} of our own design.
-Finally, to implement the compiler, we shall write one function,
-typically a structural recursive function, per pass.
+Finally, to implement each pass we write one recursive function per
+non-terminal in the grammar of the input language of the pass.
 
 \begin{description}
 \item[Pass \key{select-instructions}] To handle the difference between
@@ -1415,32 +1418,30 @@ typically a structural recursive function, per pass.
 
 \item[Pass \key{remove-complex-opera*}] To ensure that each
   subexpression (i.e. operator and operand, and hence \key{opera*}) is
-  a simple expression, we shall introduce temporary variables to hold
-  the results of subexpressions.
+  a \emph{simple expression} (a variable or integer), we shall
+  introduce temporary variables to hold the results of subexpressions.
   
 \item[Pass \key{explicate-control}] To make the execution order of the
   program explicit, we shall convert from the abstract syntax tree
   representation into a graph representation in which each node
-  contains a sequence of actions and the edges say where to go after
-  the sequence is complete.
+  contains a sequence of statements and the edges say where to go
+  after the sequence is complete.
 
 \item[Pass \key{assign-homes}] To handle the difference between the
   variables in $R_1$ versus the registers and stack location in x86,
-  we shall come up with an assignment of each variable to its
-  \emph{home}, that is, to a register or stack location.
+  we assignment of each variable to a register or stack location.
 
 \item[Pass \key{uniquify}] This pass deals with the shadowing of variables
   by renaming every variable to a unique name, so that shadowing no
   longer occurs.
-
 \end{description}
 
 The next question is: in what order should we apply these passes? This
-question can be a challenging one to answer because it is difficult to
-know ahead of time which orders will be better (easier to implement,
-produce more efficient code, etc.) so often some trial-and-error is
+question can be challenging because it is difficult to know ahead of
+time which orders will be better (easier to implement, produce more
+efficient code, etc.) so often some trial-and-error is
 involved. Nevertheless, we can try to plan ahead and make educated
-choices regarding the orderings.
+choices regarding the ordering.
 
 Let us consider the ordering of \key{uniquify} and
 \key{remove-complex-opera*}. The assignment of subexpressions to
@@ -1466,10 +1467,14 @@ With respect to \key{remove-complex-opera*}, it perhaps does not
 matter very much, but it works well to place \key{explicate-control}
 after removing complex subexpressions.
 
-The \key{assign-homes} pass should come after
-\key{remove-complex-opera*} and \key{explicate-control}.  The
-\key{remove-complex-opera*} pass generates temporary variables, which
-also need to be assigned homes. The \key{explicate-control} pass
+Next consider the ordering of the \key{assign-homes} pass with respect
+to \key{remove-complex-opera*} and \key{explicate-control}.
+%
+Removing complex subexpression requires generating temporary variables
+which then need to be assigned homes, so \key{assign-homes} should
+come after \key{remove-complex-opera*}.
+%
+The \key{explicate-control} pass
 deletes branches that will never be executed, which can remove
 variables. Thus it is good to place \key{explicate-control} prior to
 \key{assign-homes} so that there are fewer variables that need to be
@@ -1492,7 +1497,9 @@ approach in which \key{select-instructions} comes first, followed by
 the \key{assign-homes}, followed by a third pass, named
 \key{patch-instructions}, that uses a reserved register (\key{rax}) to
 patch-up outstanding problems regarding instructions with too many
-memory accesses.
+memory accesses. The disadvantage of this approach a reduction in
+runtime efficiency.
+
 
 \begin{figure}[tbp]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
