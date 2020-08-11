@@ -1677,19 +1677,19 @@ $\Rightarrow$
 \end{minipage}
 \end{tabular}
 
-We recommend implementing \code{uniquify} as a structurally recursive
-function that mostly copies the input program. However, when
-encountering a \key{let}, it should generate a unique name for the
-variable (the Racket function \code{gensym} is handy for this) and
-associate the old name with the new unique name in an association
-list. The \code{uniquify} function will need to access this
-association list when it gets to a variable reference, so we add
-another parameter to \code{uniquify} for the association list. It is
-quite common for a compiler pass to need a map to store extra
-information about variables. Such maps are traditionally called
-\emph{symbol tables}.
+We recommend implementing \code{uniquify} using an auxiliary function
+\code{uniquify-exp} that is structurally recursive function and mostly
+just copies the input program. However, when encountering a \key{let},
+it should generate a unique name for the variable (the Racket function
+\code{gensym} is handy for this) and associate the old name with the
+new unique name in an association list. The \code{uniquify-exp}
+function will need to access this association list when it gets to a
+variable reference, so we add another parameter to \code{uniquify-exp}
+for the association list. It is quite common for a compiler pass to
+need a map to store extra information about variables. Such maps are
+traditionally called \emph{symbol tables}.
 
-The skeleton of the \code{uniquify} function is shown in
+The skeleton of the \code{uniquify-exp} function is shown in
 Figure~\ref{fig:uniquify-s0}.  The function is curried so that it is
 convenient to partially apply it to an association list and then apply
 it to different expressions, as in the last clause for primitive
@@ -1707,22 +1707,21 @@ implement the clauses for variables and for the \key{let} construct.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-   (define (uniquify-exp alist)
+   (define (uniquify-exp symtab)
      (lambda (e)
        (match e
          [(? symbol?) ___]
          [(? integer?) e]
          [`(let ([,x ,e]) ,body) ___]
          [`(,op ,es ...)
-          `(,op ,@(for/list ([e es]) ((uniquify-exp alist) e)))]
+          `(,op ,@(for/list ([e es]) ((uniquify-exp symtab) e)))]
          )))
 
-   (define (uniquify alist)
-     (lambda (e)
-       (match e
-         [`(program ,info ,e)
-          `(program ,info ,((uniquify-exp alist) e))]
-         )))
+   (define (uniquify p)
+     (match p
+       [`(program ,info ,e)
+        `(program ,info ,((uniquify-exp '()) e))]
+       )))
 \end{lstlisting}
 \caption{Skeleton for the \key{uniquify} pass.}
 \label{fig:uniquify-s0}
@@ -1741,7 +1740,9 @@ subdirectory named \key{tests} and they should have the same file name
 except for a different integer at the end of the name, followed by the
 ending \key{.rkt}.  Use the \key{interp-tests} function
 (Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to test
-your \key{uniquify} pass on the example programs. 
+your \key{uniquify} pass on the example programs.  See the
+\key{run-tests.rkt} script in the student support code for an example
+of how to use \key{interp-tests}.
 
 \end{exercise}
 
@@ -2219,10 +2220,10 @@ with the Racket call \code{(system-type 'os)}, which returns
 the example programs that you created for the previous passes. Use the
 \key{compiler-tests} function (Appendix~\ref{appendix:utilities}) from
 \key{utilities.rkt} to test your complete compiler on the example
-programs.
-% The following is specific to P423/P523. -Jeremy
-%Mac support is optional, but your compiler has to output
-%valid code for Unix machines.
+programs.  See the \key{run-tests.rkt} script in the student support
+code for an example of how to use \key{compiler-tests}. Also, remember
+to compile the provided \key{runtime.c} file to \key{runtime.o} using
+\key{gcc}.
 \end{exercise}
 
 
@@ -7718,7 +7719,7 @@ registers.
 %%  LocalWords:  quasiquotes pe nullary unary rcl env lookup gcc rax
 %%  LocalWords:  addq movq callq rsp rbp rbx rcx rdx rsi rdi subq nx
 %%  LocalWords:  negq pushq popq retq globl Kernighan uniquify lll ve
-%%  LocalWords:  allocator gensym alist subdirectory scm rkt tmp lhs
+%%  LocalWords:  allocator gensym env subdirectory scm rkt tmp lhs
 %%  LocalWords:  runtime Liveness liveness undirected Balakrishnan je
 %%  LocalWords:  Rosen DSATUR SDO Gebremedhin Omari morekeywords cnd
 %%  LocalWords:  fullflexible vertices Booleans Listof Pairof thn els
