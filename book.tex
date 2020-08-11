@@ -76,6 +76,7 @@
 \lstset{%
 language=Lisp,
 basicstyle=\ttfamily\small,
+morekeywords={seq,assign,program,block,define,lambda,match},
 escapechar=|,
 columns=flexible,
 moredelim=[is][\color{red}]{~}{~}
@@ -962,7 +963,7 @@ of x86 in later chapters. Once we have introduced $R_1$ and x86, we
 reflect on their differences and come up with a plan to break down the
 translation from $R_1$ to x86 into a handful of steps
 (Section~\ref{sec:plan-s0-x86}).  The rest of the sections in this
-Chapter give detailed hints regarding each step
+chapter give detailed hints regarding each step
 (Sections~\ref{sec:uniquify-s0} through \ref{sec:patch-s0}).  We hope
 to give enough hints that the well-prepared reader, together with some
 friends, can implement a compiler from $R_1$ to x86 in a couple weeks
@@ -1239,18 +1240,18 @@ for each procedure call. The memory layout for an individual frame is
 shown in Figure~\ref{fig:frame}.  The register \key{rsp} is called the
 \emph{stack pointer} and points to the item at the top of the
 stack. The stack grows downward in memory, so we increase the size of
-the stack by subtracting from the stack pointer. The frame size is
-required to be a multiple of 16 bytes. In the context of a procedure
-call, the \emph{return address} is the next instruction after the call
-instruction on the caller side. During a function call, the return
-address is pushed onto the stack.  The register \key{rbp} is the
-\emph{base pointer} which serves two purposes: 1) it saves the
-location of the stack pointer for the calling procedure and 2) it is
-used to access variables associated with the current procedure.  The
-base pointer of the calling procedure is pushed onto the stack after
-the return address. We number the variables from $1$ to $n$. Variable
-$1$ is stored at address $-8\key{(\%rbp)}$, variable $2$ at
-$-16\key{(\%rbp)}$, etc.
+the stack by subtracting from the stack pointer. Some operating
+systems require the frame size to be a multiple of 16 bytes. In the
+context of a procedure call, the \emph{return address} is the next
+instruction after the call instruction on the caller side. During a
+function call, the return address is pushed onto the stack.  The
+register \key{rbp} is the \emph{base pointer} which serves two
+purposes: 1) it saves the location of the stack pointer for the
+calling procedure and 2) it is used to access variables associated
+with the current procedure.  The base pointer of the calling procedure
+is pushed onto the stack after the return address. We number the
+variables from $1$ to $n$. Variable $1$ is stored at address
+$-8\key{(\%rbp)}$, variable $2$ at $-16\key{(\%rbp)}$, etc.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -1423,9 +1424,9 @@ non-terminal in the grammar of the input language of the pass.
   
 \item[Pass \key{explicate-control}] To make the execution order of the
   program explicit, we shall convert from the abstract syntax tree
-  representation into a graph representation in which each node
-  contains a sequence of statements and the edges say where to go
-  after the sequence is complete.
+  representation into a \emph{control-flow graph} in which each node
+  contains a sequence of statements and the edges between nodes say
+  where to go next.
 
 \item[Pass \key{assign-homes}] To handle the difference between the
   variables in $R_1$ versus the registers and stack location in x86,
@@ -1452,53 +1453,42 @@ inadvertently change the behavior of the program.  But if we apply
 that in \key{remove-complex-opera*}, we need to ensure that the
 temporary variables that it creates are unique.
 
-Next we shall consider the ordering of the \key{explicate-control}
-pass and \key{select-instructions}. It is clear that
-\key{explicate-control} must come first because the control-flow graph
-that it generates is needed when determining where to place the x86
-label and jump instructions.
+What should be the ordering of \key{explicate-control} with respect to
+\key{uniquify}? The \key{uniquify} pass should come first because
+\key{explicate-control} changes all the \key{let}-bound variables to
+become local variables whose scope is the entire program, which would
+confuse variables with the same name.
 %
-Regarding the ordering of \key{explicate-control} with respect to
-\key{uniquify}, it is important to apply \key{uniquify} first because
-in \key{explicate-control} we change all the \key{let}-bound variables
-to become local variables whose scope is the entire program.
+Likewise, we place \key{explicate-control} after
+\key{remove-complex-opera*} because \key{explicate-control} removes
+the \key{let} form, but it is convenient to use \key{let} in the
+output of \key{remove-complex-opera*}.
 %
-With respect to \key{remove-complex-opera*}, it perhaps does not
-matter very much, but it works well to place \key{explicate-control}
-after removing complex subexpressions.
-
-Next consider the ordering of the \key{assign-homes} pass with respect
-to \key{remove-complex-opera*} and \key{explicate-control}.
-%
-Removing complex subexpression requires generating temporary variables
-which then need to be assigned homes, so \key{assign-homes} should
-come after \key{remove-complex-opera*}.
-%
-The \key{explicate-control} pass
-deletes branches that will never be executed, which can remove
-variables. Thus it is good to place \key{explicate-control} prior to
-\key{assign-homes} so that there are fewer variables that need to be
-assigned homes. This is important because the \key{assign-homes} pass
-has the highest time complexity.
+Regarding \key{assign-homes}, it is helpful to place
+\key{explicate-control} first because \key{explicate-control} changes
+\key{let}-bound variables into program-scope variables.  Instead of
+traversing the entire program for \key{let}-bound variables,
+\key{assign-homes} can read them off from the $\itm{info}$ of the
+\key{program} AST node.
 
 Last, we need to decide on the ordering of \key{select-instructions}
-and \key{assign-homes}.  These two issues are intertwined, creating a
-bit of a Gordian Knot. To do a good job of assigning homes, it is
-helpful to have already determined which instructions will be used,
-because x86 instructions have restrictions about which of their
-arguments can be registers versus stack locations. For example, one
-can give preferential treatment to variables that occur in
-register-argument positions. On the other hand, it may turn out to be
-impossible to make sure that all such variables are assigned to
-registers, and then one must redo the selection of instructions. Some
-compilers handle this problem by iteratively repeating these two
-passes until a good solution is found.  We shall use a simpler
-approach in which \key{select-instructions} comes first, followed by
-the \key{assign-homes}, followed by a third pass, named
-\key{patch-instructions}, that uses a reserved register (\key{rax}) to
-patch-up outstanding problems regarding instructions with too many
-memory accesses. The disadvantage of this approach a reduction in
-runtime efficiency.
+and \key{assign-homes}.  These two passes are intertwined, creating a
+Gordian Knot. To do a good job of assigning homes, it is helpful to
+have already determined which instructions will be used, because x86
+instructions have restrictions about which of their arguments can be
+registers versus stack locations. For example, one can give
+preferential treatment to variables that occur in register-argument
+positions. On the other hand, it may turn out to be impossible to make
+sure that all such variables are assigned to registers, and then one
+must redo the selection of instructions. Some compilers handle this
+problem by iteratively repeating these two passes until a good
+solution is found.  We shall use a simpler approach in which
+\key{select-instructions} comes first, followed by the
+\key{assign-homes}, followed by a third pass, named
+\key{patch-instructions}, that uses a reserved register to patch-up
+outstanding problems regarding instructions with too many memory
+accesses. The disadvantage of this approach a reduction in runtime
+efficiency.
 
 
 \begin{figure}[tbp]
@@ -1506,7 +1496,7 @@ runtime efficiency.
 \node (R1) at (0,2)  {\large $R_1$};
 \node (R1-2) at (3,2)  {\large $R_1$};
 \node (R1-3) at (6,2)  {\large $R_1$};
-\node (C0-1) at (6,0)  {\large $C_0$};
+%\node (C0-1) at (6,0)  {\large $C_0$};
 \node (C0-2) at (3,0)  {\large $C_0$};
 
 \node (x86-2) at (3,-2)  {\large $\text{x86}^{*}_0$};
@@ -1516,8 +1506,8 @@ runtime efficiency.
 
 \path[->,bend left=15] (R1) edge [above] node {\ttfamily\footnotesize uniquify} (R1-2);
 \path[->,bend left=15] (R1-2) edge [above] node {\ttfamily\footnotesize remove-complex.} (R1-3);
-\path[->,bend left=15] (R1-3) edge [right] node {\ttfamily\footnotesize explicate-control} (C0-1);
-\path[->,bend right=15] (C0-1) edge [above] node {\ttfamily\footnotesize uncover-locals} (C0-2);
+\path[->,bend left=15] (R1-3) edge [right] node {\ttfamily\footnotesize explicate-control} (C0-2);
+%\path[->,bend right=15] (C0-1) edge [above] node {\ttfamily\footnotesize uncover-locals} (C0-2);
 \path[->,bend right=15] (C0-2) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
 \path[->,bend left=15] (x86-2) edge [above] node {\ttfamily\footnotesize assign-homes} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-4);
@@ -1535,16 +1525,23 @@ of \key{uniquify} and \key{remove-complex-opera*} are programs that
 are still in the $R_1$ language, but the output of the pass
 \key{explicate-control} is in a different language that is designed to
 make the order of evaluation explicit in its syntax, which we
-introduce in the next section. Also, there are two passes of lesser
-importance in Figure~\ref{fig:R1-passes} that we have not yet talked
-about, \key{uncover-locals} and \key{print-x86}. We shall discuss them
-later in this Chapter.
+introduce in the next section. The last pass in
+Figure~\ref{fig:R1-passes} is \key{print-x86}, which converts from the
+abstract syntax of $\text{x86}_0$ to the concrete (textual) syntax of
+x86.
+
+In the next sections we discuss the $C_0$ language and the
+$\text{x86}^{*}_0$ and $\text{x86}^{\dagger}_0$ dialects of x86.  The
+remainder of this chapter gives hints regarding the implementation of
+each of the compiler passes in Figure~\ref{fig:R1-passes}.
+
 
 \subsection{The $C_0$ Intermediate Language}
 
-It so happens that the output of \key{explicate-control} is vaguely
-similar to the $C$ language~\citep{Kernighan:1988nx}, so we name it
-$C_0$.  The syntax for $C_0$ is defined in Figure~\ref{fig:c0-syntax}.
+The output of \key{explicate-control} is similar to the $C$
+language~\citep{Kernighan:1988nx} in that it has separate syntactic
+categories for expressions and statements, so we name it $C_0$.  The
+syntax for $C_0$ is defined in Figure~\ref{fig:c0-syntax}.
 %
 The $C_0$ language supports the same operators as $R_1$ but the
 arguments of operators are now restricted to just variables and
@@ -1562,18 +1559,18 @@ expression in tail position may contain subexpressions, and those may
 or may not be in tail position depending on the kind of expression.)
 
 A $C_0$ program consists of an association list mapping labels to
-tails. This is overkill for the present Chapter, as we do not yet need
+tails. This is overkill for the present chapter, as we do not yet need
 to introduce \key{goto} for jumping to labels, but it saves us from
 having to change the syntax of the program construct in
 Chapter~\ref{ch:bool-types}.  For now there will be just one label,
-\key{start}, and the whole program will be it's tail.
+\key{start}, and the whole program is it's tail.
 %
 The $\itm{info}$ field of the program construct, after the
-\key{uncover-locals} pass, will contain a mapping from the symbol
+\key{explicate-control} pass, contains a mapping from the symbol
 \key{locals} to a list of variables, that is, a list of all the
 variables used in the program. At the start of the program, these
-variables are uninitialized (they contain garbage) and each variable
-becomes initialized on its first assignment.
+variables are uninitialized; they become initialized on their first
+assignment.
 
 \begin{figure}[tbp]
 \fbox{
@@ -1622,18 +1619,19 @@ C_0 & ::= & (\key{program}\;\itm{info}\;((\itm{label}\,\key{.}\,\Tail)^{+}))
 \subsection{The dialects of x86}
 
 The x86$^{*}_0$ language, pronounced ``pseudo-x86'', is the output of
-the pass \key{select-instructions}. It extends $x86_0$ with variables
-and looser rules regarding instruction arguments. The x86$^{\dagger}$
-language, the output of \key{print-x86}, is the concrete syntax for
-x86.
+the pass \key{select-instructions}. It extends $x86_0$ with an unbound
+number program-scope variables and has looser rules regarding
+instruction arguments. The x86$^{\dagger}$ language, the output of
+\key{print-x86}, is the concrete syntax for x86.
 
 
 \section{Uniquify Variables}
 \label{sec:uniquify-s0}
 
-The purpose of this pass is to make sure that each \key{let} uses a
-unique variable name. For example, the \code{uniquify} pass should
-translate the program on the left into the program on the right. \\
+The \code{uniquify} pass compiles arbitrary $R_1$ programs into $R_1$
+programs in which every \key{let} uses a unique variable name. For
+example, the \code{uniquify} pass should translate the program on the
+left into the program on the right. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -1688,15 +1686,15 @@ list. The \code{uniquify} function will need to access this
 association list when it gets to a variable reference, so we add
 another parameter to \code{uniquify} for the association list. It is
 quite common for a compiler pass to need a map to store extra
-information about variables. Such maps are often called \emph{symbol
-  tables}.
+information about variables. Such maps are traditionally called
+\emph{symbol tables}.
 
 The skeleton of the \code{uniquify} function is shown in
 Figure~\ref{fig:uniquify-s0}.  The function is curried so that it is
 convenient to partially apply it to an association list and then apply
 it to different expressions, as in the last clause for primitive
 operations in Figure~\ref{fig:uniquify-s0}. In the last \key{match}
-clause for the primitive operators, note the use of the comma-@
+clause for the primitive operators, note the use of the comma-\code{@}
 operator to splice a list of S-expressions into an enclosing
 S-expression.
 
@@ -1743,20 +1741,20 @@ subdirectory named \key{tests} and they should have the same file name
 except for a different integer at the end of the name, followed by the
 ending \key{.rkt}.  Use the \key{interp-tests} function
 (Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to test
-your \key{uniquify} pass on the example programs.
+your \key{uniquify} pass on the example programs. 
 
 \end{exercise}
 
-\section{Remove Complex Operators and Operands}
+\section{Remove Complex Operands}
 \label{sec:remove-complex-opera-r1}
 
-The \code{remove-complex-opera*} pass will transform $R_1$ programs so
-that the arguments of operations are simple expressions.  Put another
-way, this pass removes complex subexpressions, such as the expression
-\code{(- 10)} in the program below. This is accomplished by
-introducing a new \key{let}-bound variable, binding the complex
-subexpression to the new variable, and then using the new variable in
-place of the complex expression, as shown in the output of
+The \code{remove-complex-opera*} pass compiles $R_1$ programs into
+$R_1$ programs in which the arguments of operations are simple
+expressions.  Put another way, this pass removes complex operands,
+such as the expression \code{(- 10)} in the program below. This is
+accomplished by introducing a new \key{let}-bound variable, binding
+the complex operand to the new variable, and then using the new
+variable in place of the complex operand, as shown in the output of
 \code{remove-complex-opera*} on the right.\\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
@@ -1781,18 +1779,20 @@ $\Rightarrow$
 We recommend implementing this pass with two mutually recursive
 functions, \code{rco-arg} and \code{rco-exp}. The idea is to apply
 \code{rco-arg} to subexpressions that need to become simple and to
-apply \code{rco-exp} to subexpressions can stay complex.  
-Both functions take an expression in $R_1$ as input.
-The \code{rco-exp} function returns an expression.
-The \code{rco-arg} function returns two things:
-a simple expression and association list mapping temporary variables
-to complex subexpressions. You can return multiple things from a
-function using Racket's \key{values} form and you can receive multiple
-things from a function call using the \key{define-values} form. If you
-are not familiar with these constructs, the Racket documentation will
-be of help.  Also, the \key{for/lists} construct is useful for
+apply \code{rco-exp} to subexpressions can stay complex.  Both
+functions take an $R_1$ expression as input.  The \code{rco-exp}
+function returns an expression.  The \code{rco-arg} function returns
+two things: a simple expression and association list mapping temporary
+variables to complex subexpressions. You can return multiple things
+from a function using Racket's \key{values} form and you can receive
+multiple things from a function call using the \key{define-values}
+form. If you are not familiar with these constructs, review the Racket
+documentation.  Also, the \key{for/lists} construct is useful for
 applying a function to each element of a list, in the case where the
 function returns multiple values.
+
+The following shows the output of \code{rco-arg} on the expression
+\code{(- 10)}.
 
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
@@ -1811,11 +1811,12 @@ $\Rightarrow$
 \end{minipage}
 \end{tabular}
 
-Take special care of programs such as the following that
-\key{let}-bind variables with integers or other variables. It should
-leave them unchanged, as shown in to the program on the right \\
+Take special care of programs such as the next one that \key{let}-bind
+variables with integers or other variables. You should leave them
+unchanged, as shown in to the program on the right \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
+% s0_20.rkt
 \begin{lstlisting}
 (program ()
   (let ([a 42])
@@ -1835,9 +1836,8 @@ $\Rightarrow$
 \end{lstlisting}
 \end{minipage}
 \end{tabular} \\
-and not translate them to the following, which might result from a
-careless implementation of \key{rco-exp} and \key{rco-arg}.
-
+A careless implementation of \key{rco-exp} and \key{rco-arg} might
+produce the following output.\\
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
    (program ()
@@ -1863,10 +1863,11 @@ your passes on the example programs.
 \section{Explicate Control}
 \label{sec:explicate-control-r1}
 
-The \code{explicate-control} pass makes the order of execution
-explicit in the syntax of the program. For $R_1$, this amounts to
-flattening \key{let} constructs into a sequence of assignment
-statements. For example, consider the following $R_1$ program.
+The \code{explicate-control} pass compiles $R_1$ programs into $C_0$
+programs that make the order of execution explicit in their
+syntax. For now this amounts to flattening \key{let} constructs into a
+sequence of assignment statements. For example, consider the following
+$R_1$ program.
 % s0_11.rkt
 \begin{lstlisting}
 (program ()
@@ -1875,13 +1876,12 @@ statements. For example, consider the following $R_1$ program.
     y))
 \end{lstlisting}
 %
-The output of \code{remove-complex-opera*} is shown below, on the
-left.  The right-hand-side of a \key{let} executes before its body, so
-the order of evaluation for this program is to assign \code{20} to
-\code{x.1}, assign \code{22} to \code{x.2}, assign \code{(+ x.1 x.2)}
-to \code{y}, then return \code{y}. Indeed, the result of
-\code{explicate-control} produces code in the $C_0$ language that
-makes this explicit.\\
+The output of the previous pass and of \code{explicate-control} is
+shown below. Recall that the right-hand-side of a \key{let} executes
+before its body, so the order of evaluation for this program is to
+assign \code{20} to \code{x.1}, assign \code{22} to \code{x.2}, assign
+\code{(+ x.1 x.2)} to \code{y}, then return \code{y}. Indeed, the
+output of \code{explicate-control} makes this ordering explicit.\\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -1897,7 +1897,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program ()
+(program ((locals . (y x.1 x.2)))
   ((start . 
    (seq (assign x.1 20)
    (seq (assign x.2 22)
@@ -1910,55 +1910,62 @@ $\Rightarrow$
 We recommend implementing \code{explicate-control} using two mutually
 recursive functions: \code{explicate-control-tail} and
 \code{explicate-control-assign}.  The \code{explicate-control-tail}
-function should be applied to expressions in tail position, whereas
+function should be applied to expressions in tail position whereas
 \code{explicate-control-assign} should be applied to expressions that
-occur on the right-hand-side of a \code{let}.  The function
+occur on the right-hand-side of a \key{let}.  The function
 \code{explicate-control-tail} takes an $R_1$ expression as input and
 produces a $C_0$ $\Tail$ (see the grammar in
-Figure~\ref{fig:c0-syntax}).  The \code{explicate-control-assign}
-function takes an $R_1$ expression, the variable that it is to be
-assigned to, and $C_0$ code (a $\Tail$) that should come after the
-assignment (e.g., the code generated for the body of the \key{let}).
+Figure~\ref{fig:c0-syntax}) and a list of formerly \key{let}-bound
+variables. The \code{explicate-control-assign} function takes an $R_1$
+expression, the variable that it is to be assigned to, and $C_0$ code
+(a $\Tail$) that should come after the assignment (e.g., the code
+generated for the body of the \key{let}).  It returns a $\Tail$ and a
+list of variables. The top-level \code{explicate-control} function
+should invoke \code{explicate-control-tail} on the body of the
+\key{program} and then associate the \code{locals} symbol with the
+resulting list of variables in the $\itm{info}$ field, as in the above
+example.
 
-\section{Uncover Locals}
-\label{sec:uncover-locals-r1}
+%% \section{Uncover Locals}
+%% \label{sec:uncover-locals-r1}
 
-The pass \code{uncover-locals} simply collects all of the variables in
-the program and places then in the $\itm{info}$ of the program
-construct. Here is the output for the example program of the last
-section.
+%% The pass \code{uncover-locals} simply collects all of the variables in
+%% the program and places then in the $\itm{info}$ of the program
+%% construct. Here is the output for the example program of the last
+%% section.
 
-\begin{minipage}{0.4\textwidth}
-\begin{lstlisting}
-(program ((locals . (x.1 x.2 y)))
-  ((start . 
-   (seq (assign x.1 20)
-   (seq (assign x.2 22)
-   (seq (assign y (+ x.1 x.2))
-   (return y)))))))
-\end{lstlisting}
-\end{minipage}
+%% \begin{minipage}{0.4\textwidth}
+%% \begin{lstlisting}
+%% (program ((locals . (x.1 x.2 y)))
+%%   ((start . 
+%%    (seq (assign x.1 20)
+%%    (seq (assign x.2 22)
+%%    (seq (assign y (+ x.1 x.2))
+%%    (return y)))))))
+%% \end{lstlisting}
+%% \end{minipage}
 
 \section{Select Instructions}
 \label{sec:select-r1}
 
 In the \code{select-instructions} pass we begin the work of
-translating from $C_0$ to x86. The target language of this pass is a
-pseudo-x86 language that still uses variables, so we add an AST node
-of the form $\VAR{\itm{var}}$ to the x86 abstract syntax.  We
-recommend implementing the \code{select-instructions} in terms of
-three auxiliary functions, one for each of the non-terminals of
-$C_0$: $\Arg$, $\Stmt$, and $\Tail$.
+translating from $C_0$ to $\text{x86}^{*}_0$. The target language of
+this pass is a pseudo-x86 language that still uses variables, so we
+add an AST node of the form $\VAR{\itm{var}}$ to the $\text{x86}_0$
+abstract syntax of Figure~\ref{fig:x86-ast-a}.  We recommend
+implementing the \code{select-instructions} in terms of three
+auxiliary functions, one for each of the non-terminals of $C_0$:
+$\Arg$, $\Stmt$, and $\Tail$.
 
-The cases for $\itm{arg}$ are straightforward, simply putting
-variables and integer literals into the s-expression format expected
-of pseudo-x86, \code{(var $x$)} and \code{(int $n$)}, respectively.
+The cases for $\itm{arg}$ are straightforward, simply put variables
+and integer literals into the s-expression format expected of
+pseudo-x86, \code{(var $x$)} and \code{(int $n$)}, respectively.
 
-Next we discuss some of the cases for $\itm{stmt}$, starting with
-arithmetic operations. For example, in $C_0$ an addition operation can
-take the form below.  To translate to x86, we need to use the
-\key{addq} instruction which does an in-place update. So we must first
-move \code{10} to \code{x}. \\
+Next we consider the cases for $\itm{stmt}$, starting with arithmetic
+operations. For example, in $C_0$ an addition operation can take the
+form below, to the left of the $\Rightarrow$.  To translate to x86, we
+need to use the \key{addq} instruction which does an in-place
+update. So we must first move \code{10} to \code{x}. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -1976,11 +1983,12 @@ $\Rightarrow$
 \end{minipage}
 \end{tabular} \\
 %
-There are some cases that require special care to avoid generating
-needlessly complicated code. If one of the arguments is the same as
-the left-hand side of the assignment, then there is no need for the
-extra move instruction.  For example, the following assignment
-statement can be translated into a single \key{addq} instruction.\\
+There are cases that require special care to avoid generating
+needlessly complicated code. If one of the arguments of the addition
+is the same as the left-hand side of the assignment, then there is no
+need for the extra move instruction.  For example, the following
+assignment statement can be translated into a single \key{addq}
+instruction.\\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -2002,11 +2010,11 @@ assembly, so we have instead implemented this functionality in the C
 language, with the function \code{read\_int} in the file
 \code{runtime.c}. In general, we refer to all of the functionality in
 this file as the \emph{runtime system}, or simply the \emph{runtime}
-for short. When compiling your generated x86 assembly code, you
-will need to compile \code{runtime.c} to \code{runtime.o} (an ``object
-file'', using \code{gcc} option \code{-c}) and link it into the final
+for short. When compiling your generated x86 assembly code, you need
+to compile \code{runtime.c} to \code{runtime.o} (an ``object file'',
+using \code{gcc} option \code{-c}) and link it into the
 executable. For our purposes of code generation, all you need to do is
-translate an assignment of \key{read} to some variable $\itm{lhs}$
+translate an assignment of \key{read} into some variable $\itm{lhs}$
 (for left-hand side) into a call to the \code{read\_int} function
 followed by a move from \code{rax} to the left-hand side.  The move
 from \code{rax} is needed because the return value from
@@ -2032,8 +2040,8 @@ There are two cases for the $\Tail$ non-terminal: \key{return} and
 \key{seq}. Regarding \RETURN{e}, we recommend treating it as an
 assignment to the \key{rax} register followed by a jump to the
 conclusion of the program (so the conclusion needs to be labeled).
-For $(\key{seq}\,s\,t)$, we simply process the statement $s$ and tail
-$t$ recursively and append the resulting instructions.
+For $(\key{seq}\,s\,t)$, we the statement $s$ and tail $t$ recursively
+and append the resulting instructions.
 
 \begin{exercise}
 \normalfont
@@ -2048,29 +2056,58 @@ your passes on the example programs.
 \section{Assign Homes}
 \label{sec:assign-r1}
 
-As discussed in Section~\ref{sec:plan-s0-x86}, the
-\key{assign-homes} pass places all of the variables on the stack.
-Consider again the example $R_1$ program \code{(+ 52 (- 10))},
-which after \key{select-instructions} looks like the following.
-\begin{lstlisting}
-   (movq (int 10) (var tmp.1))
-   (negq (var tmp.1))
-   (movq (var tmp.1) (var tmp.2))
-   (addq (int 52) (var tmp.2))
-   (movq (var tmp.2) (reg rax)))
-\end{lstlisting}
-The variable \code{tmp.1} is assigned to stack location
-\code{-8(\%rbp)}, and \code{tmp.2} is assign to \code{-16(\%rbp)}, so
-the \code{assign-homes} pass translates the above to
-\begin{lstlisting}
-   (movq (int 10) (deref rbp -8))
-   (negq (deref rbp -8))
-   (movq (deref rbp -8) (deref rbp -16))
-   (addq (int 52) (deref rbp -16))
-   (movq (deref rbp -16) (reg rax)))
-\end{lstlisting}
+The \key{assign-homes} pass compiles $\text{x86}^{*}_0$ programs to
+$\text{x86}^{*}_0$ programs that no longer use program variables.
+Thus, the \key{assign-homes} pass is responsible for placing all of
+the program variables in registers or on the stack. For runtime
+efficiency, it is better to place variables in registers, but as there
+are only 16 registers, some programs must necessarily place some
+variables on the stack. In this chapter we focus on the mechanics of
+placing variables on the stack. We study an algorithm for placing
+variables in registers in Chapter~\ref{ch:register-allocation-r1}.
 
-In the process of assigning stack locations to variables, it is
+Consider again the following $R_1$ program.
+% s0_20.rkt
+\begin{lstlisting}
+(program ()
+  (let ([a 42])
+    (let ([b a])
+      b)))
+\end{lstlisting}
+For reference, we repeat the output of \code{select-instructions} on
+the left and show the output of \code{assign-homes} on the right.
+Recall that \key{explicate-control} associated the list of
+variables with the \code{locals} symbol in the program's $\itm{info}$
+field, so \code{assign-homes} has convenient access to the them.  In
+this example, we assign variable \code{a} to stack location
+\code{-8(\%rbp)} and variable \code{b} to location \code{-16(\%rbp)}.\\
+\begin{tabular}{l}
+  \begin{minipage}{0.4\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+(program ((locals . (a b)))
+ ((start . 
+   (block ()
+    (movq (int 42) (var a))
+    (movq (var a) (var b))
+    (movq (var b) (reg rax))
+    (jmp conclusion)))))
+\end{lstlisting}
+\end{minipage}
+{$\Rightarrow$}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+(program ((stack-space . 16))
+ ((start .
+   (block ()
+    (movq (int 42) (deref rbp -8))
+    (movq (deref rbp -8) (deref rbp -16))
+    (movq (deref rbp -16) (reg rax))
+    (jmp conclusion)))))
+\end{lstlisting}
+\end{minipage}
+\end{tabular} \\
+
+In the process of assigning variables to stack locations, it is
 convenient to compute and store the size of the frame (in bytes) in
 the $\itm{info}$ field of the \key{program} node, with the key
 \code{stack-space}, which will be needed later to generate the
@@ -2090,33 +2127,39 @@ mapping of variable names to homes (stack locations for now).  Use the
 \section{Patch Instructions}
 \label{sec:patch-s0}
 
-The purpose of this pass is to make sure that each instruction adheres
-to the restrictions regarding which arguments can be memory
-references. For most instructions, the rule is that at most one
-argument may be a memory reference.
+The \code{patch-instructions} pass compiles $\text{x86}^{*}_0$
+programs to $\text{x86}_0$ programs by making sure that each
+instruction adheres to the restrictions of the x86 assembly language.
+In particular, at most one argument of an instruction may be a memory
+reference.
 
-Consider again the following example.
+We return to the following running example.
+% s0_20.rkt
 \begin{lstlisting}
    (let ([a 42])
      (let ([b a])
        b))
 \end{lstlisting}
-After \key{assign-homes} pass, the above has been translated to
+After the \key{assign-homes} pass, the above program has been translated to
+the following. \\
+\begin{minipage}{0.5\textwidth}
 \begin{lstlisting}
-   (movq (int 42) (deref rbp -8))
-   (movq (deref rbp -8) (deref rbp -16))
-   (movq (deref rbp -16) (reg rax))
-   (jmp conclusion)
+(program ((stack-space . 16))
+ ((start .
+   (block ()
+     (movq (int 42) (deref rbp -8))
+     (movq (deref rbp -8) (deref rbp -16))
+     (movq (deref rbp -16) (reg rax))
+     (jmp conclusion)))))
 \end{lstlisting}
+\end{minipage}\\
 The second \key{movq} instruction is problematic because both
 arguments are stack locations. We suggest fixing this problem by
-moving from the source to the register \key{rax} and then from
-\key{rax} to the destination, as follows.
+moving from the source location to the register \key{rax} and then
+from \key{rax} to the destination location, as follows.
 \begin{lstlisting}
-   (movq (int 42) (deref rbp -8))
    (movq (deref rbp -8) (reg rax))
    (movq (reg rax) (deref rbp -16))
-   (movq (deref rbp -16) (reg rax))
 \end{lstlisting}
 
 \begin{exercise}
@@ -2133,9 +2176,9 @@ your passes on the example programs.
 \section{Print x86}
 \label{sec:print-x86}
 
-The last step of the compiler from $R_1$ to x86 is to convert the x86
-AST (defined in Figure~\ref{fig:x86-ast-a}) to the string
-representation (defined in Figure~\ref{fig:x86-a}). The Racket
+The last step of the compiler from $R_1$ to x86 is to convert the
+$\text{x86}_0$ AST (defined in Figure~\ref{fig:x86-ast-a}) to the
+string representation (defined in Figure~\ref{fig:x86-a}). The Racket
 \key{format} and \key{string-append} functions are useful in this
 regard. The main work that this step needs to perform is to create the
 \key{main} function and the standard instructions for its prelude and
@@ -7565,21 +7608,22 @@ AST to AST), and a function that implements the interpreter (a
 function from AST to result value) for the language of the output of
 the pass.  The interpreters from Appendix~\ref{appendix:interp} make a
 good choice.  The \key{interp-tests} function assumes that the
-subdirectory \key{tests} has a bunch of Scheme programs whose names
+subdirectory \key{tests} has a collection of Scheme programs whose names
 all start with the family name, followed by an underscore and then the
 test number, ending in \key{.scm}. Also, for each Scheme program there
 is a file with the same number except that it ends with \key{.in} that
 provides the input for the Scheme program.
 \begin{lstlisting}
-(define (interp-tests name passes test-family test-nums) ...
+(define (interp-tests name passes test-family test-nums) ...)
 \end{lstlisting}
 
 The compiler-tests function takes a compiler name (a string) a
-description of the passes (see the comment for \key{interp-tests}) a
-test family name (a string), and a list of test numbers (see the
-comment for interp-tests), and runs the compiler to generate x86 (a
-\key{.s} file) and then runs gcc to generate machine code.  It runs
-the machine code and checks that the output is 42.
+description of the passes (as described above for
+\code{interp-tests}), a test family name (a string), and a list of
+test numbers (see the comment for interp-tests), and runs the compiler
+to generate x86 (a \key{.s} file) and then runs gcc to generate
+machine code.  It runs the machine code and checks that the output is
+42.
 \begin{lstlisting}
 (define (compiler-tests name passes test-family test-nums) ...)
 \end{lstlisting}
