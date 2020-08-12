@@ -910,7 +910,8 @@ test whether it produces programs that get the same result as the
 input programs. That is, we can test whether it satisfies Diagram
 \eqref{eq:compile-correct}. The following code runs the partial
 evaluator on several examples and tests the output program.  The
-\texttt{assert} function is defined in Appendix~\ref{appendix:utilities}.
+\texttt{assert} function is defined in Appendix~\ref{appendix:utilities}.\\
+\begin{minipage}{1.0\textwidth}
 \begin{lstlisting}
 (define (test-pe p)
   (assert "testing pe-R0"
@@ -920,32 +921,7 @@ evaluator on several examples and tests the output program.  The
 (test-pe `(+ 1 (+ (read) 1)))
 (test-pe `(- (+ (read) (- 5))))
 \end{lstlisting}
-
-\begin{exercise}
-\normalfont
-% I don't like the italics for exercises. -Jeremy
-Improve on the partial evaluator in Figure~\ref{fig:pe-arith} by
-replacing the \texttt{pe-neg} and \texttt{pe-add} helper functions
-with functions that know more about arithmetic. For example, your
-partial evaluator should translate
-\begin{lstlisting}
-(+ 1 (+ (read) 1))
-\end{lstlisting}
-into
-\begin{lstlisting}
-(+ 2 (read))
-\end{lstlisting}
-To accomplish this, we recommend that your partial evaluator produce
-output in the form of the $\itm{residual}$ non-terminal of the
-following grammar.
-\[
-\begin{array}{lcl}
-\Exp &::=& \Int \mid (\key{read}) \mid (\key{-} \;(\key{read}))
-      \mid (\key{+} \; \Exp \; \Exp)\\
-\itm{residual} &::=& \Int \mid (\key{+}\; \Int\; \Exp) \mid \Exp
-\end{array}
-\]
-\end{exercise}
+\end{minipage}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2226,19 +2202,71 @@ to compile the provided \key{runtime.c} file to \key{runtime.o} using
 \end{exercise}
 
 
-\margincomment{\footnotesize To do: add a challenge section. Perhaps
-  extending the partial evaluation to $R_0$? \\ --Jeremy}
+\section{Challenge: Partial Evaluator for $R_1$}
+\label{sec:pe-R1}
+
+This section describes optional challenge exercises that involve
+adapting and improving the partial evaluator for $R_0$ that was
+introduced in Section~\ref{sec:partial-evaluation}.
+
+\begin{exercise}\label{ex:pe-R1}
+\normalfont
+  
+Adapt the partial evaluator from Section~\ref{sec:partial-evaluation}
+(Figure~\ref{fig:pe-arith}) so that it applies to $R_1$ programs
+instead of $R_0$ programs. Recall that $R_1$ adds \key{let} binding
+and variables to the $R_0$ language, so you will need to add cases for
+them in the \code{pe-exp} function. Also, note that the \key{program}
+form changes slightly to include an $\itm{info}$ field.  Once
+complete, add the partial evaluation pass to the front of your
+compiler and make sure that your compiler still passes all of the
+tests.
+\end{exercise}
+
+The next exercise builds on Exercise~\ref{ex:pe-R1}.
+
+\begin{exercise}
+\normalfont
+
+Improve on the partial evaluator by replacing the \code{pe-neg} and
+\code{pe-add} auxiliary functions with functions that know more about
+arithmetic. For example, your partial evaluator should translate
+\begin{lstlisting}
+(+ 1 (+ (read) 1))
+\end{lstlisting}
+into
+\begin{lstlisting}
+(+ 2 (read))
+\end{lstlisting}
+To accomplish this, the \code{pe-exp} function should produce output
+in the form of the $\itm{residual}$ non-terminal of the following
+grammar.
+\[
+\begin{array}{lcl}
+\itm{inert} &::=& \Var \mid (\key{read}) \mid (\key{-} \;(\key{read}))
+      \mid (\key{+} \; \itm{inert} \; \itm{inert})\\
+\itm{residual} &::=& \Int \mid (\key{+}\; \Int\; \itm{inert}) \mid \itm{inert}
+\end{array}
+\]
+The \code{pe-add} and \code{pe-neg} functions may therefore assume
+that their inputs are $\itm{residual}$ expressions and they should
+return $\itm{residual}$ expressions.  Once the improvements are
+complete, make sure that your compiler still passes all of the tests.
+After all, fast code is useless if it produces incorrect results!
+\end{exercise}
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Register Allocation}
 \label{ch:register-allocation-r1}
 
-In Chapter~\ref{ch:int-exp} we simplified the generation of x86
-assembly by placing all variables on the stack. We can improve the
-performance of the generated code considerably if we instead place as
-many variables as possible into registers.  The CPU can access a
-register in a single cycle, whereas accessing the stack takes many
-cycles to go to cache or many more to access main memory.
+In Chapter~\ref{ch:int-exp} we placed all variables on the stack to
+make our life easier. However, we can improve the performance of the
+generated code if we instead place some variables into registers.  The
+CPU can access a register in a single cycle, whereas accessing the
+stack takes many cycles if the relevant data is in cache or many more
+to access main memory if the data is not in cache.
 Figure~\ref{fig:reg-eg} shows a program with four variables that
 serves as a running example. We show the source program and also the
 output of instruction selection. At that point the program is almost
@@ -2247,7 +2275,7 @@ stack locations or registers.
 
 \begin{figure}
 \begin{minipage}{0.45\textwidth}
-$R_1$ program:
+Example $R_1$ program:
 % s0_22.rkt
 \begin{lstlisting}
 (program ()
@@ -2286,22 +2314,22 @@ After instruction selection:
 \end{figure}
 
 The goal of register allocation is to fit as many variables into
-registers as possible. It is often the case that we have more
-variables than registers, so we cannot map each variable to a
-different register. Fortunately, it is common for different variables
-to be needed during different periods of time, and in such cases
-several variables can be mapped to the same register.  Consider
-variables \code{x} and \code{y} in Figure~\ref{fig:reg-eg}.  After the
-variable \code{x} is moved to \code{z} it is no longer needed.
-Variable \code{y}, on the other hand, is used only after this point,
-so \code{x} and \code{y} could share the same register. The topic of
-Section~\ref{sec:liveness-analysis-r1} is how we compute where a variable
-is needed.  Once we have that information, we compute which variables
-are needed at the same time, i.e., which ones \emph{interfere}, and
-represent this relation as graph whose vertices are variables and
-edges indicate when two variables interfere with each other
-(Section~\ref{sec:build-interference}). We then model register
-allocation as a graph coloring problem, which we discuss in
+registers as possible. A program sometimes has more variables than
+registers, so we cannot map each variable to a different
+register. Fortunately, it is common for different variables to be
+needed during different periods of time during program execution, and
+in such cases several variables can be mapped to the same register.
+Consider variables \code{x} and \code{y} in Figure~\ref{fig:reg-eg}.
+After the variable \code{x} is moved to \code{z} it is no longer
+needed.  Variable \code{y}, on the other hand, is used only after this
+point, so \code{x} and \code{y} could share the same register. The
+topic of Section~\ref{sec:liveness-analysis-r1} is how we compute
+where a variable is needed.  Once we have that information, we compute
+which variables are needed at the same time, i.e., which ones
+\emph{interfere}, and represent this relation as graph whose vertices
+are variables and edges indicate when two variables interfere with
+each other (Section~\ref{sec:build-interference}). We then model
+register allocation as a graph coloring problem, which we discuss in
 Section~\ref{sec:graph-coloring}.
 
 In the event that we run out of registers despite these efforts, we
@@ -4560,20 +4588,29 @@ would run out of memory.\footnote{The $R_3$ language does not have
 must therefore perform automatic garbage collection.
 
 Figure~\ref{fig:interp-R3} shows the definitional interpreter for the
-$R_3$ language and Figure~\ref{fig:typecheck-R3} shows the type
-checker. The additions to the interpreter are straightforward but the
-updates to the type checker deserve some explanation.  As we shall see
-in Section~\ref{sec:GC}, we need to know which variables are pointers
-into the heap, that is, which variables are vectors. Also, when
-allocating a vector, we shall need to know which elements of the
-vector are pointers. We can obtain this information during type
-checking and when we uncover local variables. The type checker in
-Figure~\ref{fig:typecheck-R3} not only computes the type of an
-expression, it also wraps every sub-expression $e$ with the form
-$(\key{has-type}\; e\; T)$, where $T$ is $e$'s type. Subsequently, in
-the \code{uncover-locals} pass (Section~\ref{sec:uncover-locals-r3})
-this type information is propagated to all variables (including the
-temporaries generated by \code{remove-complex-opera*}).
+$R_3$ language. We define the \code{vector}, \code{vector-ref}, and
+\code{vector-set!} operations for $R_3$ in terms of the corresponding
+operations in Racket. One subtle point is that the \code{vector-set!}
+operation returns the \code{\#<void>} value. The \code{\#<void>} value
+can be passed around just like other values inside an $R_3$ program,
+but there are no operations specific to the the \code{\#<void>} value
+in $R_3$. In contrast, Racket defines the \code{void?} predicate that
+returns \code{\#t} when applied to \code{\#<void>} and \code{\#f}
+otherwise.
+
+Figure~\ref{fig:typecheck-R3} shows the type checker for $R_3$ , which
+deserves some explanation. As we shall see in Section~\ref{sec:GC}, we
+need to know which variables are pointers into the heap, that is,
+which variables are vectors. Also, when allocating a vector, we shall
+need to know which elements of the vector are pointers. We can obtain
+this information during type checking and when we uncover local
+variables. The type checker in Figure~\ref{fig:typecheck-R3} not only
+computes the type of an expression, it also wraps every sub-expression
+$e$ with the form $(\key{has-type}\; e\; T)$, where $T$ is $e$'s
+type. Subsequently, in the \code{uncover-locals} pass
+(Section~\ref{sec:uncover-locals-r3}) this type information is
+propagated to all variables (including the temporaries generated by
+\code{remove-complex-opera*}).
 
 \begin{figure}[tbp]
 \begin{lstlisting}
