@@ -78,6 +78,7 @@
 language=Lisp,
 basicstyle=\ttfamily\small,
 morekeywords={seq,assign,program,block,define,lambda,match},
+deletekeywords={read},
 escapechar=|,
 columns=flexible,
 moredelim=[is][\color{red}]{~}{~}
@@ -302,8 +303,7 @@ typically stored in text files on disk, as \emph{concrete syntax}.
 ASTs can be represented in many different ways, depending on the programming
 language used to write the compiler.
 %
-Because this book uses Racket (\url{http://racket-lang.org}), a
-descendant of Lisp, we can use S-expressions to conveniently represent
+We use Racket's \code{struct} feature to conveniently represent
 ASTs (Section~\ref{sec:ast}). We use grammars to defined the abstract
 syntax of programming languages (Section~\ref{sec:grammar}) and
 pattern matching to inspect individual nodes in an AST
@@ -311,15 +311,14 @@ pattern matching to inspect individual nodes in an AST
 and deconstruct entire ASTs (Section~\ref{sec:recursion}).  This
 chapter provides an brief introduction to these ideas.
 
-\section{Abstract Syntax Trees and S-expressions}
+\section{Abstract Syntax Trees and Racket Structures}
 \label{sec:ast}
 
 The primary data structure that is commonly used for representing
 programs is the \emph{abstract syntax tree} (AST). When considering
 some part of a program, a compiler needs to ask what kind of thing it
 is and what sub-parts it contains. For example, the program on the
-left, represented by an S-expression, corresponds to the AST on the
-right.
+left corresponds to the AST on the right.
 \begin{center}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -349,64 +348,98 @@ node except for the root has a \emph{parent} (the node it is the child
 of). If a node has no children, it is a \emph{leaf} node.  Otherwise
 it is an \emph{internal} node.
 
-Recall that an \emph{symbolic expression} (S-expression) is either
-\begin{enumerate}
-\item an atom, or
-\item a pair of two S-expressions, written $(e_1 \key{.} e_2)$,
-    where $e_1$ and $e_2$ are each an S-expression.
-\end{enumerate}
-An \emph{atom} can be a symbol, such as \code{`hello}, a number, the
-null value \code{'()}, etc.  We can create an S-expression in Racket
-simply by writing a backquote (called a quasi-quote in Racket)
-followed by the textual representation of the S-expression.  It is
-quite common to use S-expressions to represent a list, such as $a, b
-,c$ in the following way:
-\begin{lstlisting}
-`(a . (b . (c . ())))
-\end{lstlisting}
-Each element of the list is in the first slot of a pair, and the
-second slot is either the rest of the list or the null value, to mark
-the end of the list. Such lists are so common that Racket provides
-special notation for them that removes the need for the periods
-and so many parenthesis:
-\begin{lstlisting}
-`(a b c)
-\end{lstlisting}
-The following expression creates an S-expression that represents AST
-\eqref{eq:arith-prog}.
-\begin{lstlisting}
-`(+ (read) (- 8))
-\end{lstlisting}
-When using S-expressions to represent ASTs, the convention is to
-represent each AST node as a list and to put the operation symbol at
-the front of the list. The rest of the list contains the children.  So
-in the above case, the root AST node has operation \code{`+} and its
-two children are \code{`(read)} and \code{`(- 8)}, just as in the
-diagram \eqref{eq:arith-prog}.
+%% Recall that an \emph{symbolic expression} (S-expression) is either
+%% \begin{enumerate}
+%% \item an atom, or
+%% \item a pair of two S-expressions, written $(e_1 \key{.} e_2)$,
+%%     where $e_1$ and $e_2$ are each an S-expression.
+%% \end{enumerate}
+%% An \emph{atom} can be a symbol, such as \code{`hello}, a number, the
+%% null value \code{'()}, etc.  We can create an S-expression in Racket
+%% simply by writing a backquote (called a quasi-quote in Racket)
+%% followed by the textual representation of the S-expression.  It is
+%% quite common to use S-expressions to represent a list, such as $a, b
+%% ,c$ in the following way:
+%% \begin{lstlisting}
+%% `(a . (b . (c . ())))
+%% \end{lstlisting}
+%% Each element of the list is in the first slot of a pair, and the
+%% second slot is either the rest of the list or the null value, to mark
+%% the end of the list. Such lists are so common that Racket provides
+%% special notation for them that removes the need for the periods
+%% and so many parenthesis:
+%% \begin{lstlisting}
+%% `(a b c)
+%% \end{lstlisting}
+%% The following expression creates an S-expression that represents AST
+%% \eqref{eq:arith-prog}.
+%% \begin{lstlisting}
+%% `(+ (read) (- 8))
+%% \end{lstlisting}
+%% When using S-expressions to represent ASTs, the convention is to
+%% represent each AST node as a list and to put the operation symbol at
+%% the front of the list. The rest of the list contains the children.  So
+%% in the above case, the root AST node has operation \code{`+} and its
+%% two children are \code{`(read)} and \code{`(- 8)}, just as in the
+%% diagram \eqref{eq:arith-prog}.
 
-To build larger S-expressions one often needs to splice together
-several smaller S-expressions. Racket provides the comma operator to
-splice an S-expression into a larger one. For example, instead of
-creating the S-expression for AST \eqref{eq:arith-prog} all at once,
-we could have first created an S-expression for AST
-\eqref{eq:arith-neg8} and then spliced that into the addition
-S-expression.
+%% To build larger S-expressions one often needs to splice together
+%% several smaller S-expressions. Racket provides the comma operator to
+%% splice an S-expression into a larger one. For example, instead of
+%% creating the S-expression for AST \eqref{eq:arith-prog} all at once,
+%% we could have first created an S-expression for AST
+%% \eqref{eq:arith-neg8} and then spliced that into the addition
+%% S-expression.
+%% \begin{lstlisting}
+%% (define ast1.4 `(- 8))
+%% (define ast1.1 `(+ (read) ,ast1.4))
+%% \end{lstlisting}
+%% In general, the Racket expression that follows the comma (splice)
+%% can be any expression that produces an S-expression.
+
+We define a Racket \code{struct} for each kind of node. For this
+chapter we require just two kinds of nodes: one for integer constants
+and one for primitive operations. The following is the \code{struct}
+definition for integer constants.
 \begin{lstlisting}
-(define ast1.4 `(- 8))
-(define ast1.1 `(+ (read) ,ast1.4))
+(struct Int (value))
 \end{lstlisting}
-In general, the Racket expression that follows the comma (splice)
-can be any expression that produces an S-expression.
+An integer node includes just one thing: the integer value.
+To create a AST node for the integer $8$, we write \code{(Int 8)}.
+\begin{lstlisting}
+(define eight (Int 8))
+\end{lstlisting}
+The following is the \code{struct} definition for primitives operations.
+\begin{lstlisting}
+(struct Prim (op arg*))
+\end{lstlisting}
+A primitive operation node includes an operator symbol \code{op}
+and a list of children \code{arg*}. For example, to create
+an AST that negates the number $8$, we write \code{(Prim '- (list eight))}.
+\begin{lstlisting}
+(define neg-eight (Prim '- (list eight)))
+\end{lstlisting}
+Primitive operations may have zero or more children. The \code{read}
+operator has zero children:
+\begin{lstlisting}
+(define rd (Prim 'read '()))
+\end{lstlisting}
+whereas the addition operator has two children:
+\begin{lstlisting}
+(define ast1.1 (Prim '+ (list rd neg-eight)))
+\end{lstlisting}
 
 When deciding how to compile program \eqref{eq:arith-prog}, we need to
 know that the operation associated with the root node is addition and
 that it has two children: \texttt{read} and a negation. The AST data
 structure directly supports these queries, as we shall see in
 Section~\ref{sec:pattern-matching}, and hence is a good choice for use
-in compilers. In this book, we often write down the S-expression
-representation of a program even when we really have in mind the AST
-because the S-expression is more concise.  We recommend that, in your
-mind, you always think of programs as abstract syntax trees.
+in compilers.
+
+In this book, we often write down the concrete syntax of a program
+even when we really have in mind the AST because the concrete syntax
+is more concise.  We recommend that, in your mind, you always think of
+programs as abstract syntax trees.
 
 \section{Grammars}
 \label{sec:grammar}
@@ -415,13 +448,17 @@ A programming language can be thought of as a \emph{set} of programs.
 The set is typically infinite (one can always create larger and larger
 programs), so one cannot simply describe a language by listing all of
 the programs in the language. Instead we write down a set of rules, a
-\emph{grammar}, for building programs. We shall write our rules in a
-variant of Backus-Naur Form (BNF)~\citep{Backus:1960aa,Knuth:1964aa}.
-As an example, we describe a small language, named $R_0$, that
-consists of integers and arithmetic operations. The first grammar rule
-says that any integer is an expression:
+\emph{grammar}, for building programs. Grammars are often used to
+define the concrete syntax of a language, but they can also be used to
+describe the abstract syntax. We shall write our rules in a variant of
+Backus-Naur Form (BNF)~\citep{Backus:1960aa,Knuth:1964aa}.  As an
+example, we describe a small language, named $R_0$, that consists of
+integers and arithmetic operations.
+
+The first grammar rule says that given any integer $n$, an integer
+node $\INT{n}$ is an expression:
 \begin{equation}
-\Exp ::= \Int  \label{eq:arith-int}
+\Exp ::= \INT{n}  \label{eq:arith-int}
 \end{equation}
 %
 Each rule has a left-hand-side and a right-hand-side. The way to read
@@ -432,40 +469,39 @@ according to the left-hand-side.
 A name such as $\Exp$ that is
 defined by the grammar rules is a \emph{non-terminal}.
 %
-The name $\Int$ is a also a non-terminal, however, we do not define
-$\Int$ because the reader already knows what an integer is.
-%
-Further, we make the simplifying design decision that all of the languages in
-this book only handle machine-representable integers.  On most modern machines
-this corresponds to integers represented with 64-bits, i.e., the in range
-$-2^{63}$ to $2^{63}-1$.
-%
-However, we restrict this range further to match the Racket \texttt{fixnum}
-datatype, which allows 63-bit integers on a 64-bit machine.
+%% The name $\Int$ is a also a non-terminal, however, we do not define
+%% $\Int$ because the reader already knows what an integer is.
+
+We make the simplifying design decision that all of the languages in
+this book only handle machine-representable integers.  On most modern
+machines this corresponds to integers represented with 64-bits, i.e.,
+the in range $-2^{63}$ to $2^{63}-1$.  We restrict this range further
+to match the Racket \texttt{fixnum} datatype, which allows 63-bit
+integers on a 64-bit machine.
 
 The second grammar rule is the \texttt{read} operation that receives
 an input integer from the user of the program.
 \begin{equation}
-  \Exp ::= (\key{read}) \label{eq:arith-read}
+  \Exp ::= \READ{} \label{eq:arith-read}
 \end{equation}
 
 The third rule says that, given an $\Exp$ node, you can build another
 $\Exp$ node by negating it.
 \begin{equation}
-  \Exp ::= (\key{-} \; \Exp)  \label{eq:arith-neg}
+  \Exp ::= \NEG{\Exp}  \label{eq:arith-neg}
 \end{equation}
 Symbols in typewriter font such as \key{-} and \key{read} are
 \emph{terminal} symbols and must literally appear in the program for
 the rule to be applicable.
 
 We can apply the rules to build ASTs in the $R_0$
-language. For example, by rule \eqref{eq:arith-int}, \texttt{8} is an
+language. For example, by rule \eqref{eq:arith-int}, \texttt{(Int 8)} is an
 $\Exp$, then by rule \eqref{eq:arith-neg}, the following AST is
 an $\Exp$.
 \begin{center}
-\begin{minipage}{0.25\textwidth}
+\begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(- 8)
+(Prim '- (list (Int 8)))
 \end{lstlisting}
 \end{minipage}
 \begin{minipage}{0.25\textwidth}
@@ -483,26 +519,37 @@ an $\Exp$.
 
 The next grammar rule defines addition expressions:
 \begin{equation}
-  \Exp ::= (\key{+} \; \Exp \; \Exp) \label{eq:arith-add}
+  \Exp ::= \ADD{\Exp}{\Exp} \label{eq:arith-add}
 \end{equation}
-We can now see that the AST \eqref{eq:arith-prog} is an $\Exp$ in
-$R_0$.  We know that \lstinline{(read)} is an $\Exp$ by rule
-\eqref{eq:arith-read} and we have shown that \texttt{(- 8)} is an
-$\Exp$, so we can apply rule \eqref{eq:arith-add} to show that
-\texttt{(+ (read) (- 8))} is an $\Exp$ in the $R_0$ language.
+We can now justify that the AST \eqref{eq:arith-prog} is an $\Exp$ in
+$R_0$.  We know that \lstinline{(Prim 'read '())} is an $\Exp$ by rule
+\eqref{eq:arith-read} and we have already shown that \code{(Prim '-
+  (list (Int 8)))} is an $\Exp$, so we apply rule \eqref{eq:arith-add}
+to show that
+\begin{lstlisting}
+(Prim '+ (list (Prim 'read '()) (Prim '- (list (Int 8)))))
+\end{lstlisting}
+is an $\Exp$ in the $R_0$ language.
 
 If you have an AST for which the above rules do not apply, then the
-AST is not in $R_0$. For example, the AST \texttt{(- (read) (+ 8))} is
-not in $R_0$ because there are no rules for \key{+} with only one
-argument, nor for \key{-} with two arguments.  Whenever we define a
-language with a grammar, we mean for the language to only include
-those programs that are justified by the rules.
+AST is not in $R_0$. For example, the program \code{(- (read) (+ 8))}
+is not in $R_0$ because there are no rules for \code{+} with only one
+argument, nor for \key{-} with two arguments. Whenever we define a
+language with a grammar, the language only includes those programs
+that are justified by the rules.
 
-The last grammar rule for $R_0$ states that there is a \key{program}
+The last grammar rule for $R_0$ states that there is a \code{Program}
 node to mark the top of the whole program:
 \[
-  R_0 ::= (\key{program} \; \Exp)
+  R_0 ::= \PROGRAM{\code{'()}}{\Exp}
 \]
+The \code{Program} structure is defined as follows
+\begin{lstlisting}
+(struct Program (info body))
+\end{lstlisting}
+where \code{body} is an expression. In later chapters, the \code{info}
+part will be used to store auxilliary information but for now it is
+just the empty list.
 
 The \code{read-program} function provided in \code{utilities.rkt}
 reads programs in from a file (the sequence of characters in the
@@ -523,9 +570,9 @@ called an {\em alternative}.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{rcl}
-\Exp &::=& \Int \mid ({\tt \key{read}}) \mid (\key{-} \; \Exp) \mid
-   (\key{+} \; \Exp \; \Exp)  \\
-R_0  &::=& (\key{program} \; \Exp)
+\Exp &::=& \INT{n} \mid \READ{} \mid \NEG{\Exp} \\
+     &\mid&  \ADD{\Exp}{\Exp}  \\
+R_0  &::=& \code{(Program} \; \code{'()}\; \Exp \code{)}
 \end{array}
 \]
 \end{minipage}
@@ -542,16 +589,14 @@ R_0  &::=& (\key{program} \; \Exp)
 
 As mentioned above, compilers often need to access the children of an
 AST node. Racket provides the \texttt{match} form to access the parts
-of an S-expression. Consider the following example and the output on
-the right.
+of a structure. Consider the following example and the output on the
+right.
 \begin{center}
 \begin{minipage}{0.5\textwidth}
 \begin{lstlisting}
 (match ast1.1
-  [`(,op ,child1 ,child2)
-    (print op) (newline)
-    (print child1) (newline)
-    (print child2)])
+  [(Prim op (list child1 child2))
+    (print op)])
 \end{lstlisting}
 \end{minipage}
 \vrule
@@ -560,8 +605,6 @@ the right.
 
 
    '+
-   '(read)
-   '(- 8)
 \end{lstlisting}
 \end{minipage}
 \end{center}
@@ -581,25 +624,22 @@ clause may contain any Racket code whatsoever.
 A \code{match} form may contain several clauses, as in the following
 function \code{leaf?} that recognizes when an $R_0$ node is
 a leaf. The \code{match} proceeds through the clauses in order,
-checking whether the pattern can match the input S-expression. The
+checking whether the pattern can match the input AST. The
 body of the first clause that matches is executed. The output of
-\code{leaf?} for several S-expressions is shown on the right. In the
-below \code{match}, we see another form of pattern: the
-pattern \code{(? fixnum?)} applies the predicate \code{fixnum?} to the input
-S-expression to see if it is a machine-representable integer.
+\code{leaf?} for several ASTs is shown on the right.
 \begin{center}
-\begin{minipage}{0.5\textwidth}
+\begin{minipage}{0.6\textwidth}
 \begin{lstlisting}
 (define (leaf? arith)
   (match arith
-    [(? fixnum?) #t]
-    [`(read) #t]
-    [`(- ,c1) #f]
-    [`(+ ,c1 ,c2) #f]))
+    [(Int n) #t]
+    [(Prim 'read '()) #t]
+    [(Prim '- (list c1)) #f]
+    [(Prim '+ (list c1 c2)) #f]))
 
-(leaf? `(read))
-(leaf? `(- 8))
-(leaf? `(+ (read) (- 8)))
+(leaf? (Prim 'read '()))
+(leaf? (Prim '- (list (Int 8))))
+(leaf? (Int 8))
 \end{lstlisting}
 \end{minipage}
 \vrule
@@ -611,10 +651,10 @@ S-expression to see if it is a machine-representable integer.
 
 
 
-
+    
    #t
    #f
-   #f
+   #t
 \end{lstlisting}
 \end{minipage}
 \end{center}
@@ -626,14 +666,13 @@ match against, then we make sure that 1) we have one clause for each
 alternative of that non-terminal and 2) that the pattern in each
 clause corresponds to the corresponding right-hand side of a grammar
 rule. For the \code{match} in the \code{leaf?} function, we refer to
-the grammar for $R\_0$ in Figure~\ref{fig:r0-syntax}. The $\Exp$
+the grammar for $R_0$ in Figure~\ref{fig:r0-syntax}. The $\Exp$
 non-terminal has 4 alternatives, so the \code{match} has 4 clauses.
 The pattern in each clause corresponds to the right-hand side of a
-grammar rule. For example, the pattern \code{`(+ ,c1 ,c2)} corresponds
-to the right-hand side $(\key{+} \; \Exp \; \Exp)$. When translating
+grammar rule. For example, the pattern \code{(Prim '+ (list c1 c2))}
+corresponds to the right-hand side $\ADD{\Exp}{\Exp}$. When translating
 from grammars to patterns, replace non-terminals such as $\Exp$ with
-pattern variables (a comma followed by a variable name of your
-choice).
+pattern variables (e.g. \code{c1} and \code{c2}).
 
 
 \section{Recursion}
@@ -662,28 +701,29 @@ one recursive function to handle each non-terminal in the grammar.
 \begin{center}
 \begin{minipage}{0.7\textwidth}
 \begin{lstlisting}
-(define (exp? sexp)
-  (match sexp
-    [(? fixnum?) #t]
-    [`(read) #t]
-    [`(- ,e) (exp? e)]
-    [`(+ ,e1 ,e2)
+(define (exp? ast)
+  (match ast
+    [(Int n) #t]
+    [(Prim 'read '()) #t]
+    [(Prim '- (list e)) (exp? e)]
+    [(Prim '+ (list e1 e2))
       (and (exp? e1) (exp? e2))]
     [else #f]))
 
-(define (R0? sexp)
-  (match sexp
-    [`(program ,e) (exp? e)]
+(define (R0? ast)
+  (match ast
+    [(Program '() e) (exp? e)]
     [else #f]))
 
-(R0? `(program (+ (read) (- 8))))
-(R0? `(program (- (read) (+ 8))))
+(R0? (Program '() ast1.1)
+(R0? (Program '()
+       (Prim '- (list (Prim 'read '())
+                      (Prim '+ (list (Num 8)))))))
 \end{lstlisting}
 \end{minipage}
 \vrule
 \begin{minipage}{0.25\textwidth}
 \begin{lstlisting}
-
 
 
 
@@ -708,13 +748,13 @@ You may be tempted to merge the two functions into one, like this:
 \begin{center}
 \begin{minipage}{0.5\textwidth}
 \begin{lstlisting}
-(define (R0? sexp)
-  (match sexp
-    [(? fixnum?) #t]
-    [`(read) #t]
-    [`(- ,e) (R0? e)]
-    [`(+ ,e1 ,e2) (and (R0? e1) (R0? e2))]
-    [`(program ,e) (R0? e)]
+(define (R0? ast)
+  (match ast
+    [(Int n) #t]
+    [(Prim 'read '()) #t]
+    [(Prim '- (list e)) (R0? e)]
+    [(Prim '+ (list e1 e2)) (and (R0? e1) (R0? e2))]
+    [(Program '() e) (R0? e)]
     [else #f]))
 \end{lstlisting}
 \end{minipage}
@@ -725,7 +765,7 @@ to the {\tt program} wrapper.  Yet this style is generally \emph{not}
 recommended because it can get you into trouble.
 %
 For instance, the above function is subtly wrong:
-\lstinline{(R0? `(program (program 3)))} will return true, when it
+\lstinline{(R0? (Program '() (Program '() (Int 3))))} will return true, when it
 should return false.
 
 %% NOTE FIXME - must check for consistency on this issue throughout.
@@ -754,18 +794,24 @@ clause per grammar rule for $R_0$ expressions.
 \begin{lstlisting}
 (define (interp-exp e)
   (match e
-    [(? fixnum?) e]
-    [`(read)
-     (let ([r (read)])
-       (cond [(fixnum? r) r]
-             [else (error 'interp-R0 "input not an integer" r)]))]
-    [`(- ,e1)     (fx- 0 (interp-exp e1))]
-    [`(+ ,e1 ,e2) (fx+ (interp-exp e1) (interp-exp e2))]
-    ))
+    [(Int n) n]
+    [(Prim 'read '())
+     (define r (read))
+     (cond [(fixnum? r) r]
+           [else (error 'interp-R1 "expected an integer" r)])]
+    [(Prim '- (list e))
+     (define v (interp-exp e))
+     (fx- 0 v)]
+    [(Prim '+ (list e1 e2))
+     (define v1 (interp-exp e1))
+     (define v2 (interp-exp e2))
+     (fx+ v1 v2)]
+    )))
 
 (define (interp-R0 p)
   (match p
-    [`(program ,e) (interp-exp e)]))
+    [(Program '() e) (interp-exp e)]
+    ))
 \end{lstlisting}
 \caption{Interpreter for the $R_0$ language.}
 \label{fig:interp-R0}
@@ -776,8 +822,11 @@ following program adds two integers.
 \begin{lstlisting}
 (+ 10 32)
 \end{lstlisting}
-The result is \key{42}.  (We wrote the above program in concrete syntax,
-whereas the parsed abstract syntax is \lstinline{(program (+ 10 32))}.)
+The result is \key{42}.  We wrote the above program in concrete syntax,
+whereas the parsed abstract syntax is:
+\begin{lstlisting}
+(Program '() (Prim '+ (list (Int 10) (Int 32))))
+\end{lstlisting}
 
 The next example demonstrates that expressions may be nested within
 each other, in this case nesting several additions and negations.
@@ -789,11 +838,11 @@ What is the result of the above program?
 As mentioned previously, the $R_0$ language does not support
 arbitrarily-large integers, but only $63$-bit integers, so we
 interpret the arithmetic operations of $R_0$ using fixnum arithmetic
-in Racket.  What happens when we run the following program?
+in Racket.
+Suppose $n = 999999999999999999$, which indeed fits in $63$-bits.
+What happens when we run the following program in our interpreter?
 \begin{lstlisting}
-(define large 999999999999999999)
-(interp-R0 `(program (+ (+ (+ ,large ,large) (+ ,large ,large))
-                        (+ (+ ,large ,large) (+ ,large ,large)))))
+(+ (+ (+ |$n$| |$n$|) (+ |$n$| |$n$|)) (+ (+ |$n$| |$n$|) (+ |$n$| |$n$|)))))
 \end{lstlisting}
 It produces an error:
 \begin{lstlisting}
@@ -816,7 +865,8 @@ program \eqref{eq:arith-prog} performs a \key{read} and then subtracts
 (interp-R0 ast1.1)
 \end{lstlisting}
 and the input the integer \code{50} we get the answer to life, the
-universe, and everything: \code{42}.
+universe, and everything: \code{42}!\footnote{\emph{The Hitchhiker's
+    Guide to the Galaxy} by Douglas Adams.}
 
 We include the \key{read} operation in $R_0$ so a clever student
 cannot implement a compiler for $R_0$ that simply runs the interpreter
@@ -876,24 +926,26 @@ functions is the output of partially evaluating the children.
 \begin{figure}[tbp]
 \begin{lstlisting}
 (define (pe-neg r)
-  (cond [(fixnum? r) (fx- 0 r)]
-        [else `(- ,r)]))
+  (match r
+    [(Int n) (Int (fx- 0 n))]
+    [else (Prim '- (list r))]))
 
 (define (pe-add r1 r2)
-  (cond [(and (fixnum? r1) (fixnum? r2)) (fx+ r1 r2)]
-        [else `(+ ,r1 ,r2)]))
+  (match* (r1 r2)
+    [((Int n1) (Int n2)) (Int (fx+ n1 n2))]
+    [(_ _) (Prim '+ (list r1 r2))]))
 
 (define (pe-exp e)
   (match e
-    [(? fixnum?) e]
-    [`(read) `(read)]
-    [`(- ,e1) (pe-neg (pe-exp e1))]
-    [`(+ ,e1 ,e2) (pe-add (pe-exp e1) (pe-exp e2))]
+    [(Int n) (Int n)]
+    [(Prim 'read '()) (Prim 'read '())]
+    [(Prim '- (list e1)) (pe-neg (pe-exp e1))]
+    [(Prim '+ (list e1 e2)) (pe-add (pe-exp e1) (pe-exp e2))]
     ))
 
 (define (pe-R0 p)
   (match p
-    [`(program ,e) `(program ,(pe-exp e))]
+    [(Program info e) (Program info (pe-exp e))]
     ))
 \end{lstlisting}
 \caption{A partial evaluator for $R_0$ expressions.}
@@ -911,16 +963,17 @@ test whether it produces programs that get the same result as the
 input programs. That is, we can test whether it satisfies Diagram
 \eqref{eq:compile-correct}. The following code runs the partial
 evaluator on several examples and tests the output program.  The
-\texttt{assert} function is defined in Appendix~\ref{appendix:utilities}.\\
+\texttt{parse-program} and \texttt{assert} functions are defined in
+Appendix~\ref{appendix:utilities}.\\
 \begin{minipage}{1.0\textwidth}
 \begin{lstlisting}
 (define (test-pe p)
   (assert "testing pe-R0"
      (equal? (interp-R0 p) (interp-R0 (pe-R0 p)))))
 
-(test-pe `(+ (read) (- (+ 5 3))))
-(test-pe `(+ 1 (+ (read) 1)))
-(test-pe `(- (+ (read) (- 5))))
+(test-pe (parse-program `(program () (+ 10 (- (+ 5 3))))))
+(test-pe (parse-program `(program () (+ 1 (+ 3 1)))))
+(test-pe (parse-program `(program () (- (+ 3 (- 5))))))
 \end{lstlisting}
 \end{minipage}
 
@@ -7778,7 +7831,7 @@ registers.
 %%  LocalWords:  Sarkar lcl Matz aa representable Chez Ph Dan's nano
 %%  LocalWords:  fk bh Siek plt uq Felleisen Bor Yuh ASTs AST Naur eq
 %%  LocalWords:  BNF fixnum datatype arith prog backquote quasiquote
-%%  LocalWords:  ast sexp Reynold's reynolds interp cond fx evaluator
+%%  LocalWords:  ast Reynold's reynolds interp cond fx evaluator
 %%  LocalWords:  quasiquotes pe nullary unary rcl env lookup gcc rax
 %%  LocalWords:  addq movq callq rsp rbp rbx rcx rdx rsi rdi subq nx
 %%  LocalWords:  negq pushq popq retq globl Kernighan uniquify lll ve
