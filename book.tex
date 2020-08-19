@@ -1158,11 +1158,12 @@ criteria in the following diagram.
 In the next section we introduce enough of the x86 assembly
 language to compile $R_1$.
 
+
 \section{The x86 Assembly Language}
 \label{sec:x86}
 
-Figure~\ref{fig:x86-a} defines the syntax for the
-subset of the x86 assembly language needed for this chapter.
+Figure~\ref{fig:x86-a} defines the concrete syntax for the subset of
+the x86 assembly language needed for this chapter.
 %
 An x86 program is a sequence of instructions. The program is stored in
 the computer's memory and the computer has a \emph{program counter}
@@ -1185,9 +1186,8 @@ We use the AT\&T syntax expected by the GNU assembler, which comes
 with the \key{gcc} compiler that we use for compiling assembly code to
 machine code.
 %
-Appendix~\ref{sec:x86-quick-reference} is a quick-reference of all the
-x86 instructions used in this book with a short explanation of what
-they do.
+Appendix~\ref{sec:x86-quick-reference} is a quick-reference for all of
+the x86 instructions used in this book.
 
 
 % to do: finish treatment of imulq
@@ -1258,9 +1258,10 @@ $10$ in \key{rax} and puts the result, $42$, back into
 The last instruction, \key{retq}, finishes the \key{main} function by
 returning the integer in \key{rax} to the operating system. The
 operating system interprets this integer as the program's exit
-code. By convention, an exit code of 0 indicates the program was
-successful, and all other exit codes indicate various errors.
-Nevertheless, we return the result of the program as the exit code.
+code. By convention, an exit code of 0 indicates that a program
+completed successfully, and all other exit codes indicate various
+errors.  Nevertheless, we return the result of the program as the exit
+code.
 
 %\begin{wrapfigure}{r}{2.25in}
 \begin{figure}[tbp]
@@ -1384,28 +1385,27 @@ assembly language. The main difference compared to the concrete syntax
 of x86 (Figure~\ref{fig:x86-a}) is that it does not allow labeled
 instructions to appear anywhere, but instead organizes instructions
 into groups called \emph{blocks} and associates a label with every
-block, which is why the \key{program} form includes an association
-list mapping labels to blocks. The reason for this organization
-becomes apparent in Chapter~\ref{ch:bool-types}.
+block, which is why the \key{CFG} struct (for control-flow graph)
+includes an association list mapping labels to blocks. The reason for
+this organization becomes apparent in Chapter~\ref{ch:bool-types} when
+we introduce conditional branching.
 
 \begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-\itm{register} &::=& \allregisters{} \\
-\Arg &::=&  \INT{\Int} \mid \REG{\itm{register}}
-    \mid (\key{deref}\;\itm{register}\;\Int) \\
-\Instr &::=& (\key{addq} \; \Arg\; \Arg) \mid
-             (\key{subq} \; \Arg\; \Arg) \mid
-             (\key{movq} \; \Arg\; \Arg) \mid
-             (\key{retq})\\
-      &\mid& (\key{negq} \; \Arg) \mid
-             (\key{callq} \; \mathit{label}) \mid
-             (\key{pushq}\;\Arg) \mid
-             (\key{popq}\;\Arg) \\
-\Block &::= & (\key{block} \;\itm{info}\; \Instr^{+}) \\
-x86_0 &::= & (\key{program} \;\itm{info} \; ((\itm{label} \,\key{.}\, \Block)^{+}))
+\itm{reg} &::=& \allregisters{} \\
+\Arg &::=&  \IMM{\Int} \mid \REG{\itm{reg}}
+   \mid \DEREF{\itm{reg}}{\Int} \\
+\Instr &::=& \BININSTR{\code{'addq}}{\Arg}{\Arg} \\
+       &\mid& \BININSTR{\code{'subq}}{\Arg}{\Arg} \\
+       &\mid& \BININSTR{\code{'movq}}{\Arg}{\Arg}\\
+       &\mid& \UNIINSTR{\code{'negq}}{\Arg}\\
+       &\mid& \CALLQ{\itm{label}} \mid \RETQ{} \\
+       &\mid& \PUSHQ{\Arg} \mid \POPQ{\Arg} \\
+\Block &::= & \BLOCK{\itm{info}}{\Instr^{+}} \\
+x86_0 &::= & \PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label} \,\key{.}\, \Block \key{)}^{+}}}
 \end{array}
 \]
 \end{minipage}
@@ -1420,7 +1420,7 @@ x86_0 &::= & (\key{program} \;\itm{info} \; ((\itm{label} \,\key{.}\, \Block)^{+
 To compile one language to another it helps to focus on the
 differences between the two languages because the compiler will need
 to bridge those differences. What are the differences between $R_1$
-and x86 assembly? Here we list some of the most important ones.
+and x86 assembly? Here are some of the most important ones:
 
 \begin{enumerate}
 \item[(a)] x86 arithmetic instructions typically have two arguments
@@ -1430,7 +1430,7 @@ and x86 assembly? Here we list some of the most important ones.
   Furthermore, some instructions place special restrictions on their
   arguments.
 
-\item[(b)] An argument to an $R_1$ operator can be any expression,
+\item[(b)] An argument of an $R_1$ operator can be any expression,
   whereas x86 instructions restrict their arguments to be integers
   constants, registers, and memory locations.
 
@@ -1450,7 +1450,10 @@ and x86 assembly? Here we list some of the most important ones.
 We ease the challenge of compiling from $R_1$ to x86 by breaking down
 the problem into several steps, dealing with the above differences one
 at a time.  Each of these steps is called a \emph{pass} of the
-compiler, because step traverses (passes over) the AST of the program.
+compiler.
+%
+This terminology comes from each step traverses (i.e. passes over) the
+AST of the program.
 %
 We begin by sketching how we might implement each pass, and give them
 names.  We then figure out an ordering of the passes and the
@@ -1464,23 +1467,24 @@ non-terminal in the grammar of the input language of the pass.
 
 \begin{description}
 \item[Pass \key{select-instructions}] To handle the difference between
-  $R_1$ operations and x86 instructions we shall convert each $R_1$
+  $R_1$ operations and x86 instructions we convert each $R_1$
   operation to a short sequence of instructions that accomplishes the
   same task.
 
 \item[Pass \key{remove-complex-opera*}] To ensure that each
-  subexpression (i.e. operator and operand, and hence \key{opera*}) is
-  a \emph{simple expression} (a variable or integer), we shall
-  introduce temporary variables to hold the results of subexpressions.
+  subexpression (i.e. operator and operand, and hence the name
+  \key{opera*}) is an \emph{atomic} expression (a variable or
+  integer), we introduce temporary variables to hold the results
+  of subexpressions.
   
 \item[Pass \key{explicate-control}] To make the execution order of the
-  program explicit, we shall convert from the abstract syntax tree
+  program explicit, we convert from the abstract syntax tree
   representation into a \emph{control-flow graph} in which each node
   contains a sequence of statements and the edges between nodes say
-  where to go next.
+  where to go at the end of the sequence.
 
 \item[Pass \key{assign-homes}] To handle the difference between the
-  variables in $R_1$ versus the registers and stack location in x86,
+  variables in $R_1$ versus the registers and stack locations in x86,
   we assignment of each variable to a register or stack location.
 
 \item[Pass \key{uniquify}] This pass deals with the shadowing of variables
@@ -1491,7 +1495,7 @@ non-terminal in the grammar of the input language of the pass.
 The next question is: in what order should we apply these passes? This
 question can be challenging because it is difficult to know ahead of
 time which orders will be better (easier to implement, produce more
-efficient code, etc.) so often some trial-and-error is
+efficient code, etc.) so oftentimes trial-and-error is
 involved. Nevertheless, we can try to plan ahead and make educated
 choices regarding the ordering.
 
@@ -1517,29 +1521,29 @@ output of \key{remove-complex-opera*}.
 %
 Regarding \key{assign-homes}, it is helpful to place
 \key{explicate-control} first because \key{explicate-control} changes
-\key{let}-bound variables into program-scope variables.  Instead of
-traversing the entire program for \key{let}-bound variables,
-\key{assign-homes} can read them off from the $\itm{info}$ of the
-\key{program} AST node.
+\key{let}-bound variables into program-scope variables.  This means
+that the \key{assign-homes} pass can read off the variables from the
+$\itm{info}$ of the \key{Program} AST node instead of traversing the
+entire program in search of \key{let}-bound variables.
 
 Last, we need to decide on the ordering of \key{select-instructions}
 and \key{assign-homes}.  These two passes are intertwined, creating a
 Gordian Knot. To do a good job of assigning homes, it is helpful to
 have already determined which instructions will be used, because x86
 instructions have restrictions about which of their arguments can be
-registers versus stack locations. For example, one can give
-preferential treatment to variables that occur in register-argument
-positions. On the other hand, it may turn out to be impossible to make
-sure that all such variables are assigned to registers, and then one
-must redo the selection of instructions. Some compilers handle this
-problem by iteratively repeating these two passes until a good
-solution is found.  We shall use a simpler approach in which
-\key{select-instructions} comes first, followed by the
-\key{assign-homes}, followed by a third pass, named
-\key{patch-instructions}, that uses a reserved register to patch-up
-outstanding problems regarding instructions with too many memory
-accesses. The disadvantage of this approach a reduction in runtime
-efficiency.
+registers versus stack locations. One might want to give preferential
+treatment to variables that occur in register-argument positions. On
+the other hand, it may turn out to be impossible to make sure that all
+such variables are assigned to registers, and then one must redo the
+selection of instructions. Some compilers handle this problem by
+iteratively repeating these two passes until a good solution is found.
+We shall use a simpler approach in which \key{select-instructions}
+comes first, followed by the \key{assign-homes}, then a third
+pass named \key{patch-instructions} that uses a reserved register to
+patch-up outstanding problems regarding instructions with too many
+memory accesses. The disadvantage of this approach is some programs
+may not execute as efficiently as they would if we used the iterative
+approach and used all of the registers for variables.
 
 
 \begin{figure}[tbp]
@@ -1574,12 +1578,14 @@ passes in the form of a graph. Each pass is an edge and the
 input/output language of each pass is a node in the graph.  The output
 of \key{uniquify} and \key{remove-complex-opera*} are programs that
 are still in the $R_1$ language, but the output of the pass
-\key{explicate-control} is in a different language that is designed to
-make the order of evaluation explicit in its syntax, which we
-introduce in the next section. The last pass in
-Figure~\ref{fig:R1-passes} is \key{print-x86}, which converts from the
-abstract syntax of $\text{x86}_0$ to the concrete (textual) syntax of
-x86.
+\key{explicate-control} is in a different language $C_0$ that is
+designed to make the order of evaluation explicit in its syntax, which
+we introduce in the next section. The \key{select-instruction} pass
+translates from $C_0$ to a variant of x86. The \key{assign-homes} and
+\key{patch-instructions} passes input and output variants of x86
+assembly. The last pass in Figure~\ref{fig:R1-passes} is
+\key{print-x86}, which converts from the abstract syntax of
+$\text{x86}_0$ to the concrete syntax of x86.
 
 In the next sections we discuss the $C_0$ language and the
 $\text{x86}^{*}_0$ and $\text{x86}^{\dagger}_0$ dialects of x86.  The
@@ -1592,31 +1598,34 @@ each of the compiler passes in Figure~\ref{fig:R1-passes}.
 The output of \key{explicate-control} is similar to the $C$
 language~\citep{Kernighan:1988nx} in that it has separate syntactic
 categories for expressions and statements, so we name it $C_0$.  The
-syntax for $C_0$ is defined in Figure~\ref{fig:c0-syntax}.
+concrete syntax for $C_0$ is define din
+Figure~\ref{fig:c0-concrete-syntax} and the abstract syntax for $C_0$
+is defined in Figure~\ref{fig:c0-syntax}.
 %
 The $C_0$ language supports the same operators as $R_1$ but the
-arguments of operators are now restricted to just variables and
-integers, thanks to the \key{remove-complex-opera*} pass.  In the
+arguments of operators are restricted to atomic expressions (variables
+and integers), thanks to the \key{remove-complex-opera*} pass.  In the
 literature this style of intermediate language is called
 administrative normal form, or ANF for
-short~\citep{Danvy:1991fk,Flanagan:1993cg}.  Instead of \key{let}
+short~\citep{Danvy:1991fk,Flanagan:1993cg}.  Instead of \key{Let}
 expressions, $C_0$ has assignment statements which can be executed in
-sequence using the \key{seq} construct. A sequence of statements
-always ends with \key{return}, a guarantee that is baked into the
-grammar rules for the \itm{tail} non-terminal. The naming of this
-non-terminal comes from the term \emph{tail position}, which refers to
-an expression that is the last one to execute within a function. (A
+sequence using the \key{Seq} form. A sequence of statements always
+ends with \key{Return}, a guarantee that is baked into the grammar
+rules for the \itm{tail} non-terminal. The naming of this non-terminal
+comes from the term \emph{tail position}, which refers to an
+expression that is the last one to execute within a function. (A
 expression in tail position may contain subexpressions, and those may
 or may not be in tail position depending on the kind of expression.)
 
-A $C_0$ program consists of an association list mapping labels to
-tails. This is overkill for the present chapter, as we do not yet need
-to introduce \key{goto} for jumping to labels, but it saves us from
-having to change the syntax of the program construct in
+A $C_0$ program consists of a control-flow graph (represented as an
+association list mapping labels to tails). This is more general than
+necessary for the present chapter, as we do not yet need to introduce
+\key{goto} for jumping to labels, but it saves us from having to
+change the syntax of the program construct in
 Chapter~\ref{ch:bool-types}.  For now there will be just one label,
-\key{start}, and the whole program is it's tail.
+\key{start}, and the whole program is its tail.
 %
-The $\itm{info}$ field of the program construct, after the
+The $\itm{info}$ field of the \key{Program} form, after the
 \key{explicate-control} pass, contains a mapping from the symbol
 \key{locals} to a list of variables, that is, a list of all the
 variables used in the program. At the start of the program, these
@@ -1629,15 +1638,34 @@ assignment.
 \[
 \begin{array}{lcl}
 \Arg &::=& \Int \mid \Var \\
-\Exp &::=& \Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)\\
-\Stmt &::=& \ASSIGN{\Var}{\Exp} \\
-\Tail &::= & \RETURN{\Exp} \mid (\key{seq}\; \Stmt\; \Tail) \\
-C_0 & ::= & (\key{program}\;\itm{info}\;((\itm{label}\,\key{.}\,\Tail)^{+}))
+\Exp &::=& \Arg \mid \key{(read)} \mid \key{(-}~\Arg\key{)} \mid \key{(+}~\Arg~\Arg\key{)}\\
+\Stmt &::=& \Var~\key{=}~\Exp\key{;} \\
+\Tail &::= & \key{return}~\Exp\key{;} \mid \Stmt~\Tail \\
+C_0 & ::= & (\itm{label}\key{:}~ \Tail)^{+}
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The $C_0$ intermediate language.}
+\caption{The concrete syntax of the $C_0$ intermediate language.}
+\label{fig:c0-concrete-syntax}
+\end{figure}
+
+\begin{figure}[tbp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{lcl}
+\Arg &::=& \INT{\Int} \mid \VAR{\Var} \\
+\Exp &::=& \Arg \mid \READ{} \mid \NEG{\Arg} \\
+ &\mid& \ADD{\Arg}{\Arg}\\
+\Stmt &::=& \ASSIGN{\Var}{\Exp} \\
+\Tail &::= & \RETURN{\Exp} \mid \SEQ{\Stmt}{\Tail} \\
+C_0 & ::= & \PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label}\,\key{.}\,\Tail\key{)}^{+}}}
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The abstract syntax of the $C_0$ intermediate language.}
 \label{fig:c0-syntax}
 \end{figure}
 
@@ -1669,11 +1697,11 @@ C_0 & ::= & (\key{program}\;\itm{info}\;((\itm{label}\,\key{.}\,\Tail)^{+}))
 
 \subsection{The dialects of x86}
 
-The x86$^{*}_0$ language, pronounced ``pseudo-x86'', is the output of
-the pass \key{select-instructions}. It extends $x86_0$ with an unbound
-number program-scope variables and has looser rules regarding
-instruction arguments. The x86$^{\dagger}$ language, the output of
-\key{print-x86}, is the concrete syntax for x86.
+The x86$^{*}_0$ language, pronounced ``pseudo x86'', is the output of
+the pass \key{select-instructions}. It extends $x86_0$ with an
+unbounded number of program-scope variables and has looser rules
+regarding instruction arguments. The x86$^{\dagger}$ language, the
+output of \key{print-x86}, is the concrete syntax for x86.
 
 
 \section{Uniquify Variables}
@@ -1686,9 +1714,8 @@ left into the program on the right. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
- (program ()
-   (let ([x 32])
-     (+ (let ([x 10]) x) x)))
+(let ([x 32])
+  (+ (let ([x 10]) x) x))
 \end{lstlisting}
 \end{minipage}
 &
@@ -1696,9 +1723,8 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program ()
-  (let ([x.1 32])
-    (+ (let ([x.2 10]) x.2) x.1)))
+(let ([x.1 32])
+  (+ (let ([x.2 10]) x.2) x.1))
 \end{lstlisting}
 \end{minipage}
 \end{tabular} \\
@@ -1709,10 +1735,9 @@ with a \key{let} nested inside the initializing expression of another
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program ()
-  (let ([x (let ([x 4])
-             (+ x 1))])
-    (+ x 2)))
+(let ([x (let ([x 4])
+            (+ x 1))])
+  (+ x 2))
 \end{lstlisting}
 \end{minipage}
 &
@@ -1720,10 +1745,9 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program ()
-  (let ([x.2 (let ([x.1 4])
-               (+ x.1 1))])
-    (+ x.2 2)))
+(let ([x.2 (let ([x.1 4])
+              (+ x.1 1))])
+  (+ x.2 2))
 \end{lstlisting}
 \end{minipage}
 \end{tabular}
@@ -1742,18 +1766,18 @@ traditionally called \emph{symbol tables}.
 
 The skeleton of the \code{uniquify-exp} function is shown in
 Figure~\ref{fig:uniquify-s0}.  The function is curried so that it is
-convenient to partially apply it to an association list and then apply
-it to different expressions, as in the last clause for primitive
-operations in Figure~\ref{fig:uniquify-s0}. In the last \key{match}
-clause for the primitive operators, note the use of the comma-\code{@}
-operator to splice a list of S-expressions into an enclosing
-S-expression.
+convenient to partially apply it to a symbol table and then apply it
+to different expressions, as in the last clause for primitive
+operations in Figure~\ref{fig:uniquify-s0}.  The \key{for/list} form
+is useful for applying a function to each element of a list to produce
+a new list.
+
 
 \begin{exercise}
 \normalfont % I don't like the italics for exercises. -Jeremy
 
 Complete the \code{uniquify} pass by filling in the blanks, that is,
-implement the clauses for variables and for the \key{let} construct.
+implement the clauses for variables and for the \key{let} form.
 \end{exercise}
 
 \begin{figure}[tbp]
@@ -1761,17 +1785,17 @@ implement the clauses for variables and for the \key{let} construct.
    (define (uniquify-exp symtab)
      (lambda (e)
        (match e
-         [(? symbol?) ___]
-         [(? integer?) e]
-         [`(let ([,x ,e]) ,body) ___]
-         [`(,op ,es ...)
-          `(,op ,@(for/list ([e es]) ((uniquify-exp symtab) e)))]
+         [(Var x) ___]
+         [(Int n) (Int n)]
+         [(Let x e body) ___]
+         [(Prim op es)
+          (Prim op (for/list ([e es]) ((uniquify-exp symtab) e)))]
          )))
 
    (define (uniquify p)
      (match p
-       [`(program ,info ,e)
-        `(program ,info ,((uniquify-exp '()) e))]
+       [(Program info e)
+        (Program info ((uniquify-exp '()) e))]
        )))
 \end{lstlisting}
 \caption{Skeleton for the \key{uniquify} pass.}
@@ -1785,7 +1809,7 @@ Test your \key{uniquify} pass by creating five example $R_1$ programs
 and checking whether the output programs produce the same result as
 the input programs. The $R_1$ programs should be designed to test the
 most interesting parts of the \key{uniquify} pass, that is, the
-programs should include \key{let} constructs, variables, and variables
+programs should include \key{let} forms, variables, and variables
 that overshadow each other.  The five programs should be in a
 subdirectory named \key{tests} and they should have the same file name
 except for a different integer at the end of the name, followed by the
@@ -1801,7 +1825,7 @@ of how to use \key{interp-tests}.
 \label{sec:remove-complex-opera-r1}
 
 The \code{remove-complex-opera*} pass compiles $R_1$ programs into
-$R_1$ programs in which the arguments of operations are simple
+$R_1$ programs in which the arguments of operations are atomic
 expressions.  Put another way, this pass removes complex operands,
 such as the expression \code{(- 10)} in the program below. This is
 accomplished by introducing a new \key{let}-bound variable, binding
@@ -1812,8 +1836,7 @@ variable in place of the complex operand, as shown in the output of
 \begin{minipage}{0.4\textwidth}
 % s0_19.rkt
 \begin{lstlisting}
- (program ()
-   (+ 52 (- 10)))
+(+ 52 (- 10))
 \end{lstlisting}
 \end{minipage}
 &
@@ -1821,35 +1844,34 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program ()
-  (let ([tmp.1 (- 10)])
-    (+ 52 tmp.1)))
+(let ([tmp.1 (- 10)])
+  (+ 52 tmp.1))
 \end{lstlisting}
 \end{minipage}
 \end{tabular}
 
 We recommend implementing this pass with two mutually recursive
-functions, \code{rco-arg} and \code{rco-exp}. The idea is to apply
-\code{rco-arg} to subexpressions that need to become simple and to
-apply \code{rco-exp} to subexpressions can stay complex.  Both
-functions take an $R_1$ expression as input.  The \code{rco-exp}
-function returns an expression.  The \code{rco-arg} function returns
-two things: a simple expression and association list mapping temporary
-variables to complex subexpressions. You can return multiple things
-from a function using Racket's \key{values} form and you can receive
-multiple things from a function call using the \key{define-values}
-form. If you are not familiar with these constructs, review the Racket
-documentation.  Also, the \key{for/lists} construct is useful for
-applying a function to each element of a list, in the case where the
-function returns multiple values.
+functions, \code{rco-atom} and \code{rco-exp}. The idea is to apply
+\code{rco-atom} to subexpressions that need to become atomic and to
+apply \code{rco-exp} to subexpressions that can be atomic or complex.
+Both functions take an $R_1$ expression as input.  The \code{rco-exp}
+function returns an expression.  The \code{rco-atom} function returns
+two things: an atomic expression and association list mapping
+temporary variables to complex subexpressions. You can return multiple
+things from a function using Racket's \key{values} form and you can
+receive multiple things from a function call using the
+\key{define-values} form. If you are not familiar with these features,
+review the Racket documentation.  Also, the \key{for/lists} form is
+useful for applying a function to each element of a list, in the case
+where the function returns multiple values.
 
-The following shows the output of \code{rco-arg} on the expression
-\code{(- 10)}.
+The following shows the output of \code{rco-atom} on the expression
+\code{(- 10)} (using concrete syntax to be concise).
 
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(rco-arg `(- 10))
+(- 10)
 \end{lstlisting}
 \end{minipage}
 &
@@ -1857,8 +1879,8 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-  (values `tmp.1
-           `((tmp.1 . (- 10))))
+tmp.1
+((tmp.1 . (- 10)))
 \end{lstlisting}
 \end{minipage}
 \end{tabular}
@@ -1870,10 +1892,9 @@ unchanged, as shown in to the program on the right \\
 \begin{minipage}{0.4\textwidth}
 % s0_20.rkt
 \begin{lstlisting}
-(program ()
-  (let ([a 42])
-    (let ([b a])
-      b)))
+(let ([a 42])
+  (let ([b a])
+    b))
 \end{lstlisting}
 \end{minipage}
 &
@@ -1881,23 +1902,21 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program ()
-  (let ([a 42])
-    (let ([b a])
-      b)))
+(let ([a 42])
+  (let ([b a])
+    b))
 \end{lstlisting}
 \end{minipage}
 \end{tabular} \\
-A careless implementation of \key{rco-exp} and \key{rco-arg} might
+A careless implementation of \key{rco-exp} and \key{rco-atom} might
 produce the following output.\\
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-   (program ()
-     (let ([tmp.1 42])
-       (let ([a tmp.1])
-         (let ([tmp.2 a])
-           (let ([b tmp.2])
-             b)))))
+(let ([tmp.1 42])
+  (let ([a tmp.1])
+    (let ([tmp.2 a])
+      (let ([b tmp.2])
+        b))))
 \end{lstlisting}
 \end{minipage}
 
@@ -1905,7 +1924,7 @@ produce the following output.\\
 \normalfont Implement the \code{remove-complex-opera*} pass and test
 it on all of the example programs that you created to test the
 \key{uniquify} pass and create three new example programs that are
-designed to exercise all of the interesting code in the
+designed to exercise the interesting code in the
 \code{remove-complex-opera*} pass. Use the \key{interp-tests} function
 (Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to test
 your passes on the example programs.
@@ -1919,14 +1938,15 @@ The \code{explicate-control} pass compiles $R_1$ programs into $C_0$
 programs that make the order of execution explicit in their
 syntax. For now this amounts to flattening \key{let} constructs into a
 sequence of assignment statements. For example, consider the following
-$R_1$ program.
+$R_1$ program.\\
 % s0_11.rkt
+\begin{minipage}{0.96\textwidth}
 \begin{lstlisting}
-(program ()
-  (let ([y (let ([x 20])
-	   (+ x (let ([x 22]) x)))])
-    y))
+(let ([y (let ([x 20])
+         (+ x (let ([x 22]) x)))])
+  y)
 \end{lstlisting}
+\end{minipage}\\
 %
 The output of the previous pass and of \code{explicate-control} is
 shown below. Recall that the right-hand-side of a \key{let} executes
@@ -1937,11 +1957,10 @@ output of \code{explicate-control} makes this ordering explicit.\\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program ()
-  (let ([y (let ([x.1 20]) 
-             (let ([x.2 22])
-               (+ x.1 x.2)))])
-   y))
+(let ([y (let ([x.1 20]) 
+           (let ([x.2 22])
+             (+ x.1 x.2)))])
+ y)
 \end{lstlisting}
 \end{minipage}
 &
@@ -1949,33 +1968,32 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program ((locals . (y x.1 x.2)))
-  ((start . 
-   (seq (assign x.1 20)
-   (seq (assign x.2 22)
-   (seq (assign y (+ x.1 x.2))
-   (return y)))))))
+locals: y x.1 x.2
+start:
+  x.1 = 20;
+  x.2 = 22;
+  y = (+ x.1 x.2);
+  return y;
 \end{lstlisting}
 \end{minipage}
 \end{tabular}
 
 We recommend implementing \code{explicate-control} using two mutually
-recursive functions: \code{explicate-control-tail} and
-\code{explicate-control-assign}.  The \code{explicate-control-tail}
-function should be applied to expressions in tail position whereas
-\code{explicate-control-assign} should be applied to expressions that
-occur on the right-hand-side of a \key{let}.
-\code{explicate-control-tail} takes an $R_1$ expression as input and
+recursive functions: \code{explicate-tail} and
+\code{explicate-assign}.  The first function should be applied to
+expressions in tail position whereas the second should be applied to
+expressions that occur on the right-hand-side of a \key{let}. The
+\code{explicate-tail} function takes an $R_1$ expression as input and
 produces a $C_0$ $\Tail$ (see Figure~\ref{fig:c0-syntax}) and a list
-of formerly \key{let}-bound variables. The
-\code{explicate-control-assign} function takes an $R_1$ expression,
-the variable that it is to be assigned to, and $C_0$ code (a $\Tail$)
-that should come after the assignment (e.g., the code generated for
-the body of the \key{let}).  It returns a $\Tail$ and a list of
-variables. The top-level \code{explicate-control} function should
-invoke \code{explicate-control-tail} on the body of the \key{program}
-and then associate the \code{locals} symbol with the resulting list of
-variables in the $\itm{info}$ field, as in the above example.
+of formerly \key{let}-bound variables. The \code{explicate-assign}
+function takes an $R_1$ expression, the variable that it is to be
+assigned to, and $C_0$ code (a $\Tail$) that should come after the
+assignment (e.g., the code generated for the body of the \key{let}).
+It returns a $\Tail$ and a list of variables. The top-level
+\code{explicate-control} function should invoke \code{explicate-tail}
+on the body of the \key{program} and then associate the \code{locals}
+symbol with the resulting list of variables in the $\itm{info}$ field,
+as in the above example.
 
 %% \section{Uncover Locals}
 %% \label{sec:uncover-locals-r1}
@@ -2001,18 +2019,17 @@ variables in the $\itm{info}$ field, as in the above example.
 
 In the \code{select-instructions} pass we begin the work of
 translating from $C_0$ to $\text{x86}^{*}_0$. The target language of
-this pass is a pseudo-x86 language that still uses variables, so we
-add an AST node of the form $\VAR{\itm{var}}$ to the $\text{x86}_0$
-abstract syntax of Figure~\ref{fig:x86-ast-a}.  We recommend
-implementing the \code{select-instructions} in terms of three
-auxiliary functions, one for each of the non-terminals of $C_0$:
-$\Arg$, $\Stmt$, and $\Tail$.
+this pass is a variable of x86 that still uses variables, so we add an
+AST node of the form $\VAR{\itm{var}}$ to the $\text{x86}_0$ abstract
+syntax of Figure~\ref{fig:x86-ast-a}.  We recommend implementing the
+\code{select-instructions} in terms of three auxiliary functions, one
+for each of the non-terminals of $C_0$: $\Arg$, $\Stmt$, and $\Tail$.
 
-The cases for $\itm{arg}$ are straightforward, simply put variables
-and integer literals into the s-expression format expected of
-pseudo-x86, \code{(var $x$)} and \code{(int $n$)}, respectively.
+The cases for $\Arg$ are straightforward, variables stay
+the same and integer constants are changed to immediates:
+$\INT{n}$ changes to $\IMM{n}$.
 
-Next we consider the cases for $\itm{stmt}$, starting with arithmetic
+Next we consider the cases for $\Stmt$, starting with arithmetic
 operations. For example, in $C_0$ an addition operation can take the
 form below, to the left of the $\Rightarrow$.  To translate to x86, we
 need to use the \key{addq} instruction which does an in-place
@@ -2020,7 +2037,7 @@ update. So we must first move \code{10} to \code{x}. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
- (assign x (+ 10 32))
+x = (+ 10 32);
 \end{lstlisting}
 \end{minipage}
 &
@@ -2028,8 +2045,8 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-   (movq (int 10) (var x))
-   (addq (int 32) (var x))
+movq $10 x
+addq $32 x
 \end{lstlisting}
 \end{minipage}
 \end{tabular} \\
@@ -2043,7 +2060,7 @@ instruction.\\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
- (assign x (+ 10 x))
+x = (+ 10 x);
 \end{lstlisting}
 \end{minipage}
 &
@@ -2051,7 +2068,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(addq (int 10) (var x))
+addq $10 x
 \end{lstlisting}
 \end{minipage}
 \end{tabular} \\
@@ -2073,7 +2090,7 @@ from \code{rax} is needed because the return value from
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
- (assign |$\itm{lhs}$| (read))
+|$\itm{lhs}$| = (read);
 \end{lstlisting}
 \end{minipage}
 &
@@ -2081,18 +2098,18 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(callq read_int)
-(movq (reg rax) (var |$\itm{lhs}$|))
+callq read_int
+movq %rax |$\itm{lhs}$|
 \end{lstlisting}
 \end{minipage}
 \end{tabular} \\
 
-There are two cases for the $\Tail$ non-terminal: \key{return} and
-\key{seq}. Regarding \RETURN{e}, we recommend treating it as an
+There are two cases for the $\Tail$ non-terminal: \key{Return} and
+\key{Seq}. Regarding \key{Return}, we recommend treating it as an
 assignment to the \key{rax} register followed by a jump to the
 conclusion of the program (so the conclusion needs to be labeled).
-For $(\key{seq}\,s\,t)$, we the statement $s$ and tail $t$ recursively
-and append the resulting instructions.
+For $\SEQ{s}{t}$, you can translate the statement $s$ and tail $t$
+recursively and append the resulting instructions.
 
 \begin{exercise}
 \normalfont
@@ -3947,53 +3964,53 @@ to this problem in Section~\ref{sec:opt-jumps}.
 
 Recall that in Section~\ref{sec:explicate-control-r1} we implement the
 \code{explicate-control} pass for $R_1$ using two mutually recursive
-functions, \code{explicate-control-tail} and
-\code{explicate-control-assign}.  The former function translated
+functions, \code{explicate-tail} and
+\code{explicate-assign}.  The former function translated
 expressions in tail position whereas the later function translated
 expressions on the right-hand-side of a \key{let}. With the addition
 of \key{if} expression in $R_2$ we have a new kind of context to deal
 with: the predicate position of the \key{if}. So we shall need another
-function, \code{explicate-control-pred}, that takes an $R_2$
+function, \code{explicate-pred}, that takes an $R_2$
 expression and two pieces of $C_1$ code (two $\Tail$'s) for the
 then-branch and else-branch. The output of
-\code{explicate-control-pred} is a $C_1$ $\Tail$.  However, these
+\code{explicate-pred} is a $C_1$ $\Tail$.  However, these
 three functions also need to construct the control-flow graph, which we
 recommend they do via updates to a global variable. Next we consider
 the specific additions to the tail and assign functions, and some of
 cases for the pred function.
 
-The \code{explicate-control-tail} function needs an additional case
+The \code{explicate-tail} function needs an additional case
 for \key{if}. The branches of the \key{if} inherit the current
 context, so they are in tail position.  Let $B_1$ be the result of
-\code{explicate-control-tail} on the $\itm{thn}$ branch and $B_2$ be
-the result of apply \code{explicate-control-tail} to the $\itm{else}$
+\code{explicate-tail} on the $\itm{thn}$ branch and $B_2$ be
+the result of apply \code{explicate-tail} to the $\itm{else}$
 branch. Then the \key{if} translates to the block $B_3$ which is the
-result of applying \code{explicate-control-pred} to the predicate
+result of applying \code{explicate-pred} to the predicate
 $\itm{cnd}$ and the blocks $B_1$ and $B_2$.
 \[
     (\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els}) \quad\Rightarrow\quad B_3
 \]
 
 Next we consider the case for \key{if} in the
-\code{explicate-control-assign} function. So the context of the
+\code{explicate-assign} function. So the context of the
 \key{if} is an assignment to some variable $x$ and then the control
 continues to some block $B_1$.  The code that we generate for both the
 $\itm{thn}$ and $\itm{els}$ branches shall both need to continue to
 $B_1$, so we add $B_1$ to the control flow graph with a fresh label
 $\ell_1$.  Again, the branches of the \key{if} inherit the current
 context, so that are in assignment positions.  Let $B_2$ be the result
-of applying \code{explicate-control-assign} to the $\itm{thn}$ branch,
+of applying \code{explicate-assign} to the $\itm{thn}$ branch,
 variable $x$, and the block \code{(goto $\ell_1$)}.  Let $B_3$ be the
-result of applying \code{explicate-control-assign} to the $\itm{else}$
+result of applying \code{explicate-assign} to the $\itm{else}$
 branch, variable $x$, and the block \code{(goto $\ell_1$)}. The
 \key{if} translates to the block $B_4$ which is the result of applying
-\code{explicate-control-pred} to the predicate $\itm{cnd}$ and the
+\code{explicate-pred} to the predicate $\itm{cnd}$ and the
 blocks $B_2$ and $B_3$.
 \[
 (\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els}) \quad\Rightarrow\quad B_4
 \]
 
-The function \code{explicate-control-pred} will need a case for every
+The function \code{explicate-pred} will need a case for every
 expression that can have type \code{Boolean}. We detail a few cases
 here and leave the rest for the reader. The input to this function is
 an expression and two blocks, $B_1$ and $B_2$, for the branches of the
@@ -4008,17 +4025,17 @@ as follows.
 (\key{if}\;(\key{<}\;e_1\;e_2)\;(\key{goto}\;\ell_1)\;(\key{goto}\;\ell_2))
 \]
 
-The case for \key{if} in \code{explicate-control-pred} is particularly
+The case for \key{if} in \code{explicate-pred} is particularly
 illuminating, as it deals with the challenges that we discussed above
 regarding the example of the nested \key{if} expressions.  Again, we
 add the two input branches $B_1$ and $B_2$ to the control flow graph
 and obtain the labels $\ell_1$ and $\ell_2$.  The branches $\itm{thn}$
 and $\itm{els}$ of the current \key{if} inherit their context from the
 current one, i.e., predicate context. So we apply
-\code{explicate-control-pred} to $\itm{thn}$ with the two blocks
+\code{explicate-pred} to $\itm{thn}$ with the two blocks
 \code{(goto $\ell_1$)} and \code{(goto $\ell_2$)}, to obtain $B_3$.
 Similarly for the $\itm{els}$ branch, to obtain $B_4$.
-Finally, we apply \code{explicate-control-pred} to
+Finally, we apply \code{explicate-pred} to
 the predicate $\itm{cnd}$ and the blocks $B_3$ and $B_4$
 to obtain the result $B_5$.
 \[
