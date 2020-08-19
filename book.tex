@@ -2563,10 +2563,6 @@ Figure~\ref{fig:live-eg} shows the results of live variables analysis
 for the running example program, with each instruction aligned with
 its $L_{\mathtt{after}}$ set to make the figure easy to read.
 
-\margincomment{JM: I think you should walk through the explanation of this formula,
-   connecting it back to the example from before. \\
-   JS: Agreed.}
-
 \begin{figure}[tbp]
 \hspace{20pt}
 \begin{minipage}{0.45\textwidth}
@@ -2651,26 +2647,27 @@ with each other: when they both contain the same value because we have
 assigned one to the other.
 
 A better way to compute the interference graph is to focus on the
-writes~\cite{Appel:2003fk}. That is, for each instruction, create an
-edge between the variable being written to and all the \emph{other}
-live variables.  (One should not create self edges.) For a \key{callq}
-instruction, think of all caller-saved registers as being written to,
-so and edge must be added between every live variable and every
-caller-saved register. For \key{movq}, we deal with the
-above-mentioned special case by not adding an edge between a live
-variable $v$ and destination $d$ if $v$ matches the source of the
+writes~\cite{Appel:2003fk}. We do not want the write performed by an
+instruction to overwrite something in a live variable. So for each
+instruction, we create an edge between the variable being written to
+and all the \emph{other} live variables.  (One should not create self
+edges.) For a \key{callq} instruction, think of all caller-saved
+registers as being written to, so an edge must be added between every
+live variable and every caller-saved register. For \key{movq}, we deal
+with the above-mentioned special case by not adding an edge between a
+live variable $v$ and destination $d$ if $v$ matches the source of the
 move. So we have the following three rules.
 
 \begin{enumerate}
 \item If instruction $I_k$ is an arithmetic instruction such as
-  (\key{addq} $s$\, $d$), then add the edge $(d,v)$ for every $v \in
+  \code{addq} $s$\key{,} $d$, then add the edge $(d,v)$ for every $v \in
   L_{\mathsf{after}}(k)$ unless $v = d$.
 
-\item If instruction $I_k$ is of the form (\key{callq}
-  $\mathit{label}$), then add an edge $(r,v)$ for every caller-saved
+\item If instruction $I_k$ is of the form \key{callq}
+  $\mathit{label}$, then add an edge $(r,v)$ for every caller-saved
   register $r$ and every variable $v \in L_{\mathsf{after}}(k)$.
 
-\item If instruction $I_k$ is a move: (\key{movq} $s$\, $d$), then add
+\item If instruction $I_k$ is a move: \key{movq} $s$\key{,} $d$, then add
   the edge $(d,v)$ for every $v \in L_{\mathsf{after}}(k)$ unless $v =
   d$ or $v = s$.
 \end{enumerate}
@@ -2764,10 +2761,10 @@ field of the program, under the key \code{conflicts}.
 \section{Graph Coloring via Sudoku}
 \label{sec:graph-coloring}
 
-We now come to the main event, mapping variables to registers (or to
-stack locations in the event that we run out of registers).  We need
-to make sure not to map two variables to the same register if the two
-variables interfere with each other.  In terms of the interference
+We come to the main event, mapping variables to registers (or to stack
+locations in the event that we run out of registers).  We need to make
+sure not to map two variables to the same register if the two
+variables interfere with each other.  Thiking about the interference
 graph, this means that adjacent vertices must be mapped to different
 registers.  If we think of registers as colors, the register
 allocation problem becomes the widely-studied graph coloring
@@ -2806,17 +2803,17 @@ edges for all of the vertices would make the graph unreadable.
 Given that Sudoku is an instance of graph coloring, one can use Sudoku
 strategies to come up with an algorithm for allocating registers. For
 example, one of the basic techniques for Sudoku is called Pencil
-Marks. The idea is that you use a process of elimination to determine
-what numbers no longer make sense for a square, and write down those
+Marks. The idea is to use a process of elimination to determine what
+numbers no longer make sense for a square and write down those
 numbers in the square (writing very small). For example, if the number
 $1$ is assigned to a square, then by process of elimination, you can
 write the pencil mark $1$ in all the squares in the same row, column,
 and region. Many Sudoku computer games provide automatic support for
-Pencil Marks. 
+Pencil Marks.
 %
-The Pencil Marks technique corresponds to the notion of color
+The Pencil Marks technique corresponds to the notion of
 \emph{saturation} due to \cite{Brelaz:1979eu}.  The saturation of a
-vertex, in Sudoku terms, is the set of colors that are no longer
+vertex, in Sudoku terms, is the set of numbers that are no longer
 available. In graph terminology, we have the following definition:
 \begin{equation*}
   \mathrm{saturation}(u) = \{ c \;|\; \exists v. v \in \mathrm{neighbors}(u)
@@ -2837,24 +2834,23 @@ consuming. One way to reduce the amount of backtracking is to use the
 most-constrained-first heuristic. That is, when making a guess, always
 choose a square with the fewest possibilities left (the vertex with
 the highest saturation).  The idea is that choosing highly constrained
-squares earlier rather than later is better because later there may
-not be any possibilities.
+squares earlier rather than later is better because later on there may
+not be any possibilities left for those squares.
 
 In some sense, register allocation is easier than Sudoku because we
 can always cheat and add more numbers by mapping variables to the
-stack. We say that a variable is \emph{spilled} when we decide to map
-it to a stack location. We would like to minimize the time needed to
-color the graph, and backtracking is expensive. Thus, it makes sense
-to keep the most-constrained-first heuristic but drop the backtracking
-in favor of greedy search (guess and just keep going).
+stack. We would like to minimize the time needed to color the graph,
+and backtracking is expensive. Thus, it makes sense to keep the
+most-constrained-first heuristic but drop backtracking in favor of
+greedy search (guess and just keep going).
 Figure~\ref{fig:satur-algo} gives the pseudo-code for this simple
 greedy algorithm for register allocation based on saturation and the
 most-constrained-first heuristic, which is roughly equivalent to the
 DSATUR algorithm of \cite{Brelaz:1979eu} (also known as saturation
-degree ordering~\citep{Gebremedhin:1999fk,Omari:2006uq}).  Just
-as in Sudoku, the algorithm represents colors with integers, with the
-first $k$ colors corresponding to the $k$ registers in a given machine
-and the rest of the integers corresponding to stack locations.
+degree ordering~\citep{Gebremedhin:1999fk,Omari:2006uq}).  Just as in
+Sudoku, the algorithm represents colors with integers, with the first
+$k$ colors corresponding to the $k$ registers in a given machine and
+the rest of the integers corresponding to stack locations.
 
 \begin{figure}[btp]
   \centering
@@ -2877,11 +2873,9 @@ while |$W \neq \emptyset$| do
 
 With this algorithm in hand, let us return to the running example and
 consider how to color the interference graph in
-Figure~\ref{fig:interfere}. We shall not use register \key{rax} for
-register allocation because we use it to patch instructions, so we
-remove that vertex from the graph.  Initially, all of the vertices are
-not yet colored and they are unsaturated, so we annotate each of them
-with a dash for their color and an empty set for the saturation.
+Figure~\ref{fig:interfere}. Initially, all of the vertices are not yet
+colored and they are unsaturated, so we annotate each of them with a
+dash for their color and an empty set for the saturation.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (v) at (0,0)    {$v:-,\{\}$};
@@ -2905,7 +2899,7 @@ with a dash for their color and an empty set for the saturation.
 \end{tikzpicture}
 \]
 We select a maximally saturated vertex and color it $0$. In this case we
-have a 7-way tie, so we arbitrarily pick $t.1$. The then mark color $0$
+have a 7-way tie, so we arbitrarily pick $t.1$. We then mark color $0$
 as no longer available for $z$ because it interferes
 with $t.1$.
 \[
@@ -2929,8 +2923,9 @@ with $t.1$.
 \draw (t1) to (z);
 \end{tikzpicture}
 \]
-Now we repeat the process, selecting another maximally saturated
-vertex, which in this case is $z$. We color $z$ with $1$.
+Next we repeat the process, selecting another maximally saturated
+vertex, in this case is $z$, and color it with the first available
+number, which is $1$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (v) at (0,0)    {$v:-,\{\}$};
@@ -3049,10 +3044,10 @@ stack locations.  Suppose for the moment that we have just one
 register to use for register allocation, \key{rcx}. Then the following
 is the mapping of colors to registers and stack allocations.
 \[
-  \{ 0 \mapsto \key{\%rcx}, \; 1 \mapsto \key{-8(\%rbp)}, \; 2 \mapsto \key{-16(\%rbp)}, \ldots \}
+  \{ 0 \mapsto \key{\%rcx}, \; 1 \mapsto \key{-8(\%rbp)}, \; 2 \mapsto \key{-16(\%rbp)} \}
 \]
 Putting this mapping together with the above coloring of the variables, we
-arrive at the assignment:
+arrive at the following assignment.
 \begin{gather*}
   \{ v \mapsto \key{\%rcx}, \,
   w \mapsto \key{-16(\%rbp)},  \,
@@ -3062,54 +3057,54 @@ arrive at the assignment:
   t.1\mapsto \key{\%rcx} \}
 \end{gather*}
 Applying this assignment to our running example, on the left, yields
-the program on the right.\\
+the program on the right.
 % why frame size of 32? -JGS
-\begin{minipage}{0.4\textwidth}
+\begin{center}
+  \begin{minipage}{0.3\textwidth}
 \begin{lstlisting}
-(block ()
-  (movq $1 v)
-  (movq $46 (var w))
-  (movq (var v) (var x))
-  (addq (int 7) (var x))
-  (movq (var x) (var y))
-  (addq (int 4) (var y))
-  (movq (var x) (var z))
-  (addq (var w) (var z))
-  (movq (var y) (var t.1))
-  (negq (var t.1))
-  (movq (var z) (reg rax))
-  (addq (var t.1) (reg rax))
-  (jmp conclusion))
+movq $1, v
+movq $46, w
+movq v, x
+addq $7, x
+movq x, y
+addq $4, y
+movq x, z
+addq w, z
+movq y, t.1
+negq t.1
+movq z, %rax
+addq t.1, %rax
+jmp conclusion
 \end{lstlisting}
 \end{minipage}
-$\Rightarrow$
+$\Rightarrow\qquad$
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-(block ()
-  (movq (int 1) (reg rcx))
-  (movq (int 46) (deref rbp -16))
-  (movq (reg rcx) (deref rbp -8))
-  (addq (int 7) (deref rbp -8))
-  (movq (deref rbp -8) (reg rcx))
-  (addq (int 4) (reg rcx))
-  (movq (deref rbp -8) (deref rbp -8))
-  (addq (deref rbp -16) (deref rbp -8))
-  (movq (reg rcx) (reg rcx))
-  (negq (reg rcx))
-  (movq (deref rbp -8) (reg rax))
-  (addq (reg rcx) (reg rax))
-  (jmp conclusion))
+movq $1, %rcx
+movq $46, -16(%rbp)
+movq %rcx, -8(%rbp)
+addq $7, -8(%rbp)
+movq -8(%rbp), %rcx
+addq $4, %rcx
+movq -8(%rbp), -8(%rbp)
+addq -16(%rbp), -8(%rbp)
+movq %rcx, %rcx
+negq %rcx
+movq -8(%rbp), %rax
+addq %rcx, %rax
+jmp conclusion
 \end{lstlisting}
 \end{minipage}
+\end{center}
 
-The resulting program is almost an x86 program. The remaining step
-is to apply the patch instructions pass. In this example, the trivial
-move of \code{-8(\%rbp)} to itself is deleted and the addition of
+The resulting program is almost an x86 program. The remaining step is
+the patch instructions pass. In this example, the trivial move of
+\code{-8(\%rbp)} to itself is deleted and the addition of
 \code{-16(\%rbp)} to \key{-8(\%rbp)} is fixed by going through
 \code{rax} as follows.
 \begin{lstlisting}
-  (movq (deref rbp -16) (reg rax)
-  (addq (reg rax) (deref rbp -8))
+movq -16(%rbp), %rax
+addq %rax, -8(%rbp)
 \end{lstlisting}
 
 An overview of all of the passes involved in register allocation is
@@ -3209,41 +3204,39 @@ color numbers to registers.
 Using the same assignment that was produced by register allocator
 described in the last section, we get the following program.
 
-\begin{minipage}{0.45\textwidth}
+\begin{minipage}{0.3\textwidth}
 \begin{lstlisting}
-(block ()
-  (movq (int 1) (var v))
-  (movq (int 46) (var w))
-  (movq (var v) (var x))
-  (addq (int 7) (var x))
-  (movq (var x) (var y))
-  (addq (int 4) (var y))
-  (movq (var x) (var z))
-  (addq (var w) (var z))
-  (movq (var y) (var t.1))
-  (negq (var t.1))
-  (movq (var z) (reg rax))
-  (addq (var t.1) (reg rax))
-  (jmp conclusion))
+movq $1, v
+movq $46, w
+movq v, x
+addq $7, x
+movq x, y
+addq $4, y
+movq x, z
+addq w, z
+movq y, t.1
+negq t.1
+movq z, %rax
+addq t.1, %rax
+jmp conclusion
 \end{lstlisting}
 \end{minipage}
-$\Rightarrow$
+$\Rightarrow\qquad$
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-(block ()
-  (movq (int 1) (reg rbx))
-  (movq (int 46) (reg rdx))
-  (movq (reg rbx) (reg rcx))
-  (addq (int 7) (reg rcx))
-  (movq (reg rcx) (reg rbx))
-  (addq (int 4) (reg rbx))
-  (movq (reg rcx) (reg rcx))
-  (addq (reg rdx) (reg rcx))
-  (movq (reg rbx) (reg rbx))
-  (negq (reg rbx))
-  (movq (reg rcx) (reg rax))
-  (addq (reg rbx) (reg rax))
-  (jmp conclusion))
+movq $1, %rbx
+movq $46, %rdx
+movq %rbx, %rcx
+addq $7, %rcx
+movq %rcx, %rbx
+addq $4, %rbx
+movq %rcx, %rcx
+addq %rdx, %rcx
+movq %rbx, %rbx
+negq %rbx
+movq %rcx, %rax
+addq %rbx, %rax
+jmp conclusion
 \end{lstlisting}
 \end{minipage}
 
@@ -3367,12 +3360,12 @@ to obtain the code on right.
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
 (block ()
-  (movq (int 1) (var v))
-  (movq (int 46) (var w))
+  (movq $1 v)
+  (movq $46 (var w))
   (movq (var v) (var x))
-  (addq (int 7) (var x))
+  (addq $7 (var x))
   (movq (var x) (var y))
-  (addq (int 4) (var y))
+  (addq $4 (var y))
   (movq (var x) (var z))
   (addq (var w) (var z))
   (movq (var y) (var t.1))
@@ -3386,12 +3379,12 @@ $\Rightarrow$
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
 (block ()
-  (movq (int 1) (reg rcx))
-  (movq (int 46) (reg rbx))
+  (movq $1 (reg rcx))
+  (movq $46 (reg rbx))
   (movq (reg rcx) (reg rcx))
-  (addq (int 7) (reg rcx))
+  (addq $7 (reg rcx))
   (movq (reg rcx) (reg rdx))
-  (addq (int 4) (reg rdx))
+  (addq $4 (reg rdx))
   (movq (reg rcx) (reg rcx))
   (addq (reg rbx) (reg rcx))
   (movq (reg rdx) (reg rbx))
@@ -3409,11 +3402,11 @@ result.
 \begin{minipage}{0.45\textwidth}
   \begin{lstlisting}
 (block ()
-  (movq (int 1) (reg rcx))
-  (movq (int 46) (reg rbx))
-  (addq (int 7) (reg rcx))
+  (movq $1 (reg rcx))
+  (movq $46 (reg rbx))
+  (addq $7 (reg rcx))
   (movq (reg rcx) (reg rdx))
-  (addq (int 4) (reg rdx))
+  (addq $4 (reg rdx))
   (addq (reg rbx) (reg rcx))
   (movq (reg rdx) (reg rbx))
   (negq (reg rbx))
