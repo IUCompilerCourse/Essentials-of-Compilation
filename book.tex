@@ -2369,35 +2369,32 @@ stack locations or registers.
 Example $R_1$ program:
 % s0_22.rkt
 \begin{lstlisting}
-(program ()
-  (let ([v 1])
-  (let ([w 46])
-  (let ([x (+ v 7)])
-  (let ([y (+ 4 x)])
-  (let ([z (+ x w)])
-       (+ z (- y))))))))
+(let ([v 1])
+(let ([w 46])
+(let ([x (+ v 7)])
+(let ([y (+ 4 x)])
+(let ([z (+ x w)])
+     (+ z (- y)))))))
 \end{lstlisting}
 \end{minipage}
 \begin{minipage}{0.45\textwidth}
 After instruction selection:
 \begin{lstlisting}
-(program
- ((locals . (v w x y z t.1)))
- ((start .
-   (block ()
-     (movq (int 1) (var v))
-     (movq (int 46) (var w))
-     (movq (var v) (var x))
-     (addq (int 7) (var x))
-     (movq (var x) (var y))
-     (addq (int 4) (var y))
-     (movq (var x) (var z))
-     (addq (var w) (var z))
-     (movq (var y) (var t.1))
-     (negq (var t.1))
-     (movq (var z) (reg rax))
-     (addq (var t.1) (reg rax))
-     (jmp conclusion)))))
+locals: v w x y z t.1
+start:
+    movq $1, v
+    movq $46, w
+    movq v, x
+    addq $7, x
+    movq x, y
+    addq $4, y
+    movq x, z
+    addq w, z
+    movq y, t.1
+    negq t.1
+    movq z, %rax
+    addq t.1, %rax
+    jmp conclusion
 \end{lstlisting}
 \end{minipage}
 \caption{An example program for register allocation.}
@@ -2414,33 +2411,33 @@ Consider variables \code{x} and \code{y} in Figure~\ref{fig:reg-eg}.
 After the variable \code{x} is moved to \code{z} it is no longer
 needed.  Variable \code{y}, on the other hand, is used only after this
 point, so \code{x} and \code{y} could share the same register. The
-topic of Section~\ref{sec:liveness-analysis-r1} is how we compute
+topic of Section~\ref{sec:liveness-analysis-r1} is how to compute
 where a variable is needed.  Once we have that information, we compute
 which variables are needed at the same time, i.e., which ones
-\emph{interfere}, and represent this relation as graph whose vertices
-are variables and edges indicate when two variables interfere with
-each other (Section~\ref{sec:build-interference}). We then model
-register allocation as a graph coloring problem, which we discuss in
-Section~\ref{sec:graph-coloring}.
+\emph{interfere}, and represent this relation as an undirected graph
+whose vertices are variables and edges indicate when two variables
+interfere with each other (Section~\ref{sec:build-interference}). We
+then model register allocation as a graph coloring problem, which we
+discuss in Section~\ref{sec:graph-coloring}.
 
 In the event that we run out of registers despite these efforts, we
 place the remaining variables on the stack, similar to what we did in
-Chapter~\ref{ch:int-exp}. It is common to say that when a variable
-that is assigned to a stack location, it has been \emph{spilled}. The
-process of spilling variables is handled as part of the graph coloring
-process described in \ref{sec:graph-coloring}.
+Chapter~\ref{ch:int-exp}. It is common to use the verb \emph{spill}
+for assigning a variable to a stack location. The process of spilling
+variables is handled as part of the graph coloring process described
+in \ref{sec:graph-coloring}.
 
 \section{Registers and Calling Conventions}
 \label{sec:calling-conventions}
 
-As we perform register allocation, we will need to be aware of the
+As we perform register allocation, we need to be aware of the
 conventions that govern the way in which registers interact with
-function calls. The convention for x86 is that the caller is
-responsible for freeing up some registers, the \emph{caller-saved
-  registers}, prior to the function call, and the callee is
-responsible for saving and restoring some other registers, the
-\emph{callee-saved registers}, before and after using them. The
-caller-saved registers are
+function calls, such as calls to the \code{read\_int} function. The
+convention for x86 is that the caller is responsible for freeing up
+some registers, the \emph{caller-saved registers}, prior to the
+function call, and the callee is responsible for saving and restoring
+some other registers, the \emph{callee-saved registers}, before and
+after using them. The caller-saved registers are
 \begin{lstlisting}
   rax rdx rcx rsi rdi r8 r9 r10 r11
 \end{lstlisting}
@@ -2471,13 +2468,13 @@ To understand the latter condition, consider the following code
 fragment in which there are two writes to \code{b}. Are \code{a} and
 \code{b} both live at the same time?
 \begin{lstlisting}[numbers=left,numberstyle=\tiny]
-   (movq (int 5) (var a))
-   (movq (int 30) (var b))
-   (movq (var a) (var c))
-   (movq (int 10) (var b))
-   (addq (var b) (var c))
+movq $5, a
+movq $30, b
+movq a, c
+movq $10, b
+addq b, c
 \end{lstlisting}
-The answer is no because the value \code{30} written to \code{b} on
+The answer is no because the integer \code{30} written to \code{b} on
 line 2 is never used. The variable \code{b} is read on line 5 and
 there is an intervening write to \code{b} on line 4, so the read on
 line 5 receives the value written on line 4, not line 2.
@@ -2490,24 +2487,81 @@ instruction $I_k$ and $L_{\mathsf{before}}(k)$ for the set of live
 variables before instruction $I_k$. The live variables after an
 instruction are always the same as the live variables before the next
 instruction.
-\begin{equation*}
+\begin{equation} \label{eq:live-after-before-next}
   L_{\mathsf{after}}(k) = L_{\mathsf{before}}(k+1)
-\end{equation*}
+\end{equation}
 To start things off, there are no live variables after the last
 instruction, so
-\begin{equation*}
+\begin{equation}\label{eq:live-last-empty}
   L_{\mathsf{after}}(n) = \emptyset
-\end{equation*}
+\end{equation}
 We then apply the following rule repeatedly, traversing the
 instruction sequence back to front.
-\begin{equation*}
+\begin{equation}\label{eq:live-before-after-minus-writes-plus-reads}
   L_{\mathtt{before}}(k) = (L_{\mathtt{after}}(k) - W(k)) \cup R(k),
-\end{equation*}
+\end{equation}
 where $W(k)$ are the variables written to by instruction $I_k$ and
 $R(k)$ are the variables read by instruction $I_k$.
+
+Let us walk through the above example, applying these formulas
+starting with the instruction on line 5. We collect the answers in the
+below listing.  The $L_{\mathsf{after}}$ for the \code{addq b, c}
+instruction is $\emptyset$ because it is the last instruction
+(formula~\ref{eq:live-last-empty}).  The $L_{\mathsf{before}}$ for
+this instruction is $\{b,c\}$ because it reads from variables $b$ and
+$c$ (formula~\ref{eq:live-before-after-minus-writes-plus-reads}), that
+is
+\[
+   L_{\mathsf{before}}(5) = (\emptyset - \{c\}) \cup \{ b, c \} = \{ b, c \}
+\]
+Moving on the the instruction \code{movq \$10, b} at line 4, we copy
+the live-before set from line 5 to be the live-after set for this
+instruction (formula~\ref{eq:live-after-before-next}).
+\[
+  L_{\mathsf{after}}(4) = \{ b, c \}
+\]
+This move instruction writes to $b$ and does not read from any
+variables, so we have the following live-before set
+(formula~\ref{eq:live-before-after-minus-writes-plus-reads}).
+\[
+  L_{\mathsf{before}}(4) = (\{b,c\} - \{b\}) \cup \emptyset = \{ c \}
+\]
+Moving on more quickly, the live-before for instruction \code{movq a, c}
+is $\{a\}$ because it writes to $\{c\}$ and reads from $\{a\}$
+(formula~\ref{eq:live-before-after-minus-writes-plus-reads}).  The
+live-before for \code{movq \$30, b} is $\{a\}$ because it writes to a
+variable that is not live and does not read from a variable.
+Finally, the live-before for \code{movq \$5, a} is $\emptyset$
+because it writes to variable $a$.
+
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}[numbers=left,numberstyle=\tiny]
+movq $5, a
+movq $30, b
+movq a, c
+movq $10, b
+addq b, c
+\end{lstlisting}
+\end{minipage}
+\vrule\hspace{10pt}
+\begin{minipage}{0.45\textwidth}
+\begin{align*}
+L_{\mathsf{before}}(1)=  \emptyset, 
+L_{\mathsf{after}}(1)=  \{a\}\\
+L_{\mathsf{before}}(2)=  \{a\},
+L_{\mathsf{after}}(2)=  \{a\}\\
+L_{\mathsf{before}}(3)=  \{a\},
+L_{\mathsf{after}}(2)=  \{c\}\\
+L_{\mathsf{before}}(4)=  \{c\},
+L_{\mathsf{after}}(4)=  \{b,c\}\\
+L_{\mathsf{before}}(5)=  \{b,c\},
+L_{\mathsf{after}}(5)=  \emptyset
+\end{align*}
+\end{minipage}
+
 Figure~\ref{fig:live-eg} shows the results of live variables analysis
-for the running example, with each instruction aligned with its
-$L_{\mathtt{after}}$ set to make the figure easy to read.
+for the running example program, with each instruction aligned with
+its $L_{\mathtt{after}}$ set to make the figure easy to read.
 
 \margincomment{JM: I think you should walk through the explanation of this formula,
    connecting it back to the example from before. \\
@@ -2517,20 +2571,19 @@ $L_{\mathtt{after}}$ set to make the figure easy to read.
 \hspace{20pt}
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}[numbers=left]
-(block ()
-  (movq (int 1) (var v))
-  (movq (int 46) (var w))
-  (movq (var v) (var x))
-  (addq (int 7) (var x))
-  (movq (var x) (var y))
-  (addq (int 4) (var y))
-  (movq (var x) (var z))
-  (addq (var w) (var z))
-  (movq (var y) (var t.1))
-  (negq (var t.1))
-  (movq (var z) (reg rax))
-  (addq (var t.1) (reg rax))
-  (jmp conclusion))
+movq $1, v
+movq $46, w
+movq v, x
+addq $7, x
+movq x, y
+addq $4, y
+movq x, z
+addq w, z
+movq y, t.1
+negq t.1)
+movq z, %rax
+addq t.1, %rax
+jmp conclusion
 \end{lstlisting}
 \end{minipage}
 \vrule\hspace{10pt}
@@ -2553,15 +2606,15 @@ $L_{\mathtt{after}}$ set to make the figure easy to read.
 \end{lstlisting}
 \end{minipage}
 
-\caption{An example block annotated with live-after sets.}
+\caption{The running example annotated with live-after sets.}
 \label{fig:live-eg}
 \end{figure}
 
 \begin{exercise}\normalfont
 Implement the compiler pass named \code{uncover-live} that computes
 the live-after sets. We recommend storing the live-after sets (a list
-of lists of variables) in the $\itm{info}$ field of the \key{block}
-construct.
+of lists of variables) in the $\itm{info}$ field of the \key{Block}
+structure.
 %
 We recommend organizing your code to use a helper function that takes
 a list of instructions and an initial live-after set (typically empty)
@@ -2573,6 +2626,7 @@ the variables read by an instruction which corresponds to the $R$
 function discussed above, and 3) the variables written by an
 instruction which corresponds to $W$.
 \end{exercise}
+
 
 \section{Building the Interference Graph}
 \label{sec:build-interference}
@@ -2587,25 +2641,25 @@ graph that has an edge between two variables if they are live at the
 same time, that is, if they interfere with each other.
 
 The most obvious way to compute the interference graph is to look at
-the set of live variables between each statement in the program, and
+the set of live variables between each statement in the program and
 add an edge to the graph for every pair of variables in the same set.
 This approach is less than ideal for two reasons. First, it can be
-rather expensive because it takes $O(n^2)$ time to look at every pair
-in a set of $n$ live variables. Second, there is a special case in
-which two variables that are live at the same time do not actually
-interfere with each other: when they both contain the same value
-because we have assigned one to the other.
+expensive because it takes $O(n^2)$ time to look at every pair in a
+set of $n$ live variables. Second, there is a special case in which
+two variables that are live at the same time do not actually interfere
+with each other: when they both contain the same value because we have
+assigned one to the other.
 
 A better way to compute the interference graph is to focus on the
-writes. That is, for each instruction, create an edge between the
-variable being written to and all the \emph{other} live variables.
-(One should not create self edges.) For a \key{callq} instruction,
-think of all caller-saved registers as being written to, so and edge
-must be added between every live variable and every caller-saved
-register. For \key{movq}, we deal with the above-mentioned special
-case by not adding an edge between a live variable $v$ and destination
-$d$ if $v$ matches the source of the move. So we have the following
-three rules.
+writes~\cite{Appel:2003fk}. That is, for each instruction, create an
+edge between the variable being written to and all the \emph{other}
+live variables.  (One should not create self edges.) For a \key{callq}
+instruction, think of all caller-saved registers as being written to,
+so and edge must be added between every live variable and every
+caller-saved register. For \key{movq}, we deal with the
+above-mentioned special case by not adding an edge between a live
+variable $v$ and destination $d$ if $v$ matches the source of the
+move. So we have the following three rules.
 
 \begin{enumerate}
 \item If instruction $I_k$ is an arithmetic instruction such as
@@ -3013,8 +3067,8 @@ the program on the right.\\
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
 (block ()
-  (movq (int 1) (var v))
-  (movq (int 46) (var w))
+  (movq $1 v)
+  (movq $46 (var w))
   (movq (var v) (var x))
   (addq (int 7) (var x))
   (movq (var x) (var y))
