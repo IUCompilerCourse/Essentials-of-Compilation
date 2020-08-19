@@ -3199,10 +3199,11 @@ We return to the running example, but we remove the supposition that
 we only have one register to use. So we have the following mapping of
 color numbers to registers.
 \[
-  \{ 0 \mapsto \key{\%rbx}, \; 1 \mapsto \key{\%rcx}, \; 2 \mapsto \key{\%rdx}, \ldots \}
+  \{ 0 \mapsto \key{\%rbx}, \; 1 \mapsto \key{\%rcx}, \; 2 \mapsto \key{\%rdx} \}
 \]
-Using the same assignment that was produced by register allocator
-described in the last section, we get the following program.
+Using the same assignment of variables to color numbers that was
+produced by the register allocator described in the last section, we
+get the following program.
 
 \begin{minipage}{0.3\textwidth}
 \begin{lstlisting}
@@ -3247,17 +3248,17 @@ if they had been placed in the same register, then the move from
 
 We say that two variables $p$ and $q$ are \emph{move related} if they
 participate together in a \key{movq} instruction, that is, \key{movq}
-  $p$, $q$ or \key{movq} $q$, $p$. When the register allocator chooses a
-color for a variable, it should prefer a color that has already been
-used for a move-related variable (assuming that they do not
-interfere). Of course, this preference should not override the
-preference for registers over stack locations, but should only be used
-as a tie breaker when choosing between registers or when choosing
-between stack locations.
+$p$\key{,} $q$ or \key{movq} $q$\key{,} $p$. When the register
+allocator chooses a color for a variable, it should prefer a color
+that has already been used for a move-related variable (assuming that
+they do not interfere). Of course, this preference should not override
+the preference for registers over stack locations. This preference
+should be used as a tie breaker when choosing between registers or
+when choosing between stack locations.
 
-We recommend that you represent the move relationships in a graph,
-similar to how we represented interference.  The following is the
-\emph{move graph} for our running example.
+We recommend representing the move relationships in a graph, similar
+to how we represented interference.  The following is the \emph{move
+  graph} for our running example.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (v) at (0,0)    {$v$};
@@ -3300,12 +3301,12 @@ vertex is $x$.
 Last time we chose to color $x$ with $1$,
 %
 which so happens to be the color of $z$, and $x$ is move related to
-$z$. This was rather lucky, and if the program had been a little
-different, and say $z$ had been already assigned to $2$, then $x$
-would still get $1$ and our luck would have run out. With move
-biasing, we use the fact that $x$ and $z$ are move related to
-influence the choice of color for $x$, in this case choosing $1$
-because that's the color of $z$.
+$z$. This was lucky, and if the program had been a little different,
+and say $z$ had been already assigned to $2$, then $x$ would still get
+$1$ and our luck would have run out. With move biasing, we use the
+fact that $x$ and $z$ are move related to influence the choice of
+color for $x$, in this case choosing $1$ because that is the color of
+$z$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (v) at (0,0)   {$v:-,\{2\}$};
@@ -3328,10 +3329,10 @@ because that's the color of $z$.
 \end{tikzpicture}
 \]
 
-Next we consider coloring the variable $v$, and we just need to avoid
-choosing $2$ because of the interference with $w$. Last time we choose
-the color $0$, simply because it was the lowest, but this time we know
-that $v$ is move related to $x$, so we choose the color $1$.
+Next we consider coloring the variable $v$. We need to avoid choosing
+$2$ because of the interference with $w$. Last time we chose the color
+$0$ because it was the lowest, but this time we know that $v$ is move
+related to $x$, so we choose the color $1$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (v) at (0,0)   {$v:\mathbf{1},\{2\}$};
@@ -3357,41 +3358,39 @@ that $v$ is move related to $x$, so we choose the color $1$.
 We apply this register assignment to the running example, on the left,
 to obtain the code on right.
 
-\begin{minipage}{0.45\textwidth}
+\begin{minipage}{0.3\textwidth}
 \begin{lstlisting}
-(block ()
-  (movq $1 v)
-  (movq $46 (var w))
-  (movq (var v) (var x))
-  (addq $7 (var x))
-  (movq (var x) (var y))
-  (addq $4 (var y))
-  (movq (var x) (var z))
-  (addq (var w) (var z))
-  (movq (var y) (var t.1))
-  (negq (var t.1))
-  (movq (var z) (reg rax))
-  (addq (var t.1) (reg rax))
-  (jmp conclusion))
+movq $1, v
+movq $46, w
+movq v, x
+addq $7, x
+movq x, y
+addq $4, y
+movq x, z
+addq w, z
+movq y, t.1
+negq t.1
+movq z, %rax
+addq t.1, %rax
+jmp conclusion
 \end{lstlisting}
 \end{minipage}
-$\Rightarrow$
+$\Rightarrow\qquad$
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-(block ()
-  (movq $1 (reg rcx))
-  (movq $46 (reg rbx))
-  (movq (reg rcx) (reg rcx))
-  (addq $7 (reg rcx))
-  (movq (reg rcx) (reg rdx))
-  (addq $4 (reg rdx))
-  (movq (reg rcx) (reg rcx))
-  (addq (reg rbx) (reg rcx))
-  (movq (reg rdx) (reg rbx))
-  (negq (reg rbx))
-  (movq (reg rcx) (reg rax))
-  (addq (reg rbx) (reg rax))
-  (jmp conclusion))
+movq $1, %rcx
+movq $46, %rbx
+movq %rcx, %rcx
+addq $7, %rcx
+movq %rcx, %rdx
+addq $4, %rdx
+movq %rcx, %rcx
+addq %rbx, %rcx
+movq %rdx, %rbx
+negq %rbx
+movq %rcx, %rax
+addq %rbx, %rax
+jmp conclusion
 \end{lstlisting}
 \end{minipage}
 
@@ -3401,18 +3400,17 @@ result.
 
 \begin{minipage}{0.45\textwidth}
   \begin{lstlisting}
-(block ()
-  (movq $1 (reg rcx))
-  (movq $46 (reg rbx))
-  (addq $7 (reg rcx))
-  (movq (reg rcx) (reg rdx))
-  (addq $4 (reg rdx))
-  (addq (reg rbx) (reg rcx))
-  (movq (reg rdx) (reg rbx))
-  (negq (reg rbx))
-  (movq (reg rcx) (reg rax))
-  (addq (reg rbx) (reg rax))
-  (jmp conclusion))
+movq $1 %rcx
+movq $46 %rbx
+addq $7 %rcx
+movq %rcx %rdx
+addq $4 %rdx
+addq %rbx %rcx
+movq %rdx %rbx
+negq %rbx
+movq %rcx %rax
+addq %rbx %rax
+jmp conclusion
 \end{lstlisting}
 \end{minipage}
 
@@ -4362,7 +4360,7 @@ $\Downarrow$
 (program ((locals . (tmp30)))
  ((block32 .
     (block ()
-      (movq (int 0) (reg rax))
+      (movq (int 0) %rax)
       (jmp conclusion)))
   (block31 .
     (block () 
@@ -4371,8 +4369,8 @@ $\Downarrow$
   (start .
     (block ()
       (callq read_int)
-      (movq (reg rax) (var tmp30))
-      (cmpq (int 1) (var tmp30))
+      (movq (reg rax) tmp30)
+      (cmpq (int 1) tmp30)
       (jmp-if e block31)
       (jmp block32)))))
 \end{lstlisting}
