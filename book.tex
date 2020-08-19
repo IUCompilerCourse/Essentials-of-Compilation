@@ -409,6 +409,9 @@ To create a AST node for the integer $8$, we write \code{(Int 8)}.
 \begin{lstlisting}
 (define eight (Int 8))
 \end{lstlisting}
+We say that the value created by \code{(Int 8)} is an
+\emph{instance} of the \code{Int} structure.
+
 The following is the \code{struct} definition for primitives operations.
 \begin{lstlisting}
 (struct Prim (op arg*))
@@ -429,7 +432,21 @@ whereas the addition operator has two children:
 (define ast1.1 (Prim '+ (list rd neg-eight)))
 \end{lstlisting}
 
-When deciding how to compile program \eqref{eq:arith-prog}, we need to
+We have made a design choice regarding the \code{Prim} structure.
+Instead of using one structure for many different operations
+(\code{read}, \code{+}, and \code{-}), we could have instead defined a
+structure for each operation, as follows.
+\begin{lstlisting}
+(struct Read ())
+(struct Add (left right))
+(struct Neg (value))
+\end{lstlisting}
+The reason we choose to use just one structure is that in many parts
+of the compiler, the code for the different primitive operators is the
+same, so we might as well just write that code once, which is enabled
+by using a single structure.
+
+When compiling a program such as \eqref{eq:arith-prog}, we need to
 know that the operation associated with the root node is addition and
 that it has two children: \texttt{read} and a negation. The AST data
 structure directly supports these queries, as we shall see in
@@ -455,10 +472,10 @@ Backus-Naur Form (BNF)~\citep{Backus:1960aa,Knuth:1964aa}.  As an
 example, we describe a small language, named $R_0$, that consists of
 integers and arithmetic operations.
 
-The first grammar rule says that given any integer $n$, an integer
-node $\INT{n}$ is an expression:
+The first grammar rule says that an instance of the \code{Int}
+structure is an expression:
 \begin{equation}
-\Exp ::= \INT{n}  \label{eq:arith-int}
+\Exp ::= \INT{\Int}  \label{eq:arith-int}
 \end{equation}
 %
 Each rule has a left-hand-side and a right-hand-side. The way to read
@@ -469,15 +486,17 @@ according to the left-hand-side.
 A name such as $\Exp$ that is
 defined by the grammar rules is a \emph{non-terminal}.
 %
-%% The name $\Int$ is a also a non-terminal, however, we do not define
-%% $\Int$ because the reader already knows what an integer is.
-
-We make the simplifying design decision that all of the languages in
-this book only handle machine-representable integers.  On most modern
+The name $\Int$ is a also a non-terminal, but instead of defining it
+with a grammar rule, we define it with the following explanation.  We
+make the simplifying design decision that all of the languages in this
+book only handle machine-representable integers.  On most modern
 machines this corresponds to integers represented with 64-bits, i.e.,
 the in range $-2^{63}$ to $2^{63}-1$.  We restrict this range further
 to match the Racket \texttt{fixnum} datatype, which allows 63-bit
-integers on a 64-bit machine.
+integers on a 64-bit machine. So an $\Int$ is a sequence of decimals
+($0$ to $9$), possibly starting with $-$ (for negative integers), such
+that the sequence of decimals represent an integer in range $-2^{62}$
+to $2^{62}-1$.
 
 The second grammar rule is the \texttt{read} operation that receives
 an input integer from the user of the program.
@@ -570,14 +589,14 @@ called an {\em alternative}.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{rcl}
-\Exp &::=& \INT{n} \mid \READ{} \mid \NEG{\Exp} \\
+\Exp &::=& \INT{\Int} \mid \READ{} \mid \NEG{\Exp} \\
      &\mid&  \ADD{\Exp}{\Exp}  \\
-R_0  &::=& \code{(Program} \; \code{'()}\; \Exp \code{)}
+R_0  &::=& \PROGRAM{\code{'()}}{\Exp}
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The syntax of $R_0$, a language of integer arithmetic.}
+\caption{The abstract syntax of $R_0$, a language of integer arithmetic.}
 \label{fig:r0-syntax}
 \end{figure}
 
@@ -987,18 +1006,18 @@ integer arithmetic and local variable binding, which we name $R_1$, to
 x86-64 assembly code~\citep{Intel:2015aa}.  Henceforth we shall refer
 to x86-64 simply as x86.  The chapter begins with a description of the
 $R_1$ language (Section~\ref{sec:s0}) followed by a description of x86
-(Section~\ref{sec:x86}). The x86 assembly language is quite large, so
-we discuss only what is needed for compiling $R_1$. We introduce more
-of x86 in later chapters. Once we have introduced $R_1$ and x86, we
+(Section~\ref{sec:x86}). The x86 assembly language is large, so we
+discuss only what is needed for compiling $R_1$. We introduce more of
+x86 in later chapters. Once we have introduced $R_1$ and x86, we
 reflect on their differences and come up with a plan to break down the
 translation from $R_1$ to x86 into a handful of steps
 (Section~\ref{sec:plan-s0-x86}).  The rest of the sections in this
 chapter give detailed hints regarding each step
 (Sections~\ref{sec:uniquify-s0} through \ref{sec:patch-s0}).  We hope
-to give enough hints that the well-prepared reader, together with some
-friends, can implement a compiler from $R_1$ to x86 in a couple weeks
-while at the same time leaving room for some fun and creativity.  To
-give the reader a feeling for the scale of this first compiler, the
+to give enough hints that the well-prepared reader, together with a
+few friends, can implement a compiler from $R_1$ to x86 in a couple
+weeks while at the same time leaving room for some fun and creativity.
+To give the reader a feeling for the scale of this first compiler, the
 instructor solution for the $R_1$ compiler is less than 500 lines of
 code.
 
@@ -1011,12 +1030,12 @@ the $R_1$ language is defined by the grammar in
 Figure~\ref{fig:r1-syntax}.  The non-terminal \Var{} may be any Racket
 identifier. As in $R_0$, \key{read} is a nullary operator, \key{-} is
 a unary operator, and \key{+} is a binary operator.  Similar to $R_0$,
-the $R_1$ language includes the \key{program} construct to mark the
-top of the program, which is helpful in some of the compiler passes.
-The $\itm{info}$ field of the \key{program} construct contains an
-association list that is used to communicate auxiliary data from one
-compiler pass the next. Despite the simplicity of the $R_1$ language,
-it is rich enough to exhibit several compilation techniques.
+the $R_1$ language includes the \key{Program} struct to mark the top
+of the program. The $\itm{info}$ field of the \key{Program} struct
+contains an \emph{association list} (a list of key-value pairs) that
+is used to communicate auxiliary data from one compiler pass the
+next. Despite the simplicity of the $R_1$ language, it is rich enough
+to exhibit several compilation techniques.
 
 \begin{figure}[btp]
 \centering
@@ -1024,50 +1043,52 @@ it is rich enough to exhibit several compilation techniques.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{rcl}
-\Exp &::=& \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)  \\
-     &\mid&  \Var \mid \LET{\Var}{\Exp}{\Exp} \\
-R_1  &::=& (\key{program} \;\itm{info}\; \Exp)
+\Exp &::=& \INT{\Int} \mid \READ{} \mid \NEG{\Exp} \\
+     &\mid& \ADD{\Exp}{\Exp}  
+     \mid  \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp} \\
+R_1  &::=& \PROGRAM{\code{'()}}{\Exp}
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The syntax of $R_1$, a language of integers and variables.}
+\caption{The abstract syntax of $R_1$, a language of integers and variables.}
 \label{fig:r1-syntax}
 \end{figure}
 
 Let us dive further into the syntax and semantics of the $R_1$
-language.  The \key{let} construct defines a variable for use within
-its body and initializes the variable with the value of an expression.
-So the following program initializes \code{x} to \code{32} and then
-evaluates the body \code{(+ 10 x)}, producing \code{42}.
+language.  The \key{Let} feature defines a variable for use within its
+body and initializes the variable with the value of an expression.
+The abstract syntax for \key{Let} is defined in Figure~\ref{fig:r1-syntax}.
+The concrete syntax for \key{Let} is
 \begin{lstlisting}
-(program ()
-   (let ([x (+ 12 20)]) (+ 10 x)))
+(let ([|$\itm{var}$| |$\itm{exp}$|]) |$\itm{exp}$|)
+\end{lstlisting}
+For example, the following program initializes \code{x} to $32$ and then
+evaluates the body \code{(+ 10 x)}, producing $42$.
+\begin{lstlisting}
+(let ([x (+ 12 20)]) (+ 10 x))
 \end{lstlisting}
 When there are multiple \key{let}'s for the same variable, the closest
 enclosing \key{let} is used. That is, variable definitions overshadow
 prior definitions. Consider the following program with two \key{let}'s
 that define variables named \code{x}. Can you figure out the result?
 \begin{lstlisting}
-(program ()
-   (let ([x 32]) (+ (let ([x 10]) x) x)))
+(let ([x 32]) (+ (let ([x 10]) x) x))
 \end{lstlisting}
-For the purposes of showing which variable uses correspond to which
-definitions, the following shows the \code{x}'s annotated with subscripts
-to distinguish them. Double check that your answer for the above is
-the same as your answer for this annotated version of the program.
+For the purposes of depicting which variable uses correspond to which
+definitions, the following shows the \code{x}'s annotated with
+subscripts to distinguish them. Double check that your answer for the
+above is the same as your answer for this annotated version of the
+program.
 \begin{lstlisting}
-(program ()
-   (let ([x|$_1$| 32]) (+ (let ([x|$_2$| 10]) x|$_2$|) x|$_1$|)))
+(let ([x|$_1$| 32]) (+ (let ([x|$_2$| 10]) x|$_2$|) x|$_1$|))
 \end{lstlisting}
 The initializing expression is always evaluated before the body of the
 \key{let}, so in the following, the \key{read} for \code{x} is
 performed before the \key{read} for \code{y}. Given the input
-\code{52} then \code{10}, the following produces \code{42} (and not
-\code{-42}).
+$52$ then $10$, the following produces $42$ (not $-42$).
 \begin{lstlisting}
-(program ()
-  (let ([x (read)]) (let ([y (read)]) (+ x (- y)))))
+(let ([x (read)]) (let ([y (read)]) (+ x (- y))))
 \end{lstlisting}
 
 Figure~\ref{fig:interp-R1} shows the definitional interpreter for the
@@ -1081,37 +1102,37 @@ environment. The \code{interp-R1} function takes the current
 environment, \code{env}, as an extra parameter.  When the interpreter
 encounters a variable, it finds the corresponding value using the
 \code{lookup} function (Appendix~\ref{appendix:utilities}).  When the
-interpreter encounters a \key{let}, it evaluates the initializing
+interpreter encounters a \key{Let}, it evaluates the initializing
 expression, extends the environment with the result value bound to the
-variable, then evaluates the body of the \key{let}.
+variable, then evaluates the body of the \key{Let}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
 (define (interp-exp env)
   (lambda (e)
     (match e
-      [(? fixnum?) e]
-      [`(read)
+      [(Int n) n]
+      [(Prim 'read '())
        (define r (read))
        (cond [(fixnum? r) r]
              [else (error 'interp-R1 "expected an integer" r)])]
-      [`(- ,e)
+      [(Prim '- (list e))
        (define v ((interp-exp env) e))
        (fx- 0 v)]
-      [`(+ ,e1 ,e2)
+      [(Prim '+ (list e1 e2))
        (define v1 ((interp-exp env) e1))
        (define v2 ((interp-exp env) e2))
        (fx+ v1 v2)]
-      [(? symbol?) (lookup e env)]
-      [`(let ([,x ,e]) ,body)
+      [(Var x) (lookup x env)]
+      [(Let x e body)
        (define new-env (cons (cons x ((interp-exp env) e)) env))
        ((interp-exp new-env) body)]
       )))
 
-   (define (interp-R1 env)
-     (lambda (p)
-       (match p
-         [`(program ,info ,e) ((interp-exp '()) e)])))
+(define (interp-R1 p)
+  (match p
+    [(Program info e) ((interp-exp '()) e)]
+    ))
 \end{lstlisting}
 \caption{Interpreter for the $R_1$ language.}
 \label{fig:interp-R1}
