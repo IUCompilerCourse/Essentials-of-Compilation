@@ -296,29 +296,44 @@ following people.
 \label{ch:trees-recur}
 
 In this chapter we review the basic tools that are needed to implement
-a compiler. We use \emph{abstract syntax trees} (ASTs), which are data
-structures in computer memory, in contrast to how programs are
-typically stored in text files on disk, as \emph{concrete syntax}.
+a compiler. Programs are typically input by a programmer as text,
+i.e., a sequence of characters. The program-as-text representation is
+called \emph{concrete syntax}. We use concrete syntax to concisely
+write down and talk about programs. Inside the compiler, we use
+\emph{abstract syntax trees} (ASTs) to represent programs in a way
+that efficiently supports the operations that the compiler needs to
+perform.
 %
-ASTs can be represented in many different ways, depending on the programming
-language used to write the compiler.
+The translation from concrete syntax to abstract syntax is a process
+called \emph{parsing}~\cite{Aho:1986qf}. We do not cover the theory
+and implementation of parsing in this book. A parser is provided in
+the supporting materials for translating from concrete syntax to
+abstract syntax for the languages used in this book.
+
+ASTs can be represented in many different ways inside the compiler,
+depending on the programming language used to write the compiler.
 %
-We use Racket's \code{struct} feature to conveniently represent
-ASTs (Section~\ref{sec:ast}). We use grammars to defined the abstract
-syntax of programming languages (Section~\ref{sec:grammar}) and
-pattern matching to inspect individual nodes in an AST
+We use Racket's \code{struct} feature to represent ASTs
+(Section~\ref{sec:ast}). We use grammars to define the abstract syntax
+of programming languages (Section~\ref{sec:grammar}) and pattern
+matching to inspect individual nodes in an AST
 (Section~\ref{sec:pattern-matching}).  We use recursion to construct
 and deconstruct entire ASTs (Section~\ref{sec:recursion}).  This
 chapter provides an brief introduction to these ideas.
 
+
 \section{Abstract Syntax Trees and Racket Structures}
 \label{sec:ast}
 
-The primary data structure that is commonly used for representing
-programs is the \emph{abstract syntax tree} (AST). When considering
-some part of a program, a compiler needs to ask what kind of thing it
-is and what sub-parts it contains. For example, the program on the
-left corresponds to the AST on the right.
+Compilers use abstract syntax trees to represent programs because
+compilers often need to ask questions like: for a given part of a
+program, what kind of language feature is it? What are the sub-parts
+of this part of the program? Consider the program on the left and its
+AST on the right. This program is an addition and it has two
+sub-parts, a read operation and a negation. The negation has another
+sub-part, the integer constant \code{8}. By using a tree to represent
+the program, we can easily follow the links to go from one part of a
+program to its sub-parts.
 \begin{center}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -341,12 +356,12 @@ left corresponds to the AST on the right.
 \end{equation}
 \end{minipage}
 \end{center}
-We shall use the standard terminology for trees: each circle above is
-called a \emph{node}. The arrows connect a node to its \emph{children}
-(which are also nodes). The top-most node is the \emph{root}.  Every
-node except for the root has a \emph{parent} (the node it is the child
-of). If a node has no children, it is a \emph{leaf} node.  Otherwise
-it is an \emph{internal} node.
+We use the standard terminology for trees to describe ASTs: each
+circle above is called a \emph{node}. The arrows connect a node to its
+\emph{children} (which are also nodes). The top-most node is the
+\emph{root}.  Every node except for the root has a \emph{parent} (the
+node it is the child of). If a node has no children, it is a
+\emph{leaf} node.  Otherwise it is an \emph{internal} node.
 
 %% Recall that an \emph{symbolic expression} (S-expression) is either
 %% \begin{enumerate}
@@ -442,16 +457,15 @@ structure for each operation, as follows.
 (struct Neg (value))
 \end{lstlisting}
 The reason we choose to use just one structure is that in many parts
-of the compiler, the code for the different primitive operators is the
+of the compiler the code for the different primitive operators is the
 same, so we might as well just write that code once, which is enabled
 by using a single structure.
 
 When compiling a program such as \eqref{eq:arith-prog}, we need to
 know that the operation associated with the root node is addition and
-that it has two children: \texttt{read} and a negation. The AST data
-structure directly supports these queries, as we shall see in
-Section~\ref{sec:pattern-matching}, and hence is a good choice for use
-in compilers.
+we need to be able to access its two children. Racket provides pattern
+matching over structures to support these kinds of queries, as we
+shall see in Section~\ref{sec:pattern-matching}.
 
 In this book, we often write down the concrete syntax of a program
 even when we really have in mind the AST because the concrete syntax
@@ -472,8 +486,8 @@ Backus-Naur Form (BNF)~\citep{Backus:1960aa,Knuth:1964aa}.  As an
 example, we describe a small language, named $R_0$, that consists of
 integers and arithmetic operations.
 
-The first grammar rule says that an instance of the \code{Int}
-structure is an expression:
+The first grammar rule for the abstract syntax of $R_0$ says that an
+instance of the \code{Int} structure is an expression:
 \begin{equation}
 \Exp ::= \INT{\Int}  \label{eq:arith-int}
 \end{equation}
@@ -570,19 +584,39 @@ where \code{body} is an expression. In later chapters, the \code{info}
 part will be used to store auxilliary information but for now it is
 just the empty list.
 
-The \code{read-program} function provided in \code{utilities.rkt}
-reads programs in from a file (the sequence of characters in the
-concrete syntax of Racket) and parses them into the abstract syntax
-tree. The concrete syntax does not include a \key{program} form; that
-is added by the \code{read-program} function as it creates the
-AST. See the description of \code{read-program} in
+It is common to have many grammar rules with the same left-hand side
+but different right-hand sides, such as the rules for $\Exp$ in the
+grammar of $R_0$. As a short-hand, a vertical bar can be used to
+combine several right-hand-sides into a single rule.
+
+We collect all of the grammar rules for the abstract syntax of $R_0$
+in Figure~\ref{fig:r0-syntax}. The concrete syntax for $R_0$ is
+defined in Figure~\ref{fig:r0-concrete-syntax}.
+
+The \code{read-program} function provided in \code{utilities.rkt} of
+the support materials reads a program in from a file (the sequence of
+characters in the concrete syntax of Racket) and parses it into an
+abstract syntax tree. See the description of \code{read-program} in
 Appendix~\ref{appendix:utilities} for more details.
 
-It is common to have many rules with the same left-hand side, such as
-$\Exp$ in the grammar for $R_0$, so there is a vertical bar notation
-for gathering several rules, as shown in
-Figure~\ref{fig:r0-syntax}. Each clause between a vertical bar is
-called an {\em alternative}.
+
+\begin{figure}[tp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{rcl}
+\begin{array}{rcl}
+  \Exp &::=& \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)
+        \mid (\key{-}\;\Exp\;\Exp) \\
+  R_0 &::=& \Exp
+\end{array}
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The concrete syntax of $R_0$.}
+\label{fig:r0-concrete-syntax}
+\end{figure}
 
 \begin{figure}[tp]
 \fbox{
@@ -596,20 +630,18 @@ R_0  &::=& \PROGRAM{\code{'()}}{\Exp}
 \]
 \end{minipage}
 }
-\caption{The abstract syntax of $R_0$, a language of integer arithmetic.}
+\caption{The abstract syntax of $R_0$.}
 \label{fig:r0-syntax}
 \end{figure}
-
-
 
 
 \section{Pattern Matching}
 \label{sec:pattern-matching}
 
-As mentioned above, compilers often need to access the children of an
-AST node. Racket provides the \texttt{match} form to access the parts
-of a structure. Consider the following example and the output on the
-right.
+As mentioned in Section~\ref{sec:ast}, compilers often need to access
+the parts of an AST node. Racket provides the \texttt{match} form to
+access the parts of a structure. Consider the following example and
+the output on the right.
 \begin{center}
 \begin{minipage}{0.5\textwidth}
 \begin{lstlisting}
@@ -627,18 +659,21 @@ right.
 \end{lstlisting}
 \end{minipage}
 \end{center}
-The \texttt{match} form takes AST \eqref{eq:arith-prog} and binds its
-parts to the three variables \texttt{op}, \texttt{child1}, and
-\texttt{child2}. In general, a match clause consists of a
-\emph{pattern} and a \emph{body}. The pattern is a quoted S-expression
-that may also contain pattern-variables (each one preceded by a comma).
+In the above example, the \texttt{match} form takes the AST
+\eqref{eq:arith-prog} and binds its parts to the three pattern
+variables \texttt{op}, \texttt{child1}, and \texttt{child2}. In
+general, a match clause consists of a \emph{pattern} and a
+\emph{body}. Patterns are recursively defined to be either a pattern
+variable, a structure name followed by a pattern for each of the
+structure's arguments, or an S-expression (symbols, lists, etc.).
+(See Chapter 12 of The Racket
+Guide\footnote{\url{https://docs.racket-lang.org/guide/match.html}}
+and Chapter 9 of The Racket
+Reference\footnote{\url{https://docs.racket-lang.org/reference/match.html}}
+for a complete description of \code{match}.)
 %
-The pattern is not the same thing as a quasiquote expression used to
-\emph{construct} ASTs, however, the similarity is intentional:
-constructing and deconstructing ASTs uses similar syntax.
-%
-While the pattern uses a restricted syntax, the body of the match
-clause may contain any Racket code whatsoever.
+The body of a match clause may contain arbitrary Racket code.  The
+pattern variables can be used in the scope of the body.
 
 A \code{match} form may contain several clauses, as in the following
 function \code{leaf?} that recognizes when an $R_0$ node is
@@ -678,20 +713,19 @@ body of the first clause that matches is executed. The output of
 \end{minipage}
 \end{center}
 
-
-When writing a \code{match}, we always refer to the grammar definition
-for the language and identify which non-terminal we're expecting to
-match against, then we make sure that 1) we have one clause for each
-alternative of that non-terminal and 2) that the pattern in each
-clause corresponds to the corresponding right-hand side of a grammar
-rule. For the \code{match} in the \code{leaf?} function, we refer to
-the grammar for $R_0$ in Figure~\ref{fig:r0-syntax}. The $\Exp$
-non-terminal has 4 alternatives, so the \code{match} has 4 clauses.
-The pattern in each clause corresponds to the right-hand side of a
-grammar rule. For example, the pattern \code{(Prim '+ (list c1 c2))}
-corresponds to the right-hand side $\ADD{\Exp}{\Exp}$. When translating
-from grammars to patterns, replace non-terminals such as $\Exp$ with
-pattern variables (e.g. \code{c1} and \code{c2}).
+When writing a \code{match}, we refer to the grammar definition to
+identify which non-terminal we are expecting to match against, then we
+make sure that 1) we have one clause for each alternative of that
+non-terminal and 2) that the pattern in each clause corresponds to the
+corresponding right-hand side of a grammar rule. For the \code{match}
+in the \code{leaf?} function, we refer to the grammar for $R_0$ in
+Figure~\ref{fig:r0-syntax}. The $\Exp$ non-terminal has 4
+alternatives, so the \code{match} has 4 clauses.  The pattern in each
+clause corresponds to the right-hand side of a grammar rule. For
+example, the pattern \code{(Prim '+ (list c1 c2))} corresponds to the
+right-hand side $\ADD{\Exp}{\Exp}$. When translating from grammars to
+patterns, replace non-terminals such as $\Exp$ with pattern variables
+of your choice (e.g. \code{c1} and \code{c2}).
 
 
 \section{Recursion}
@@ -701,21 +735,19 @@ Programs are inherently recursive. For example, an $R_0$ expression is
 often made of smaller expressions. Thus, the natural way to process an
 entire program is with a recursive function.  As a first example of
 such a recursive function, we define \texttt{exp?} below, which takes
-an arbitrary S-expression and determines whether or not it is an $R_0$
-expression. As discussed in the previous section, each match clause
-corresponds to one grammar rule.  The body of each clause makes a
-recursive call for each child node. This kind of recursive function is
-so common that it has a name: \emph{structural recursion}.  In
-general, when a recursive function is defined using a sequence of
-match clauses that correspond to a grammar, and the body of each
-clause makes a recursive call on each child node, then we say the
-function is defined by structural recursion\footnote{This principle of
-  structuring code according to the data definition is advocated in
-  the book \emph{How to Design Programs}
+an arbitrary value and determines whether or not it is an $R_0$
+expression.
+%
+When a recursive function is defined using a sequence of match clauses
+that correspond to a grammar, and the body of each clause makes a
+recursive call on each child node, then we say the function is defined
+by \emph{structural recursion}\footnote{This principle of structuring
+  code according to the data definition is advocated in the book
+  \emph{How to Design Programs}
   \url{http://www.ccs.neu.edu/home/matthias/HtDP2e/}.}. Below we also
-define a second function, named \code{R0?}, that determines whether an
-S-expression is an $R_0$ program.  In general we can expect to write
-one recursive function to handle each non-terminal in the grammar.
+define a second function, named \code{R0?}, that determines whether a
+value is an $R_0$ program.  In general we can expect to write one
+recursive function to handle each non-terminal in a grammar.
 %
 \begin{center}
 \begin{minipage}{0.7\textwidth}
@@ -779,13 +811,13 @@ You may be tempted to merge the two functions into one, like this:
 \end{minipage}
 \end{center}
 %
-Sometimes such a trick will save a few lines of code, especially when it comes
-to the {\tt program} wrapper.  Yet this style is generally \emph{not}
-recommended because it can get you into trouble.
+Sometimes such a trick will save a few lines of code, especially when
+it comes to the \code{Program} wrapper.  Yet this style is generally
+\emph{not} recommended because it can get you into trouble.
 %
-For instance, the above function is subtly wrong:
-\lstinline{(R0? (Program '() (Program '() (Int 3))))} will return true, when it
-should return false.
+For example, the above function is subtly wrong:
+\lstinline{(R0? (Program '() (Program '() (Int 3))))}
+will return true, when it should return false.
 
 %% NOTE FIXME - must check for consistency on this issue throughout.
 
@@ -798,16 +830,16 @@ specification of the language. For example, the Scheme language is
 defined in the report by \cite{SPERBER:2009aa}. The Racket language is
 defined in its reference manual~\citep{plt-tr}. In this book we use an
 interpreter to define the meaning of each language that we consider,
-following Reynolds' advice in this
-regard~\citep{reynolds72:_def_interp}. An interpreter that is
-designated (by some people) as the definition of a language is called
-a \emph{definitional interpreter}.  Here we warm up by creating a
-definitional interpreter for the $R_0$ language, which serves as a
-second example of structural recursion. The \texttt{interp-R0}
-function is defined in Figure~\ref{fig:interp-R0}. The body of the
-function is a match on the input program followed by a call to the
-\lstinline{interp-exp} helper function, which in turn has one match
-clause per grammar rule for $R_0$ expressions.
+following Reynolds' advice~\citep{reynolds72:_def_interp}. An
+interpreter that is designated (by some people) as the definition of a
+language is called a \emph{definitional interpreter}.  We warm up by
+creating a definitional interpreter for the $R_0$ language, which
+serves as a second example of structural recursion. The
+\texttt{interp-R0} function is defined in
+Figure~\ref{fig:interp-R0}. The body of the function is a match on the
+input program followed by a call to the \lstinline{interp-exp} helper
+function, which in turn has one match clause per grammar rule for
+$R_0$ expressions.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -858,8 +890,12 @@ As mentioned previously, the $R_0$ language does not support
 arbitrarily-large integers, but only $63$-bit integers, so we
 interpret the arithmetic operations of $R_0$ using fixnum arithmetic
 in Racket.
-Suppose $n = 999999999999999999$, which indeed fits in $63$-bits.
-What happens when we run the following program in our interpreter?
+Suppose
+\[
+  n = 999999999999999999
+\]
+which indeed fits in $63$-bits.  What happens when we run the
+following program in our interpreter?
 \begin{lstlisting}
 (+ (+ (+ |$n$| |$n$|) (+ |$n$| |$n$|)) (+ (+ |$n$| |$n$|) (+ |$n$| |$n$|)))))
 \end{lstlisting}
@@ -883,15 +919,15 @@ program \eqref{eq:arith-prog} performs a \key{read} and then subtracts
 \begin{lstlisting}
 (interp-R0 ast1.1)
 \end{lstlisting}
-and the input the integer \code{50} we get the answer to life, the
+and if the input is \code{50}, then we get the answer to life, the
 universe, and everything: \code{42}!\footnote{\emph{The Hitchhiker's
     Guide to the Galaxy} by Douglas Adams.}
 
 We include the \key{read} operation in $R_0$ so a clever student
 cannot implement a compiler for $R_0$ that simply runs the interpreter
 during compilation to obtain the output and then generates the trivial
-code to produce the output. (Yes, a clever student did this in a
-previous version of the course.)
+code to produce the output. (Yes, a clever student did this in the
+first instance of this course.)
 
 The job of a compiler is to translate a program in one language into a
 program in another language so that the output program behaves the
@@ -1025,17 +1061,35 @@ code.
 \label{sec:s0}
 
 The $R_1$ language extends the $R_0$ language
-(Figure~\ref{fig:r0-syntax}) with variable definitions.  The syntax of
-the $R_1$ language is defined by the grammar in
-Figure~\ref{fig:r1-syntax}.  The non-terminal \Var{} may be any Racket
-identifier. As in $R_0$, \key{read} is a nullary operator, \key{-} is
-a unary operator, and \key{+} is a binary operator.  Similar to $R_0$,
-the $R_1$ language includes the \key{Program} struct to mark the top
-of the program. The $\itm{info}$ field of the \key{Program} struct
-contains an \emph{association list} (a list of key-value pairs) that
-is used to communicate auxiliary data from one compiler pass the
-next. Despite the simplicity of the $R_1$ language, it is rich enough
-to exhibit several compilation techniques.
+(Figures~\ref{fig:r0-concrete-syntax} and \ref{fig:r0-syntax}) with
+variable definitions.  The syntax of the $R_1$ language is defined by
+the grammar in Figure~\ref{fig:r1-syntax}.  The non-terminal \Var{}
+may be any Racket identifier. As in $R_0$, \key{read} is a nullary
+operator, \key{-} is a unary operator, and \key{+} is a binary
+operator.  Similar to $R_0$, the $R_1$ language includes the
+\key{Program} struct to mark the top of the program. The $\itm{info}$
+field of the \key{Program} struct contains an \emph{association list}
+(a list of key-value pairs) that is used to communicate auxiliary data
+from one compiler pass the next. Despite the simplicity of the $R_1$
+language, it is rich enough to exhibit several compilation techniques.
+
+\begin{figure}[btp]
+\centering
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{rcl}
+  \Exp &::=& \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)
+        \mid (\key{-}\;\Exp\;\Exp) \\
+     &\mid&  \Var \mid \key{(let}~\key{([}\Var ~\Exp \key{])}~ \Exp \key{)} \\
+  R_1 &::=& \Exp
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The concrete syntax of $R_1$, a language of integers and variables.}
+\label{fig:r1-concrete-syntax}
+\end{figure}
 
 \begin{figure}[btp]
 \centering
@@ -3426,30 +3480,31 @@ programs to make sure that your move biasing is working properly.
   live range splitting~\citep{Cooper:1998ly}. \\ --Jeremy}
 
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Booleans and Control Flow}
 \label{ch:bool-types}
 
 The $R_0$ and $R_1$ languages only had a single kind of value, the
-integers. In this Chapter we add a second kind of value, the Booleans,
+integers. In this chapter we add a second kind of value, the Booleans,
 to create the $R_2$ language. The Boolean values \emph{true} and
 \emph{false} are written \key{\#t} and \key{\#f} respectively in
-Racket.  We also introduce several operations that involve Booleans
-(\key{and}, \key{not}, \key{eq?}, \key{<}, etc.) and the conditional
-\key{if} expression. With the addition of \key{if} expressions,
-programs can have non-trivial control flow which has an impact on
-several parts of the compiler. Also, because we now have two kinds of
-values, we need to worry about programs that apply an operation to the
-wrong kind of value, such as \code{(not 1)}.
+Racket.  The $R_2$ language includes several operations that involve
+Booleans (\key{and}, \key{not}, \key{eq?}, \key{<}, etc.) and the
+conditional \key{if} expression. With the addition of \key{if}
+expressions, programs can have non-trivial control flow which has an
+impact on several parts of the compiler. Also, because we now have two
+kinds of values, we need to worry about programs that apply an
+operation to the wrong kind of value, such as \code{(not 1)}.
 
 There are two language design options for such situations.  One option
 is to signal an error and the other is to provide a wider
 interpretation of the operation. The Racket language uses a mixture of
 these two options, depending on the operation and the kind of
 value. For example, the result of \code{(not 1)} in Racket is
-\code{\#f} because Racket treats non-zero integers like \code{\#t}. On
-the other hand, \code{(car 1)} results in a run-time error in Racket
-stating that \code{car} expects a pair.
+\code{\#f} because Racket treats non-zero integers as if they were
+\code{\#t}. On the other hand, \code{(car 1)} results in a run-time
+error in Racket stating that \code{car} expects a pair.
 
 The Typed Racket language makes similar design choices as Racket,
 except much of the error detection happens at compile time instead of
@@ -3480,14 +3535,15 @@ conditional control flow.
 \section{The $R_2$ Language}
 \label{sec:r2-lang}
 
-The syntax of the $R_2$ language is defined in
-Figure~\ref{fig:r2-syntax}. It includes all of $R_1$ (shown in gray),
-the Boolean literals \code{\#t} and \code{\#f}, and the conditional
-\code{if} expression. Also, we expand the operators to include
-subtraction, \key{and}, \key{or} and \key{not}, the \key{eq?}
-operations for comparing two integers or two Booleans, and the
-\key{<}, \key{<=}, \key{>}, and \key{>=} operations for comparing
-integers.
+The concrete syntax of the $R_2$ language is defined in
+Figure~\ref{fig:r2-concretesyntax} and the abstract syntax is defined
+in Figure~\ref{fig:r2-syntax}. The $R_2$ language includes all of
+$R_1$ (shown in gray), the Boolean literals \code{\#t} and \code{\#f},
+and the conditional \code{if} expression. Also, we expand the
+operators to include subtraction, \key{and}, \key{or} and \key{not},
+the \key{eq?}  operations for comparing two integers or two Booleans,
+and the \key{<}, \key{<=}, \key{>}, and \key{>=} operations for
+comparing integers.
 
 \begin{figure}[tp]
 \centering
@@ -3502,12 +3558,36 @@ integers.
       \mid (\key{and}\;\Exp\;\Exp) \mid (\key{or}\;\Exp\;\Exp)
       \mid (\key{not}\;\Exp) \\
       &\mid& (\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp} \\
-  R_2 &::=& (\key{program} \; \itm{info}\; \Exp)
+  R_2 &::=& \Exp
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The syntax of $R_2$, extending $R_1$
+\caption{The concrete syntax of $R_2$, extending $R_1$
+  (Figure~\ref{fig:r1-concrete-syntax}) with Booleans and conditionals.}
+\label{fig:r2-concrete-syntax}
+\end{figure}
+
+\begin{figure}[tp]
+\centering
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{lcl}
+  \itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
+\Exp &::=& \gray{\INT{\Int} \mid \READ{} \mid \NEG{\Exp}} \\
+     &\mid& \gray{\ADD{\Exp}{\Exp}  
+      \mid  \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp}} \\
+     &\mid& \key{\#t} \mid \key{\#f} 
+      \mid (\key{and}\;\Exp\;\Exp) \mid (\key{or}\;\Exp\;\Exp)
+      \mid (\key{not}\;\Exp) \\
+      &\mid& (\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp} \\
+  R_2 &::=& \PROGRAM{\key{'()}}{\Exp}
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The abstract syntax of $R_2$, extending $R_1$
   (Figure~\ref{fig:r1-syntax}) with Booleans and conditionals.}
 \label{fig:r2-syntax}
 \end{figure}
