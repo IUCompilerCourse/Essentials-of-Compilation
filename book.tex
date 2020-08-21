@@ -581,7 +581,7 @@ The \code{Program} structure is defined as follows
 (struct Program (info body))
 \end{lstlisting}
 where \code{body} is an expression. In later chapters, the \code{info}
-part will be used to store auxilliary information but for now it is
+part will be used to store auxiliary information but for now it is
 just the empty list.
 
 It is common to have many grammar rules with the same left-hand side
@@ -1060,18 +1060,20 @@ code.
 \section{The $R_1$ Language}
 \label{sec:s0}
 
-The $R_1$ language extends the $R_0$ language
-(Figures~\ref{fig:r0-concrete-syntax} and \ref{fig:r0-syntax}) with
-variable definitions.  The syntax of the $R_1$ language is defined by
-the grammar in Figure~\ref{fig:r1-syntax}.  The non-terminal \Var{}
-may be any Racket identifier. As in $R_0$, \key{read} is a nullary
-operator, \key{-} is a unary operator, and \key{+} is a binary
-operator.  Similar to $R_0$, the $R_1$ language includes the
-\key{Program} struct to mark the top of the program. The $\itm{info}$
-field of the \key{Program} struct contains an \emph{association list}
-(a list of key-value pairs) that is used to communicate auxiliary data
-from one compiler pass the next. Despite the simplicity of the $R_1$
-language, it is rich enough to exhibit several compilation techniques.
+The $R_1$ language extends the $R_0$ language with variable
+definitions.  The concrete syntax of the $R_1$ language is defined by
+the grammar in Figure~\ref{fig:r1-concrete-syntax} and the abstract
+syntax is defined in Figure~\ref{fig:r1-syntax}.  The non-terminal
+\Var{} may be any Racket identifier. As in $R_0$, \key{read} is a
+nullary operator, \key{-} is a unary operator, and \key{+} is a binary
+operator.  Similar to $R_0$, the abstract syntax of $R_1$ includes the
+\key{Program} struct to mark the top of the program.
+%% The $\itm{info}$
+%% field of the \key{Program} structure contains an \emph{association
+%%   list} (a list of key-value pairs) that is used to communicate
+%% auxiliary data from one compiler pass the next.
+Despite the simplicity of the $R_1$ language, it is rich enough to
+exhibit several compilation techniques.
 
 \begin{figure}[btp]
 \centering
@@ -1087,7 +1089,7 @@ language, it is rich enough to exhibit several compilation techniques.
 \]
 \end{minipage}
 }
-\caption{The concrete syntax of $R_1$, a language of integers and variables.}
+\caption{The concrete syntax of $R_1$.}
 \label{fig:r1-concrete-syntax}
 \end{figure}
 
@@ -1105,7 +1107,7 @@ R_1  &::=& \PROGRAM{\code{'()}}{\Exp}
 \]
 \end{minipage}
 }
-\caption{The abstract syntax of $R_1$, a language of integers and variables.}
+\caption{The abstract syntax of $R_1$.}
 \label{fig:r1-syntax}
 \end{figure}
 
@@ -1179,7 +1181,7 @@ variable, then evaluates the body of the \key{Let}.
        (fx+ v1 v2)]
       [(Var x) (lookup x env)]
       [(Let x e body)
-       (define new-env (cons (cons x ((interp-exp env) e)) env))
+       (define new-env (dict-set env x ((interp-exp env) e)))
        ((interp-exp new-env) body)]
       )))
 
@@ -2587,7 +2589,7 @@ live-before for \code{movq \$30, b} is $\{a\}$ because it writes to a
 variable that is not live and does not read from a variable.
 Finally, the live-before for \code{movq \$5, a} is $\emptyset$
 because it writes to variable $a$.
-
+\begin{center}
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}[numbers=left,numberstyle=\tiny]
 movq $5, a
@@ -2612,6 +2614,7 @@ L_{\mathsf{before}}(5)=  \{b,c\},
 L_{\mathsf{after}}(5)=  \emptyset
 \end{align*}
 \end{minipage}
+\end{center}
 
 Figure~\ref{fig:live-eg} shows the results of live variables analysis
 for the running example program, with each instruction aligned with
@@ -2817,11 +2820,11 @@ field of the program, under the key \code{conflicts}.
 
 We come to the main event, mapping variables to registers (or to stack
 locations in the event that we run out of registers).  We need to make
-sure not to map two variables to the same register if the two
-variables interfere with each other.  Thiking about the interference
-graph, this means that adjacent vertices must be mapped to different
-registers.  If we think of registers as colors, the register
-allocation problem becomes the widely-studied graph coloring
+sure that two variables do not get mapped to the same register if the
+two variables interfere with each other.  Thinking about the
+interference graph, this means that adjacent vertices must be mapped
+to different registers.  If we think of registers as colors, the
+register allocation problem becomes the widely-studied graph coloring
 problem~\citep{Balakrishnan:1996ve,Rosen:2002bh}.
 
 The reader may be more familiar with the graph coloring problem than he
@@ -2843,8 +2846,8 @@ colors, then you have also solved the corresponding game of Sudoku.
 Figure~\ref{fig:sudoku-graph} shows an initial Sudoku game board and
 the corresponding graph with colored vertices.  We map the Sudoku
 number 1 to blue, 2 to yellow, and 3 to red.  We only show edges for a
-sampling of the vertices (those that are colored) because showing
-edges for all of the vertices would make the graph unreadable.
+sampling of the vertices (the colored ones) because showing edges for
+all of the vertices would make the graph unreadable.
 
 \begin{figure}[tbp]
 \includegraphics[width=0.45\textwidth]{figs/sudoku}
@@ -2878,33 +2881,33 @@ edge with $u$.
 
 Using the Pencil Marks technique leads to a simple strategy for
 filling in numbers: if there is a square with only one possible number
-left, then write down that number! But what if there are no squares
-with only one possibility left? One brute-force approach is to just
-make a guess. If that guess ultimately leads to a solution, great.  If
-not, backtrack to the guess and make a different guess.  One good
+left, then choose that number! But what if there are no squares with
+only one possibility left? One brute-force approach is to try them
+all: choose the first  and if it ultimately leads to a solution,
+great.  If not, backtrack and choose the next possibility.  One good
 thing about Pencil Marks is that it reduces the degree of branching in
 the search tree. Nevertheless, backtracking can be horribly time
 consuming. One way to reduce the amount of backtracking is to use the
-most-constrained-first heuristic. That is, when making a guess, always
-choose a square with the fewest possibilities left (the vertex with
+most-constrained-first heuristic. That is, when choosing a square,
+always choose one with the fewest possibilities left (the vertex with
 the highest saturation).  The idea is that choosing highly constrained
 squares earlier rather than later is better because later on there may
 not be any possibilities left for those squares.
 
-In some sense, register allocation is easier than Sudoku because we
-can always cheat and add more numbers by mapping variables to the
-stack. We would like to minimize the time needed to color the graph,
-and backtracking is expensive. Thus, it makes sense to keep the
-most-constrained-first heuristic but drop backtracking in favor of
-greedy search (guess and just keep going).
-Figure~\ref{fig:satur-algo} gives the pseudo-code for this simple
-greedy algorithm for register allocation based on saturation and the
-most-constrained-first heuristic, which is roughly equivalent to the
+In some sense, register allocation is easier than Sudoku because the
+register allocator can choose to map variables to stack locations when
+the registers run out. Thus, it makes sense to drop backtracking in
+favor of greedy search, that is, make the best choice at the time and
+keep going. We still wish to minimize the number of colors needed, so
+keeping the most-constrained-first heuristic is a good idea.
+Figure~\ref{fig:satur-algo} gives the pseudo-code for a simple greedy
+algorithm for register allocation based on saturation and the
+most-constrained-first heuristic. It is roughly equivalent to the
 DSATUR algorithm of \cite{Brelaz:1979eu} (also known as saturation
 degree ordering~\citep{Gebremedhin:1999fk,Omari:2006uq}).  Just as in
-Sudoku, the algorithm represents colors with integers, with the first
-$k$ colors corresponding to the $k$ registers in a given machine and
-the rest of the integers corresponding to stack locations.
+Sudoku, the algorithm represents colors with integers. The first $k$
+colors corresponding to the $k$ registers in a given machine and the
+rest of the integers corresponding to stack locations.
 
 \begin{figure}[btp]
   \centering
@@ -2952,10 +2955,10 @@ dash for their color and an empty set for the saturation.
 \draw (t1) to (z);
 \end{tikzpicture}
 \]
-We select a maximally saturated vertex and color it $0$. In this case we
-have a 7-way tie, so we arbitrarily pick $t.1$. We then mark color $0$
-as no longer available for $z$ because it interferes
-with $t.1$.
+The algorithm says to select a maximally saturated vertex and color it
+$0$. In this case we have a 7-way tie, so we arbitrarily pick
+$t.1$. We then mark color $0$ as no longer available for $z$ because
+it interferes with $t.1$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (v) at (0,0)    {$v:-,\{\}$};
@@ -2978,8 +2981,8 @@ with $t.1$.
 \end{tikzpicture}
 \]
 Next we repeat the process, selecting another maximally saturated
-vertex, in this case is $z$, and color it with the first available
-number, which is $1$.
+vertex, which is $z$, and color it with the first available number,
+which is $1$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (v) at (0,0)    {$v:-,\{\}$};
@@ -3025,6 +3028,9 @@ first available color, which is $0$.
 \end{tikzpicture}
 \]
 Vertex $w$ is now the most highly saturated, so we color $w$ with $2$.
+We cannot choose $0$ or $1$ because those numbers are in $w$'s
+saturation set. Indeed, $w$ interferes with $y$ and $z$, whose colors
+are $0$ and $1$ respectively.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (v) at (0,0)   {$v:-,\{2\}$};
@@ -3091,17 +3097,18 @@ In the last step of the algorithm, we color $v$ with $0$.
 \end{tikzpicture}
 \]
 
-With the coloring complete, we can finalize the assignment of
-variables to registers and stack locations. Recall that if we have $k$
-registers, we map the first $k$ colors to registers and the rest to
-stack locations.  Suppose for the moment that we have just one
-register to use for register allocation, \key{rcx}. Then the following
-is the mapping of colors to registers and stack allocations.
+With the coloring complete, we finalize the assignment of variables to
+registers and stack locations. Recall that if we have $k$ registers,
+we map the first $k$ colors to registers and the rest to stack
+locations.  Suppose for the moment that we have just one register to
+use for register allocation, \key{rcx}. Then the following is the
+mapping of colors to registers and stack allocations.
 \[
   \{ 0 \mapsto \key{\%rcx}, \; 1 \mapsto \key{-8(\%rbp)}, \; 2 \mapsto \key{-16(\%rbp)} \}
 \]
-Putting this mapping together with the above coloring of the variables, we
-arrive at the following assignment.
+Putting this mapping together with the above coloring of the
+variables, we arrive at the following assignment of variables to
+registers and stack locations.
 \begin{gather*}
   \{ v \mapsto \key{\%rcx}, \,
   w \mapsto \key{-16(\%rbp)},  \,
@@ -3225,7 +3232,7 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \section{Print x86 and Conventions for Registers}
 \label{sec:print-x86-reg-alloc}
 
-Recall the \code{print-x86} pass generates the prelude and
+Recall that the \code{print-x86} pass generates the prelude and
 conclusion instructions for the \code{main} function.
 %
 The prelude saved the values in \code{rbp} and \code{rsp} and the
@@ -3241,6 +3248,7 @@ registers were used and only save and restore them. Either way, make
 sure to take this use of stack space into account when you are
 calculating the size of the frame. Also, don't forget that the size of
 the frame needs to be a multiple of 16 bytes.
+
 
 \section{Challenge: Move Biasing$^{*}$}
 \label{sec:move-biasing}
@@ -3587,8 +3595,7 @@ comparing integers.
 \]
 \end{minipage}
 }
-\caption{The abstract syntax of $R_2$, extending $R_1$
-  (Figure~\ref{fig:r1-syntax}) with Booleans and conditionals.}
+\caption{The abstract syntax of $R_2$.}
 \label{fig:r2-syntax}
 \end{figure}
 
@@ -3615,52 +3622,49 @@ short-circuiting behavior in the order of evaluation of its arguments.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-   (define primitives (set '+ '- 'eq? '< '<= '> '>= 'not 'read))
+(define (interp-op op)
+  (match op
+    ...
+    ['not (lambda (v) (match v [#t #f] [#f #t]))]
+    ['eq? (lambda (v1 v2)
+            (cond [(or (and (fixnum? v1) (fixnum? v2))
+                       (and (boolean? v1) (boolean? v2)))
+                   (eq? v1 v2)]))]
+    ['< (lambda (v1 v2)
+          (cond [(and (fixnum? v1) (fixnum? v2)) (< v1 v2)]))]
+    ['<= (lambda (v1 v2)
+           (cond [(and (fixnum? v1) (fixnum? v2)) (<= v1 v2)]))]
+    ['> (lambda (v1 v2)
+          (cond [(and (fixnum? v1) (fixnum? v2)) (> v1 v2)]))]
+    ['>= (lambda (v1 v2)
+           (cond [(and (fixnum? v1) (fixnum? v2)) (>= v1 v2)]))]
+    [else (error 'interp-op "unknown operator")]))
 
-   (define (interp-op op)
-     (match op
-       ...
-       ['not (lambda (v) (match v [#t #f] [#f #t]))]
-       ['eq? (lambda (v1 v2)
-               (cond [(or (and (fixnum? v1) (fixnum? v2))
-                          (and (boolean? v1) (boolean? v2)))
-                      (eq? v1 v2)]))]
-       ['< (lambda (v1 v2)
-             (cond [(and (fixnum? v1) (fixnum? v2)) (< v1 v2)]))]
-       ['<= (lambda (v1 v2)
-              (cond [(and (fixnum? v1) (fixnum? v2)) (<= v1 v2)]))]
-       ['> (lambda (v1 v2)
-             (cond [(and (fixnum? v1) (fixnum? v2)) (> v1 v2)]))]
-       ['>= (lambda (v1 v2)
-              (cond [(and (fixnum? v1) (fixnum? v2)) (>= v1 v2)]))]
-       [else (error 'interp-op "unknown operator")]))
+(define (interp-exp env)
+  (lambda (e)
+    (define recur (interp-exp env))
+    (match e
+      ...
+      [(Bool b) b]
+      [(If cnd thn els)
+       (define b (recur cnd))
+       (match b
+         [#t (recur thn)]
+         [#f (recur els)])]
+      [(Prim 'and (list e1 e2))
+       (define v1 (recur e1))
+       (match v1
+         [#t (match (recur e2) [#t #t] [#f #f])]
+         [#f #f])]
+      [(Prim op args)
+       (apply (interp-op op) (for/list ([e args]) (recur e)))]
+      )))
 
-   (define (interp-exp env)
-     (lambda (e)
-       (define recur (interp-exp env))
-       (match e
-         ...
-         [(? boolean?) e]
-         [`(if ,cnd ,thn ,els)
-          (define b (recur cnd))
-          (match b
-            [#t (recur thn)]
-            [#f (recur els)])]
-         [`(and ,e1 ,e2)
-          (define v1 (recur e1))
-          (match v1
-            [#t (match (recur e2) [#t #t] [#f #f])]
-            [#f #f])]
-         [`(,op ,args ...)
-          #:when (set-member? primitives op)
-          (apply (interp-op op) (for/list ([e args]) (recur e)))]
-         )))
-
-   (define (interp-R2 env)
-     (lambda (p)
-       (match p
-        [`(program ,info ,e)
-         ((interp-exp '()) e)])))
+(define (interp-R2 p)
+  (match p
+    [(Program info e)
+     ((interp-exp '()) e)]
+    ))
 \end{lstlisting}
 \caption{Interpreter for the $R_2$ language.}
 \label{fig:interp-R2}
@@ -3686,10 +3690,10 @@ produces a \key{Boolean}.
 
 As mentioned at the beginning of this chapter, a type checker also
 rejects programs that apply operators to the wrong type of value. Our
-type checker for $R_2$ will signal an error for the following
-expression because, as we have seen above, the expression \code{(+ 10
-  ...)} has type \key{Integer}, and we require the argument of a
-\code{not} to have type \key{Boolean}.
+type checker for $R_2$ will signal an error for the below expression
+because, as we have seen above, the expression \code{(+ 10 ...)} has
+type \key{Integer}, and we require the argument of a \code{not} to
+have type \key{Boolean}.
 \begin{lstlisting}
    (not (+ 10 (- (+ 12 20))))
 \end{lstlisting}
@@ -3711,33 +3715,29 @@ association list.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-   (define (type-check-exp env)
-     (lambda (e)
-       (define recur (type-check-exp env))
-       (match e
-         [(? fixnum?)  'Integer]
-         [(? boolean?) 'Boolean]
-         [(? symbol? x) (dict-ref env x)]
-         [`(read)      'Integer]
-         [`(let ([,x ,e]) ,body)
-          (define T (recur e))
-          (define new-env (cons (cons x T) env))
-          (type-check-exp new-env body)]
-         ...
-         [`(not ,e)
-          (match (recur e)
-            ['Boolean 'Boolean]
-            [else (error 'type-check-exp "'not' expects a Boolean" e)])]
-         ...
-         )))
+(definepublic (type-check-exp env)
+  (lambda (e)
+    (match e
+      [(Var x) (dict-ref env x)]
+      [(Int n) 'Integer]
+      [(Bool b) 'Boolean]
+      [(Let x e body)
+        (define Te ((type-check-exp env) e))
+        (define Tb ((type-check-exp (dict-set env x Te)) body))
+        Tb]
+      ...
+      [else
+       (error "type-check-exp couldn't match" e)])))
 
-   (define (type-check-R2 env)
-     (lambda (e)
-       (match e
-         [`(program ,info ,body)
-          (define ty ((type-check-exp '()) body))
-          `(program ,info ,body)]
-         )))
+(define (type-check env)
+  (lambda (e)
+    (match e
+      [(Program info body)
+       (define Tb ((type-check-exp '()) body))
+       (unless (equal? Tb 'Integer)
+         (error "result of the program must be an integer, not " Tb))
+       (Program info body)]
+      )))
 \end{lstlisting}
 \caption{Skeleton of a type checker for the $R_2$ language.}
 \label{fig:type-check-R2}
@@ -8023,3 +8023,4 @@ registers.
 % LocalWords:  mainconclusion Cardelli bodyT fvs clos fvts subtype uj
 % LocalWords:  polymorphism untyped elts tys tagof Vectorof tyeq orq
 % LocalWords:  andq untagged Shao inlining ebp jge setle setg setge
+% LocalWords:  struct symtab
