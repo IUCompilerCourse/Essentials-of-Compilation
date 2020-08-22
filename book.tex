@@ -4254,7 +4254,7 @@ sequence of three instructions. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
- (assign |$\itm{lhs}$| (eq? |$\Arg_1$| |$\Arg_2$|))
+|$\itm{lhs}$| = (eq? |$\Arg_1$| |$\Arg_2$|);
 \end{lstlisting}
 \end{minipage}
 &
@@ -4262,9 +4262,9 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(cmpq |$\Arg'_2$| |$\Arg'_1$|)
-(set e (byte-reg al))
-(movzbq (byte-reg al) |$\itm{lhs}'$|)
+cmpq |$\Arg'_2$|, |$\Arg'_1$|
+sete %al
+movzbq %al, |$\itm{lhs}'$|
 \end{lstlisting}
 \end{minipage}
 \end{tabular}  \\
@@ -4273,7 +4273,7 @@ Regarding the $\Tail$ non-terminal, we have two new cases, for
 \key{goto} and conditional \key{goto}. Both are straightforward
 to handle. A \key{goto} becomes a jump instruction.
 \[
-(\key{goto}\; \ell) \quad \Rightarrow \quad ((\key{jmp} \;\ell))
+\key{goto}\; \ell\key{;} \quad \Rightarrow \quad \key{jmp}\;\ell
 \]
 A conditional \key{goto} becomes a compare instruction followed
 by a conditional jump (for ``then'') and the fall-through is
@@ -4281,9 +4281,10 @@ to a regular jump (for ``else'').\\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-  (if (eq? |$\Arg_1$| |$\Arg_2$|)
-      (goto |$\ell_1$|)
-      (goto |$\ell_2$|))
+if (eq? |$\Arg_1$| |$\Arg_2$|) then
+   goto |$\ell_1$|;
+else
+   goto |$\ell_2$|;
 \end{lstlisting}
 \end{minipage}
 &
@@ -4291,9 +4292,9 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-((cmpq |$\Arg'_2$| |$\Arg'_1$|)
- (jmp-if e |$\ell_1$|)
- (jmp |$\ell_2$|))
+cmpq |$\Arg'_2$| |$\Arg'_1$|
+je |$\ell_1$|
+jmp |$\ell_2$|
 \end{lstlisting}
 \end{minipage}
 \end{tabular}  \\
@@ -4310,9 +4311,9 @@ the output using the \code{interp-x86} interpreter
 \section{Register Allocation}
 \label{sec:register-allocation-r2}
 
-The changes required for $R_2$ affect the liveness analysis, building
-the interference graph, and assigning homes, but the graph coloring
-algorithm itself does not need to change.
+The changes required for $R_2$ affect liveness analysis, building the
+interference graph, and assigning homes, but the graph coloring
+algorithm itself does not change.
 
 \subsection{Liveness Analysis}
 \label{sec:liveness-analysis-r2}
@@ -4321,32 +4322,34 @@ Recall that for $R_1$ we implemented liveness analysis for a single
 basic block (Section~\ref{sec:liveness-analysis-r1}). With the
 addition of \key{if} expressions to $R_2$, \code{explicate-control}
 now produces many basic blocks arranged in a control-flow graph. The
-first question we need to consider is in what order should we process
+first question we need to consider is: what order should we process
 the basic blocks? Recall that to perform liveness analysis, we need to
-know the live-after set. If a basic block has no successor blocks,
-then it has an empty live-after set and we can immediately apply
-liveness analysis to it. If a basic block has some successors, then we
-need to complete liveness analysis on those blocks first.
-Furthermore, we know that the control flow graph does not contain any
-cycles (it is a DAG, that is, a directed acyclic graph)\footnote{If we
-  were to add loops to the language, then the CFG could contain cycles
-  and we would instead need to use the classic worklist algorithm for
-  computing the fixed point of the liveness
-  analysis~\citep{Aho:1986qf}.}. What all this amounts to is that we
-need to process the basic blocks in reverse topological order. We
-recommend using the \code{tsort} and \code{transpose} functions of the
+know the live-after set. If a basic block has no successor blocks
+(i.e. no out-edges in the control flow graph), then it has an empty
+live-after set and we can immediately apply liveness analysis to
+it. If a basic block has some successors, then we need to complete
+liveness analysis on those blocks first.  Furthermore, we know that
+the control flow graph does not contain any cycles (it is a DAG, that
+is, a directed acyclic graph)\footnote{If we were to add loops to the
+  language, then the CFG could contain cycles and we would instead
+  need to use the classic worklist algorithm for computing the fixed
+  point of the liveness analysis~\citep{Aho:1986qf}.}.  Returning to
+the question of what order should we process the basic blocks: the
+answer is reverse topological order. We recommend using the
+\code{tsort} (topological sort) and \code{transpose} functions of the
 Racket \code{graph} package to obtain this ordering.
 
 The next question is how to compute the live-after set of a block
 given the live-before sets of all its successor blocks.  During
 compilation we do not know which way the branch will go, so we do not
 know which of the successor's live-before set to use.  The solution
-comes from the observation that there is no harm in identifying more
-variables as live than absolutely necessary. Thus, we can take the
-union of the live-before sets from all the successors to be the
-live-after set for the block. Once we have computed the live-after
-set, we can proceed to perform liveness analysis on the block just as
-we did in Section~\ref{sec:liveness-analysis-r1}.
+comes from the observation that there is no harm to the correctness of
+the compiler if we classify more variables as live than the ones that
+are truly live during program execution. Thus, we can take the union
+of the live-before sets from all the successors to be the live-after
+set for the block. Once we have computed the live-after set, we can
+proceed to perform liveness analysis on the block just as we did in
+Section~\ref{sec:liveness-analysis-r1}.
 
 The helper functions for computing the variables in an instruction's
 argument and for computing the variables read-from ($R$) or written-to
@@ -4427,14 +4430,14 @@ and test your compiler using your previously created programs on the
 \section{Patch Instructions}
 
 The second argument of the \key{cmpq} instruction must not be an
-immediate value (such as a literal integer). So if you are comparing
-two immediates, we recommend inserting a \key{movq} instruction to put
-the second argument in \key{rax}.
+immediate value (such as an integer). So if you are comparing two
+immediates, we recommend inserting a \key{movq} instruction to put the
+second argument in \key{rax}.
 %
 The second argument of the \key{movzbq} must be a register.
 %
-There are no special restrictions on the x86 instructions
-\key{jmp-if}, \key{jmp}, and \key{label}. 
+There are no special restrictions on the x86 instructions \key{JmpIf}
+and \key{Jmp}.
 
 \begin{exercise}\normalfont
 Update \code{patch-instructions} to handle the new x86 instructions.
@@ -4455,73 +4458,70 @@ x86 assembly code.
 \begin{minipage}{0.5\textwidth}
 % s1_20.rkt
 \begin{lstlisting}
-(program ()
-  (if (eq? (read) 1) 42 0))
+(if (eq? (read) 1) 42 0)
 \end{lstlisting}
 $\Downarrow$
 \begin{lstlisting}
-(program ()
- ((block32 . (return 0))
-  (block31 . (return 42))
-  (start .
-     (seq (assign tmp30 (read))
-          (if (eq? tmp30 1)
-              (goto block31)
-              (goto block32))))))
+start:
+    tmp7951 = (read);
+    if (eq? tmp7951 1) then
+       goto block7952;
+    else
+       goto block7953;
+block7952:
+    return 42;
+block7953:
+    return 0;
 \end{lstlisting}
 $\Downarrow$
 \begin{lstlisting}
-(program ((locals . (tmp30)))
- ((block32 .
-    (block ()
-      (movq (int 0) %rax)
-      (jmp conclusion)))
-  (block31 .
-    (block () 
-      (movq (int 42) (reg rax))
-      (jmp conclusion)))
-  (start .
-    (block ()
-      (callq read_int)
-      (movq (reg rax) tmp30)
-      (cmpq (int 1) tmp30)
-      (jmp-if e block31)
-      (jmp block32)))))
+start:
+    callq read_int
+    movq %rax, tmp7951
+    cmpq $1, tmp7951
+    je block7952
+    jmp block7953
+block7952:
+    movq $42, %rax
+    jmp conclusion
+block7953:
+    movq $0, %rax
+    jmp conclusion
 \end{lstlisting}
 \end{minipage}
 &
-$\Rightarrow$
+$\Rightarrow\qquad$
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-_block31:
-	movq	$42, %rax
-	jmp _conclusion
-_block32:
-	movq	$0, %rax
-	jmp _conclusion
-_start:
-	callq	_read_int
+start:
+	callq	read_int
 	movq	%rax, %rcx
 	cmpq	$1, %rcx
-	je _block31
-	jmp _block32
+	je block7952
+	jmp block7953
+block7952:
+	movq	$42, %rax
+	jmp conclusion
+block7953:
+	movq	$0, %rax
+	jmp conclusion
 
-	.globl _main
-_main:
+	.globl main
+main:
 	pushq	%rbp
 	movq	%rsp, %rbp
+	pushq	%r13
 	pushq	%r12
 	pushq	%rbx
-	pushq	%r13
 	pushq	%r14
 	subq	$0, %rsp
-	jmp _start
-_conclusion:
+	jmp start
+conclusion:
 	addq	$0, %rsp
 	popq	%r14
-	popq	%r13
 	popq	%rbx
 	popq	%r12
+	popq	%r13
 	popq	%rbp
 	retq
 \end{lstlisting}
