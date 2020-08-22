@@ -3252,7 +3252,7 @@ calculating the size of the frame. Also, don't forget that the size of
 the frame needs to be a multiple of 16 bytes.
 
 
-\section{Challenge: Move Biasing$^{*}$}
+\section{Challenge: Move Biasing}
 \label{sec:move-biasing}
 
 This section describes an optional enhancement to register allocation
@@ -4481,11 +4481,11 @@ start:
     cmpq $1, tmp7951
     je block7952
     jmp block7953
-block7952:
-    movq $42, %rax
-    jmp conclusion
 block7953:
     movq $0, %rax
+    jmp conclusion
+block7952:
+    movq $42, %rax
     jmp conclusion
 \end{lstlisting}
 \end{minipage}
@@ -4499,11 +4499,11 @@ start:
 	cmpq	$1, %rcx
 	je block7952
 	jmp block7953
-block7952:
-	movq	$42, %rax
-	jmp conclusion
 block7953:
 	movq	$0, %rax
+	jmp conclusion
+block7952:
+	movq	$42, %rax
 	jmp conclusion
 
 	.globl main
@@ -4570,137 +4570,182 @@ conclusion:
 Figure~\ref{fig:R2-passes} lists all the passes needed for the
 compilation of $R_2$.
 
-\section{Challenge: Optimize Jumps$^{*}$}
+
+\section{Challenge: Optimize Jumps}
 \label{sec:opt-jumps}
 
-UNDER CONSTRUCTION
+Recall that in the example output of \code{explicate-control} in
+Figure~\ref{fig:explicate-control-s1-38}, \code{block57} through
+\code{block60} are trivial blocks, they do nothing but jump to another
+block. The first goal of this challenge assignment is to remove those
+blocks. Figure~\ref{fig:optimize-jumps} repeats the result of
+\code{explicate-control} on the left and shows the result of bypassing
+the trivial blocks on the right. Let us focus on \code{block61}.  The
+\code{then} branch jumps to \code{block57}, which in turn jumps to
+\code{block55}. The optimized code on the right of
+Figure~\ref{fig:optimize-jumps} bypasses \code{block57}, with the
+\code{then} branch jumping directly to \code{block55}. The story is
+similar for the \code{else} branch, as well as for the two branchs in
+\code{block62}. After the jumps in \code{block61} and \code{block62}
+have been optimized in this way, there are no longer any jumps to
+blocks \code{block57} through \code{block60}, so they can be removed.
 
+\begin{figure}[tbp]
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+block62:
+    tmp54 = (read);
+    if (eq? tmp54 2) then
+       goto block59;
+    else
+       goto block60;
+block61:
+    tmp53 = (read);
+    if (eq? tmp53 0) then
+       goto block57;
+    else
+       goto block58;
+block60:
+    goto block56;
+block59:
+    goto block55;
+block58:
+    goto block56;
+block57:
+    goto block55;
+block56:
+    return (+ 700 77);
+block55:
+    return (+ 10 32);
+start:
+    tmp52 = (read);
+    if (eq? tmp52 1) then
+       goto block61;
+    else
+       goto block62;
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.55\textwidth}
+\begin{lstlisting}
+block62:
+    tmp54 = (read);
+    if (eq? tmp54 2) then
+       goto block55;
+    else
+       goto block56;
+block61:
+    tmp53 = (read);
+    if (eq? tmp53 0) then
+       goto block55;
+    else
+       goto block56;
+block56:
+    return (+ 700 77);
+block55:
+    return (+ 10 32);
+start:
+    tmp52 = (read);
+    if (eq? tmp52 1) then
+       goto block61;
+    else
+       goto block62;
+\end{lstlisting}
+\end{minipage}
+\end{tabular}
+\caption{Optimize jumps by removing trivial blocks.}
+\label{fig:optimize-jumps}
+\end{figure}
 
-%% \section{Challenge: Optimizing Conditions$^{*}$}
-%% \label{sec:opt-if}
+The name of this pass is \code{optimize-jumps}.  We recommend
+implementing this pass in two phases. The first phrase builds a hash
+table that maps labels to possibly improved labels. The second phase
+changes the target of each \code{goto} to use the improved label.  If
+the label is for a trivial block, then the hash table should map the
+label to the first non-trivial block that can be reached from this
+label by jumping through trivial blocks.  If the label is for a
+non-trivial block, then the hash table should map the label to itself;
+we do not want to change jumps to non-trivial blocks.
 
-%% A close inspection of the x86 code generated in
-%% Figure~\ref{fig:if-example-x86} reveals some redundant computation
-%% regarding the condition of the \key{if}. We compare \key{rcx} to $1$
-%% twice using \key{cmpq} as follows.
+The first phase can be accomplished by constructing an empty hash
+table, call it \code{short-cut}, and then iterating over the control
+flow graph. Each time you encouter a block that is just a \code{goto},
+then update the hash table, mapping the block's source to the target
+of the \code{goto}. Also, the hash table may already have mapped some
+labels to the block's source, to you must iterate through the hash
+table and update all of those so that they instead map to the target
+of the \code{goto}.
 
-%% % Wierd LaTeX bug if I remove the following. -Jeremy
-%% % Does it have to do with page breaks?
-%% \begin{lstlisting}
-%% \end{lstlisting}
+For the second phase, we recommend iterating through the $\Tail$ of
+each block in the program, updating the target of every \code{goto}
+according to the mapping in \code{short-cut}.
 
-%% \begin{lstlisting}
-%% 	cmpq	$1, %rcx
-%% 	sete	%al
-%% 	movzbq	%al, %rcx
-%% 	cmpq	$1, %rcx
-%% 	je then21288
-%% \end{lstlisting}
+\begin{exercise}\normalfont
+  Implement the \code{optimize-jumps} pass and check that it remove
+  trivial blocks in a few example programs. Then check that your
+  compiler still passes all of your tests.
+\end{exercise}
 
+There is another opportunity for optimizing jumps that is apparent in
+the example of Figure~\ref{fig:if-example-x86}. The \code{start} block
+end with a jump to \code{block7953} and there are no other jumps to
+\code{block7953} in the rest of the program. In this situation we can
+avoid the runtime overhead of this jump by merging \code{block7953}
+into the preceeding block, in this case the \code{start} block.
+Figure~\ref{fig:remove-jumps} shows the output of
+\code{select-instructions} on the left and the result of this
+optimization on the right.
 
-%% The reason for this non-optimal code has to do with the \code{flatten}
-%% pass earlier in this Chapter. We recommended flattening the condition
-%% to an $\Arg$ and then comparing with \code{\#t}. But if the condition
-%% is already an \code{eq?} test, then we would like to use that
-%% directly. In fact, for many of the expressions of Boolean type, we can
-%% generate more optimized code. For example, if the condition is
-%% \code{\#t} or \code{\#f}, we do not need to generate an \code{if} at
-%% all. If the condition is a \code{let}, we can optimize based on the
-%% form of its body. If the condition is a \code{not}, then we can flip
-%% the two branches.
-%% %
-%% \margincomment{\tiny We could do even better by converting to basic
-%%   blocks.\\ --Jeremy}
-%% %
-%% On the other hand, if the condition is a \code{and}
-%% or another \code{if}, we should flatten them into an $\Arg$ to avoid
-%% code duplication.
+\begin{figure}[tbp]
+\begin{tabular}{lll}
+\begin{minipage}{0.5\textwidth}
+% s1_20.rkt
+\begin{lstlisting}
+start:
+    callq read_int
+    movq %rax, tmp7951
+    cmpq $1, tmp7951
+    je block7952
+    jmp block7953
+block7953:
+    movq $0, %rax
+    jmp conclusion
+block7952:
+    movq $42, %rax
+    jmp conclusion
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow\qquad$
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+start:
+    callq read_int
+    movq %rax, tmp7951
+    cmpq $1, tmp7951
+    je block7952
+    movq $0, %rax
+    jmp conclusion
+block7952:
+    movq $42, %rax
+    jmp conclusion
+\end{lstlisting}
+\end{minipage}
+\end{tabular}
+\caption{Merging basic blocks by removing unnecessary jumps.}
+\label{fig:remove-jumps}
+\end{figure}
 
-%% Figure~\ref{fig:opt-if} shows an example program and the result of
-%% applying the above suggested optimizations.
+\begin{exercise}\normalfont
+  Implement a pass named \code{remove-jumps} that merges basic blocks
+  into their preceeding basic block, when there is only one preceeding
+  block. Check that your pass accomplishes this goal on several test
+  programs and check that your compiler passes all of your tests.
+\end{exercise}
 
-%% \begin{exercise}\normalfont
-%%   Change the \code{flatten} pass to improve the code that gets
-%%   generated for \code{if} expressions. We recommend writing a helper
-%%   function that recursively traverses the condition of the \code{if}.
-%% \end{exercise}
-
-%% \begin{figure}[tbp]
-%% \begin{tabular}{lll}
-%% \begin{minipage}{0.5\textwidth}
-%% \begin{lstlisting}
-%% (program
-%%   (if (let ([x 1])
-%%         (not (eq? x (read))))
-%%     777
-%%     42))
-%% \end{lstlisting}
-%% $\Downarrow$
-%% \begin{lstlisting}
-%% (program (x.1 if.2 tmp.3)
-%%   (type Integer)
-%%   (assign x.1 1)
-%%   (assign tmp.3 (read))
-%%   (if (eq? x.1 tmp.3)
-%%     ((assign if.2 42))
-%%     ((assign if.2 777)))
-%%   (return if.2))
-%% \end{lstlisting}
-%% $\Downarrow$
-%% \begin{lstlisting}
-%% (program (x.1 if.2 tmp.3)
-%%   (type Integer)
-%%   (movq (int 1) (var x.1))
-%%   (callq read_int)
-%%   (movq (reg rax) (var tmp.3))
-%%   (if (eq? (var x.1) (var tmp.3))
-%%     ((movq (int 42) (var if.2)))
-%%     ((movq (int 777) (var if.2))))
-%%   (movq (var if.2) (reg rax)))
-%% \end{lstlisting}
-%% \end{minipage}
-%% &
-%% $\Rightarrow$
-%% \begin{minipage}{0.4\textwidth}
-%% \begin{lstlisting}
-%% 	.globl _main
-%% _main:
-%% 	pushq	%rbp
-%% 	movq	%rsp, %rbp
-%% 	pushq	%r13
-%% 	pushq	%r14
-%% 	pushq	%r12
-%% 	pushq	%rbx
-%% 	subq	$0, %rsp
-
-%% 	movq	$1, %rbx
-%% 	callq	_read_int
-%% 	movq	%rax, %rcx
-%% 	cmpq	%rcx, %rbx
-%% 	je then35989
-%% 	movq	$777, %rbx
-%% 	jmp if_end35990
-%% then35989:
-%% 	movq	$42, %rbx
-%% if_end35990:
-%% 	movq	%rbx, %rax
-
-%% 	movq	%rax, %rdi
-%% 	callq	_print_int
-%% 	movq	$0, %rax
-%% 	addq	$0, %rsp
-%% 	popq	%rbx
-%% 	popq	%r12
-%% 	popq	%r14
-%% 	popq	%r13
-%% 	popq	%rbp
-%% 	retq
-%% \end{lstlisting}
-%% \end{minipage}
-%% \end{tabular}
-%% \caption{Example program with optimized conditionals.}
-%% \label{fig:opt-if}
-%% \end{figure}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Tuples and Garbage Collection}
