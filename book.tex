@@ -77,7 +77,7 @@
 \lstset{%
 language=Lisp,
 basicstyle=\ttfamily\small,
-morekeywords={seq,assign,program,block,define,lambda,match},
+morekeywords={seq,assign,program,block,define,lambda,match,goto,if,else,then},
 deletekeywords={read},
 escapechar=|,
 columns=flexible,
@@ -1157,10 +1157,11 @@ simplicity, here we use an association list to represent the
 environment. The \code{interp-R1} function takes the current
 environment, \code{env}, as an extra parameter.  When the interpreter
 encounters a variable, it finds the corresponding value using the
-\code{lookup} function (Appendix~\ref{appendix:utilities}).  When the
-interpreter encounters a \key{Let}, it evaluates the initializing
+\code{dict-ref} function from the \code{racket/dict} package.  When
+the interpreter encounters a \key{Let}, it evaluates the initializing
 expression, extends the environment with the result value bound to the
-variable, then evaluates the body of the \key{Let}.
+variable (using \code{dict-set}), then evaluates the body of the
+\key{Let}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -1179,7 +1180,7 @@ variable, then evaluates the body of the \key{Let}.
        (define v1 ((interp-exp env) e1))
        (define v2 ((interp-exp env) e2))
        (fx+ v1 v2)]
-      [(Var x) (lookup x env)]
+      [(Var x) (dict-ref env x)]
       [(Let x e body)
        (define new-env (dict-set env x ((interp-exp env) e)))
        ((interp-exp new-env) body)]
@@ -1261,10 +1262,10 @@ the x86 instructions used in this book.
 \[
 \begin{array}{lcl}
 \Reg &::=& \allregisters{} \\
-\Arg &::=&  \key{\$}\Int \mid \key{\%}\Reg \mid \Int(\key{\%}\Reg) \\
-\Instr &::=& \key{addq} \; \Arg, \Arg \mid
-      \key{subq} \; \Arg, \Arg \mid
-      \key{negq} \; \Arg \mid \key{movq} \; \Arg, \Arg \mid \\
+\Arg &::=&  \key{\$}\Int \mid \key{\%}\Reg \mid \Int\key{(}\key{\%}\Reg\key{)}\\
+\Instr &::=& \key{addq} \; \Arg\key{,} \Arg \mid
+      \key{subq} \; \Arg\key{,} \Arg \mid
+      \key{negq} \; \Arg \mid \key{movq} \; \Arg\key{,} \Arg \mid \\
   &&  \key{callq} \; \mathit{label} \mid
       \key{pushq}\;\Arg \mid \key{popq}\;\Arg \mid \key{retq} \mid \itm{label}\key{:}\; \Instr \\
 \Prog &::= & \key{.globl main}\\
@@ -1289,12 +1290,12 @@ bytes to the address. The resulting address is used to either load or
 store to memory depending on whether it occurs as a source or
 destination argument of an instruction.
 
-An arithmetic instruction such as $\key{addq}\,s,\,d$ reads from the
+An arithmetic instruction such as $\key{addq}\,s\key{,}\,d$ reads from the
 source $s$ and destination $d$, applies the arithmetic operation, then
 writes the result back to the destination $d$.
 %
-The move instruction $\key{movq}\,s\,d$ reads from $s$ and stores the
-result in $d$.
+The move instruction $\key{movq}\,s\key{,}\,d$ reads from $s$ and
+stores the result in $d$.
 %
 The $\key{callq}\,\mathit{label}$ instruction executes the procedure
 specified by the label. We discuss procedure calls in more detail
@@ -1449,24 +1450,25 @@ we introduce conditional branching.
 \begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
+\small    
 \[
 \begin{array}{lcl}
-\itm{reg} &::=& \allregisters{} \\
-\Arg &::=&  \IMM{\Int} \mid \REG{\itm{reg}}
-   \mid \DEREF{\itm{reg}}{\Int} \\
-\Instr &::=& \BININSTR{\code{'addq}}{\Arg}{\Arg} \\
-       &\mid& \BININSTR{\code{'subq}}{\Arg}{\Arg} \\
-       &\mid& \BININSTR{\code{'movq}}{\Arg}{\Arg}\\
-       &\mid& \UNIINSTR{\code{'negq}}{\Arg}\\
-       &\mid& \CALLQ{\itm{label}} \mid \RETQ{} \\
-       &\mid& \PUSHQ{\Arg} \mid \POPQ{\Arg} \\
+\Reg &::=& \allregisters{} \\
+\Arg &::=&  \IMM{\Int} \mid \REG{\code{'}\Reg}
+   \mid \DEREF{\Reg}{\Int} \\
+\Instr &::=& \BININSTR{\code{'addq}}{\Arg}{\Arg} 
+       \mid \BININSTR{\code{'subq}}{\Arg}{\Arg} \\
+       &\mid& \BININSTR{\code{'movq}}{\Arg}{\Arg}
+       \mid \UNIINSTR{\code{'negq}}{\Arg}\\
+       &\mid& \CALLQ{\itm{label}} \mid \RETQ{} 
+       \mid \PUSHQ{\Arg} \mid \POPQ{\Arg} \\
 \Block &::= & \BLOCK{\itm{info}}{\Instr^{+}} \\
 x86_0 &::= & \PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label} \,\key{.}\, \Block \key{)}^{+}}}
 \end{array}
 \]
 \end{minipage}
 }
-\caption{Abstract syntax for $x86_0$ assembly.}
+\caption{Abstract syntax of $x86_0$ assembly.}
 \label{fig:x86-ast-a}
 \end{figure}
 
@@ -1693,8 +1695,8 @@ assignment.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-\Arg &::=& \Int \mid \Var \\
-\Exp &::=& \Arg \mid \key{(read)} \mid \key{(-}~\Arg\key{)} \mid \key{(+}~\Arg~\Arg\key{)}\\
+\Atm &::=& \Int \mid \Var \\
+\Exp &::=& \Atm \mid \key{(read)} \mid \key{(-}~\Atm\key{)} \mid \key{(+}~\Atm~\Atm\key{)}\\
 \Stmt &::=& \Var~\key{=}~\Exp\key{;} \\
 \Tail &::= & \key{return}~\Exp\key{;} \mid \Stmt~\Tail \\
 C_0 & ::= & (\itm{label}\key{:}~ \Tail)^{+}
@@ -1711,9 +1713,9 @@ C_0 & ::= & (\itm{label}\key{:}~ \Tail)^{+}
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-\Arg &::=& \INT{\Int} \mid \VAR{\Var} \\
-\Exp &::=& \Arg \mid \READ{} \mid \NEG{\Arg} \\
- &\mid& \ADD{\Arg}{\Arg}\\
+\Atm &::=& \INT{\Int} \mid \VAR{\Var} \\
+\Exp &::=& \Atm \mid \READ{} \mid \NEG{\Atm} \\
+ &\mid& \ADD{\Atm}{\Atm}\\
 \Stmt &::=& \ASSIGN{\Var}{\Exp} \\
 \Tail &::= & \RETURN{\Exp} \mid \SEQ{\Stmt}{\Tail} \\
 C_0 & ::= & \PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label}\,\key{.}\,\Tail\key{)}^{+}}}
@@ -2079,9 +2081,9 @@ this pass is a variable of x86 that still uses variables, so we add an
 AST node of the form $\VAR{\itm{var}}$ to the $\text{x86}_0$ abstract
 syntax of Figure~\ref{fig:x86-ast-a}.  We recommend implementing the
 \code{select-instructions} in terms of three auxiliary functions, one
-for each of the non-terminals of $C_0$: $\Arg$, $\Stmt$, and $\Tail$.
+for each of the non-terminals of $C_0$: $\Atm$, $\Stmt$, and $\Tail$.
 
-The cases for $\Arg$ are straightforward, variables stay
+The cases for $\Atm$ are straightforward, variables stay
 the same and integer constants are changed to immediates:
 $\INT{n}$ changes to $\IMM{n}$.
 
@@ -3565,7 +3567,7 @@ comparing integers.
      &\mid& \key{\#t} \mid \key{\#f} 
       \mid (\key{and}\;\Exp\;\Exp) \mid (\key{or}\;\Exp\;\Exp)
       \mid (\key{not}\;\Exp) \\
-      &\mid& (\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp} \\
+      &\mid& (\itm{cmp}\;\Exp\;\Exp) \mid (\key{if}~\Exp~\Exp~\Exp) \\
   R_2 &::=& \Exp
 \end{array}
 \]
@@ -3582,14 +3584,17 @@ comparing integers.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
+  \itm{bool} &::=& \key{\#t} \mid \key{\#f} \\
   \itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
 \Exp &::=& \gray{\INT{\Int} \mid \READ{} \mid \NEG{\Exp}} \\
-     &\mid& \gray{\ADD{\Exp}{\Exp}  
-      \mid  \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp}} \\
-     &\mid& \key{\#t} \mid \key{\#f} 
-      \mid (\key{and}\;\Exp\;\Exp) \mid (\key{or}\;\Exp\;\Exp)
-      \mid (\key{not}\;\Exp) \\
-      &\mid& (\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp} \\
+     &\mid& \gray{\ADD{\Exp}{\Exp}}
+      \mid \BINOP{\code{'-}}{\Exp}{\Exp} \\
+     &\mid& \gray{\VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp}} \\
+     &\mid& \BOOL{\itm{bool}} 
+      \mid \AND{\Exp}{\Exp}\\
+     &\mid& \OR{\Exp}{\Exp}
+      \mid \NOT{\Exp} \\
+      &\mid& \BINOP{\code{'}\itm{cmp}}{\Exp}{\Exp} \mid \IF{\Exp}{\Exp}{\Exp} \\
   R_2 &::=& \PROGRAM{\key{'()}}{\Exp}
 \end{array}
 \]
@@ -3775,6 +3780,7 @@ for a program, then interpreting that program should not encounter an
 error.  If it does, there is something wrong with your type checker.
 \end{exercise}
 
+
 \section{Shrink the $R_2$ Language}
 \label{sec:shrink-r2}
 
@@ -3782,7 +3788,7 @@ The $R_2$ language includes several operators that are easily
 expressible in terms of other operators. For example, subtraction is
 expressible in terms of addition and negation.
 \[
- (\key{-}\; e_1 \; e_2) \quad \Rightarrow \quad (\key{+} \; e_1 \; (\key{-} \; e_2))
+ \key{(-}\; e_1 \; e_2\key{)} \quad \Rightarrow \quad (\key{+} \; e_1 \; (\key{-} \; e_2))
 \]
 Several of the comparison operations are expressible in terms of
 less-than and logical negation.
@@ -3791,7 +3797,7 @@ less-than and logical negation.
 \LET{t_1}{e_1}{(\key{not}\;(\key{<}\;e_2\;t_1))}
 \]
 By performing these translations near the front-end of the compiler,
-the later passes of the compiler will not need to deal with these
+the later passes of the compiler do not need to deal with these
 constructs, making those passes shorter. On the other hand, sometimes
 these translations make it more difficult to generate the most
 efficient code with respect to the number of instructions. However,
@@ -3832,50 +3838,53 @@ exclusive-or:
 \end{tabular}
 \end{center}
 For example, $0011 \mathrel{\mathrm{XOR}} 0101 = 0110$.  Notice that
-in row of the table for the bit $1$, the result is the opposite of the
+in the row of the table for the bit $1$, the result is the opposite of the
 second bit.  Thus, the \code{not} operation can be implemented by
-\code{xorq} with $1$ as the first argument: $0001
-\mathrel{\mathrm{XOR}} 0000 = 0001$ and $0001 \mathrel{\mathrm{XOR}}
-0001 = 0000$.
+\code{xorq} with $1$ as the first argument:
+\begin{align*}
+  0001 \mathrel{\mathrm{XOR}} 0000 &= 0001\\
+  0001 \mathrel{\mathrm{XOR}} 0001 &= 0000
+\end{align*}
 
 \begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
+\small    
 \[
 \begin{array}{lcl}
-\Arg &::=&  \gray{\INT{\Int} \mid \REG{\itm{register}}
-    \mid (\key{deref}\,\itm{register}\,\Int)} \\
-     &\mid& (\key{byte-reg}\; \itm{register}) \\
+\Arg &::=&  \gray{\IMM{\Int} \mid \REG{\code{'}\Reg} \mid \DEREF{\Reg}{\Int}} 
+     \mid \BYTEREG{\code{'}\Reg} \\
 \itm{cc} & ::= & \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge} \\
-\Instr &::=& \gray{(\key{addq} \; \Arg\; \Arg) \mid
-             (\key{subq} \; \Arg\; \Arg) \mid
-             (\key{negq} \; \Arg) \mid (\key{movq} \; \Arg\; \Arg)} \\
-      &\mid& \gray{(\key{callq} \; \mathit{label}) \mid
-             (\key{pushq}\;\Arg) \mid
-             (\key{popq}\;\Arg) \mid
-             (\key{retq})} \\
-       &\mid& (\key{xorq} \; \Arg\;\Arg)
-       \mid (\key{cmpq} \; \Arg\; \Arg) \mid (\key{set}\;\itm{cc} \; \Arg) \\
-       &\mid& (\key{movzbq}\;\Arg\;\Arg)
-       \mid  (\key{jmp} \; \itm{label})
-       \mid (\key{jmp-if}\; \itm{cc} \; \itm{label}) \\
-       &\mid& (\key{label} \; \itm{label}) \\
-x86_1 &::= & (\key{program} \;\itm{info} \;(\key{type}\;\itm{type})\; \Instr^{+})
+\Instr &::=& \gray{\BININSTR{\code{'addq}}{\Arg}{\Arg}} 
+       \mid \gray{\BININSTR{\code{'subq}}{\Arg}{\Arg}} \\
+       &\mid& \gray{\BININSTR{\code{'movq}}{\Arg}{\Arg}} 
+       \mid \gray{\UNIINSTR{\code{'negq}}{\Arg}} \\
+       &\mid& \gray{\CALLQ{\itm{label}} \mid \RETQ{}} 
+       \mid \gray{\PUSHQ{\Arg} \mid \POPQ{\Arg}} \\
+       &\mid& \BININSTR{\code{'xorq}}{\Arg}{\Arg}
+       \mid \BININSTR{\code{'cmpq}}{\Arg}{\Arg}\\
+       &\mid& \BININSTR{\code{'set}}{\code{'}\itm{cc}}{\Arg} 
+       \mid \BININSTR{\code{'movzbq}}{\Arg}{\Arg}\\
+       &\mid&  \JMP{\itm{label}}
+       \mid \JMPIF{\code{'}\itm{cc}}{\itm{label}} \\
+%       &\mid& (\key{label} \; \itm{label}) \\
+\Block &::= & \gray{\BLOCK{\itm{info}}{\Instr^{+}}} \\
+x86_1 &::= & \gray{\PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label} \,\key{.}\, \Block \key{)}^{+}}}}
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The x86$_1$ language (extends x86$_0$ of Figure~\ref{fig:x86-ast-a}).}
+\caption{The abstract syntax of $x86_1$ (extends x86$_0$ of Figure~\ref{fig:x86-ast-a}).}
 \label{fig:x86-1}
 \end{figure}
 
-Next we consider the x86 instructions that are relevant for
-compiling the comparison operations. The \key{cmpq} instruction
-compares its two arguments to determine whether one argument is less
-than, equal, or greater than the other argument. The \key{cmpq}
-instruction is unusual regarding the order of its arguments and where
-the result is placed. The argument order is backwards: if you want to
-test whether $x < y$, then write \code{cmpq y, x}. The result of
+Next we consider the x86 instructions that are relevant for compiling
+the comparison operations. The \key{cmpq} instruction compares its two
+arguments to determine whether one argument is less than, equal, or
+greater than the other argument. The \key{cmpq} instruction is unusual
+regarding the order of its arguments and where the result is
+placed. The argument order is backwards: if you want to test whether
+$x < y$, then write \code{cmpq} $y$\code{,} $x$. The result of
 \key{cmpq} is placed in the special EFLAGS register. This register
 cannot be accessed directly but it can be queried by a number of
 instructions, including the \key{set} instruction. The \key{set}
@@ -3883,25 +3892,26 @@ instruction puts a \key{1} or \key{0} into its destination depending
 on whether the comparison came out according to the condition code
 \itm{cc} (\key{e} for equal, \key{l} for less, \key{le} for
 less-or-equal, \key{g} for greater, \key{ge} for greater-or-equal).
-The set instruction has an annoying quirk in that its destination
-argument must be single byte register, such as \code{al}, which is
-part of the \code{rax} register.  Thankfully, the \key{movzbq}
-instruction can then be used to move from a single byte register to a
-normal 64-bit register.
+The \key{set} instruction has an annoying quirk in that its
+destination argument must be single byte register, such as \code{al},
+which is part of the \code{rax} register.  Thankfully, the
+\key{movzbq} instruction can then be used to move from a single byte
+register to a normal 64-bit register.
 
 For compiling the \key{if} expression, the x86 instructions for
-jumping are relevant. The \key{jmp} instruction updates the program
+jumping are relevant. The \key{Jmp} instruction updates the program
 counter to point to the instruction after the indicated label.  The
-\key{jmp-if} instruction updates the program counter to point to the
+\key{JmpIf} instruction updates the program counter to point to the
 instruction after the indicated label depending on whether the result
 in the EFLAGS register matches the condition code \itm{cc}, otherwise
-the \key{jmp-if} instruction falls through to the next
-instruction. Because the \key{jmp-if} instruction relies on the EFLAGS
-register, it is quite common for the \key{jmp-if} to be immediately
+the \key{JmpIf} instruction falls through to the next
+instruction. Because the \key{JmpIf} instruction relies on the EFLAGS
+register, it is quite common for the \key{JmpIf} to be immediately
 preceded by a \key{cmpq} instruction, to set the EFLAGS register.
-Our abstract syntax for \key{jmp-if} differs from the concrete syntax
+Our abstract syntax for \key{JmpIf} differs from the concrete syntax
 for x86 to separate the instruction name from the condition code. For
-example, \code{(jmp-if le foo)} corresponds to \code{jle foo}.
+example, \code{(JmpIf le foo)} corresponds to \code{jle foo}.
+
 
 \section{The $C_1$ Intermediate Language}
 \label{sec:c1}
@@ -3925,23 +3935,27 @@ and \key{goto}'s.
 \begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
+\small    
 \[
 \begin{array}{lcl}
-\Arg &::=& \gray{\Int \mid \Var} \mid \key{\#t} \mid \key{\#f} \\
+\Atm &::=& \gray{\INT{\Int} \mid \VAR{\Var}} \mid \BOOL{\itm{bool}} \\
 \itm{cmp} &::= & \key{eq?} \mid \key{<}  \\
-\Exp &::= & \gray{\Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)}
-      \mid (\key{not}\;\Arg) \mid (\itm{cmp}\;\Arg\;\Arg) \\
+\Exp &::= & \gray{\Atm \mid \READ{} \mid \NEG{\Atm} }\\
+     &\mid& \gray{ \ADD{\Atm}{\Atm} } 
+     \mid \UNIOP{\key{not}}{\Atm} \\
+     &\mid& \BINOP{\itm{cmp}}{\Atm}{\Atm} \\
 \Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} } \\
-\Tail &::= & \gray{\RETURN{\Exp} \mid (\key{seq}\;\Stmt\;\Tail)} \\
-      &\mid& (\key{goto}\,\itm{label}) \mid \IF{(\itm{cmp}\, \Arg\,\Arg)}{(\key{goto}\,\itm{label})}{(\key{goto}\,\itm{label})} \\
-C_1 & ::= & (\key{program}\;\itm{info}\; ((\itm{label}\,\key{.}\,\Tail)^{+}))
+\Tail &::= & \gray{\RETURN{\Exp} \mid \SEQ{\Stmt}{\Tail} } \\
+      &\mid& \GOTO{\itm{label}} \mid \IFSTMT{\key{(}\itm{cmp}\,\Atm\,\Atm\key{)}}{\GOTO{\itm{label}}}{\GOTO{\itm{label}}} \\
+C_1 & ::= & \gray{\PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label}\,\key{.}\,\Tail\key{)}^{+}}}}
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The $C_1$ language, extending $C_0$ with Booleans and conditionals.}
+\caption{The abstract syntax of $C_1$, extending $C_0$ with Booleans and conditionals.}
 \label{fig:c1-syntax}
 \end{figure}
+
 
 \section{Explicate Control}
 \label{sec:explicate-control-r2}
@@ -3953,57 +3967,64 @@ addition of \key{if} in $R_2$, things get more interesting.
 As a motivating example, consider the following program that has an
 \key{if} expression nested in the predicate of another \key{if}.
 % s1_38.rkt
+\begin{center}
+\begin{minipage}{0.96\textwidth}
 \begin{lstlisting}
-    (program ()
-      (if (if (eq? (read) 1)
-              (eq? (read) 0)
-              (eq? (read) 2))
-          (+ 10 32)
-          (+ 700 77)))
+(if (if (eq? (read) 1)
+        (eq? (read) 0)
+        (eq? (read) 2))
+    (+ 10 32)
+    (+ 700 77))
 \end{lstlisting}
+\end{minipage}
+\end{center}
 %
 The naive way to compile \key{if} and \key{eq?} would be to handle
 each of them in isolation, regardless of their context.  Each
 \key{eq?} would be translated into a \key{cmpq} instruction followed
 by a couple instructions to move the result from the EFLAGS register
 into a general purpose register or stack location. Each \key{if} would
-be translated into the combination of a \key{cmpq} and \key{jmp-if}.
+be translated into the combination of a \key{cmpq} and \key{JmpIf}.
 However, if we take context into account we can do better and reduce
 the use of \key{cmpq} and EFLAG-accessing instructions.
 
 One idea is to try and reorganize the code at the level of $R_2$,
 pushing the outer \key{if} inside the inner one. This would yield the
 following code.
+\begin{center}
+\begin{minipage}{0.96\textwidth}
 \begin{lstlisting}
-    (if (eq? (read) 1)
-        (if (eq? (read) 0)
-                (+ 10 32)
-                (+ 700 77))
-            (if (eq? (read) 2))
-                (+ 10 32)
-                (+ 700 77))
+(if (eq? (read) 1)
+    (if (eq? (read) 0)
+            (+ 10 32)
+            (+ 700 77))
+        (if (eq? (read) 2))
+            (+ 10 32)
+            (+ 700 77))
 \end{lstlisting}
+\end{minipage}
+\end{center}
 Unfortunately, this approach duplicates the two branches, and a
 compiler must never duplicate code!
 
 We need a way to perform the above transformation, but without
 duplicating code. The solution is straightforward if we think at the
 level of x86 assembly: we can label the code for each of the branches
-and insert \key{goto}'s in all the places that need to execute the
+and insert jumps in all the places that need to execute the
 branches. Put another way, we need to move away from abstract syntax
 \emph{trees} and instead use \emph{graphs}. In particular, we shall
 use a standard program representation called a \emph{control flow
   graph} (CFG), due to Frances Elizabeth \citet{Allen:1970uq}.  Each
 vertex is a labeled sequence of code, called a \emph{basic block}, and
-each edge represents a jump to another block. The \key{program}
-construct of $C_0$ and $C_1$ represents a control flow graph as an
-association list mapping labels to basic blocks. Each block is
+each edge represents a jump to another block. The \key{Program}
+construct of $C_0$ and $C_1$ contains a control flow graph represented
+as an association list mapping labels to basic blocks. Each block is
 represented by the $\Tail$ non-terminal.
 
 Figure~\ref{fig:explicate-control-s1-38} shows the output of the
 \code{remove-complex-opera*} pass and then the
-\code{explicate-control} pass on the example program. We shall walk
-through the output program and then discuss the algorithm.
+\code{explicate-control} pass on the example program. We walk through
+the output program and then discuss the algorithm.
 %
 Following the order of evaluation in the output of
 \code{remove-complex-opera*}, we first have the \code{(read)} and
@@ -4023,24 +4044,22 @@ story for \code{block62} is similar.
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(program ()
-  (if (if (eq? (read) 1)
-          (eq? (read) 0)
-          (eq? (read) 2))
-      (+ 10 32)
-      (+ 700 77)))  
+(if (if (eq? (read) 1)
+        (eq? (read) 0)
+        (eq? (read) 2))
+    (+ 10 32)
+    (+ 700 77))
 \end{lstlisting}
 \hspace{40pt}$\Downarrow$
 \begin{lstlisting}
-(program ()
-  (if (if (let ([tmp52 (read)])
-            (eq? tmp52 1))
-          (let ([tmp53 (read)]) 
-            (eq? tmp53 0))
-          (let ([tmp54 (read)]) 
-            (eq? tmp54 2)))
-   (+ 10 32)
-   (+ 700 77)))
+(if (if (let ([tmp52 (read)])
+          (eq? tmp52 1))
+        (let ([tmp53 (read)]) 
+          (eq? tmp53 0))
+        (let ([tmp54 (read)]) 
+          (eq? tmp54 2)))
+ (+ 10 32)
+ (+ 700 77))
 \end{lstlisting}
 \end{minipage}
 &
@@ -4048,28 +4067,36 @@ $\Rightarrow$
 &
 \begin{minipage}{0.55\textwidth}
 \begin{lstlisting}
-(program ()
-  ((block62 .
-     (seq (assign tmp54 (read))
-          (if (eq? tmp54 2)
-              (goto block59)
-              (goto block60))))
-   (block61 .
-     (seq (assign tmp53 (read))
-          (if (eq? tmp53 0)
-               (goto block57)
-               (goto block58))))
-   (block60 . (goto block56))
-   (block59 . (goto block55))
-   (block58 . (goto block56))
-   (block57 . (goto block55))
-   (block56 . (return (+ 700 77)))
-   (block55 . (return (+ 10 32)))
-   (start . 
-     (seq (assign tmp52 (read))
-          (if (eq? tmp52 1)
-               (goto block61)
-               (goto block62))))))
+block62:
+    tmp54 = (read);
+    if (eq? tmp54 2) then
+       goto block59;
+    else
+       goto block60;
+block61:
+    tmp53 = (read);
+    if (eq? tmp53 0) then
+       goto block57;
+    else
+       goto block58;
+block60:
+    goto block56;
+block59:
+    goto block55;
+block58:
+    goto block56;
+block57:
+    goto block55;
+block56:
+    return (+ 700 77);
+block55:
+    return (+ 10 32);
+start:
+    tmp52 = (read);
+    if (eq? tmp52 1) then
+       goto block61;
+    else
+       goto block62;
 \end{lstlisting}
 \end{minipage}
 \end{tabular} 
@@ -4086,47 +4113,46 @@ is that it includes trivial blocks, such as \code{block57} through
 \code{block60}, that only jump to another block. We discuss a solution
 to this problem in Section~\ref{sec:opt-jumps}.
 
-Recall that in Section~\ref{sec:explicate-control-r1} we implement the
-\code{explicate-control} pass for $R_1$ using two mutually recursive
-functions, \code{explicate-tail} and
-\code{explicate-assign}.  The former function translated
-expressions in tail position whereas the later function translated
-expressions on the right-hand-side of a \key{let}. With the addition
-of \key{if} expression in $R_2$ we have a new kind of context to deal
-with: the predicate position of the \key{if}. So we shall need another
-function, \code{explicate-pred}, that takes an $R_2$
-expression and two pieces of $C_1$ code (two $\Tail$'s) for the
-then-branch and else-branch. The output of
-\code{explicate-pred} is a $C_1$ $\Tail$.  However, these
-three functions also need to construct the control-flow graph, which we
-recommend they do via updates to a global variable. Next we consider
-the specific additions to the tail and assign functions, and some of
-cases for the pred function.
+Recall that in Section~\ref{sec:explicate-control-r1} we implement
+\code{explicate-control} for $R_1$ using two mutually recursive
+functions, \code{explicate-tail} and \code{explicate-assign}.  The
+former function translates expressions in tail position whereas the
+later function translates expressions on the right-hand-side of a
+\key{let}. With the addition of \key{if} expression in $R_2$ we have a
+new kind of context to deal with: the predicate position of the
+\key{if}. We need another function, \code{explicate-pred}, that takes
+an $R_2$ expression and two pieces of $C_1$ code (two $\Tail$'s) for
+the then-branch and else-branch. The output of \code{explicate-pred}
+is a $C_1$ $\Tail$.  However, these three functions also need to
+construct the control-flow graph, which we recommend they do via
+updates to a global variable (be careful!). Next we consider the
+specific additions to the tail and assign functions, and some of cases
+for the pred function.
 
-The \code{explicate-tail} function needs an additional case
-for \key{if}. The branches of the \key{if} inherit the current
-context, so they are in tail position.  Let $B_1$ be the result of
-\code{explicate-tail} on the $\itm{thn}$ branch and $B_2$ be
-the result of apply \code{explicate-tail} to the $\itm{else}$
-branch. Then the \key{if} translates to the block $B_3$ which is the
-result of applying \code{explicate-pred} to the predicate
-$\itm{cnd}$ and the blocks $B_1$ and $B_2$.
+The \code{explicate-tail} function needs an additional case for
+\key{if}. The branches of the \key{if} inherit the current context, so
+they are in tail position.  Let $B_1$ be the result of
+\code{explicate-tail} on the $\itm{thn}$ branch and $B_2$ be the
+result of apply \code{explicate-tail} to the $\itm{else}$ branch. Then
+the \key{if} as a whole translates to the block $B_3$ which is the
+result of applying \code{explicate-pred} to the predicate $\itm{cnd}$
+and the blocks $B_1$ and $B_2$.
 \[
     (\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els}) \quad\Rightarrow\quad B_3
 \]
 
 Next we consider the case for \key{if} in the
-\code{explicate-assign} function. So the context of the
+\code{explicate-assign} function. The context of the
 \key{if} is an assignment to some variable $x$ and then the control
-continues to some block $B_1$.  The code that we generate for both the
-$\itm{thn}$ and $\itm{els}$ branches shall both need to continue to
+continues to some block $B_1$.  The code that we generate for the
+$\itm{thn}$ and $\itm{els}$ branches needs to continue to
 $B_1$, so we add $B_1$ to the control flow graph with a fresh label
 $\ell_1$.  Again, the branches of the \key{if} inherit the current
 context, so that are in assignment positions.  Let $B_2$ be the result
 of applying \code{explicate-assign} to the $\itm{thn}$ branch,
-variable $x$, and the block \code{(goto $\ell_1$)}.  Let $B_3$ be the
+variable $x$, and the block \GOTO{$\ell_1$}.  Let $B_3$ be the
 result of applying \code{explicate-assign} to the $\itm{else}$
-branch, variable $x$, and the block \code{(goto $\ell_1$)}. The
+branch, variable $x$, and the block \GOTO{$\ell_1$}. The
 \key{if} translates to the block $B_4$ which is the result of applying
 \code{explicate-pred} to the predicate $\itm{cnd}$ and the
 blocks $B_2$ and $B_3$.
@@ -4139,14 +4165,18 @@ expression that can have type \code{Boolean}. We detail a few cases
 here and leave the rest for the reader. The input to this function is
 an expression and two blocks, $B_1$ and $B_2$, for the branches of the
 enclosing \key{if}. One of the base cases of this function is when the
-expression is a less-than comparison. We translate it to a
-conditional \code{goto}. We need labels for the two branches $B_1$ and
-$B_2$, so we add them to the control flow graph and obtain some labels
-$\ell_1$ and $\ell_2$. The translation of the less-than comparison is
-as follows.
+expression is a less-than comparison. We translate it to a conditional
+goto. We need labels for the two branches $B_1$ and $B_2$, so we add
+them to the control flow graph and obtain some labels $\ell_1$ and
+$\ell_2$. The translation of the less-than comparison is as follows.
 \[
-(\key{<}\;e_1\;e_2) \quad\Rightarrow\quad
-(\key{if}\;(\key{<}\;e_1\;e_2)\;(\key{goto}\;\ell_1)\;(\key{goto}\;\ell_2))
+(\key{<}~e_1~e_2) \quad\Rightarrow\quad
+\begin{array}{l}
+\key{if}~(\key{<}~e_1~e_2)~\key{then} \\
+\qquad\key{goto}~\ell_1\key{;}\\
+\key{else}\\
+\qquad\key{goto}~\ell_2\key{;}
+\end{array}
 \]
 
 The case for \key{if} in \code{explicate-pred} is particularly
@@ -4157,8 +4187,8 @@ and obtain the labels $\ell_1$ and $\ell_2$.  The branches $\itm{thn}$
 and $\itm{els}$ of the current \key{if} inherit their context from the
 current one, i.e., predicate context. So we apply
 \code{explicate-pred} to $\itm{thn}$ with the two blocks
-\code{(goto $\ell_1$)} and \code{(goto $\ell_2$)}, to obtain $B_3$.
-Similarly for the $\itm{els}$ branch, to obtain $B_4$.
+\GOTO{$\ell_1$} and \GOTO{$\ell_2$}, to obtain $B_3$.
+Proceed in a similar way with the $\itm{els}$ branch, to obtain $B_4$.
 Finally, we apply \code{explicate-pred} to
 the predicate $\itm{cnd}$ and the blocks $B_3$ and $B_4$
 to obtain the result $B_5$.
@@ -4183,9 +4213,9 @@ Recall that the \code{select-instructions} pass lowers from our
 $C$-like intermediate representation to the pseudo-x86 language, which
 is suitable for conducting register allocation. The pass is
 implemented using three auxiliary functions, one for each of the
-non-terminals $\Arg$, $\Stmt$, and $\Tail$.
+non-terminals $\Atm$, $\Stmt$, and $\Tail$.
 
-For $\Arg$, we have new cases for the Booleans.  We take the usual
+For $\Atm$, we have new cases for the Booleans.  We take the usual
 approach of encoding them as integers, with true as 1 and false as 0.
 \[
 \key{\#t} \Rightarrow \key{1}
@@ -4195,21 +4225,25 @@ approach of encoding them as integers, with true as 1 and false as 0.
 
 For $\Stmt$, we discuss a couple cases.  The \code{not} operation can
 be implemented in terms of \code{xorq} as we discussed at the
-beginning of this section. Given an assignment \code{(assign
-  $\itm{lhs}$ (not $\Arg$))}, if the left-hand side $\itm{lhs}$ is
-the same as $\Arg$, then just the \code{xorq} suffices:
+beginning of this section. Given an assignment
+$\itm{lhs}$ \key{=} \key{(not} $\Arg$\key{);},
+if the left-hand side $\itm{lhs}$ is
+the same as $\Arg$, then just the \code{xorq} suffices.
 \[
-(\key{assign}\; x\; (\key{not}\; x))
+x~\key{=}~ \key{(not}\; x\key{);}
 \quad\Rightarrow\quad
-((\key{xorq}\;(\key{int}\;1)\;x'))
+\key{xorq}~\key{\$}1\key{,}~x
 \]
 Otherwise, a \key{movq} is needed to adapt to the update-in-place
 semantics of x86. Let $\Arg'$ be the result of recursively processing
 $\Arg$. Then we have
 \[
-(\key{assign}\; \itm{lhs}\; (\key{not}\; \Arg))
+\itm{lhs}~\key{=}~ \key{(not}\; \Arg\key{);}
 \quad\Rightarrow\quad
-((\key{movq}\; \Arg'\; \itm{lhs}') \; (\key{xorq}\;(\key{int}\;1)\;\itm{lhs}'))
+\begin{array}{l}
+\key{movq}~\Arg'\key{,}~\itm{lhs}\\
+\key{xorq}~\key{\$}1\key{,}~\itm{lhs}
+\end{array}
 \]
 
 Next consider the cases for \code{eq?} and less-than comparison.
@@ -5455,9 +5489,9 @@ the register allocator.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-\Arg &::=&  \gray{  \INT{\Int} \mid \REG{\itm{register}}
-    \mid (\key{deref}\,\itm{register}\,\Int) } \\
-   &\mid& \gray{ (\key{byte-reg}\; \itm{register})  }
+\Arg &::=&  \gray{  \INT{\Int} \mid \REG{\Reg}
+    \mid (\key{deref}\,\Reg\,\Int) } \\
+   &\mid& \gray{ (\key{byte-reg}\; \Reg)  }
    \mid (\key{global-value}\; \itm{name}) \\
 \itm{cc} & ::= & \gray{  \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge}  } \\
 \Instr &::=& \gray{(\key{addq} \; \Arg\; \Arg) \mid
@@ -6312,9 +6346,9 @@ language, whose syntax is defined in Figure~\ref{fig:x86-3}.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-\Arg &::=&  \gray{  \INT{\Int} \mid \REG{\itm{register}}
-    \mid (\key{deref}\,\itm{register}\,\Int) } \\
-   &\mid& \gray{ (\key{byte-reg}\; \itm{register}) 
+\Arg &::=&  \gray{  \INT{\Int} \mid \REG{\Reg}
+    \mid (\key{deref}\,\Reg\,\Int) } \\
+   &\mid& \gray{ (\key{byte-reg}\; \Reg) 
     \mid   (\key{global-value}\; \itm{name})  } \\
    &\mid& (\key{fun-ref}\; \itm{label})\\
 \itm{cc} & ::= & \gray{  \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge}  } \\
