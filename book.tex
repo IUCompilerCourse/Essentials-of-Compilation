@@ -291,6 +291,7 @@ following people.
 %\noindent Spring 2016
 
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Preliminaries}
 \label{ch:trees-recur}
@@ -1033,6 +1034,7 @@ Appendix~\ref{appendix:utilities}.\\
 \end{minipage}
 
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Integers and Variables}
 \label{ch:int-exp}
@@ -1083,7 +1085,7 @@ exhibit several compilation techniques.
 \begin{array}{rcl}
   \Exp &::=& \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)
         \mid (\key{-}\;\Exp\;\Exp) \\
-     &\mid&  \Var \mid \key{(let}~\key{([}\Var ~\Exp \key{])}~ \Exp \key{)} \\
+     &\mid&  \Var \mid (\key{let}~([\Var~\Exp])~\Exp) \\
   R_1 &::=& \Exp
 \end{array}
 \]
@@ -3562,8 +3564,8 @@ comparing integers.
 \[
 \begin{array}{lcl}
   \itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
-  \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)}  \mid (\key{-}\;\Exp\;\Exp) \\
-     &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp}} \\
+  \Exp &::=& \gray{ \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp) }  \mid (\key{-}\;\Exp\;\Exp) \\
+     &\mid&  \gray{ \Var \mid (\key{let}~([\Var~\Exp])~\Exp) } \\
      &\mid& \key{\#t} \mid \key{\#f} 
       \mid (\key{and}\;\Exp\;\Exp) \mid (\key{or}\;\Exp\;\Exp)
       \mid (\key{not}\;\Exp) \\
@@ -4747,6 +4749,7 @@ block7952:
 \end{exercise}
 
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Tuples and Garbage Collection}
 \label{ch:tuples}
@@ -4773,12 +4776,13 @@ techniques in this chapter.
 Section~\ref{sec:r3} introduces the $R_3$ language including its
 interpreter and type checker. The $R_3$ language extends the $R_2$
 language of Chapter~\ref{ch:bool-types} with vectors and Racket's
-``void'' value. The reason for including the later is that the
+\code{void} value. The reason for including the later is that the
 \code{vector-set!} operation returns a value of type
-\code{Void}\footnote{This may sound contradictory, but Racket's
-  \code{Void} type corresponds to what is more commonly called the
-  \code{Unit} type. This type is inhabited by a single value that is
-  usually written \code{unit} or \code{()}\citep{Pierce:2002hj}.}.
+\code{Void}\footnote{Racket's \code{Void} type corresponds to what is
+  called the \code{Unit} type in the programming languages
+  literature. Racket's \code{Void} type is inhabited by a single value
+  \code{void} which corresponds to \code{unit} or \code{()} in the
+  literature~\citep{Pierce:2002hj}.}.
 
 Section~\ref{sec:GC} describes a garbage collection algorithm based on
 copying live objects back and forth between two halves of the
@@ -4792,16 +4796,17 @@ passes, including a new compiler pass named \code{expose-allocation}.
 \section{The $R_3$ Language}
 \label{sec:r3}
 
-Figure~\ref{fig:r3-syntax} defines the syntax for $R_3$, which
-includes three new forms for creating a tuple, reading an element of a
-tuple, and writing to an element of a tuple. The program in
-Figure~\ref{fig:vector-eg} shows the usage of tuples in Racket. We
-create a 3-tuple \code{t} and a 1-tuple. The 1-tuple is stored at
-index $2$ of the 3-tuple, demonstrating that tuples are first-class
-values.  The element at index $1$ of \code{t} is \code{\#t}, so the
-``then'' branch is taken.  The element at index $0$ of \code{t} is
-$40$, to which we add the $2$, the element at index $0$ of the
-1-tuple.
+Figure~\ref{fig:r3-concrete-syntax} defines the concrete syntax for
+$R_3$ and Figure~\ref{fig:r3-syntax} defines the abstract syntax.  The
+$R_3$ language includes three new forms for creating a tuple, reading
+an element of a tuple, and writing to an element of a tuple. The
+program in Figure~\ref{fig:vector-eg} shows the usage of tuples in
+Racket. We create a 3-tuple \code{t} and a 1-tuple. The 1-tuple is
+stored at index $2$ of the 3-tuple, demonstrating that tuples are
+first-class values.  The element at index $1$ of \code{t} is
+\code{\#t}, so the ``then'' branch is taken.  The element at index $0$
+of \code{t} is $40$, to which we add the $2$, the element at index $0$
+of the 1-tuple.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -4823,28 +4828,56 @@ $40$, to which we add the $2$, the element at index $0$ of the
 \begin{array}{lcl}
   \Type &::=& \gray{\key{Integer} \mid \key{Boolean}}
   \mid (\key{Vector}\;\Type^{+}) \mid \key{Void}\\
-  \itm{cmp} &::= & \gray{  \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=}  } \\
+  \itm{cmp} &::= & \gray{ \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} } \\
   \Exp &::=& \gray{  \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp) \mid (\key{-}\;\Exp\;\Exp) }  \\
-  &\mid&  \gray{  \Var \mid \LET{\Var}{\Exp}{\Exp}  }\\
+  &\mid&  \gray{  \Var \mid (\key{let}~([\Var~\Exp])~\Exp)  }\\
   &\mid& \gray{ \key{\#t} \mid \key{\#f} 
    \mid (\key{and}\;\Exp\;\Exp) 
    \mid (\key{or}\;\Exp\;\Exp)
    \mid (\key{not}\;\Exp) } \\
   &\mid& \gray{  (\itm{cmp}\;\Exp\;\Exp) 
-   \mid \IF{\Exp}{\Exp}{\Exp}  } \\
+   \mid (\key{if}~\Exp~\Exp~\Exp)  } \\
   &\mid& (\key{vector}\;\Exp^{+}) 
    \mid (\key{vector-ref}\;\Exp\;\Int) \\
   &\mid& (\key{vector-set!}\;\Exp\;\Int\;\Exp)\\
   &\mid& (\key{void}) \\
-  R_3 &::=& (\key{program} \; \Exp)
+  R_3 &::=& \Exp
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The syntax of $R_3$, extending $R_2$
-  (Figure~\ref{fig:r2-syntax}) with tuples.}
+\caption{The concrete syntax of $R_3$, extending $R_2$
+  (Figure~\ref{fig:r2-concrete-syntax}).}
+\label{fig:r3-concrete-syntax}
+\end{figure}
+
+\begin{figure}[tp]
+\centering
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{lcl}
+  \itm{bool} &::=& \key{\#t} \mid \key{\#f} \\
+  \itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
+\Exp &::=& \gray{ \INT{\Int} \mid \READ{} \mid \NEG{\Exp} } \\
+     &\mid& \gray{ \ADD{\Exp}{\Exp} 
+      \mid \BINOP{\code{'-}}{\Exp}{\Exp} } \\
+     &\mid& \gray{ \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp} } \\
+     &\mid& \gray{ \BOOL{\itm{bool}} 
+      \mid \AND{\Exp}{\Exp} }\\
+     &\mid& \gray{ \OR{\Exp}{\Exp}
+      \mid \NOT{\Exp} } \\
+     &\mid& \gray{ \BINOP{\code{'}\itm{cmp}}{\Exp}{\Exp}
+      \mid \IF{\Exp}{\Exp}{\Exp} } \\
+  R_3 &::=& \PROGRAM{\key{'()}}{\Exp}
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The abstract syntax of $R_3$.}
 \label{fig:r3-syntax}
 \end{figure}
+
 
 Tuples are our first encounter with heap-allocated data, which raises
 several interesting issues. First, variable binding performs a
