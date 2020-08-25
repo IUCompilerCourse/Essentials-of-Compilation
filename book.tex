@@ -1658,7 +1658,7 @@ each of the compiler passes in Figure~\ref{fig:R1-passes}.
 The output of \key{explicate-control} is similar to the $C$
 language~\citep{Kernighan:1988nx} in that it has separate syntactic
 categories for expressions and statements, so we name it $C_0$.  The
-concrete syntax for $C_0$ is define din
+concrete syntax for $C_0$ is defined in
 Figure~\ref{fig:c0-concrete-syntax} and the abstract syntax for $C_0$
 is defined in Figure~\ref{fig:c0-syntax}.
 %
@@ -2054,25 +2054,6 @@ It returns a $\Tail$ and a list of variables. The top-level
 on the body of the \key{program} and then associate the \code{locals}
 symbol with the resulting list of variables in the $\itm{info}$ field,
 as in the above example.
-
-%% \section{Uncover Locals}
-%% \label{sec:uncover-locals-r1}
-
-%% The pass \code{uncover-locals} simply collects all of the variables in
-%% the program and places then in the $\itm{info}$ of the program
-%% construct. Here is the output for the example program of the last
-%% section.
-
-%% \begin{minipage}{0.4\textwidth}
-%% \begin{lstlisting}
-%% (program ((locals . (x.1 x.2 y)))
-%%   ((start . 
-%%    (seq (assign x.1 20)
-%%    (seq (assign x.2 22)
-%%    (seq (assign y (+ x.1 x.2))
-%%    (return y)))))))
-%% \end{lstlisting}
-%% \end{minipage}
 
 \section{Select Instructions}
 \label{sec:select-r1}
@@ -3750,22 +3731,6 @@ association list.
 \label{fig:type-check-R2}
 \end{figure}
 
-%% To print the resulting value correctly, the overall type of the
-%% program must be threaded through the remainder of the passes. We can
-%% store the type within the \key{program} form as shown in Figure
-%% \ref{fig:type-check-R2}. Let $R^\dagger_2$ be the name for the
-%% intermediate language produced by the type checker, which we define as
-%% follows: \\[1ex]
-%% \fbox{
-%% \begin{minipage}{0.87\textwidth}
-%% \[
-%% \begin{array}{lcl}
-%%   R^\dagger_2 &::=& (\key{program}\;(\key{type}\;\itm{type})\; \Exp)
-%% \end{array}
-%% \]
-%% \end{minipage}
-%% }
-
 \begin{exercise}\normalfont
 Complete the implementation of \code{type-check-R2} and test it on 10
 new example programs in $R_2$ that you choose based on how thoroughly
@@ -4125,7 +4090,8 @@ new kind of context to deal with: the predicate position of the
 \key{if}. We need another function, \code{explicate-pred}, that takes
 an $R_2$ expression and two pieces of $C_1$ code (two $\Tail$'s) for
 the then-branch and else-branch. The output of \code{explicate-pred}
-is a $C_1$ $\Tail$.  However, these three functions also need to
+is a $C_1$ $\Tail$ and a list of formerly \key{let}-bound variables.
+However, these three functions also need to
 construct the control-flow graph, which we recommend they do via
 updates to a global variable (be careful!). Next we consider the
 specific additions to the tail and assign functions, and some of cases
@@ -4134,30 +4100,29 @@ for the pred function.
 The \code{explicate-tail} function needs an additional case for
 \key{if}. The branches of the \key{if} inherit the current context, so
 they are in tail position.  Let $B_1$ be the result of
-\code{explicate-tail} on the $\itm{thn}$ branch and $B_2$ be the
-result of apply \code{explicate-tail} to the $\itm{else}$ branch. Then
-the \key{if} as a whole translates to the block $B_3$ which is the
-result of applying \code{explicate-pred} to the predicate $\itm{cnd}$
-and the blocks $B_1$ and $B_2$.
+\code{explicate-tail} on the ``then'' branch of the \key{if} and $B_2$
+be the result of apply \code{explicate-tail} to the ``else''
+branch. Then the \key{if} as a whole translates to the block $B_3$
+which is the result of applying \code{explicate-pred} to the predicate
+$\itm{cnd}$ and the blocks $B_1$ and $B_2$.
 \[
     (\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els}) \quad\Rightarrow\quad B_3
 \]
 
-Next we consider the case for \key{if} in the
-\code{explicate-assign} function. The context of the
-\key{if} is an assignment to some variable $x$ and then the control
-continues to some block $B_1$.  The code that we generate for the
-$\itm{thn}$ and $\itm{els}$ branches needs to continue to
-$B_1$, so we add $B_1$ to the control flow graph with a fresh label
-$\ell_1$.  Again, the branches of the \key{if} inherit the current
-context, so that are in assignment positions.  Let $B_2$ be the result
-of applying \code{explicate-assign} to the $\itm{thn}$ branch,
-variable $x$, and the block \GOTO{$\ell_1$}.  Let $B_3$ be the
-result of applying \code{explicate-assign} to the $\itm{else}$
-branch, variable $x$, and the block \GOTO{$\ell_1$}. The
+Next we consider the case for \key{if} in the \code{explicate-assign}
+function. The context of the \key{if} is an assignment to some
+variable $x$ and then the control continues to some block $B_1$.  The
+code that we generate for the $\itm{thn}$ and $\itm{els}$ branches
+needs to continue to $B_1$, so we add $B_1$ to the control flow graph
+with a fresh label $\ell_1$.  Again, the branches of the \key{if}
+inherit the current context, so that are in assignment positions.  Let
+$B_2$ be the result of applying \code{explicate-assign} to the
+$\itm{thn}$ branch, variable $x$, and the block \GOTO{$\ell_1$}.  Let
+$B_3$ be the result of applying \code{explicate-assign} to the
+$\itm{else}$ branch, variable $x$, and the block \GOTO{$\ell_1$}. The
 \key{if} translates to the block $B_4$ which is the result of applying
-\code{explicate-pred} to the predicate $\itm{cnd}$ and the
-blocks $B_2$ and $B_3$.
+\code{explicate-pred} to the predicate $\itm{cnd}$ and the blocks
+$B_2$ and $B_3$.
 \[
 (\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els}) \quad\Rightarrow\quad B_4
 \]
@@ -4166,11 +4131,21 @@ The function \code{explicate-pred} will need a case for every
 expression that can have type \code{Boolean}. We detail a few cases
 here and leave the rest for the reader. The input to this function is
 an expression and two blocks, $B_1$ and $B_2$, for the branches of the
-enclosing \key{if}. One of the base cases of this function is when the
+enclosing \key{if}. Suppose the expression is the Boolean \code{\#t}.
+Then we can perform a kind of partial evaluation and translate it to the
+``then'' branch $B_1$. Likewise, we translate
+\code{\#f} to the ``else`` branch $B_2$.
+\[
+\key{\#t} \quad\Rightarrow\quad B_1,
+\qquad\qquad\qquad
+\key{\#f} \quad\Rightarrow\quad B_2
+\]
+Next, suppose the
 expression is a less-than comparison. We translate it to a conditional
 goto. We need labels for the two branches $B_1$ and $B_2$, so we add
-them to the control flow graph and obtain some labels $\ell_1$ and
-$\ell_2$. The translation of the less-than comparison is as follows.
+those blocks to the control flow graph and obtain some labels $\ell_1$
+and $\ell_2$. The translation of the less-than comparison is as
+follows.
 \[
 (\key{<}~e_1~e_2) \quad\Rightarrow\quad
 \begin{array}{l}
@@ -4201,10 +4176,10 @@ B_5
 \]
 
 \begin{exercise}\normalfont
-  Implement the pass \code{explicate-code} by adding the cases for
+  Implement the pass \code{explicate-control} by adding the cases for
   \key{if} to the functions for tail and assignment contexts, and
-  implement the function for predicate contexts. Create test cases
-  that exercise all of the new cases in the code for this pass.
+  implement \code{explicate-pred} for predicate contexts. Create test
+  cases that exercise all of the new cases in the code for this pass.
 \end{exercise}
 
 
@@ -4383,52 +4358,6 @@ and test your compiler using your previously created programs on the
 \end{exercise}
 
 
-%% \section{Lower Conditionals (New Pass)}
-%% \label{sec:lower-conditionals}
-
-%% In the \code{select-instructions} pass we decided to procrastinate in
-%% the lowering of the \key{if} statement, thereby making liveness
-%% analysis easier. Now we need to make up for that and turn the \key{if}
-%% statement into the appropriate instruction sequence.  The following
-%% translation gives the general idea. If the condition is true, we need
-%% to execute the $\itm{thns}$ branch and otherwise we need to execute
-%% the $\itm{elss}$ branch. So we use \key{cmpq} and do a conditional
-%% jump to the $\itm{thenlabel}$, choosing the condition code $cc$ that
-%% is appropriate for the comparison operator \itm{cmp}.  If the
-%% condition is false, we fall through to the $\itm{elss}$ branch. At the
-%% end of the $\itm{elss}$ branch we need to take care to not fall
-%% through to the $\itm{thns}$ branch. So we jump to the
-%% $\itm{endlabel}$. All of the labels in the generated code should be
-%% created with \code{gensym}.
-
-%% \begin{tabular}{lll}
-%% \begin{minipage}{0.4\textwidth}
-%% \begin{lstlisting}
-%%  (if (|\itm{cmp}| |$\Arg_1$| |$\Arg_2$|) |$\itm{thns}$| |$\itm{elss}$|)
-%% \end{lstlisting}
-%% \end{minipage}
-%% &
-%% $\Rightarrow$
-%% &
-%% \begin{minipage}{0.4\textwidth}
-%% \begin{lstlisting}
-%%  (cmpq |$\Arg_2$| |$\Arg_1$|)
-%%  (jmp-if |$cc$| |$\itm{thenlabel}$|)
-%%  |$\itm{elss}$|
-%%  (jmp |$\itm{endlabel}$|)
-%%  (label |$\itm{thenlabel}$|)
-%%  |$\itm{thns}$|
-%%  (label |$\itm{endlabel}$|)
-%% \end{lstlisting}
-%% \end{minipage}
-%% \end{tabular}
-
-%% \begin{exercise}\normalfont
-%% Implement the \code{lower-conditionals} pass. Test your compiler using
-%% your previously created programs on the \code{interp-x86} interpreter
-%% (Appendix~\ref{appendix:interp}).
-%% \end{exercise}
-
 \section{Patch Instructions}
 
 The second argument of the \key{cmpq} instruction must not be an
@@ -4542,7 +4471,7 @@ conclusion:
 \node (R2-4) at (9,2)  {\large $R_2$};
 \node (R2-5) at (12,2)  {\large $R_2$};
 \node (C1-1) at (6,0)  {\large $C_1$};
-\node (C1-2) at (3,0)  {\large $C_1$};
+%\node (C1-2) at (3,0)  {\large $C_1$};
 
 \node (x86-2) at (3,-2)  {\large $\text{x86}^{*}$};
 \node (x86-3) at (6,-2)  {\large $\text{x86}^{*}$};
@@ -4557,8 +4486,8 @@ conclusion:
 \path[->,bend left=15] (R2-3) edge [above] node {\ttfamily\footnotesize uniquify} (R2-4);
 \path[->,bend left=15] (R2-4) edge [above] node {\ttfamily\footnotesize remove-complex.} (R2-5);
 \path[->,bend left=15] (R2-5) edge [right] node {\ttfamily\footnotesize\color{red} explicate-control} (C1-1);
-\path[->,bend right=15] (C1-1) edge [above] node {\ttfamily\footnotesize uncover-locals} (C1-2);
-\path[->,bend right=15] (C1-2) edge [left] node {\ttfamily\footnotesize\color{red} select-instr.} (x86-2);
+%\path[->,bend right=15] (C1-1) edge [above] node {\ttfamily\footnotesize uncover-locals} (C1-2);
+\path[->,bend right=15] (C1-1) edge [left] node {\ttfamily\footnotesize\color{red} select-instructions} (x86-2);
 \path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize\color{red} uncover-live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build-inter.} (x86-2-2);
 \path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate-reg.} (x86-3);
@@ -4804,9 +4733,10 @@ program in Figure~\ref{fig:vector-eg} shows the usage of tuples in
 Racket. We create a 3-tuple \code{t} and a 1-tuple. The 1-tuple is
 stored at index $2$ of the 3-tuple, demonstrating that tuples are
 first-class values.  The element at index $1$ of \code{t} is
-\code{\#t}, so the ``then'' branch is taken.  The element at index $0$
-of \code{t} is $40$, to which we add the $2$, the element at index $0$
-of the 1-tuple.
+\code{\#t}, so the ``then'' branch of the \key{if} is taken.  The
+element at index $0$ of \code{t} is $40$, to which we add $2$, the
+element at index $0$ of the 1-tuple. So the result of the program is
+$42$.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -4869,6 +4799,10 @@ of the 1-tuple.
       \mid \NOT{\Exp} } \\
      &\mid& \gray{ \BINOP{\code{'}\itm{cmp}}{\Exp}{\Exp}
       \mid \IF{\Exp}{\Exp}{\Exp} } \\
+     &\mid& \VECTOR{\Exp} \\
+     &\mid& \VECREF{\Exp}{\Int}\\
+     &\mid& \VECSET{\Exp}{\Int}{\Exp}\\
+      &\mid& \VOID{} \\
   R_3 &::=& \PROGRAM{\key{'()}}{\Exp}
 \end{array}
 \]
@@ -4887,12 +4821,16 @@ be \emph{aliases} for the same thing. Consider the following example
 in which both \code{t1} and \code{t2} refer to the same tuple.  Thus,
 the mutation through \code{t2} is visible when referencing the tuple
 from \code{t1}, so the result of this program is \code{42}.
+\begin{center}
+\begin{minipage}{0.96\textwidth}
 \begin{lstlisting}
     (let ([t1 (vector 3 7)])
       (let ([t2 t1])
         (let ([_ (vector-set! t2 0 42)])
           (vector-ref t1 0))))
 \end{lstlisting}
+\end{minipage}
+\end{center}
 
 The next issue concerns the lifetime of tuples. Of course, they are
 created by the \code{vector} form, but when does their lifetime end?
@@ -4901,12 +4839,17 @@ an operation for deleting tuples. Furthermore, the lifetime of a tuple
 is not tied to any notion of static scoping. For example, the
 following program returns \code{3} even though the variable \code{t}
 goes out of scope prior to accessing the vector.
+\begin{center}
+\begin{minipage}{0.96\textwidth}
 \begin{lstlisting}
     (vector-ref
       (let ([t (vector 3 7)])
         t)
       0)
 \end{lstlisting}
+\end{minipage}
+\end{center}
+
 From the perspective of programmer-observable behavior, tuples live
 forever. Of course, if they really lived forever, then many programs
 would run out of memory.\footnote{The $R_3$ language does not have
@@ -4925,20 +4868,6 @@ but there are no operations specific to the the \code{\#<void>} value
 in $R_3$. In contrast, Racket defines the \code{void?} predicate that
 returns \code{\#t} when applied to \code{\#<void>} and \code{\#f}
 otherwise.
-
-Figure~\ref{fig:typecheck-R3} shows the type checker for $R_3$ , which
-deserves some explanation. As we shall see in Section~\ref{sec:GC}, we
-need to know which variables are pointers into the heap, that is,
-which variables are vectors. Also, when allocating a vector, we shall
-need to know which elements of the vector are pointers. We can obtain
-this information during type checking and when we uncover local
-variables. The type checker in Figure~\ref{fig:typecheck-R3} not only
-computes the type of an expression, it also wraps every sub-expression
-$e$ with the form $(\key{has-type}\; e\; T)$, where $T$ is $e$'s
-type. Subsequently, in the \code{uncover-locals} pass
-(Section~\ref{sec:uncover-locals-r3}) this type information is
-propagated to all variables (including the temporaries generated by
-\code{remove-complex-opera*}).
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -4963,6 +4892,21 @@ propagated to all variables (including the temporaries generated by
 \label{fig:interp-R3}
 \end{figure}
 
+Figure~\ref{fig:typecheck-R3} shows the type checker for $R_3$, which
+deserves some explanation. As we shall see in Section~\ref{sec:GC}, we
+need to know which variables are pointers into the heap, that is,
+which variables are vectors. Also, when allocating a vector, we need
+to know which elements of the vector are pointers. We can obtain this
+information during type checking. The type checker in
+Figure~\ref{fig:typecheck-R3} not only computes the type of an
+expression, it also wraps every sub-expression $e$ with the form
+$(\key{HasType}~e~T)$, where $T$ is $e$'s type.
+% TODO: UPDATE? -Jeremy
+Subsequently, in the \code{uncover-locals} pass
+(Section~\ref{sec:uncover-locals-r3}) this type information is
+propagated to all variables (including the temporaries generated by
+\code{remove-complex-opera*}).
+
 \begin{figure}[tbp]
 \begin{lstlisting}
 (define (type-check-exp env)
@@ -4970,30 +4914,30 @@ propagated to all variables (including the temporaries generated by
     (define recur (type-check-exp env))
     (match e
       ...
-      ['(void) (values '(has-type (void) Void) 'Void)]
-      [`(vector ,es ...)
+      [(Void) (values (HasType (Void) 'Void) 'Void)]
+      [(Prim 'vector es)
        (define-values (e* t*) (for/lists (e* t*) ([e es])
                                 (recur e)))
        (let ([t `(Vector ,@t*)])
-         (debug "vector/type-check-exp finished vector" t)
-         (values `(has-type (vector ,@e*) ,t) t))]
-      [`(vector-ref ,e ,i)
+         (values (HasType (Prim 'vector e*) t) t))]
+      [(Prim 'vector-ref (list e (Int i)))
        (define-values (e^ t) (recur e))
        (match t
          [`(Vector ,ts ...)
           (unless (and (exact-nonnegative-integer? i) (< i (length ts)))
             (error 'type-check-exp "invalid index ~a" i))
           (let ([t (list-ref ts i)])
-            (values `(has-type (vector-ref ,e^ (has-type ,i Integer)) ,t) 
-                    t))]
+            (values
+             (HasType (Prim 'vector-ref (list e^ (HasType (Int i) 'Integer))) t)
+             t))]
          [else (error "expected a vector in vector-ref, not" t)])]
-      [`(eq? ,arg1 ,arg2)
-       (define-values (e1 t1) (recur arg1))
-       (define-values (e2 t2) (recur arg2))
-       (match* (t1 t2)
-         [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))
-          (values `(has-type (eq? ,e1 ,e2) Boolean) 'Boolean)]
-         [(other wise) ((super type-check-exp env) e)])]
+      [(Prim 'eq? (list e1 e2))
+       (define-values (e1^ T1) (recur e1))
+       (define-values (e2^ T2) (recur e2))
+       (unless (equal? T1 T2)
+         (error "arguments of eq? must have the same type, but are not"
+                (list T1 T2)))
+       (values (HasType (Prim 'eq? (list e1^ e2^)) 'Boolean) 'Boolean)]
       ...
       )))
 \end{lstlisting}
@@ -5298,7 +5242,7 @@ accesses the element in the inner tuple tuple via two vector
 references.
 % tests/s2_17.rkt
 \begin{lstlisting}
-    (vector-ref (vector-ref (vector (vector 42)) 0) 0))
+(vector-ref (vector-ref (vector (vector 42)) 0) 0))
 \end{lstlisting}
 
 Next we proceed to discuss the new \code{expose-allocation} pass.
@@ -5365,34 +5309,40 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
 \code{expose-allocation} pass on our running example.
 
 \begin{figure}[tbp]
+% tests/s2_17.rkt
 \begin{lstlisting}
-(program ()
+(vector-ref
  (vector-ref
-  (vector-ref
-   (let ((vecinit48
-          (let ((vecinit44 42))
-            (let ((collectret46
-                   (if (<
-                        (+ (global-value free_ptr) 16)
-                        (global-value fromspace_end))
-                     (void)
-                     (collect 16))))
-              (let ((alloc43 (allocate 1 (Vector Integer))))
-                (let ((initret45 (vector-set! alloc43 0 vecinit44)))
-                  alloc43))))))
-     (let ((collectret50
-            (if (< (+ (global-value free_ptr) 16)
-                   (global-value fromspace_end))
-              (void)
-              (collect 16))))
-       (let ((alloc47 (allocate 1 (Vector (Vector Integer)))))
-         (let ((initret49 (vector-set! alloc47 0 vecinit48)))
-           alloc47))))
-   0)
-  0))
+  (let ([vecinit7976
+         (let ([vecinit7972 42])
+           (let ([collectret7974
+                  (if (< (+ free_ptr 16) fromspace_end)
+                      (void)
+                      (collect 16);
+                      )])
+             (let ([alloc7971 (allocate 1 (Vector Integer))])
+               (let ([initret7973 (vector-set! alloc7971 0 vecinit7972)])
+                 alloc7971)
+               )
+             )
+           )
+         ])
+    (let ([collectret7978
+           (if (< (+ free_ptr 16) fromspace_end)
+               (void)
+               (collect 16);
+               )])
+      (let ([alloc7975 (allocate 1 (Vector (Vector Integer)))])
+        (let ([initret7977 (vector-set! alloc7975 0 vecinit7976)])
+          alloc7975)
+        )
+      )
+    )
+  0)
+ 0)
 \end{lstlisting}
 \caption{Output of the \code{expose-allocation} pass, minus
-  all of the \code{has-type} forms.}
+  all of the \code{HasType} forms.}
 \label{fig:expose-alloc-output}
 \end{figure}
 
@@ -5442,47 +5392,66 @@ other forms.
 \section{Uncover Locals}
 \label{sec:uncover-locals-r3}
 
-Recall that the \code{uncover-locals} function collects all of the
+Recall that the \code{explicate-control} function collects all of the
 local variables so that it can store them in the $\itm{info}$ field of
-the \code{program} form. Also recall that we need to know the types of
-all the local variables for purposes of identifying the root set for
-the garbage collector.  Thus, we change \code{uncover-locals} to
-collect not just the variables, but the variables and their types in
-the form of an association list. Thanks to the \code{has-type} forms,
-the types are readily available. Figure~\ref{fig:uncover-locals-r3}
-lists the output of the \code{uncover-locals} pass on the running
-example.
+the \code{Program} structure. Also recall that we need to know the
+types of all the local variables for purposes of identifying the root
+set for the garbage collector.  Thus, we create a pass named
+\code{uncover-locals} to collect not just the variables but the
+variables and their types in the form of an association list. Thanks
+to the \code{HasType} nodes, the types are readily available in the
+AST. Figure~\ref{fig:uncover-locals-r3} lists the output of the
+\code{uncover-locals} pass on the running example.
 
 \begin{figure}[tbp]
+% tests/s2_17.rkt
 \begin{lstlisting}
-(program
- ((locals . ((tmp54 . Integer) (tmp51 . Integer) (tmp53 . Integer)
-             (alloc43 . (Vector Integer)) (tmp55 . Integer)
-             (initret45 . Void) (alloc47 . (Vector (Vector Integer)))
-             (collectret46 . Void) (vecinit48 . (Vector Integer))
-             (tmp52 . Integer) (tmp57 . (Vector Integer))
-             (vecinit44 . Integer) (tmp56 . Integer) (initret49 . Void)
-             (collectret50 . Void))))
- ((block63 . (seq (collect 16) (goto block61)))
-  (block62 . (seq (assign collectret46 (void)) (goto block61)))
-  (block61 . (seq (assign alloc43 (allocate 1 (Vector Integer)))
-               (seq (assign initret45 (vector-set! alloc43 0 vecinit44))
-               (seq (assign vecinit48 alloc43)
-               (seq (assign tmp54 (global-value free_ptr))
-               (seq (assign tmp55 (+ tmp54 16))
-               (seq (assign tmp56 (global-value fromspace_end))
-               (if (< tmp55 tmp56) (goto block59) (goto block60)))))))))
-  (block60 . (seq (collect 16) (goto block58)))
-  (block59 . (seq (assign collectret50 (void)) (goto block58)))
-  (block58 . (seq (assign alloc47 (allocate 1 (Vector (Vector Integer))))
-               (seq (assign initret49 (vector-set! alloc47 0 vecinit48))
-               (seq (assign tmp57 (vector-ref alloc47 0))
-               (return (vector-ref tmp57 0))))))
-  (start . (seq (assign vecinit44 42)
-           (seq (assign tmp51 (global-value free_ptr))
-           (seq (assign tmp52 (+ tmp51 16))
-           (seq (assign tmp53 (global-value fromspace_end))
-           (if (< tmp52 tmp53) (goto block62) (goto block63)))))))))
+program:
+locals:
+    vecinit7976 : '(Vector Integer), tmp7980 : 'Integer,
+    alloc7975 : '(Vector (Vector Integer)), tmp7983 : 'Integer,
+    collectret7974 : 'Void, initret7977 : 'Void,
+    collectret7978 : 'Void, tmp7985 : '(Vector Integer),
+    tmp7984 : 'Integer, tmp7979 : 'Integer, tmp7982 : 'Integer,
+    alloc7971 : '(Vector Integer), tmp7981 : 'Integer, vecinit7972 : 'Integer,
+    initret7973 : 'Void, 
+block7991:
+    (collect 16);
+    goto block7989;
+block7990:
+    collectret7974 = (void);
+    goto block7989;
+block7989:
+    alloc7971 = (allocate 1 (Vector Integer));
+    initret7973 = (vector-set! alloc7971 0 vecinit7972);
+    vecinit7976 = alloc7971;
+    tmp7982 = free_ptr;
+    tmp7983 = (+ tmp7982 16);
+    tmp7984 = fromspace_end;
+    if (< tmp7983 tmp7984) then
+       goto block7987;
+    else
+       goto block7988;
+block7988:
+    (collect 16);
+    goto block7986;
+block7987:
+    collectret7978 = (void);
+    goto block7986;
+block7986:
+    alloc7975 = (allocate 1 (Vector (Vector Integer)));
+    initret7977 = (vector-set! alloc7975 0 vecinit7976);
+    tmp7985 = (vector-ref alloc7975 0);
+    return (vector-ref tmp7985 0);
+start:
+    vecinit7972 = 42;
+    tmp7979 = free_ptr;
+    tmp7980 = (+ tmp7979 16);
+    tmp7981 = fromspace_end;
+    if (< tmp7980 tmp7981) then
+       goto block7990;
+    else
+       goto block7991;
 \end{lstlisting}
 \caption{Output of \code{uncover-locals} for the running example.}
 \label{fig:uncover-locals-r3}
