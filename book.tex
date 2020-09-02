@@ -1082,9 +1082,8 @@ exhibit several compilation techniques.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{rcl}
-  \Exp &::=& \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)
-        \mid \Var \\
-     &\mid& (\key{let}~([\Var~\Exp])~\Exp) \\
+  \Exp &::=& \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)\\
+       &\mid& \Var \mid (\key{let}~([\Var~\Exp])~\Exp) \\
   R_1 &::=& \Exp
 \end{array}
 \]
@@ -1100,9 +1099,9 @@ exhibit several compilation techniques.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{rcl}
-\Exp &::=& \INT{\Int} \mid \READ{} \mid \NEG{\Exp} \\
-     &\mid& \ADD{\Exp}{\Exp}  
-     \mid  \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp} \\
+\Exp &::=& \INT{\Int} \mid \READ{} \\
+     &\mid& \NEG{\Exp} \mid \ADD{\Exp}{\Exp}  \\
+     &\mid&  \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp} \\
 R_1  &::=& \PROGRAM{\code{'()}}{\Exp}
 \end{array}
 \]
@@ -3477,17 +3476,18 @@ programs to make sure that your move biasing is working properly.
 \chapter{Booleans and Control Flow}
 \label{ch:bool-types}
 
-The $R_0$ and $R_1$ languages only had a single kind of value, the
+The $R_0$ and $R_1$ languages only have a single kind of value, the
 integers. In this chapter we add a second kind of value, the Booleans,
 to create the $R_2$ language. The Boolean values \emph{true} and
 \emph{false} are written \key{\#t} and \key{\#f} respectively in
 Racket.  The $R_2$ language includes several operations that involve
 Booleans (\key{and}, \key{not}, \key{eq?}, \key{<}, etc.) and the
 conditional \key{if} expression. With the addition of \key{if}
-expressions, programs can have non-trivial control flow which has an
-impact on several parts of the compiler. Also, because we now have two
-kinds of values, we need to worry about programs that apply an
-operation to the wrong kind of value, such as \code{(not 1)}.
+expressions, programs can have non-trivial control flow which which
+significantly impacts the \code{explicate-control} and the liveness
+analysis for register allocation. Also, because we now have two kinds
+of values, we need to handle programs that apply an operation to the
+wrong kind of value, such as \code{(not 1)}.
 
 There are two language design options for such situations.  One option
 is to signal an error and the other is to provide a wider
@@ -3510,16 +3510,15 @@ we shall perform type checking during compilation. In
 Chapter~\ref{ch:type-dynamic} we study the alternative choice, that
 is, how to compile a dynamically typed language like Racket.  The
 $R_2$ language is a subset of Typed Racket but by no means includes
-all of Typed Racket. Furthermore, for many of the operations we shall
-take a narrower interpretation than Typed Racket, for example,
-rejecting \code{(not 1)}.
+all of Typed Racket. For many operations we take a narrower
+interpretation than Typed Racket, for example, rejecting \code{(not 1)}.
 
 This chapter is organized as follows.  We begin by defining the syntax
 and interpreter for the $R_2$ language (Section~\ref{sec:r2-lang}). We
 then introduce the idea of type checking and build a type checker for
 $R_2$ (Section~\ref{sec:type-check-r2}). To compile $R_2$ we need to
 enlarge the intermediate language $C_0$ into $C_1$, which we do in
-Section~\ref{sec:c1}. The remaining sections of this Chapter discuss
+Section~\ref{sec:c1}. The remaining sections of this chapter discuss
 how our compiler passes need to change to accommodate Booleans and
 conditional control flow.
 
@@ -3568,14 +3567,12 @@ comparing integers.
 \begin{array}{lcl}
   \itm{bool} &::=& \key{\#t} \mid \key{\#f} \\
   \itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
-\Exp &::=& \gray{\INT{\Int} \mid \READ{} \mid \NEG{\Exp}} \\
-     &\mid& \gray{\ADD{\Exp}{\Exp}}
-      \mid \BINOP{\code{'-}}{\Exp}{\Exp} \\
-     &\mid& \gray{\VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp}} \\
-     &\mid& \BOOL{\itm{bool}} 
-      \mid \AND{\Exp}{\Exp}\\
-     &\mid& \OR{\Exp}{\Exp}
-      \mid \NOT{\Exp} \\
+  \Exp &::=& \gray{ \INT{\Int} \mid \READ{} } \\
+    &\mid& \gray{ \NEG{\Exp} \mid \ADD{\Exp}{\Exp} }\\
+     &\mid& \BINOP{\code{'-}}{\Exp}{\Exp} \\
+     &\mid& \gray{ \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp} } \\
+     &\mid& \BOOL{\itm{bool}}  \mid \AND{\Exp}{\Exp}\\
+     &\mid& \OR{\Exp}{\Exp} \mid \NOT{\Exp} \\
       &\mid& \BINOP{\code{'}\itm{cmp}}{\Exp}{\Exp} \mid \IF{\Exp}{\Exp}{\Exp} \\
   R_2 &::=& \PROGRAM{\key{'()}}{\Exp}
 \end{array}
@@ -3599,11 +3596,12 @@ the expression $(\key{and}\,e_1\,e_2)$, the expression $e_2$ is not
 evaluated if $e_1$ evaluates to \code{\#f}.
 
 With the addition of the comparison operations, there are quite a few
-primitive operations and the interpreter code for them is somewhat
-repetitive. In Figure~\ref{fig:interp-R2} we factor out the different
-parts into the \code{interp-op} function and the similar parts into
-the one match clause shown in Figure~\ref{fig:interp-R2}. We do not
-use \code{interp-op} for the \code{and} operation because of the
+primitive operations and the interpreter code for them could become
+repetitive without some care. In Figure~\ref{fig:interp-R2} we factor
+out the different parts of the code for primitve operations into the
+\code{interp-op} function and the similar parts into the match clause
+for \code{Prim} shown in Figure~\ref{fig:interp-R2}. We do not use
+\code{interp-op} for the \code{and} operation because of the
 short-circuiting behavior in the order of evaluation of its arguments.
 
 
@@ -3662,10 +3660,9 @@ short-circuiting behavior in the order of evaluation of its arguments.
 \label{sec:type-check-r2}
 
 It is helpful to think about type checking in two complementary
-ways. A type checker predicts the \emph{type} of value that will be
-produced by each expression in the program.  For $R_2$, we have just
-two types, \key{Integer} and \key{Boolean}. So a type checker should
-predict that
+ways. A type checker predicts the type of value that will be produced
+by each expression in the program.  For $R_2$, we have just two types,
+\key{Integer} and \key{Boolean}. So a type checker should predict that
 \begin{lstlisting}
    (+ 10 (- (+ 12 20)))
 \end{lstlisting}
@@ -3675,12 +3672,13 @@ produces an \key{Integer} while
 \end{lstlisting}
 produces a \key{Boolean}.
 
-As mentioned at the beginning of this chapter, a type checker also
-rejects programs that apply operators to the wrong type of value. Our
-type checker for $R_2$ will signal an error for the below expression
-because, as we have seen above, the expression \code{(+ 10 ...)} has
-type \key{Integer}, and we require the argument of a \code{not} to
-have type \key{Boolean}.
+Another way to think about type checking is that it enforces a set of
+rules about which operators can be applied to which kinds of
+values. For example, our type checker for $R_2$ will signal an error
+for the below expression because, as we have seen above, the
+expression \code{(+ 10 ...)} has type \key{Integer} but the type
+checker enforces the rule that the argument of \code{not} must be a
+\key{Boolean}.
 \begin{lstlisting}
    (not (+ 10 (- (+ 12 20))))
 \end{lstlisting}
@@ -3688,21 +3686,20 @@ have type \key{Boolean}.
 The type checker for $R_2$ is best implemented as a structurally
 recursive function over the AST. Figure~\ref{fig:type-check-R2} shows
 many of the clauses for the \code{type-check-exp} function.  Given an
-input expression \code{e}, the type checker either returns the type
+input expression \code{e}, the type checker either returns a type
 (\key{Integer} or \key{Boolean}) or it signals an error.  Of course,
 the type of an integer literal is \code{Integer} and the type of a
 Boolean literal is \code{Boolean}.  To handle variables, the type
-checker, like the interpreter, uses an association list. However, in
-this case the association list maps variables to types instead of
-values. Consider the clause for \key{let}.  We type check the
+checker, like the interpreter, uses an environment that maps variables
+to types. Consider the clause for \key{let}.  We type check the
 initializing expression to obtain its type \key{T} and then associate
 type \code{T} with the variable \code{x}. When the type checker
 encounters the use of a variable, it can find its type in the
-association list.
+environment.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(definepublic (type-check-exp env)
+(define (type-check-exp env)
   (lambda (e)
     (match e
       [(Var x) (dict-ref env x)]
@@ -3908,11 +3905,12 @@ and \key{goto}'s.
 \itm{cmp} &::= & \key{eq?} \mid \key{<}  \\
 \Exp &::= & \gray{\Atm \mid \READ{} \mid \NEG{\Atm} }\\
      &\mid& \gray{ \ADD{\Atm}{\Atm} } 
-     \mid \UNIOP{\key{not}}{\Atm} \\
-     &\mid& \BINOP{\itm{cmp}}{\Atm}{\Atm} \\
-\Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} } \\
+     \mid \UNIOP{\key{'not}}{\Atm} \\
+     &\mid& \BINOP{'\itm{cmp}}{\Atm}{\Atm} \\
+\Stmt &::=& \gray{ \ASSIGN{\VAR{\Var}}{\Exp} } \\
 \Tail &::= & \gray{\RETURN{\Exp} \mid \SEQ{\Stmt}{\Tail} } \\
-      &\mid& \GOTO{\itm{label}} \mid \IFSTMT{\key{(}\itm{cmp}\,\Atm\,\Atm\key{)}}{\GOTO{\itm{label}}}{\GOTO{\itm{label}}} \\
+    &\mid& \GOTO{\itm{label}} \\
+    &\mid& \IFSTMT{\BINOP{\itm{cmp}}{\Atm}{\Atm}}{\GOTO{\itm{label}}}{\GOTO{\itm{label}}} \\
 C_1 & ::= & \gray{\PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label}\,\key{.}\,\Tail\key{)}^{+}}}}
 \end{array}
 \]
@@ -5353,29 +5351,30 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
 
 \begin{figure}[tp]
 \fbox{
-\begin{minipage}{0.96\textwidth}
+  \begin{minipage}{0.96\textwidth}
+    \small
 \[
 \begin{array}{lcl}
-\Arg &::=& \gray{ \Int \mid \Var \mid \key{\#t} \mid \key{\#f} }\\
+\Atm &::=& \gray{ \INT{\Int} \mid \VAR{\Var} \mid \BOOL{\itm{bool}} }\\
 \itm{cmp} &::= & \gray{  \key{eq?} \mid \key{<} } \\
-\Exp &::= & \gray{ \Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)
-      \mid (\key{not}\;\Arg) \mid (\itm{cmp}\;\Arg\;\Arg)  } \\
-   &\mid& (\key{allocate} \,\itm{int}\,\itm{type})
-   \mid (\key{vector-ref}\, \Arg\, \Int)  \\
-   &\mid& (\key{vector-set!}\,\Arg\,\Int\,\Arg)
-    \mid (\key{global-value} \,\itm{name}) \mid (\key{void}) \\
-\Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Exp} } 
-       \mid (\key{collect} \,\itm{int}) \\
-\Tail &::= & \gray{\RETURN{\Exp} \mid (\key{seq}\;\Stmt\;\Tail)} \\
-      &\mid& \gray{(\key{goto}\,\itm{label})
-       \mid \IF{(\itm{cmp}\, \Arg\,\Arg)}{(\key{goto}\,\itm{label})}{(\key{goto}\,\itm{label})}} \\
-C_2 & ::= & (\key{program}\;\itm{info}\; ((\itm{label}\,\key{.}\,\Tail)^{+}))
+\Exp &::= & \gray{ \Atm \mid \READ{} \mid \NEG{\Atm} \mid \ADD{\Atm}{\Atm} }\\
+   &\mid& \gray{ \UNIOP{\key{not}}{\Atm} \mid \BINOP{\itm{cmp}}{\Atm}{\Atm}  } \\
+   &\mid& (\key{Allocate} \,\itm{int}\,\itm{type})
+   \mid \BINOP{\key{'vector-ref}}{\Atm}{\Int}  \\
+   &\mid& (\key{Prim}~\key{'vector-set!}\,(\key{list}\,\Atm\,\Int\,\Atm))\\
+   &\mid& (\key{GlobalValue} \,\itm{name}) \mid (\key{Void}) \\
+\Stmt &::=& \gray{ \ASSIGN{\VAR{\Var}}{\Exp} \mid \RETURN{\Exp} } 
+       \mid (\key{Collect} \,\itm{int}) \\
+\Tail &::= & \gray{ \RETURN{\Exp} \mid \SEQ{\Stmt}{\Tail} }\\
+      &\mid& \gray{ \GOTO{\itm{label}} }\\
+      &\mid& \gray{ \IFSTMT{\BINOP{\itm{cmp}}{\Atm}{\Atm}}{\GOTO{\itm{label}}}{\GOTO{\itm{label}}}  }\\
+C_2 & ::= & \PROGRAM{\itm{info}}{\CFG{(\itm{label}\,\key{.}\,\Tail)^{+}}}
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The $C_2$ language, extending $C_1$
-  (Figure~\ref{fig:c1-syntax}) with vectors.}
+\caption{The abstract syntax of the $C_2$ language.
+   TODO: UPDATE}
 \label{fig:c2-syntax}
 \end{figure}
 
