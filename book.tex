@@ -4240,23 +4240,23 @@ approach of encoding them as integers, with true as 1 and false as 0.
 For $\Stmt$, we discuss a couple cases.  The \code{not} operation can
 be implemented in terms of \code{xorq} as we discussed at the
 beginning of this section. Given an assignment
-$\itm{lhs}$ \key{=} \key{(not} $\Arg$\key{);},
-if the left-hand side $\itm{lhs}$ is
+$\itm{var}$ \key{=} \key{(not} $\Arg$\key{);},
+if the left-hand side $\itm{var}$ is
 the same as $\Arg$, then just the \code{xorq} suffices.
 \[
-x~\key{=}~ \key{(not}\; x\key{);}
+\Var~\key{=}~ \key{(not}\; \Var\key{);}
 \quad\Rightarrow\quad
-\key{xorq}~\key{\$}1\key{,}~x
+\key{xorq}~\key{\$}1\key{,}~\Var
 \]
 Otherwise, a \key{movq} is needed to adapt to the update-in-place
 semantics of x86. Let $\Arg'$ be the result of recursively processing
 $\Arg$. Then we have
 \[
-\itm{lhs}~\key{=}~ \key{(not}\; \Arg\key{);}
+\Var~\key{=}~ \key{(not}\; \Arg\key{);}
 \quad\Rightarrow\quad
 \begin{array}{l}
-\key{movq}~\Arg'\key{,}~\itm{lhs}\\
-\key{xorq}~\key{\$}1\key{,}~\itm{lhs}
+\key{movq}~\Arg'\key{,}~\Var\\
+\key{xorq}~\key{\$}1\key{,}~\Var
 \end{array}
 \]
 
@@ -4268,7 +4268,7 @@ sequence of three instructions. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-|$\itm{lhs}$| = (eq? |$\Arg_1$| |$\Arg_2$|);
+|$\Var$| = (eq? |$\Arg_1$| |$\Arg_2$|);
 \end{lstlisting}
 \end{minipage}
 &
@@ -4278,14 +4278,14 @@ $\Rightarrow$
 \begin{lstlisting}
 cmpq |$\Arg'_2$|, |$\Arg'_1$|
 sete %al
-movzbq %al, |$\itm{lhs}'$|
+movzbq %al, |$\Var$|
 \end{lstlisting}
 \end{minipage}
 \end{tabular}  \\
 
-Regarding the $\Tail$ non-terminal, we have two new cases, for
-\key{goto} and conditional \key{goto}. Both are straightforward
-to handle. A \key{goto} becomes a jump instruction.
+Regarding the $\Tail$ non-terminal, we have two new cases: \key{goto}
+and conditional \key{goto}. Both are straightforward to handle. A
+\key{goto} becomes a jump instruction.
 \[
 \key{goto}\; \ell\key{;} \quad \Rightarrow \quad \key{jmp}\;\ell
 \]
@@ -4335,34 +4335,39 @@ algorithm itself does not change.
 Recall that for $R_1$ we implemented liveness analysis for a single
 basic block (Section~\ref{sec:liveness-analysis-r1}). With the
 addition of \key{if} expressions to $R_2$, \code{explicate-control}
-now produces many basic blocks arranged in a control-flow graph. The
-first question we need to consider is: what order should we process
-the basic blocks? Recall that to perform liveness analysis, we need to
+produces many basic blocks arranged in a control-flow graph. The first
+question we need to consider is: what order should we process the
+basic blocks? Recall that to perform liveness analysis, we need to
 know the live-after set. If a basic block has no successor blocks
 (i.e. no out-edges in the control flow graph), then it has an empty
 live-after set and we can immediately apply liveness analysis to
 it. If a basic block has some successors, then we need to complete
 liveness analysis on those blocks first.  Furthermore, we know that
-the control flow graph does not contain any cycles (it is a DAG, that
-is, a directed acyclic graph)\footnote{If we were to add loops to the
-  language, then the CFG could contain cycles and we would instead
-  need to use the classic worklist algorithm for computing the fixed
-  point of the liveness analysis~\citep{Aho:1986qf}.}.  Returning to
-the question of what order should we process the basic blocks: the
-answer is reverse topological order. We recommend using the
-\code{tsort} (topological sort) and \code{transpose} functions of the
-Racket \code{graph} package to obtain this ordering.
+the control flow graph does not contain any cycles because $R_2$ does
+not include loops
+%
+\footnote{If we were to add loops to the language, then the CFG could
+  contain cycles and we would instead need to use the classic worklist
+  algorithm for computing the fixed point of the liveness
+  analysis~\citep{Aho:1986qf}.}.
+%
+Returning to the question of what order should we process the basic
+blocks, the answer is reverse topological order. We recommend using
+the \code{tsort} (topological sort) and \code{transpose} functions of
+the Racket \code{graph} package to obtain this ordering.
 
 The next question is how to compute the live-after set of a block
-given the live-before sets of all its successor blocks.  During
-compilation we do not know which way the branch will go, so we do not
-know which of the successor's live-before set to use.  The solution
-comes from the observation that there is no harm to the correctness of
-the compiler if we classify more variables as live than the ones that
-are truly live during program execution. Thus, we can take the union
-of the live-before sets from all the successors to be the live-after
-set for the block. Once we have computed the live-after set, we can
-proceed to perform liveness analysis on the block just as we did in
+given the live-before sets of all its successor blocks.  (There can be
+more than one because of conditional jumps.)  During compilation we do
+not know which way a conditional jump will go, so we do not know which
+of the successor's live-before set to use.  The solution to this
+challenge is based on the observation that there is no harm to the
+correctness of the compiler if we classify more variables as live than
+the ones that are truly live during a particular execution of the
+block. Thus, we can take the union of the live-before sets from all
+the successors to be the live-after set for the block. Once we have
+computed the live-after set, we can proceed to perform liveness
+analysis on the block just as we did in
 Section~\ref{sec:liveness-analysis-r1}.
 
 The helper functions for computing the variables in an instruction's
@@ -4376,9 +4381,14 @@ arguments and instructions in x86$_1$.
 Many of the new instructions in x86$_1$ can be handled in the same way
 as the instructions in x86$_0$. Thus, if your code was already quite
 general, it will not need to be changed to handle the new
-instructions. If not, I recommend that you change your code to be more
-general. The \key{movzbq} instruction should be handled like the
-\key{movq} instruction.
+instructions. If you code is not general enough, I recommend that you
+change your code to be more general. For example, you can factor out
+the computing of the the read and write sets for each kind of
+instruction into two auxiliary functions.
+
+Note that the \key{movzbq} instruction requires some special care,
+just like the \key{movq} instruction. See rule number 3 in
+Section~\ref{sec:build-interference}.
 
 %% \subsection{Assign Homes}
 %% \label{sec:assign-homes-r2}
