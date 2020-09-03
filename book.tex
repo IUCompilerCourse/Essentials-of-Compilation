@@ -2058,7 +2058,7 @@ as in the above example.
 
 In the \code{select-instructions} pass we begin the work of
 translating from $C_0$ to $\text{x86}^{*}_0$. The target language of
-this pass is a variable of x86 that still uses variables, so we add an
+this pass is a variant of x86 that still uses variables, so we add an
 AST node of the form $\VAR{\itm{var}}$ to the $\text{x86}_0$ abstract
 syntax of Figure~\ref{fig:x86-ast-a}.  We recommend implementing the
 \code{select-instructions} in terms of three auxiliary functions, one
@@ -3531,10 +3531,14 @@ Figure~\ref{fig:r2-concrete-syntax} and the abstract syntax is defined
 in Figure~\ref{fig:r2-syntax}. The $R_2$ language includes all of
 $R_1$ (shown in gray), the Boolean literals \code{\#t} and \code{\#f},
 and the conditional \code{if} expression. Also, we expand the
-operators to include subtraction, \key{and}, \key{or} and \key{not},
-the \key{eq?}  operations for comparing two integers or two Booleans,
-and the \key{<}, \key{<=}, \key{>}, and \key{>=} operations for
-comparing integers.
+operators to include
+\begin{enumerate}
+\item subtraction on integers,
+\item the logical operators \key{and}, \key{or} and \key{not},
+\item the \key{eq?} operation for comparing two integers or two Booleans, and
+\item the \key{<}, \key{<=}, \key{>}, and \key{>=} operations for
+  comparing integers.
+\end{enumerate}
 
 \begin{figure}[tp]
 \centering
@@ -3542,10 +3546,11 @@ comparing integers.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
+  \itm{bool} &::=& \key{\#t} \mid \key{\#f} \\  
   \itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
   \Exp &::=& \gray{ \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp) }  \mid (\key{-}\;\Exp\;\Exp) \\
      &\mid&  \gray{ \Var \mid (\key{let}~([\Var~\Exp])~\Exp) } \\
-     &\mid& \key{\#t} \mid \key{\#f} 
+     &\mid& \itm{bool}
       \mid (\key{and}\;\Exp\;\Exp) \mid (\key{or}\;\Exp\;\Exp)
       \mid (\key{not}\;\Exp) \\
       &\mid& (\itm{cmp}\;\Exp\;\Exp) \mid (\key{if}~\Exp~\Exp~\Exp) \\
@@ -3586,23 +3591,25 @@ comparing integers.
 Figure~\ref{fig:interp-R2} defines the interpreter for $R_2$, omitting
 the parts that are the same as the interpreter for $R_1$
 (Figure~\ref{fig:interp-R1}). The literals \code{\#t} and \code{\#f}
-simply evaluate to themselves. The conditional expression $(\key{if}\,
-\itm{cnd}\,\itm{thn}\,\itm{els})$ evaluates the Boolean expression
-\itm{cnd} and then either evaluates \itm{thn} or \itm{els} depending
-on whether \itm{cnd} produced \code{\#t} or \code{\#f}. The logical
-operations \code{not} and \code{and} behave as you might expect, but
-note that the \code{and} operation is short-circuiting. That is, given
-the expression $(\key{and}\,e_1\,e_2)$, the expression $e_2$ is not
-evaluated if $e_1$ evaluates to \code{\#f}.
+evaluate to the corresponding Boolean values. The conditional
+expression $(\key{if}\, \itm{cnd}\,\itm{thn}\,\itm{els})$ evaluates
+the Boolean expression \itm{cnd} and then either evaluates \itm{thn}
+or \itm{els} depending on whether \itm{cnd} produced \code{\#t} or
+\code{\#f}. The logical operations \code{not} and \code{and} behave as
+you might expect, but note that the \code{and} operation is
+short-circuiting. That is, given the expression
+$(\key{and}\,e_1\,e_2)$, the expression $e_2$ is not evaluated if
+$e_1$ evaluates to \code{\#f}.
 
 With the addition of the comparison operations, there are quite a few
 primitive operations and the interpreter code for them could become
 repetitive without some care. In Figure~\ref{fig:interp-R2} we factor
-out the different parts of the code for primitve operations into the
-\code{interp-op} function and the similar parts into the match clause
-for \code{Prim} shown in Figure~\ref{fig:interp-R2}. We do not use
-\code{interp-op} for the \code{and} operation because of the
-short-circuiting behavior in the order of evaluation of its arguments.
+out the different parts of the code for primitive operations into the
+\code{interp-op} function and the similar parts of the code into the
+match clause for \code{Prim} shown in Figure~\ref{fig:interp-R2}. We
+do not use \code{interp-op} for the \code{and} operation because of
+the short-circuiting behavior in the order of evaluation of its
+arguments.
 
 
 \begin{figure}[tbp]
@@ -3683,18 +3690,18 @@ checker enforces the rule that the argument of \code{not} must be a
    (not (+ 10 (- (+ 12 20))))
 \end{lstlisting}
 
-The type checker for $R_2$ is best implemented as a structurally
-recursive function over the AST. Figure~\ref{fig:type-check-R2} shows
-many of the clauses for the \code{type-check-exp} function.  Given an
-input expression \code{e}, the type checker either returns a type
-(\key{Integer} or \key{Boolean}) or it signals an error.  Of course,
-the type of an integer literal is \code{Integer} and the type of a
-Boolean literal is \code{Boolean}.  To handle variables, the type
-checker, like the interpreter, uses an environment that maps variables
-to types. Consider the clause for \key{let}.  We type check the
-initializing expression to obtain its type \key{T} and then associate
-type \code{T} with the variable \code{x}. When the type checker
-encounters the use of a variable, it can find its type in the
+The type checker for $R_2$ is a structurally recursive function over
+the AST. Figure~\ref{fig:type-check-R2} shows many of the clauses for
+the \code{type-check-exp} function.  Given an input expression
+\code{e}, the type checker either returns a type (\key{Integer} or
+\key{Boolean}) or it signals an error.  The type of an integer literal
+is \code{Integer} and the type of a Boolean literal is \code{Boolean}.
+To handle variables, the type checker uses an environment that maps
+variables to types. Consider the clause for \key{let}.  We type check
+the initializing expression to obtain its type \key{T} and then
+associate type \code{T} with the variable \code{x} in the
+environment. When the type checker encounters a use of variable
+\code{x} in the body of the \key{let}, it can find its type in the
 environment.
 
 \begin{figure}[tbp]
@@ -3730,8 +3737,8 @@ environment.
 \begin{exercise}\normalfont
 Complete the implementation of \code{type-check-R2} and test it on 10
 new example programs in $R_2$ that you choose based on how thoroughly
-they test the type checking algorithm. Half of the example programs
-should have a type error, to make sure that your type checker properly
+they test the type checking function. Half of the example programs
+should have a type error to make sure that your type checker properly
 rejects them. The other half of the example programs should not have
 type errors. Your testing should check that the result of the type
 checker agrees with the value returned by the interpreter, that is, if
@@ -3751,14 +3758,17 @@ The $R_2$ language includes several operators that are easily
 expressible in terms of other operators. For example, subtraction is
 expressible in terms of addition and negation.
 \[
- \key{(-}\; e_1 \; e_2\key{)} \quad \Rightarrow \quad (\key{+} \; e_1 \; (\key{-} \; e_2))
+ \key{(-}\; e_1 \; e_2\key{)} \quad \Rightarrow \quad \LP\key{+} \; e_1 \; \LP\key{-} \; e_2\RP\RP
 \]
 Several of the comparison operations are expressible in terms of
 less-than and logical negation.
 \[
-(\key{<=}\; e_1 \; e_2) \quad \Rightarrow \quad
-\LET{t_1}{e_1}{(\key{not}\;(\key{<}\;e_2\;t_1))}
+\LP\key{<=}\; e_1 \; e_2\RP \quad \Rightarrow \quad
+\LP\key{let}~\LP\LS\key{tmp.1}~e_1\RS\RP~\LP\key{not}\;\LP\key{<}\;e_2\;\key{tmp.1})\RP\RP
 \]
+The \key{let} is needed in the above translation to ensure that
+expression $e_1$ is evaluated before $e_2$.
+
 By performing these translations near the front-end of the compiler,
 the later passes of the compiler do not need to deal with these
 constructs, making those passes shorter. On the other hand, sometimes
