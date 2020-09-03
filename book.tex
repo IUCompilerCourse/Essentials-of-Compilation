@@ -2127,18 +2127,18 @@ followed by a move from \code{rax} to the left-hand side.  The move
 from \code{rax} is needed because the return value from
 \code{read\_int} goes into \code{rax}, as is the case in general.  \\
 \begin{tabular}{lll}
-\begin{minipage}{0.4\textwidth}
+\begin{minipage}{0.3\textwidth}
 \begin{lstlisting}
-|$\itm{lhs}$| = (read);
+|$\itm{var}$| = (read);
 \end{lstlisting}
 \end{minipage}
 &
 $\Rightarrow$
 &
-\begin{minipage}{0.4\textwidth}
+\begin{minipage}{0.3\textwidth}
 \begin{lstlisting}
 callq read_int
-movq %rax, |$\itm{lhs}$|
+movq %rax, |$\itm{var}$|
 \end{lstlisting}
 \end{minipage}
 \end{tabular} \\
@@ -3800,9 +3800,9 @@ One small challenge is that x86 does not provide an instruction that
 directly implements logical negation (\code{not} in $R_2$ and $C_1$).
 However, the \code{xorq} instruction can be used to encode \code{not}.
 The \key{xorq} instruction takes two arguments, performs a pairwise
-exclusive-or operation on each bit of its arguments, and writes the
-results into its second argument.  Recall the truth table for
-exclusive-or:
+exclusive-or ($\mathrm{XOR}$) operation on each bit of its arguments,
+and writes the results into its second argument.  Recall the truth
+table for exclusive-or:
 \begin{center}
 \begin{tabular}{l|cc}
    & 0 & 1 \\ \hline
@@ -3810,14 +3810,19 @@ exclusive-or:
 1  & 1 & 0
 \end{tabular}
 \end{center}
-For example, $0011 \mathrel{\mathrm{XOR}} 0101 = 0110$.  Notice that
-in the row of the table for the bit $1$, the result is the opposite of the
-second bit.  Thus, the \code{not} operation can be implemented by
-\code{xorq} with $1$ as the first argument:
-\begin{align*}
-  0001 \mathrel{\mathrm{XOR}} 0000 &= 0001\\
-  0001 \mathrel{\mathrm{XOR}} 0001 &= 0000
-\end{align*}
+For example, applying $\mathrm{XOR}$ to each bit of the binary numbers
+$0011$ and $0101$ yields $0110$. Notice that in the row of the table
+for the bit $1$, the result is the opposite of the second bit.  Thus,
+the \code{not} operation can be implemented by \code{xorq} with $1$ as
+the first argument:
+\[
+\Var~ \key{=}~ \LP\key{not}~\Arg\RP\key{;}
+\qquad\Rightarrow\qquad
+\begin{array}{l}
+\key{movq}~ \Arg\key{,} \Var\\
+\key{xorq}~ \key{\$1,} \Var
+\end{array}
+\]
 
 \begin{figure}[tp]
 \fbox{
@@ -3828,12 +3833,12 @@ second bit.  Thus, the \code{not} operation can be implemented by
 \Arg &::=&  \gray{\IMM{\Int} \mid \REG{\code{'}\Reg} \mid \DEREF{\Reg}{\Int}} 
      \mid \BYTEREG{\code{'}\Reg} \\
 \itm{cc} & ::= & \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge} \\
-\Instr &::=& \gray{\BININSTR{\code{'addq}}{\Arg}{\Arg}} 
-       \mid \gray{\BININSTR{\code{'subq}}{\Arg}{\Arg}} \\
-       &\mid& \gray{\BININSTR{\code{'movq}}{\Arg}{\Arg}} 
-       \mid \gray{\UNIINSTR{\code{'negq}}{\Arg}} \\
-       &\mid& \gray{\CALLQ{\itm{label}} \mid \RETQ{}} 
-       \mid \gray{\PUSHQ{\Arg} \mid \POPQ{\Arg}} \\
+\Instr &::=& \gray{ \BININSTR{\code{'addq}}{\Arg}{\Arg} 
+       \mid \BININSTR{\code{'subq}}{\Arg}{\Arg} } \\
+       &\mid& \gray{ \BININSTR{\code{'movq}}{\Arg}{\Arg} 
+       \mid \UNIINSTR{\code{'negq}}{\Arg} } \\
+       &\mid& \gray{ \CALLQ{\itm{label}} \mid \RETQ{} 
+       \mid \PUSHQ{\Arg} \mid \POPQ{\Arg} } \\
        &\mid& \BININSTR{\code{'xorq}}{\Arg}{\Arg}
        \mid \BININSTR{\code{'cmpq}}{\Arg}{\Arg}\\
        &\mid& \BININSTR{\code{'set}}{\code{'}\itm{cc}}{\Arg} 
@@ -3871,39 +3876,64 @@ which is part of the \code{rax} register.  Thankfully, the
 \key{movzbq} instruction can then be used to move from a single byte
 register to a normal 64-bit register.
 
-For compiling the \key{if} expression, the x86 instructions for
-jumping are relevant. The \key{Jmp} instruction updates the program
+The x86 instructions for jumping are relevant to the compilation of
+\key{if} expressions. The \key{Jmp} instruction updates the program
 counter to point to the instruction after the indicated label.  The
 \key{JmpIf} instruction updates the program counter to point to the
 instruction after the indicated label depending on whether the result
 in the EFLAGS register matches the condition code \itm{cc}, otherwise
-the \key{JmpIf} instruction falls through to the next
-instruction. Because the \key{JmpIf} instruction relies on the EFLAGS
-register, it is quite common for the \key{JmpIf} to be immediately
-preceded by a \key{cmpq} instruction, to set the EFLAGS register.
-Our abstract syntax for \key{JmpIf} differs from the concrete syntax
-for x86 to separate the instruction name from the condition code. For
-example, \code{(JmpIf le foo)} corresponds to \code{jle foo}.
+the \key{JmpIf} instruction falls through to the next instruction
+\footnote{The abstract syntax for \key{JmpIf} differs from the
+  concrete syntax for x86 in that it separates the instruction name
+  from the condition code. For example, \code{(JmpIf le foo)}
+  corresponds to \code{jle foo}.}.  Because the \key{JmpIf}
+instruction relies on the EFLAGS register, it is common for the
+\key{JmpIf} to be immediately preceded by a \key{cmpq} instruction to
+set the EFLAGS register.
 
 
 \section{The $C_1$ Intermediate Language}
 \label{sec:c1}
 
-As with $R_1$, we shall compile $R_2$ to a C-like intermediate
-language, but we need to grow that intermediate language to handle the
-new features in $R_2$: Booleans and conditional expressions.
-Figure~\ref{fig:c1-syntax} shows the new features of $C_1$; we add
-logic and comparison operators to the $\Exp$ non-terminal, the
-literals \key{\#t} and \key{\#f} to the $\Arg$ non-terminal.
-Regarding control flow, $C_1$ differs considerably from $R_2$.
-Instead of \key{if} expressions, $C_1$ has goto's and conditional
-goto's in the grammar for $\Tail$. This means that a sequence of
-statements may now end with a \code{goto} or a conditional
-\code{goto}, which jumps to one of two labeled pieces of code
+As with $R_1$, we compile $R_2$ to a C-like intermediate language, but
+we need to grow that intermediate language to handle the new features
+in $R_2$: Booleans and conditional expressions.
+Figure~\ref{fig:c1-concrete-syntax} defines the concrete syntax of
+$C_1$ and Figure~\ref{fig:c1-syntax} defines the abstract syntax.  In
+particular, we add logical and comparison operators to the $\Exp$
+non-terminal and the literals \key{\#t} and \key{\#f} to the $\Arg$
+non-terminal.  Regarding control flow, $C_1$ differs considerably from
+$R_2$.  Instead of \key{if} expressions, $C_1$ has \key{goto} and
+conditional \key{goto} in the grammar for $\Tail$. This means that a
+sequence of statements may now end with a \code{goto} or a conditional
+\code{goto}. The conditional \code{goto} jumps to one of two labels
 depending on the outcome of the comparison. In
 Section~\ref{sec:explicate-control-r2} we discuss how to translate
 from $R_2$ to $C_1$, bridging this gap between \key{if} expressions
 and \key{goto}'s.
+
+\begin{figure}[tbp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\small    
+\[
+\begin{array}{lcl}
+\Atm &::=& \gray{ \Int \mid \Var } \mid \itm{bool} \\
+\itm{cmp} &::= & \key{eq?} \mid \key{<}  \\
+\Exp &::=& \gray{ \Atm \mid \key{(read)} \mid \key{(-}~\Atm\key{)} \mid \key{(+}~\Atm~\Atm\key{)} } \\
+   &::=& \LP \key{not}~\Atm \RP \mid \LP \itm{cmp}~\Atm~\Atm\RP \\
+\Stmt &::=& \gray{ \Var~\key{=}~\Exp\key{;} } \\
+\Tail &::= & \gray{ \key{return}~\Exp\key{;} \mid \Stmt~\Tail } \\
+   &\mid& \key{goto}~\itm{label}\key{;}\\
+   &\mid& \key{if}~\LP \itm{cmp}~\Atm~\Atm \RP~ \key{goto}~\itm{label}\key{;} ~\key{else}~\key{goto}~\itm{label}\key{;} \\
+C_1 & ::= & \gray{ (\itm{label}\key{:}~ \Tail)^{+} }
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The concrete syntax of the $C_1$ intermediate language.}
+\label{fig:c1-concrete-syntax}
+\end{figure}
 
 \begin{figure}[tp]
 \fbox{
@@ -3913,10 +3943,10 @@ and \key{goto}'s.
 \begin{array}{lcl}
 \Atm &::=& \gray{\INT{\Int} \mid \VAR{\Var}} \mid \BOOL{\itm{bool}} \\
 \itm{cmp} &::= & \key{eq?} \mid \key{<}  \\
-\Exp &::= & \gray{\Atm \mid \READ{} \mid \NEG{\Atm} }\\
-     &\mid& \gray{ \ADD{\Atm}{\Atm} } 
-     \mid \UNIOP{\key{'not}}{\Atm} \\
-     &\mid& \BINOP{'\itm{cmp}}{\Atm}{\Atm} \\
+\Exp &::= & \gray{ \Atm \mid \READ{} }\\
+     &\mid& \gray{ \NEG{\Atm} \mid \ADD{\Atm}{\Atm} } \\
+     &\mid& \UNIOP{\key{'not}}{\Atm} 
+     \mid \BINOP{\key{'}\itm{cmp}}{\Atm}{\Atm} \\
 \Stmt &::=& \gray{ \ASSIGN{\VAR{\Var}}{\Exp} } \\
 \Tail &::= & \gray{\RETURN{\Exp} \mid \SEQ{\Stmt}{\Tail} } \\
     &\mid& \GOTO{\itm{label}} \\
@@ -3936,7 +3966,7 @@ C_1 & ::= & \gray{\PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label}\,\key{.}\,\Tail\k
 
 Recall that the purpose of \code{explicate-control} is to make the
 order of evaluation explicit in the syntax of the program.  With the
-addition of \key{if} in $R_2$, things get more interesting.
+addition of \key{if} in $R_2$ this get more interesting.
 
 As a motivating example, consider the following program that has an
 \key{if} expression nested in the predicate of another \key{if}.
@@ -4004,8 +4034,8 @@ Following the order of evaluation in the output of
 \code{remove-complex-opera*}, we first have the \code{(read)} and
 comparison to \code{1} from the predicate of the inner \key{if}.  In
 the output of \code{explicate-control}, in the \code{start} block,
-this becomes a \code{(read)} followed by a conditional goto to either
-\code{block61} or \code{block62}. Each of these contains the
+this becomes a \code{(read)} followed by a conditional \key{goto} to
+either \code{block61} or \code{block62}. Each of these contains the
 translations of the code \code{(eq? (read) 0)} and \code{(eq? (read)
   1)}, respectively. Regarding \code{block61}, we start with the
 \code{(read)} and comparison to \code{0} and then have a conditional
@@ -4098,11 +4128,14 @@ new kind of context to deal with: the predicate position of the
 an $R_2$ expression and two pieces of $C_1$ code (two $\Tail$'s) for
 the then-branch and else-branch. The output of \code{explicate-pred}
 is a $C_1$ $\Tail$ and a list of formerly \key{let}-bound variables.
-However, these three functions also need to
-construct the control-flow graph, which we recommend they do via
-updates to a global variable (be careful!). Next we consider the
-specific additions to the tail and assign functions, and some of cases
-for the pred function.
+
+Note that the three explicate functions need to construct a
+control-flow graph, which we recommend they do via updates to a global
+variable.
+
+In the following paragraphs we consider the specific additions to the
+\code{explicate-tail} and \code{explicate-assign} functions, and some
+of cases for the \code{explicate-pred} function.
 
 The \code{explicate-tail} function needs an additional case for
 \key{if}. The branches of the \key{if} inherit the current context, so
@@ -4119,17 +4152,16 @@ $\itm{cnd}$ and the blocks $B_1$ and $B_2$.
 Next we consider the case for \key{if} in the \code{explicate-assign}
 function. The context of the \key{if} is an assignment to some
 variable $x$ and then the control continues to some block $B_1$.  The
-code that we generate for the $\itm{thn}$ and $\itm{els}$ branches
-needs to continue to $B_1$, so we add $B_1$ to the control flow graph
-with a fresh label $\ell_1$.  Again, the branches of the \key{if}
-inherit the current context, so that are in assignment positions.  Let
-$B_2$ be the result of applying \code{explicate-assign} to the
-$\itm{thn}$ branch, variable $x$, and the block \GOTO{$\ell_1$}.  Let
-$B_3$ be the result of applying \code{explicate-assign} to the
-$\itm{else}$ branch, variable $x$, and the block \GOTO{$\ell_1$}. The
-\key{if} translates to the block $B_4$ which is the result of applying
-\code{explicate-pred} to the predicate $\itm{cnd}$ and the blocks
-$B_2$ and $B_3$.
+code that we generate for the ``then'' and ``else'' branches needs to
+continue to $B_1$, so we add $B_1$ to the control flow graph with a
+fresh label $\ell_1$.  Again, the branches of the \key{if} inherit the
+current context, so that are in assignment positions.  Let $B_2$ be
+the result of applying \code{explicate-assign} to the ``then'' branch,
+variable $x$, and the block \GOTO{$\ell_1$}.  Let $B_3$ be the result
+of applying \code{explicate-assign} to the ``else'' branch, variable
+$x$, and the block \GOTO{$\ell_1$}. The \key{if} translates to the
+block $B_4$ which is the result of applying \code{explicate-pred} to
+the predicate $\itm{cnd}$ and the blocks $B_2$ and $B_3$.
 \[
 (\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els}) \quad\Rightarrow\quad B_4
 \]
@@ -4137,22 +4169,21 @@ $B_2$ and $B_3$.
 The function \code{explicate-pred} will need a case for every
 expression that can have type \code{Boolean}. We detail a few cases
 here and leave the rest for the reader. The input to this function is
-an expression and two blocks, $B_1$ and $B_2$, for the branches of the
-enclosing \key{if}. Suppose the expression is the Boolean \code{\#t}.
-Then we can perform a kind of partial evaluation and translate it to the
-``then'' branch $B_1$. Likewise, we translate
+an expression and two blocks, $B_1$ and $B_2$, for the two branches of
+the enclosing \key{if}. Suppose the expression is the Boolean
+\code{\#t}.  Then we can perform a kind of partial evaluation and
+translate it to the ``then'' branch $B_1$. Likewise, we translate
 \code{\#f} to the ``else`` branch $B_2$.
 \[
 \key{\#t} \quad\Rightarrow\quad B_1,
 \qquad\qquad\qquad
 \key{\#f} \quad\Rightarrow\quad B_2
 \]
-Next, suppose the
-expression is a less-than comparison. We translate it to a conditional
-goto. We need labels for the two branches $B_1$ and $B_2$, so we add
-those blocks to the control flow graph and obtain some labels $\ell_1$
-and $\ell_2$. The translation of the less-than comparison is as
-follows.
+Next, suppose the expression is a less-than comparison. We translate
+it to a conditional \code{goto}. We need labels for the two branches
+$B_1$ and $B_2$, so we add those blocks to the control flow graph and
+obtain some labels $\ell_1$ and $\ell_2$. The translation of the
+less-than comparison is as follows.
 \[
 (\key{<}~e_1~e_2) \quad\Rightarrow\quad
 \begin{array}{l}
@@ -4164,18 +4195,17 @@ follows.
 \]
 
 The case for \key{if} in \code{explicate-pred} is particularly
-illuminating, as it deals with the challenges that we discussed above
+illuminating as it deals with the challenges that we discussed above
 regarding the example of the nested \key{if} expressions.  Again, we
-add the two input branches $B_1$ and $B_2$ to the control flow graph
-and obtain the labels $\ell_1$ and $\ell_2$.  The branches $\itm{thn}$
-and $\itm{els}$ of the current \key{if} inherit their context from the
-current one, i.e., predicate context. So we apply
-\code{explicate-pred} to $\itm{thn}$ with the two blocks
-\GOTO{$\ell_1$} and \GOTO{$\ell_2$}, to obtain $B_3$.
-Proceed in a similar way with the $\itm{els}$ branch, to obtain $B_4$.
-Finally, we apply \code{explicate-pred} to
-the predicate $\itm{cnd}$ and the blocks $B_3$ and $B_4$
-to obtain the result $B_5$.
+add the two branches $B_1$ and $B_2$ to the control flow graph and
+obtain the labels $\ell_1$ and $\ell_2$.  The ``then'' and ``else''
+branches of the current \key{if} inherit their context from the
+current one, that is, predicate context. So we apply
+\code{explicate-pred} to the ``then'' branch with the two blocks
+\GOTO{$\ell_1$} and \GOTO{$\ell_2$} to obtain $B_3$.  Proceed in a
+similar way with the ``else'' branch to obtain $B_4$.  Finally, we
+apply \code{explicate-pred} to the predicate of hte \code{if} and the
+blocks $B_3$ and $B_4$ to obtain the result $B_5$.
 \[
 (\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els})
 \quad\Rightarrow\quad
@@ -4523,7 +4553,7 @@ the trivial blocks on the right. Let us focus on \code{block61}.  The
 \code{block55}. The optimized code on the right of
 Figure~\ref{fig:optimize-jumps} bypasses \code{block57}, with the
 \code{then} branch jumping directly to \code{block55}. The story is
-similar for the \code{else} branch, as well as for the two branchs in
+similar for the \code{else} branch, as well as for the two branches in
 \code{block62}. After the jumps in \code{block61} and \code{block62}
 have been optimized in this way, there are no longer any jumps to
 blocks \code{block57} through \code{block60}, so they can be removed.
