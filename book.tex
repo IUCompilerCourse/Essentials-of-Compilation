@@ -48,6 +48,7 @@
 \usepackage{xypic}
 \usepackage{semantic}
 \usepackage{wrapfig}
+\usepackage{tcolorbox}
 \usepackage{multirow}
 \usepackage{color}
 \usepackage{upquote}
@@ -1147,21 +1148,58 @@ $52$ then $10$, the following produces $42$ (not $-42$).
 (let ([x (read)]) (let ([y (read)]) (+ x (- y))))
 \end{lstlisting}
 
+\begin{wrapfigure}[24]{r}[1.0in]{0.6\textwidth}
+  \small
+  \begin{tcolorbox}[title=Association Lists as Dictionaries]
+  An \emph{association list} (alist) is a list of key-value pairs.
+  For example, we can map people to their ages with an alist.
+  \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+  (define ages
+    '((jane . 25) (sam . 24) (kate . 45)))
+  \end{lstlisting}
+  The \emph{dictionary} interface is for mapping keys to values.
+  Every alist implements this interface.  The package
+  \href{https://docs.racket-lang.org/reference/dicts.html}{\code{racket/dict}}
+  provides many functions for working with dictionaries. Here
+  are a few of them:
+  \begin{description}
+  \item[$\LP\key{dict-ref}\,\itm{dict}\,\itm{key}\RP$]
+    returns the value associated with the given $\itm{key}$.
+  \item[$\LP\key{dict-set}\,\itm{dict}\,\itm{key}\,\itm{val}\RP$]
+    returns a new dictionary that maps $\itm{key}$ to $\itm{val}$
+    but otherwise is the same as $\itm{dict}$.
+  \item[$\LP\code{in-dict}\,\itm{dict}\RP$] returns the
+    \href{https://docs.racket-lang.org/reference/sequences.html}{sequence}
+    of keys and values in $\itm{dict}$. For example, the following
+    creates a new alist in which the ages are incremented by one.
+  \end{description}
+  \vspace{-10pt}
+  \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+  (for/list ([(k v) (in-dict ages)])
+    (cons k (add1 v)))
+  \end{lstlisting}
+\end{tcolorbox}
+\end{wrapfigure}
+
 Figure~\ref{fig:interp-R1} shows the definitional interpreter for the
 $R_1$ language. It extends the interpreter for $R_0$ with two new
 \key{match} clauses for variables and for \key{let}.  For \key{let},
 we need a way to communicate the value of a variable to all the uses
 of a variable. To accomplish this, we maintain a mapping from
-variables to values, which is called an \emph{environment}. For
-simplicity, here we use an association list to represent the
-environment. The \code{interp-R1} function takes the current
-environment, \code{env}, as an extra parameter.  When the interpreter
-encounters a variable, it finds the corresponding value using the
-\code{dict-ref} function from the \code{racket/dict} package.  When
-the interpreter encounters a \key{Let}, it evaluates the initializing
-expression, extends the environment with the result value bound to the
-variable (using \code{dict-set}), then evaluates the body of the
-\key{Let}.
+variables to values. Throughout the compiler we often need to map
+variables to information about them. We refer to these mappings as
+\emph{environments}
+\footnote{Another common term for environment in the compiler
+  literature is \emph{symbol table}.}. For simplicity, we use an
+association list (alist) to represent the environment. The sidebar to
+the right gives a brief introduction to alists and the
+\code{racket/dict} package.  The \code{interp-R1} function takes the
+current environment, \code{env}, as an extra parameter.  When the
+interpreter encounters a variable, it finds the corresponding value
+using the \code{dict-ref} function.  When the interpreter encounters a
+\key{Let}, it evaluates the initializing expression, extends the
+environment with the result value bound to the variable, using
+\code{dict-set}, then evaluates the body of the \key{Let}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -1214,7 +1252,6 @@ criteria in the following diagram.
 \]
 In the next section we introduce enough of the x86 assembly
 language to compile $R_1$.
-
 
 \section{The x86 Assembly Language}
 \label{sec:x86}
@@ -1443,7 +1480,7 @@ of x86 (Figure~\ref{fig:x86-a}) is that it does not allow labeled
 instructions to appear anywhere, but instead organizes instructions
 into groups called \emph{blocks} and associates a label with every
 block, which is why the \key{CFG} struct (for control-flow graph)
-includes an association list mapping labels to blocks. The reason for
+includes an alist mapping labels to blocks. The reason for
 this organization becomes apparent in Chapter~\ref{ch:bool-types} when
 we introduce conditional branching.
 
@@ -1676,7 +1713,7 @@ expression in tail position may contain subexpressions, and those may
 or may not be in tail position depending on the kind of expression.)
 
 A $C_0$ program consists of a control-flow graph (represented as an
-association list mapping labels to tails). This is more general than
+alist mapping labels to tails). This is more general than
 necessary for the present chapter, as we do not yet need to introduce
 \key{goto} for jumping to labels, but it saves us from having to
 change the syntax of the program construct in
@@ -1815,12 +1852,11 @@ We recommend implementing \code{uniquify} by creating a function named
 just copies the input program. However, when encountering a \key{let},
 it should generate a unique name for the variable (the Racket function
 \code{gensym} is handy for this) and associate the old name with the
-new unique name in an association list. The \code{uniquify-exp}
-function will need to access this association list when it gets to a
+new unique name in an alist. The \code{uniquify-exp}
+function will need to access this alist when it gets to a
 variable reference, so we add another parameter to \code{uniquify-exp}
-for the association list. It is quite common for a compiler pass to
-need a map to store extra information about variables. Such maps are
-traditionally called \emph{symbol tables}.
+for the alist.
+
 
 The skeleton of the \code{uniquify-exp} function is shown in
 Figure~\ref{fig:uniquify-s0}.  The function is curried so that it is
@@ -1914,7 +1950,7 @@ functions, \code{rco-atom} and \code{rco-exp}. The idea is to apply
 apply \code{rco-exp} to subexpressions that can be atomic or complex.
 Both functions take an $R_1$ expression as input.  The \code{rco-exp}
 function returns an expression.  The \code{rco-atom} function returns
-two things: an atomic expression and association list mapping
+two things: an atomic expression and alist mapping
 temporary variables to complex subexpressions. You can return multiple
 things from a function using Racket's \key{values} form and you can
 receive multiple things from a function call using the
@@ -4022,7 +4058,7 @@ use a standard program representation called a \emph{control flow
 vertex is a labeled sequence of code, called a \emph{basic block}, and
 each edge represents a jump to another block. The \key{Program}
 construct of $C_0$ and $C_1$ contains a control flow graph represented
-as an association list mapping labels to basic blocks. Each block is
+as an alist mapping labels to basic blocks. Each block is
 represented by the $\Tail$ non-terminal.
 
 Figure~\ref{fig:explicate-control-s1-38} shows the output of the
@@ -5446,7 +5482,7 @@ the \code{Program} structure. Also recall that we need to know the
 types of all the local variables for purposes of identifying the root
 set for the garbage collector.  Thus, we create a pass named
 \code{uncover-locals} to collect not just the variables but the
-variables and their types in the form of an association list. Thanks
+variables and their types in the form of an alist. Thanks
 to the \code{HasType} nodes, the types are readily available in the
 AST. Figure~\ref{fig:uncover-locals-r3} lists the output of the
 \code{uncover-locals} pass on the running example.
@@ -5709,7 +5745,7 @@ vector-typed variables and all the callee-saved registers. (They
 already interfere with the caller-saved registers.)  The type
 information for variables is in the \code{program} form, so we
 recommend adding another parameter to the \code{build-interference}
-function to communicate this association list.
+function to communicate this alist.
 
 The spilling of vector-typed variables to the root stack can be
 handled after graph coloring, when choosing how to assign the colors
@@ -7978,11 +8014,12 @@ Boolean \key{bool} is false.
 (define (assert msg bool) ...)
 \end{lstlisting}
 
-The \key{lookup} function takes a key and an association list (a list
-of key-value pairs), and returns the first value that is associated
-with the given key, if there is one. If not, an error is triggered.
-The association list may contain both immutable pairs (built with
-\key{cons}) and mutable pairs (built with \key{mcons}).
+% remove discussion of lookup? -Jeremy
+The \key{lookup} function takes a key and an alist, and returns the
+first value that is associated with the given key, if there is one. If
+not, an error is triggered.  The alist may contain both immutable
+pairs (built with \key{cons}) and mutable pairs (built with
+\key{mcons}).
 
 The \key{map2} function ...
 
