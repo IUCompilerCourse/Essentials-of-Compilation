@@ -55,7 +55,8 @@
 
 \definecolor{lightgray}{gray}{1}
 \newcommand{\black}[1]{{\color{black} #1}}
-\newcommand{\gray}[1]{{\color{lightgray} #1}}
+%\newcommand{\gray}[1]{{\color{lightgray} #1}}
+\newcommand{\gray}[1]{{\color{gray} #1}}
 
 %% For pictures
 \usepackage{tikz}
@@ -842,7 +843,7 @@ input program followed by a call to the \lstinline{interp-exp} helper
 function, which in turn has one match clause per grammar rule for
 $R_0$ expressions.
 
-\begin{figure}[tbp]
+\begin{figure}[tp]
 \begin{lstlisting}
 (define (interp-exp e)
   (match e
@@ -980,7 +981,7 @@ operations is factored into two separate helper functions:
 \code{pe-neg} and \code{pe-add}. The input to these helper
 functions is the output of partially evaluating the children.
 
-\begin{figure}[tbp]
+\begin{figure}[tp]
 \begin{lstlisting}
 (define (pe-neg r)
   (match r
@@ -1077,7 +1078,7 @@ operator.  Similar to $R_0$, the abstract syntax of $R_1$ includes the
 Despite the simplicity of the $R_1$ language, it is rich enough to
 exhibit several compilation techniques.
 
-\begin{figure}[btp]
+\begin{figure}[tp]
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
@@ -1094,7 +1095,7 @@ exhibit several compilation techniques.
 \label{fig:r1-concrete-syntax}
 \end{figure}
 
-\begin{figure}[btp]
+\begin{figure}[tp]
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
@@ -1171,7 +1172,7 @@ $52$ then $10$, the following produces $42$ (not $-42$).
   \item[$\LP\code{in-dict}\,\itm{dict}\RP$] returns the
     \href{https://docs.racket-lang.org/reference/sequences.html}{sequence}
     of keys and values in $\itm{dict}$. For example, the following
-    creates a new alist in which the ages are incremented by one.
+    creates a new alist in which the ages are incremented.
   \end{description}
   \vspace{-10pt}
   \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
@@ -1201,7 +1202,7 @@ using the \code{dict-ref} function.  When the interpreter encounters a
 environment with the result value bound to the variable, using
 \code{dict-set}, then evaluates the body of the \key{Let}.
 
-\begin{figure}[tbp]
+\begin{figure}[tp]
 \begin{lstlisting}
 (define (interp-exp env)
   (lambda (e)
@@ -1256,21 +1257,25 @@ language to compile $R_1$.
 \section{The x86 Assembly Language}
 \label{sec:x86}
 
-Figure~\ref{fig:x86-a} defines the concrete syntax for the subset of
+Figure~\ref{fig:x86-0-concrete} defines the concrete syntax for the subset of
 the x86 assembly language needed for this chapter.
 %
-An x86 program is a sequence of instructions. The program is stored in
-the computer's memory and the computer has a \emph{program counter}
-that points to the address of the next instruction to be executed. For
-most instructions, once the instruction is executed, the program
-counter is incremented to point to the immediately following
-instruction in memory. Most x86 instructions take two operands, where
-each operand is either an integer constant (called \emph{immediate
-  value}), a \emph{register}, or a \emph{memory} location.  A register
-is a special kind of variable. Each one holds a 64-bit value; there
-are 16 registers in the computer and their names are given in
-Figure~\ref{fig:x86-a}. The computer's memory as a mapping of 64-bit
-addresses to 64-bit values%
+An x86 program begins with a \code{main} label followed by a sequence
+of instructions.  In the grammar, the superscript $+$ is used to
+indicate a sequence of one or more items, e.g., $\Instr^{+}$ is a
+sequence of instructions.
+%
+An x86 program is stored in the computer's memory and the computer has
+a \emph{program counter} that points to the address of the next
+instruction to be executed. For most instructions, once the
+instruction is executed, the program counter is incremented to point
+to the immediately following instruction in memory. Most x86
+instructions take two operands, where each operand is either an
+integer constant (called \emph{immediate value}), a \emph{register},
+or a memory location.  A register is a special kind of variable. Each
+one holds a 64-bit value; there are 16 registers in the computer and
+their names are given in Figure~\ref{fig:x86-0-concrete}. The computer's memory
+as a mapping of 64-bit addresses to 64-bit values%
 \footnote{This simple story suffices for describing how sequential
   programs access memory but is not sufficient for multi-threaded
   programs. However, multi-threaded execution is beyond the scope of
@@ -1304,15 +1309,16 @@ the x86 instructions used in this book.
       \key{subq} \; \Arg\key{,} \Arg \mid
       \key{negq} \; \Arg \mid \key{movq} \; \Arg\key{,} \Arg \mid \\
   &&  \key{callq} \; \mathit{label} \mid
-      \key{pushq}\;\Arg \mid \key{popq}\;\Arg \mid \key{retq} \mid \itm{label}\key{:}\; \Instr \\
+      \key{pushq}\;\Arg \mid \key{popq}\;\Arg \mid \key{retq} \mid \key{jmp}\,\itm{label} \\
+  && \itm{label}\key{:}\; \Instr \\
 \Prog &::= & \key{.globl main}\\
       &    & \key{main:} \; \Instr^{+}
 \end{array}
 \]
 \end{minipage}
 }
-\caption{A subset of the x86 assembly language (AT\&T syntax).}
-\label{fig:x86-a}
+\caption{The concrete syntax of the $x86_0$ assembly language (AT\&T syntax).}
+\label{fig:x86-0-concrete}
 \end{figure}
 
 An immediate value is written using the notation \key{\$}$n$ where $n$
@@ -1334,9 +1340,12 @@ writes the result back to the destination $d$.
 The move instruction $\key{movq}\,s\key{,}\,d$ reads from $s$ and
 stores the result in $d$.
 %
-The $\key{callq}\,\mathit{label}$ instruction executes the procedure
-specified by the label. We discuss procedure calls in more detail
-later in this chapter and in Chapter~\ref{ch:functions}.
+The $\key{callq}\,\itm{label}$ instruction executes the procedure
+specified by the label and $\key{retq}$ returns from a procedure to
+its caller. We discuss procedure calls in more detail later in this
+chapter and in Chapter~\ref{ch:functions}. The
+$\key{jmp}\,\itm{label}$ instruction updates the program counter to
+the address of the instruction after the specified label.
 
 Figure~\ref{fig:p0-x86} depicts an x86 program that is equivalent
 to \code{(+ 10 32)}. The \key{globl} directive says that the
@@ -1366,7 +1375,7 @@ main:
 	addq	$32, %rax
 	retq
 \end{lstlisting}
-\caption{An x86 program equivalent to $\BINOP{+}{10}{32}$.}
+\caption{An x86 program equivalent to \code{(+ 10 32)}.}
 \label{fig:p0-x86}
 %\end{wrapfigure}
 \end{figure}
@@ -1379,11 +1388,11 @@ labels like \key{main} must be prefixed with an underscore, as in
 
 We exhibit the use of memory for storing intermediate results in the
 next example.  Figure~\ref{fig:p1-x86} lists an x86 program that is
-equivalent to $\BINOP{+}{52}{ \UNIOP{-}{10} }$. This program uses a
-region of memory called the \emph{procedure call stack} (or
-\emph{stack} for short). The stack consists of a separate \emph{frame}
-for each procedure call. The memory layout for an individual frame is
-shown in Figure~\ref{fig:frame}.  The register \key{rsp} is called the
+equivalent to \code{(+ 52 (- 10))}. This program uses a region of
+memory called the \emph{procedure call stack} (or \emph{stack} for
+short). The stack consists of a separate \emph{frame} for each
+procedure call. The memory layout for an individual frame is shown in
+Figure~\ref{fig:frame}.  The register \key{rsp} is called the
 \emph{stack pointer} and points to the item at the top of the
 stack. The stack grows downward in memory, so we increase the size of
 the stack by subtracting from the stack pointer. Some operating
@@ -1391,13 +1400,12 @@ systems require the frame size to be a multiple of 16 bytes. In the
 context of a procedure call, the \emph{return address} is the next
 instruction after the call instruction on the caller side. During a
 function call, the return address is pushed onto the stack.  The
-register \key{rbp} is the \emph{base pointer} which serves two
-purposes: 1) it saves the location of the stack pointer for the
-calling procedure and 2) it is used to access variables associated
-with the current procedure.  The base pointer of the calling procedure
-is pushed onto the stack after the return address. We number the
-variables from $1$ to $n$. Variable $1$ is stored at address
-$-8\key{(\%rbp)}$, variable $2$ at $-16\key{(\%rbp)}$, etc.
+register \key{rbp} is the \emph{base pointer} and is used to access
+variables associated with the current procedure call.  The base
+pointer of the caller is pushed onto the stack after the return
+address. We number the variables from $1$ to $n$. Variable $1$ is
+stored at address $-8\key{(\%rbp)}$, variable $2$ at
+$-16\key{(\%rbp)}$, etc.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -1419,7 +1427,7 @@ conclusion:
 	popq	%rbp
 	retq
 \end{lstlisting}
-\caption{An x86 program equivalent to $\BINOP{+}{52}{\UNIOP{-}{10} }$.}
+\caption{An x86 program equivalent to \code{(+ 10 32)}.}
 \label{fig:p1-x86}
 \end{figure}
 
@@ -1444,15 +1452,15 @@ Getting back to the program in Figure~\ref{fig:p1-x86}, the first
 three instructions are the typical \emph{prelude} for a procedure.
 The instruction \key{pushq \%rbp} saves the base pointer for the
 caller onto the stack and subtracts $8$ from the stack pointer. The
-second instruction \key{movq \%rsp, \%rbp} changes the base pointer to
-the top of the stack. The instruction \key{subq \$16, \%rsp} moves the
-stack pointer down to make enough room for storing variables.  This
-program needs one variable ($8$ bytes) but because the frame size is
-required to be a multiple of 16 bytes, the space for variables is
-rounded to 16 bytes.
+second instruction \key{movq \%rsp, \%rbp} changes the base pointer so
+that it points the location of the old base pointer. The instruction
+\key{subq \$16, \%rsp} moves the stack pointer down to make enough
+room for storing variables.  This program needs one variable ($8$
+bytes) but because the frame size is required to be a multiple of 16
+bytes, the space for variables is rounded up to 16 bytes.
 
 The four instructions under the label \code{start} carry out the work
-of computing $\BINOP{+}{52}{\UNIOP{-}{10} }$. The first instruction
+of computing \code{(+ 52 (- 10)))}. The first instruction
 \key{movq \$10, -8(\%rbp)} stores $10$ in variable $1$. The
 instruction \key{negq -8(\%rbp)} changes variable $1$ to $-10$. The
 instruction \key{movq \$52, \%rax} places $52$ in the register \key{rax} and
@@ -1471,18 +1479,21 @@ instruction, \key{retq}, jumps back to the procedure that called this
 one and adds 8 to the stack pointer, which returns the stack pointer
 to where it was prior to the procedure call.
 
-The compiler will need a convenient representation for manipulating
-x86 programs, so we define an abstract syntax for x86 in
-Figure~\ref{fig:x86-ast-a}. We refer to this language as $x86_0$ with
+The compiler needs a convenient representation for manipulating x86
+programs, so we define an abstract syntax for x86 in
+Figure~\ref{fig:x86-0-ast}. We refer to this language as $x86_0$ with
 a subscript $0$ because later we introduce extended versions of this
 assembly language. The main difference compared to the concrete syntax
-of x86 (Figure~\ref{fig:x86-a}) is that it does not allow labeled
+of x86 (Figure~\ref{fig:x86-0-concrete}) is that it does not allow labeled
 instructions to appear anywhere, but instead organizes instructions
 into groups called \emph{blocks} and associates a label with every
 block, which is why the \key{CFG} struct (for control-flow graph)
-includes an alist mapping labels to blocks. The reason for
-this organization becomes apparent in Chapter~\ref{ch:bool-types} when
-we introduce conditional branching.
+includes an alist mapping labels to blocks. The reason for this
+organization becomes apparent in Chapter~\ref{ch:bool-types} when we
+introduce conditional branching. The \code{Block} structure includes
+an $\itm{info}$ field that is not needed for this chapter, but will
+become useful in Chapter~\ref{ch:register-allocation-r1}.  For now,
+the $\itm{info}$ field should just contain an empty list.
 
 \begin{figure}[tp]
 \fbox{
@@ -1498,15 +1509,15 @@ we introduce conditional branching.
        &\mid& \BININSTR{\code{'movq}}{\Arg}{\Arg}
        \mid \UNIINSTR{\code{'negq}}{\Arg}\\
        &\mid& \CALLQ{\itm{label}} \mid \RETQ{} 
-       \mid \PUSHQ{\Arg} \mid \POPQ{\Arg} \\
+       \mid \PUSHQ{\Arg} \mid \POPQ{\Arg} \mid \JMP{\itm{label}} \\
 \Block &::= & \BLOCK{\itm{info}}{\Instr^{+}} \\
 x86_0 &::= & \PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label} \,\key{.}\, \Block \key{)}^{+}}}
 \end{array}
 \]
 \end{minipage}
 }
-\caption{Abstract syntax of $x86_0$ assembly.}
-\label{fig:x86-ast-a}
+\caption{The abstract syntax of $x86_0$ assembly.}
+\label{fig:x86-0-ast}
 \end{figure}
 
 \section{Planning the trip to x86 via the $C_0$ language}
@@ -1645,7 +1656,7 @@ approach and used all of the registers for variables.
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (R1) at (0,2)  {\large $R_1$};
 \node (R1-2) at (3,2)  {\large $R_1$};
-\node (R1-3) at (6,2)  {\large $R_1$};
+\node (R1-3) at (6,2)  {\large $R_1^{\dagger}$};
 %\node (C0-1) at (6,0)  {\large $C_0$};
 \node (C0-2) at (3,0)  {\large $C_0$};
 
@@ -1699,18 +1710,16 @@ is defined in Figure~\ref{fig:c0-syntax}.
 %
 The $C_0$ language supports the same operators as $R_1$ but the
 arguments of operators are restricted to atomic expressions (variables
-and integers), thanks to the \key{remove-complex-opera*} pass.  In the
-literature this style of intermediate language is called
-administrative normal form, or ANF for
-short~\citep{Danvy:1991fk,Flanagan:1993cg}.  Instead of \key{Let}
-expressions, $C_0$ has assignment statements which can be executed in
-sequence using the \key{Seq} form. A sequence of statements always
-ends with \key{Return}, a guarantee that is baked into the grammar
-rules for the \itm{tail} non-terminal. The naming of this non-terminal
-comes from the term \emph{tail position}, which refers to an
-expression that is the last one to execute within a function. (A
-expression in tail position may contain subexpressions, and those may
-or may not be in tail position depending on the kind of expression.)
+and integers), thanks to the \key{remove-complex-opera*} pass. Instead
+of \key{Let} expressions, $C_0$ has assignment statements which can be
+executed in sequence using the \key{Seq} form. A sequence of
+statements always ends with \key{Return}, a guarantee that is baked
+into the grammar rules for the \itm{tail} non-terminal. The naming of
+this non-terminal comes from the term \emph{tail position}, which
+refers to an expression that is the last one to execute within a
+function. (A expression in tail position may contain subexpressions,
+and those may or may not be in tail position depending on the kind of
+expression.)
 
 A $C_0$ program consists of a control-flow graph (represented as an
 alist mapping labels to tails). This is more general than
@@ -1944,20 +1953,47 @@ $\Rightarrow$
 \end{minipage}
 \end{tabular}
 
+
+\begin{figure}[tp]
+\centering
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{rcl}
+\Atm &::=& \INT{\Int} \mid \VAR{\Var} \\
+\Exp &::=& \Atm \mid \READ{} \\
+     &\mid& \NEG{\Atm} \mid \ADD{\Atm}{\Atm}  \\
+     &\mid&  \LET{\Var}{\Exp}{\Exp} \\
+R_1  &::=& \PROGRAM{\code{'()}}{\Exp}
+\end{array}
+\]
+\end{minipage}
+}
+\caption{$R_1^{\dagger}$ is $R_1$ in administrative normal form (ANF).}
+\label{fig:r1-anf-syntax}
+\end{figure}
+
+Figure~\ref{fig:r1-anf-syntax} presents the grammar for the output of
+this pass, language $R_1^{\dagger}$. The main difference is that
+operator arguments are required to be atomic expressions.  In the
+literature this is called \emph{administrative normal form}, or ANF
+for short~\citep{Danvy:1991fk,Flanagan:1993cg}.
+
 We recommend implementing this pass with two mutually recursive
 functions, \code{rco-atom} and \code{rco-exp}. The idea is to apply
-\code{rco-atom} to subexpressions that need to become atomic and to
-apply \code{rco-exp} to subexpressions that can be atomic or complex.
-Both functions take an $R_1$ expression as input.  The \code{rco-exp}
-function returns an expression.  The \code{rco-atom} function returns
-two things: an atomic expression and alist mapping
-temporary variables to complex subexpressions. You can return multiple
-things from a function using Racket's \key{values} form and you can
-receive multiple things from a function call using the
-\key{define-values} form. If you are not familiar with these features,
-review the Racket documentation.  Also, the \key{for/lists} form is
-useful for applying a function to each element of a list, in the case
-where the function returns multiple values.
+\code{rco-atom} to subexpressions that are required to be atomic and
+to apply \code{rco-exp} to subexpressions that can be atomic or
+complex (see Figure~\ref{fig:r1-anf-syntax}).  Both functions take an
+$R_1$ expression as input.  The \code{rco-exp} function returns an
+expression.  The \code{rco-atom} function returns two things: an
+atomic expression and alist mapping temporary variables to complex
+subexpressions. You can return multiple things from a function using
+Racket's \key{values} form and you can receive multiple things from a
+function call using the \key{define-values} form. If you are not
+familiar with these features, review the Racket documentation.  Also,
+the \key{for/lists} form is useful for applying a function to each
+element of a list, in the case where the function returns multiple
+values.
 
 The following shows the output of \code{rco-atom} on the expression
 \code{(- 10)} (using concrete syntax to be concise).
@@ -2096,7 +2132,7 @@ In the \code{select-instructions} pass we begin the work of
 translating from $C_0$ to $\text{x86}^{*}_0$. The target language of
 this pass is a variant of x86 that still uses variables, so we add an
 AST node of the form $\VAR{\itm{var}}$ to the $\text{x86}_0$ abstract
-syntax of Figure~\ref{fig:x86-ast-a}.  We recommend implementing the
+syntax of Figure~\ref{fig:x86-0-ast}.  We recommend implementing the
 \code{select-instructions} in terms of three auxiliary functions, one
 for each of the non-terminals of $C_0$: $\Atm$, $\Stmt$, and $\Tail$.
 
@@ -2319,8 +2355,8 @@ your passes on the example programs.
 \label{sec:print-x86}
 
 The last step of the compiler from $R_1$ to x86 is to convert the
-$\text{x86}_0$ AST (defined in Figure~\ref{fig:x86-ast-a}) to the
-string representation (defined in Figure~\ref{fig:x86-a}). The Racket
+$\text{x86}_0$ AST (defined in Figure~\ref{fig:x86-0-ast}) to the
+string representation (defined in Figure~\ref{fig:x86-0-concrete}). The Racket
 \key{format} and \key{string-append} functions are useful in this
 regard. The main work that this step needs to perform is to create the
 \key{main} function and the standard instructions for its prelude and
@@ -3874,21 +3910,19 @@ the first argument:
        &\mid& \gray{ \BININSTR{\code{'movq}}{\Arg}{\Arg} 
        \mid \UNIINSTR{\code{'negq}}{\Arg} } \\
        &\mid& \gray{ \CALLQ{\itm{label}} \mid \RETQ{} 
-       \mid \PUSHQ{\Arg} \mid \POPQ{\Arg} } \\
+       \mid \PUSHQ{\Arg} \mid \POPQ{\Arg} \mid \JMP{\itm{label}} } \\
        &\mid& \BININSTR{\code{'xorq}}{\Arg}{\Arg}
        \mid \BININSTR{\code{'cmpq}}{\Arg}{\Arg}\\
        &\mid& \BININSTR{\code{'set}}{\code{'}\itm{cc}}{\Arg} 
        \mid \BININSTR{\code{'movzbq}}{\Arg}{\Arg}\\
-       &\mid&  \JMP{\itm{label}}
-       \mid \JMPIF{\code{'}\itm{cc}}{\itm{label}} \\
-%       &\mid& (\key{label} \; \itm{label}) \\
+       &\mid&  \JMPIF{\code{'}\itm{cc}}{\itm{label}} \\
 \Block &::= & \gray{\BLOCK{\itm{info}}{\Instr^{+}}} \\
 x86_1 &::= & \gray{\PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label} \,\key{.}\, \Block \key{)}^{+}}}}
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The abstract syntax of $x86_1$ (extends x86$_0$ of Figure~\ref{fig:x86-ast-a}).}
+\caption{The abstract syntax of $x86_1$ (extends x86$_0$ of Figure~\ref{fig:x86-0-ast}).}
 \label{fig:x86-1}
 \end{figure}
 
@@ -3912,20 +3946,18 @@ which is part of the \code{rax} register.  Thankfully, the
 \key{movzbq} instruction can then be used to move from a single byte
 register to a normal 64-bit register.
 
-The x86 instructions for jumping are relevant to the compilation of
-\key{if} expressions. The \key{Jmp} instruction updates the program
-counter to point to the instruction after the indicated label.  The
-\key{JmpIf} instruction updates the program counter to point to the
-instruction after the indicated label depending on whether the result
-in the EFLAGS register matches the condition code \itm{cc}, otherwise
-the \key{JmpIf} instruction falls through to the next instruction
-\footnote{The abstract syntax for \key{JmpIf} differs from the
-  concrete syntax for x86 in that it separates the instruction name
-  from the condition code. For example, \code{(JmpIf le foo)}
-  corresponds to \code{jle foo}.}.  Because the \key{JmpIf}
-instruction relies on the EFLAGS register, it is common for the
-\key{JmpIf} to be immediately preceded by a \key{cmpq} instruction to
-set the EFLAGS register.
+The x86 instruction for conditional jump are relevant to the
+compilation of \key{if} expressions.  The \key{JmpIf} instruction
+updates the program counter to point to the instruction after the
+indicated label depending on whether the result in the EFLAGS register
+matches the condition code \itm{cc}, otherwise the \key{JmpIf}
+instruction falls through to the next instruction.  The abstract
+syntax for \key{JmpIf} differs from the concrete syntax for x86 in
+that it separates the instruction name from the condition code. For
+example, \code{(JmpIf le foo)} corresponds to \code{jle foo}.  Because
+the \key{JmpIf} instruction relies on the EFLAGS register, it is
+common for the \key{JmpIf} to be immediately preceded by a \key{cmpq}
+instruction to set the EFLAGS register.
 
 
 \section{The $C_1$ Intermediate Language}
