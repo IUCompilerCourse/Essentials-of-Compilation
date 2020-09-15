@@ -3282,11 +3282,10 @@ get the following program.
 \begin{minipage}{0.3\textwidth}
 \begin{lstlisting}
 movq $1, v
-movq $46, w
+movq $42, w
 movq v, x
 addq $7, x
 movq x, y
-addq $4, y
 movq x, z
 addq w, z
 movq y, t
@@ -3299,15 +3298,14 @@ jmp conclusion
 $\Rightarrow\qquad$
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-movq $1, %rbx
-movq $46, %rdx
-movq %rbx, %rcx
-addq $7, %rcx
-movq %rcx, %rbx
-addq $4, %rbx
+movq $1, %rcx
+movq $42, $rbx
 movq %rcx, %rcx
-addq %rdx, %rcx
-movq %rbx, %rbx
+addq $7, %rcx
+movq %rcx, %rdx
+movq %rcx, %rcx
+addq %rbx, %rcx
+movq %rdx, %rbx
 negq %rbx
 movq %rcx, %rax
 addq %rbx, %rax
@@ -3316,9 +3314,9 @@ jmp conclusion
 \end{minipage}
 
 While this allocation is quite good, we could do better. For example,
-the variables \key{v} and \key{x} ended up in different registers, but
+the variables \key{x} and \key{y} ended up in different registers, but
 if they had been placed in the same register, then the move from
-\key{v} to \key{x} could be removed.
+\key{x} to \key{y} could be removed.
 
 We say that two variables $p$ and $q$ are \emph{move related} if they
 participate together in a \key{movq} instruction, that is, \key{movq}
@@ -3335,99 +3333,109 @@ to how we represented interference.  The following is the \emph{move
   graph} for our running example.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (v) at (0,0)    {$v$};
-\node (w) at (3,0)    {$w$};
-\node (x) at (6,0)    {$x$};
-\node (y) at (3,-1.5) {$y$};
-\node (z) at (6,-1.5) {$z$};
-\node (t1) at (9,-1.5)   {$t.1$};
-\draw[bend left=15] (t1) to (y);
-\draw[bend left=15] (v) to (x);
+\node (t) at (0,2) {$t$};
+\node (z) at (3,2)  {$z$};
+\node (x) at (6,2)  {$x$};
+\node (y) at (3,0)  {$y$};
+\node (w) at (6,0)  {$w$};
+\node (v) at (9,0)  {$v$};
+
+\draw (v) to (x);
 \draw (x) to (y);
 \draw (x) to (z);
+\draw (y) to (t);
 \end{tikzpicture}
 \]
 
-Now we replay the graph coloring, pausing to see the coloring of $x$
-and $v$. So we have the following coloring and the most saturated
-vertex is $x$.
+Now we replay the graph coloring, pausing to see the coloring of
+$y$. Recall the following configuration. The most saturated vertices
+were $w$ and $y$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (v) at (0,0)   {$v:-,\{2\}$};
-\node (w) at (3,0)   {$w:2,\{0,1\}$};
-\node (x) at (6,0)   {$x:-,\{0,2\}$};
-\node (y) at (3,-1.5)  {$y:0,\{1,2\}$};
-\node (z) at (6,-1.5)  {$z:1,\{0,2\}$};
-\node (t1) at (9,-1.5)   {$t.1:0,\{\}$};
+\node (t1) at (0,2) {$t:0,\{1\}$};
+\node (z) at (3,2)  {$z:1,\{0\}$};
+\node (x) at (6,2)  {$x:-,\{\}$};
+\node (y) at (3,0)  {$y:-,\{1\}$};
+\node (w) at (6,0)  {$w:-,\{1\}$};
+\node (v) at (9,0)  {$v:-,\{\}$};
+
 \draw (t1) to (z);
-\draw (v) to (w);
-\foreach \i in {w,x,y}
-{
-  \foreach \j in {w,x,y}
-  {
-    \draw (\i) to (\j);
-  }
-}
-\draw (z) to (w);
 \draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (w);
+\draw (v) to (w);
 \end{tikzpicture}
 \]
-Last time we chose to color $x$ with $1$,
 %
-which so happens to be the color of $z$, and $x$ is move related to
-$z$. This was lucky, and if the program had been a little different,
-and say $z$ had been already assigned to $2$, then $x$ would still get
-$1$ and our luck would have run out. With move biasing, we use the
-fact that $x$ and $z$ are move related to influence the choice of
-color for $x$, in this case choosing $1$ because that is the color of
-$z$.
+Last time we chose to color $w$ with $0$. But this time we note that
+$w$ is not move related to any vertex, and $y$ is move related to $t$.
+So we choose to color $y$ the same color, $0$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (v) at (0,0)   {$v:-,\{2\}$};
-\node (w) at (3,0)   {$w:2,\{0,\mathbf{1}\}$};
-\node (x) at (6,0)   {$x:\mathbf{1},\{0,2\}$};
-\node (y) at (3,-1.5)  {$y:0,\{\mathbf{1},2\}$};
-\node (z) at (6,-1.5)  {$z:1,\{0,2\}$};
-\node (t1) at (9,-1.5)   {$t.1:0,\{\}$};
+\node (t1) at (0,2) {$t:0,\{1\}$};
+\node (z) at (3,2)  {$z:1,\{0\}$};
+\node (x) at (6,2)  {$x:-,\{\}$};
+\node (y) at (3,0)  {$y:0,\{1\}$};
+\node (w) at (6,0)  {$w:-,\{0,1\}$};
+\node (v) at (9,0)  {$v:-,\{\}$};
+
 \draw (t1) to (z);
-\draw (v) to (w);
-\foreach \i in {w,x,y}
-{
-  \foreach \j in {w,x,y}
-  {
-    \draw (\i) to (\j);
-  }
-}
-\draw (z) to (w);
 \draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (w);
+\draw (v) to (w);
+\end{tikzpicture}
+\]
+Now $w$ is the most saturated, so we color it $2$.
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (t1) at (0,2) {$t:0,\{1\}$};
+\node (z) at (3,2)  {$z:1,\{0,2\}$};
+\node (x) at (6,2)  {$x:-,\{2\}$};
+\node (y) at (3,0)  {$y:0,\{1,2\}$};
+\node (w) at (6,0)  {$w:2,\{0,1\}$};
+\node (v) at (9,0)  {$v:-,\{2\}$};
+
+\draw (t1) to (z);
+\draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (w);
+\draw (v) to (w);
+\end{tikzpicture}
+\]
+At this point, vertices $x$ and $v$ are most saturated,
+but $x$ is move related to $y$ and $z$, so we color $x$ to $0$
+to match $y$. Finally, we color $v$ to $0$.
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (t) at (0,2) {$t:0,\{1\}$};
+\node (z) at (3,2)  {$z:1,\{0,2\}$};
+\node (x) at (6,2)  {$x:0,\{2\}$};
+\node (y) at (3,0)  {$y:0,\{1,2\}$};
+\node (w) at (6,0)  {$w:2,\{0,1\}$};
+\node (v) at (9,0)  {$v:0,\{2\}$};
+
+\draw (t) to (z);
+\draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (w);
+\draw (v) to (w);
 \end{tikzpicture}
 \]
 
-Next we consider coloring the variable $v$. We need to avoid choosing
-$2$ because of the interference with $w$. Last time we chose the color
-$0$ because it was the lowest, but this time we know that $v$ is move
-related to $x$, so we choose the color $1$.
-\[
-\begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (v) at (0,0)   {$v:\mathbf{1},\{2\}$};
-\node (w) at (3,0)   {$w:2,\{0,\mathbf{1}\}$};
-\node (x) at (6,0)   {$x:1,\{0,2\}$};
-\node (y) at (3,-1.5)  {$y:0,\{1,2\}$};
-\node (z) at (6,-1.5)  {$z:1,\{0,2\}$};
-\node (t1) at (9,-1.5)   {$t.1:0,\{\}$};
-\draw (t1) to (z);
-\draw (v) to (w);
-\foreach \i in {w,x,y}
-{
-  \foreach \j in {w,x,y}
-  {
-    \draw (\i) to (\j);
-  }
-}
-\draw (z) to (w);
-\draw (z) to (y);
-\end{tikzpicture}
-\]
+So we have the following assignment of variables to registers.
+\begin{gather*}
+  \{ v \mapsto \key{\%rbx}, \,
+     w \mapsto \key{\%rdx},  \,
+     x \mapsto \key{\%rbx}, \\
+     y \mapsto \key{\%rbx},  \,
+     z\mapsto \key{\%rcx}, 
+     t\mapsto \key{\%rbx} \}
+\end{gather*}
 
 We apply this register assignment to the running example, on the left,
 to obtain the code on right.
@@ -3435,32 +3443,30 @@ to obtain the code on right.
 \begin{minipage}{0.3\textwidth}
 \begin{lstlisting}
 movq $1, v
-movq $46, w
+movq $42, w
 movq v, x
 addq $7, x
 movq x, y
-addq $4, y
 movq x, z
 addq w, z
-movq y, t.1
-negq t.1
+movq y, t
+negq t
 movq z, %rax
-addq t.1, %rax
+addq t, %rax
 jmp conclusion
 \end{lstlisting}
 \end{minipage}
 $\Rightarrow\qquad$
 \begin{minipage}{0.45\textwidth}
-\begin{lstlisting}
-movq $1, %rcx
-movq $46, %rbx
-movq %rcx, %rcx
-addq $7, %rcx
-movq %rcx, %rdx
-addq $4, %rdx
-movq %rcx, %rcx
-addq %rbx, %rcx
-movq %rdx, %rbx
+  \begin{lstlisting}
+movq $1, %rbx
+movq $42, %rdx
+movq %rbx, %rbx
+addq $7, %rbx
+movq %rbx, %rbx
+movq %rbx, %rcx
+addq %rdx, %rcx
+movq %rbx, %rbx
 negq %rbx
 movq %rcx, %rax
 addq %rbx, %rax
@@ -3468,23 +3474,21 @@ jmp conclusion
 \end{lstlisting}
 \end{minipage}
 
-The \code{patch-instructions} then removes the trivial moves from
-\key{v} to \key{x} and from \key{x} to \key{z} to obtain the following
-result.
+The \code{patch-instructions} then removes the three trivial moves
+from \key{rbx} to \key{rbx} to obtain the following result.
 
 \begin{minipage}{0.45\textwidth}
-  \begin{lstlisting}
-movq $1 %rcx
-movq $46 %rbx
-addq $7 %rcx
-movq %rcx %rdx
-addq $4 %rdx
-addq %rbx %rcx
-movq %rdx %rbx
+\begin{lstlisting}
+movq $1, %rbx
+movq $42, %rdx
+addq $7, %rbx
+movq %rbx, %rcx
+addq %rdx, %rcx
 negq %rbx
-movq %rcx %rax
-addq %rbx %rax
+movq %rcx, %rax
+addq %rbx, %rax
 jmp conclusion
+
 \end{lstlisting}
 \end{minipage}
 
