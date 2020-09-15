@@ -2497,8 +2497,8 @@ start:
     movq $46, w
     movq v, x
     addq $7, x
-    movq x, y
-    addq $4, y
+    movq $4, y
+    addq x, y
     movq x, z
     addq w, z
     movq y, t.1
@@ -2672,45 +2672,40 @@ L_{\mathsf{after}}(5)=  \emptyset
 \end{center}
 
 Figure~\ref{fig:live-eg} shows the results of live variables analysis
-for the running example program, with each instruction aligned with
-its $L_{\mathtt{after}}$ set to make the figure easy to read.
+for the running example program, with the live-before and live-after
+sets shown between each instruction to make the figure easy to read.
 
 \begin{figure}[tbp]
 \hspace{20pt}
 \begin{minipage}{0.45\textwidth}
-\begin{lstlisting}[numbers=left]
-movq $1, v
-movq $46, w
-movq v, x
-addq $7, x
-movq x, y
-addq $4, y
-movq x, z
-addq w, z
-movq y, t.1
-negq t.1)
-movq z, %rax
-addq t.1, %rax
-jmp conclusion
-\end{lstlisting}
-\end{minipage}
-\vrule\hspace{10pt}
-\begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-|$\{\}$|
-|$\{v \}$|
-|$\{v,w\}$|
-|$\{w,x\}$|
-|$\{w,x\}$|
-|$\{w,x,y\}$|
-|$\{w,x,y\}$|
-|$\{w,y,z\}$|
-|$\{y,z\}$|
-|$\{z,t.1\}$|
-|$\{z,t.1\}$|
-|$\{t.1\}$|
-|$\{\}$|
-|$\{\}$|
+                       |$\{\}$|    
+    movq $1, v
+                       |$\{v\}$|  
+    movq $46, w
+                       |$\{v,w\}$|    
+    movq v, x
+                       |$\{w,x\}$|    
+    addq $7, x
+                       |$\{w,x\}$|    
+    movq $4, y
+                       |$\{w,x,y\}$|    
+    addq x, y
+                       |$\{w,x,y\}$|    
+    movq x, z
+                       |$\{w,y,z\}$|    
+    addq w, z
+                       |$\{y,z\}$|    
+    movq y, t.1
+                       |$\{t.1,z\}$|    
+    negq t.1
+                       |$\{t.1,z\}$|    
+    movq z, %rax
+                       |$\{t.1\}$|    
+    addq t.1, %rax
+                       |$\{\}$|    
+    jmp conclusion
+                       |$\{\}$|
 \end{lstlisting}
 \end{minipage}
 
@@ -2789,22 +2784,23 @@ move. So we have the following three rules.
   JS: Agreed.}
 
 Working from the top to bottom of Figure~\ref{fig:live-eg}, we obtain
-the following interference for the instruction at the specified line
-number.
+the following interference for each instruction.
 \begin{quote}
-Line 2: no interference,\\
-Line 3: $w$ interferes with $v$,\\
-Line 4: $x$ interferes with $w$,\\
-Line 5: $x$ interferes with $w$,\\
-Line 6: $y$ interferes with $w$,\\
-Line 7: $y$ interferes with $w$ and $x$,\\
-Line 8: $z$ interferes with $w$ and $y$,\\
-Line 9: $z$ interferes with $y$, \\
-Line 10: $t.1$ interferes with $z$, \\
-Line 11: $t.1$ interferes with $z$, \\
-Line 12: no interference, \\
-Line 13: no interference. \\
-Line 14: no interference.
+\begin{tabular}{ll}
+\lstinline{movq $1, v}& no interference by rule 3,\\
+\lstinline{movq $46, w}& $w$ interferes with $v$ by rule 3,\\
+\lstinline{movq v, x}& $x$ interferes with $w$ by rule 3,\\
+\lstinline{addq $7, x}& $x$ interferes with $w$ by rule 1,\\
+\lstinline{movq $4, y}& $y$ interferes with $w$ and $x$ by rule 3,\\
+\lstinline{addq x, y}& $y$ interferes with $w$ and $x$ by rule 1,\\
+\lstinline{movq x, z}& $z$ interferes with $w$ and $y$ by rule 3,\\
+\lstinline{addq w, z}& $z$ interferes with $y$ by rule 1, \\
+\lstinline{movq y, t.1}& $t.1$ interferes with $z$ by rule 3, \\
+\lstinline{negq t.1}& $t.1$ interferes with $z$ by rule 1, \\
+\lstinline{movq z, %rax}   & no interference (ignore rax), \\
+\lstinline{addq t.1, %rax} & no interference (ignore rax). \\
+  \lstinline{jmp conclusion}& no interference.
+\end{tabular}
 \end{quote}
 The resulting interference graph is shown in
 Figure~\ref{fig:interfere}.
@@ -2813,24 +2809,21 @@ Figure~\ref{fig:interfere}.
 \large
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (v) at (0,0)   {$v$};
-\node (w) at (2,0)   {$w$};
-\node (x) at (4,0)   {$x$};
-\node (t1) at (6,-2)   {$t.1$};
-\node (y) at (2,-2)  {$y$};
-\node (z) at (4,-2)  {$z$};
+\node (t1) at (0,2) {$t.1$};
+\node (z) at (3,2)  {$z$};
+\node (x) at (6,2)  {$x$};
+\node (y) at (3,0)  {$y$};
+\node (w) at (6,0)  {$w$};
+\node (v) at (9,0)  {$v$};
 
-\draw (v) to (w);
-\foreach \i in {w,x,y}
-{
-  \foreach \j in {w,x,y}
-  {
-    \draw (\i) to (\j);
-  }
-}
-\draw (z) to (w);
-\draw (z) to (y);
+
 \draw (t1) to (z);
+\draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (x);
+\draw (y) to (w);
+\draw (v) to (w);
 \end{tikzpicture}
 \]
 \caption{The interference graph of the example program.}
@@ -2949,11 +2942,11 @@ the highest saturation).  The idea is that choosing highly constrained
 squares earlier rather than later is better because later on there may
 not be any possibilities left for those squares.
 
-In some sense, register allocation is easier than Sudoku because the
-register allocator can choose to map variables to stack locations when
-the registers run out. Thus, it makes sense to drop backtracking in
-favor of greedy search, that is, make the best choice at the time and
-keep going. We still wish to minimize the number of colors needed, so
+However, register allocation is easier than Sudoku because the
+register allocator can map variables to stack locations when the
+registers run out. Thus, it makes sense to drop backtracking in favor
+of greedy search, that is, make the best choice at the time and keep
+going. We still wish to minimize the number of colors needed, so
 keeping the most-constrained-first heuristic is a good idea.
 Figure~\ref{fig:satur-algo} gives the pseudo-code for a simple greedy
 algorithm for register allocation based on saturation and the
@@ -2990,49 +2983,42 @@ colored and they are unsaturated, so we annotate each of them with a
 dash for their color and an empty set for the saturation.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (v) at (0,0)    {$v:-,\{\}$};
-\node (w) at (3,0)    {$w:-,\{\}$};
-\node (x) at (6,0)    {$x:-,\{\}$};
-\node (y) at (3,-1.5) {$y:-,\{\}$};
-\node (z) at (6,-1.5) {$z:-,\{\}$};
-\node (t1) at (9,-1.5)   {$t.1:-,\{\}$};
+\node (t1) at (0,2) {$t.1:-,\{\}$};
+\node (z) at (3,2)  {$z:-,\{\}$};
+\node (x) at (6,2)  {$x:-,\{\}$};
+\node (y) at (3,0)  {$y:-,\{\}$};
+\node (w) at (6,0)  {$w:-,\{\}$};
+\node (v) at (9,0)  {$v:-,\{\}$};
 
-\draw (v) to (w);
-\foreach \i in {w,x,y}
-{
-  \foreach \j in {w,x,y}
-  {
-    \draw (\i) to (\j);
-  }
-}
-\draw (z) to (w);
-\draw (z) to (y);
 \draw (t1) to (z);
+\draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (x);
+\draw (y) to (w);
+\draw (v) to (w);
 \end{tikzpicture}
 \]
 The algorithm says to select a maximally saturated vertex and color it
-$0$. In this case we have a 7-way tie, so we arbitrarily pick
+$0$. In this case we have a 6-way tie, so we arbitrarily pick
 $t.1$. We then mark color $0$ as no longer available for $z$ because
 it interferes with $t.1$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (v) at (0,0)    {$v:-,\{\}$};
-\node (w) at (3,0)    {$w:-,\{\}$};
-\node (x) at (6,0)    {$x:-,\{\}$};
-\node (y) at (3,-1.5) {$y:-,\{\}$};
-\node (z) at (6,-1.5) {$z:-,\{\mathbf{0}\}$};
-\node (t1) at (9,-1.5)   {$t.1:\mathbf{0},\{\}$};
-\draw (v) to (w);
-\foreach \i in {w,x,y}
-{
-  \foreach \j in {w,x,y}
-  {
-    \draw (\i) to (\j);
-  }
-}
-\draw (z) to (w);
-\draw (z) to (y);
+\node (t1) at (0,2) {$t.1:0,\{\}$};
+\node (z) at (3,2)  {$z:-,\{0\}$};
+\node (x) at (6,2)  {$x:-,\{\}$};
+\node (y) at (3,0)  {$y:-,\{\}$};
+\node (w) at (6,0)  {$w:-,\{\}$};
+\node (v) at (9,0)  {$v:-,\{\}$};
+
 \draw (t1) to (z);
+\draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (x);
+\draw (y) to (w);
+\draw (v) to (w);
 \end{tikzpicture}
 \]
 Next we repeat the process, selecting another maximally saturated
@@ -3040,46 +3026,40 @@ vertex, which is $z$, and color it with the first available number,
 which is $1$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (v) at (0,0)    {$v:-,\{\}$};
-\node (w) at (3,0)    {$w:-,\{\mathbf{1}\}$};
-\node (x) at (6,0)    {$x:-,\{\}$};
-\node (y) at (3,-1.5) {$y:-,\{\mathbf{1}\}$};
-\node (z) at (6,-1.5) {$z:\mathbf{1},\{0\}$};
-\node (t1) at (9,-1.5)   {$t.1:0,\{\mathbf{1}\}$};
+\node (t1) at (0,2) {$t.1:0,\{\}$};
+\node (z) at (3,2)  {$z:1,\{0\}$};
+\node (x) at (6,2)  {$x:-,\{\}$};
+\node (y) at (3,0)  {$y:-,\{1\}$};
+\node (w) at (6,0)  {$w:-,\{1\}$};
+\node (v) at (9,0)  {$v:-,\{\}$};
+
 \draw (t1) to (z);
-\draw (v) to (w);
-\foreach \i in {w,x,y}
-{
-  \foreach \j in {w,x,y}
-  {
-    \draw (\i) to (\j);
-  }
-}
-\draw (z) to (w);
 \draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (x);
+\draw (y) to (w);
+\draw (v) to (w);
 \end{tikzpicture}
 \]
 The most saturated vertices are now $w$ and $y$. We color $y$ with the
 first available color, which is $0$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (v) at (0,0)    {$v:-,\{\}$};
-\node (w) at (3,0)    {$w:-,\{\mathbf{0},1\}$};
-\node (x) at (6,0)    {$x:-,\{\mathbf{0},\}$};
-\node (y) at (3,-1.5) {$y:\mathbf{0},\{1\}$};
-\node (z) at (6,-1.5) {$z:1,\{\mathbf{0}\}$};
-\node (t1) at (9,-1.5)   {$t.1:0,\{1\}$};
+\node (t1) at (0,2) {$t.1:0,\{\}$};
+\node (z) at (3,2)  {$z:1,\{0\}$};
+\node (x) at (6,2)  {$x:-,\{0\}$};
+\node (y) at (3,0)  {$y:0,\{1\}$};
+\node (w) at (6,0)  {$w:-,\{0,1\}$};
+\node (v) at (9,0)  {$v:-,\{\}$};
+
 \draw (t1) to (z);
-\draw (v) to (w);
-\foreach \i in {w,x,y}
-{
-  \foreach \j in {w,x,y}
-  {
-    \draw (\i) to (\j);
-  }
-}
-\draw (z) to (w);
 \draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (x);
+\draw (y) to (w);
+\draw (v) to (w);
 \end{tikzpicture}
 \]
 Vertex $w$ is now the most highly saturated, so we color $w$ with $2$.
@@ -3088,67 +3068,58 @@ saturation set. Indeed, $w$ interferes with $y$ and $z$, whose colors
 are $0$ and $1$ respectively.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (v) at (0,0)   {$v:-,\{2\}$};
-\node (w) at (3,0)   {$w:\mathbf{2},\{0,1\}$};
-\node (x) at (6,0)   {$x:-,\{0,\mathbf{2}\}$};
-\node (y) at (3,-1.5)  {$y:0,\{1,\mathbf{2}\}$};
-\node (z) at (6,-1.5)  {$z:1,\{0,\mathbf{2}\}$};
-\node (t1) at (9,-1.5)   {$t.1:0,\{\}$};
+\node (t1) at (0,2) {$t.1:0,\{\}$};
+\node (z) at (3,2)  {$z:1,\{0,2\}$};
+\node (x) at (6,2)  {$x:-,\{0,2\}$};
+\node (y) at (3,0)  {$y:0,\{1,2\}$};
+\node (w) at (6,0)  {$w:2,\{0,1\}$};
+\node (v) at (9,0)  {$v:-,\{2\}$};
+
 \draw (t1) to (z);
-\draw (v) to (w);
-\foreach \i in {w,x,y}
-{
-  \foreach \j in {w,x,y}
-  {
-    \draw (\i) to (\j);
-  }
-}
-\draw (z) to (w);
 \draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (x);
+\draw (y) to (w);
+\draw (v) to (w);
 \end{tikzpicture}
 \]
 Now $x$ has the highest saturation, so we color it $1$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (v) at (0,0)   {$v:-,\{2\}$};
-\node (w) at (3,0)   {$w:2,\{0,\mathbf{1}\}$};
-\node (x) at (6,0)   {$x:\mathbf{1},\{0,2\}$};
-\node (y) at (3,-1.5)  {$y:0,\{\mathbf{1},2\}$};
-\node (z) at (6,-1.5)  {$z:1,\{0,2\}$};
-\node (t1) at (9,-1.5)   {$t.1:0,\{\}$};
+\node (t1) at (0,2) {$t.1:0,\{\}$};
+\node (z) at (3,2)  {$z:1,\{0,2\}$};
+\node (x) at (6,2)  {$x:1,\{0,2\}$};
+\node (y) at (3,0)  {$y:0,\{1,2\}$};
+\node (w) at (6,0)  {$w:2,\{0,1\}$};
+\node (v) at (9,0)  {$v:-,\{2\}$};
+
 \draw (t1) to (z);
-\draw (v) to (w);
-\foreach \i in {w,x,y}
-{
-  \foreach \j in {w,x,y}
-  {
-    \draw (\i) to (\j);
-  }
-}
-\draw (z) to (w);
 \draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (x);
+\draw (y) to (w);
+\draw (v) to (w);
 \end{tikzpicture}
 \]
 In the last step of the algorithm, we color $v$ with $0$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (v) at (0,0)   {$v:\mathbf{0},\{2\}$};
-\node (w) at (3,0)   {$w:2,\{\mathbf{0},1\}$};
-\node (x) at (6,0)   {$x:1,\{0,2\}$};
-\node (y) at (3,-1.5)  {$y:0,\{1,2\}$};
-\node (z) at (6,-1.5)  {$z:1,\{0,2\}$};
-\node (t1) at (9,-1.5)   {$t.1:0,\{\}$};
+\node (t1) at (0,2) {$t.1:0,\{\}$};
+\node (z) at (3,2)  {$z:1,\{0,2\}$};
+\node (x) at (6,2)  {$x:1,\{0,2\}$};
+\node (y) at (3,0)  {$y:0,\{1,2\}$};
+\node (w) at (6,0)  {$w:2,\{0,1\}$};
+\node (v) at (9,0)  {$v:0,\{2\}$};
+
 \draw (t1) to (z);
-\draw (v) to (w);
-\foreach \i in {w,x,y}
-{
-  \foreach \j in {w,x,y}
-  {
-    \draw (\i) to (\j);
-  }
-}
-\draw (z) to (w);
 \draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (x);
+\draw (y) to (w);
+\draw (v) to (w);
 \end{tikzpicture}
 \]
 
@@ -3182,8 +3153,8 @@ movq $1, v
 movq $46, w
 movq v, x
 addq $7, x
-movq x, y
-addq $4, y
+movq $4, y
+addq x, y
 movq x, z
 addq w, z
 movq y, t.1
@@ -3200,8 +3171,8 @@ movq $1, %rcx
 movq $46, -16(%rbp)
 movq %rcx, -8(%rbp)
 addq $7, -8(%rbp)
-movq -8(%rbp), %rcx
-addq $4, %rcx
+movq $4, %rcx
+addq -8(%rbp), %rcx
 movq -8(%rbp), -8(%rbp)
 addq -16(%rbp), -8(%rbp)
 movq %rcx, %rcx
