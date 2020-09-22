@@ -1395,17 +1395,15 @@ procedure call. The memory layout for an individual frame is shown in
 Figure~\ref{fig:frame}.  The register \key{rsp} is called the
 \emph{stack pointer} and points to the item at the top of the
 stack. The stack grows downward in memory, so we increase the size of
-the stack by subtracting from the stack pointer. Some operating
-systems require the frame size to be a multiple of 16 bytes. In the
-context of a procedure call, the \emph{return address} is the next
-instruction after the call instruction on the caller side. During a
-function call, the return address is pushed onto the stack.  The
-register \key{rbp} is the \emph{base pointer} and is used to access
-variables associated with the current procedure call.  The base
-pointer of the caller is pushed onto the stack after the return
-address. We number the variables from $1$ to $n$. Variable $1$ is
-stored at address $-8\key{(\%rbp)}$, variable $2$ at
-$-16\key{(\%rbp)}$, etc.
+the stack by subtracting from the stack pointer.  In the context of a
+procedure call, the \emph{return address} is the next instruction
+after the call instruction on the caller side. During a function call,
+the return address is pushed onto the stack.  The register \key{rbp}
+is the \emph{base pointer} and is used to access variables associated
+with the current procedure call.  The base pointer of the caller is
+pushed onto the stack after the return address. We number the
+variables from $1$ to $n$. Variable $1$ is stored at address
+$-8\key{(\%rbp)}$, variable $2$ at $-16\key{(\%rbp)}$, etc.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -1448,36 +1446,49 @@ Position & Contents \\ \hline
 \label{fig:frame}
 \end{figure}
 
-Getting back to the program in Figure~\ref{fig:p1-x86}, the first
-three instructions are the typical \emph{prelude} for a procedure.
-The instruction \key{pushq \%rbp} saves the base pointer for the
-caller onto the stack and subtracts $8$ from the stack pointer. The
-second instruction \key{movq \%rsp, \%rbp} changes the base pointer so
-that it points the location of the old base pointer. The instruction
-\key{subq \$16, \%rsp} moves the stack pointer down to make enough
-room for storing variables.  This program needs one variable ($8$
-bytes) but because the frame size is required to be a multiple of 16
-bytes, the space for variables is rounded up to 16 bytes.
+
+Getting back to the program in Figure~\ref{fig:p1-x86}, consider how
+control is transfered from the operating system to the \code{main}
+function.  The operating system issues a \code{callq main} instruction
+which pushes its return address on the stack and then jumps to
+\code{main}. In x86-64, the stack pointer \code{rsp} must be divisible
+by 16 bytes prior to the execution of any \code{callq} instruction, so
+when control arrives at \code{main}, the \code{rsp} is 8 bytes out of
+alignment (because the \code{callq} pushed the return address).  The
+first three instructions are the typical \emph{prelude} for a
+procedure.  The instruction \code{pushq \%rbp} saves the base pointer
+for the caller onto the stack and subtracts $8$ from the stack
+pointer. At this point the stack pointer is back to being 16-byte
+aligned. The second instruction \code{movq \%rsp, \%rbp} changes the
+base pointer so that it points the location of the old base
+pointer. The instruction \code{subq \$16, \%rsp} moves the stack
+pointer down to make enough room for storing variables.  This program
+needs one variable ($8$ bytes) but we round up to 16 bytes to maintain
+the 16-byte alignment of the \code{rsp}. With the \code{rsp} aligned,
+we are ready to make calls to other functions. The last instruction of
+the prelude is \code{jmp start}, which transfers control to the
+instructions that were generated from the Racket expression \code{(+
+  10 32)}.
 
 The four instructions under the label \code{start} carry out the work
 of computing \code{(+ 52 (- 10)))}. The first instruction
-\key{movq \$10, -8(\%rbp)} stores $10$ in variable $1$. The
-instruction \key{negq -8(\%rbp)} changes variable $1$ to $-10$. The
-instruction \key{movq \$52, \%rax} places $52$ in the register \key{rax} and
-finally \key{addq -8(\%rbp), \%rax} adds the contents of variable $1$ to
-\key{rax}, at which point \key{rax} contains $42$.
+\code{movq \$10, -8(\%rbp)} stores $10$ in variable $1$. The
+instruction \code{negq -8(\%rbp)} changes variable $1$ to $-10$. The
+instruction \code{movq \$52, \%rax} places $52$ in the register \code{rax} and
+finally \code{addq -8(\%rbp), \%rax} adds the contents of variable $1$ to
+\code{rax}, at which point \code{rax} contains $42$.
 
 The three instructions under the label \code{conclusion} are the
-typical \emph{finale} of a procedure.  The first two instructions are
-necessary to get the state of the machine back to where it was at the
-beginning of the procedure.  The instruction \key{addq \$16, \%rsp}
-moves the stack pointer back to point at the old base pointer. The
-amount added here needs to match the amount that was subtracted in the
-prelude of the procedure. Then \key{popq \%rbp} returns the old base
-pointer to \key{rbp} and adds $8$ to the stack pointer.  The last
-instruction, \key{retq}, jumps back to the procedure that called this
-one and adds 8 to the stack pointer, which returns the stack pointer
-to where it was prior to the procedure call.
+typical \emph{conclusion} of a procedure.  The first two instructions
+are necessary to get the state of the machine back to where it was at
+the beginning of the procedure.  The instruction \key{addq \$16,
+  \%rsp} moves the stack pointer back to point at the old base
+pointer. The amount added here needs to match the amount that was
+subtracted in the prelude of the procedure. Then \key{popq \%rbp}
+returns the old base pointer to \key{rbp} and adds $8$ to the stack
+pointer.  The last instruction, \key{retq}, jumps back to the
+procedure that called this one and adds 8 to the stack pointer, which
+returns the stack pointer to where it was prior to the procedure call.
 
 The compiler needs a convenient representation for manipulating x86
 programs, so we define an abstract syntax for x86 in
@@ -2549,7 +2560,7 @@ function call, and the callee is responsible for saving and restoring
 some other registers, the \emph{callee-saved registers}, before and
 after using them. The caller-saved registers are
 \begin{lstlisting}
-  rax rdx rcx rsi rdi r8 r9 r10 r11
+  rax rcx rdx rsi rdi r8 r9 r10 r11
 \end{lstlisting}
 while the callee-saved registers are
 \begin{lstlisting}
@@ -2775,13 +2786,23 @@ move. So we have the following three rules.
   the edge $(d,v)$ for every $v \in L_{\mathsf{after}}(k)$ unless $v =
   d$ or $v = s$.
 \end{enumerate}
-\margincomment{JM: I think you could give examples of each one of these
-  using the example program and use those to help explain why these
-  rules are correct.\\
-  JS: Agreed.}
 
-Working from the top to bottom of Figure~\ref{fig:live-eg}, we obtain
-the following interference for each instruction.
+Working from the top to bottom of Figure~\ref{fig:live-eg}, apply the
+above rules to each instruction. We highlight a few of the
+instructions and then refer the reader to
+Figure~\ref{fig:interference-results} all the interference results.
+The first instruction is \lstinline{movq $1, v}, so rule 3 applies,
+and the live-after set is $\{v\}$. We do not add any interference
+edges because the one live variable $v$ is also the destination of
+this instruction.
+%
+For the second instruction, \lstinline{movq $42, w}, so rule 3 applies
+again, and the live-after set is $\{v,w\}$. So the target $w$ of
+\key{movq} interferes with $v$.
+%
+Next we skip forward to the instruction \lstinline{movq x, y}.
+
+\begin{figure}[tbp]
 \begin{quote}
 \begin{tabular}{ll}
 \lstinline{movq $1, v}& no interference by rule 3,\\
@@ -2798,6 +2819,10 @@ the following interference for each instruction.
   \lstinline{jmp conclusion}& no interference.
 \end{tabular}
 \end{quote}
+\caption{Interference results for the running example.}
+\label{fig:interference-results}
+\end{figure}
+
 The resulting interference graph is shown in
 Figure~\ref{fig:interfere}.
 
@@ -3251,15 +3276,17 @@ The prelude saved the values in \code{rbp} and \code{rsp} and the
 conclusion returned those values to \code{rbp} and \code{rsp}.  The
 reason for this is that our \code{main} function must adhere to the
 x86 calling conventions that we described in
-Section~\ref{sec:calling-conventions}. In addition, the \code{main}
-function needs to restore (in the conclusion) any callee-saved
-registers that get used during register allocation. The simplest
+Section~\ref{sec:calling-conventions}.  Furthermore, if your register
+allocator assigned variables to other callee-saved registers
+(e.g. rbx, r12, etc.), then those variables must also be saved to the
+stack in the prelude and restored in the conclusion.  The simplest
 approach is to save and restore all of the callee-saved registers. The
 more efficient approach is to keep track of which callee-saved
 registers were used and only save and restore them. Either way, make
 sure to take this use of stack space into account when you are
-calculating the size of the frame. Also, don't forget that the size of
-the frame needs to be a multiple of 16 bytes.
+calculating the size of the frame and adjusting the \code{rsp} in the
+prelude. Also, don't forget that the size of the frame needs to be a
+multiple of 16 bytes!
 
 
 \section{Challenge: Move Biasing}
@@ -3313,10 +3340,12 @@ jmp conclusion
 \end{lstlisting}
 \end{minipage}
 
-While this allocation is quite good, we could do better. For example,
-the variables \key{x} and \key{y} ended up in different registers, but
-if they had been placed in the same register, then the move from
-\key{x} to \key{y} could be removed.
+In the above output code there are two \key{movq} instructions that
+can be removed because their source and target are the same.  However,
+if we had put \key{t}, \key{v}, \key{x}, and \key{y} into the same
+register, we could instead remove three \key{movq} instructions.  We
+can accomplish this by taking into account which variables appear in
+\key{movq} instructions with which other variables.
 
 We say that two variables $p$ and $q$ are \emph{move related} if they
 participate together in a \key{movq} instruction, that is, \key{movq}
@@ -3502,6 +3531,76 @@ programs to make sure that your move biasing is working properly.
 
 \margincomment{\footnotesize To do: another neat challenge would be to do
   live range splitting~\citep{Cooper:1998ly}. \\ --Jeremy}
+
+\section{Output of the Running Example}
+\label{sec:reg-alloc-output}
+
+Figure~\ref{fig:running-example-x86} shows the x86 code generated for
+the running example (Figure~\ref{fig:reg-eg}) with register allocation
+and move biasing. To demonstrate both the use of registers and the
+stack, we have limited the register allocator to use just two
+registers: \code{rbx} and \code{rcx}.  In the prelude of the
+\code{main} function, we push \code{rbx} onto the stack because it is
+a callee-saved register and it was assigned to variable by the
+register allocator.  We substract \code{8} from the \code{rsp} at the
+end of the prelude to reserve space for the one spilled variable.
+After that subtraction, the \code{rsp} is aligned to 16 bytes.
+
+Moving on the the \code{start} block, we see how the registers were
+allocated. Variables \code{v}, \code{x}, and \code{y} were assigned to
+\code{rbx} and variable \code{z} was assigned to \code{rcx}.  Variable
+\code{w} was spilled to the stack location \code{-16(\%rbp)}.  Recall
+that the prelude saved the callee-save register \code{rbx} onto the
+stack. The spilled variables must be placed lower on the stack than
+the saved callee-save registers, so in this case \code{w} is placed at
+\code{-16(\%rbp)}.
+
+In the \code{conclusion}, we undo the work that was done in the
+prelude. We move the stack pointer up by \code{8} bytes (the room for
+spilled variables), then we pop the old values of \code{rbx} and
+\code{rbp} (callee-saved registers), and finish with \code{retq} to
+return control to the operating system.
+
+  
+\begin{figure}[tbp]
+  % s0_28.rkt
+  % (use-minimal-set-of-registers! #t)
+  % and only rbx rcx
+% tmp 0
+% z 1  rcx
+% y 0  rbx
+% w 2  16(%rbp)
+% v 0  rbx
+% x 0  rbx
+\begin{lstlisting}
+start:
+	movq	$1, %rbx
+	movq	$42, -16(%rbp)
+	addq	$7, %rbx
+	movq	%rbx, %rcx
+	addq	-16(%rbp), %rcx
+	negq	%rbx
+	movq	%rcx, %rax
+	addq	%rbx, %rax
+	jmp conclusion
+
+	.globl main
+main:
+	pushq	%rbp
+	movq	%rsp, %rbp
+	pushq	%rbx
+	subq	$8, %rsp
+	jmp start
+conclusion:
+	addq	$8, %rsp
+	popq	%rbx
+	popq	%rbp
+	retq
+\end{lstlisting}
+\caption{The x86 output from the running example (Figure~\ref{fig:reg-eg}).}
+\label{fig:running-example-x86}
+\end{figure}
+
 
 
 
@@ -3827,7 +3926,7 @@ To implement the new logical operations, the comparison operations,
 and the \key{if} expression, we need to delve further into the x86
 language. Figure~\ref{fig:x86-1} defines the abstract syntax for a
 larger subset of x86 that includes instructions for logical
-operations, comparisons, and jumps.
+operations, comparisons, and conditional jumps.
 
 One small challenge is that x86 does not provide an instruction that
 directly implements logical negation (\code{not} in $R_2$ and $C_1$).
@@ -4216,7 +4315,7 @@ less-than comparison is as follows.
 \[
 (\key{<}~e_1~e_2) \quad\Rightarrow\quad
 \begin{array}{l}
-\key{if}~(\key{<}~e_1~e_2)~\key{then} \\
+\key{if}~(\key{<}~e_1~e_2) \\
 \qquad\key{goto}~\ell_1\key{;}\\
 \key{else}\\
 \qquad\key{goto}~\ell_2\key{;}
@@ -4233,7 +4332,7 @@ current one, that is, predicate context. So we apply
 \code{explicate-pred} to the ``then'' branch with the two blocks
 \GOTO{$\ell_1$} and \GOTO{$\ell_2$} to obtain $B_3$.  Proceed in a
 similar way with the ``else'' branch to obtain $B_4$.  Finally, we
-apply \code{explicate-pred} to the predicate of hte \code{if} and the
+apply \code{explicate-pred} to the predicate of the \code{if} and the
 blocks $B_3$ and $B_4$ to obtain the result $B_5$.
 \[
 (\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els})
@@ -4269,22 +4368,22 @@ approach of encoding them as integers, with true as 1 and false as 0.
 For $\Stmt$, we discuss a couple cases.  The \code{not} operation can
 be implemented in terms of \code{xorq} as we discussed at the
 beginning of this section. Given an assignment
-$\itm{var}$ \key{=} \key{(not} $\Arg$\key{);},
+$\itm{var}$ \key{=} \key{(not} $\Atm$\key{);},
 if the left-hand side $\itm{var}$ is
-the same as $\Arg$, then just the \code{xorq} suffices.
+the same as $\Atm$, then just the \code{xorq} suffices.
 \[
 \Var~\key{=}~ \key{(not}\; \Var\key{);}
 \quad\Rightarrow\quad
 \key{xorq}~\key{\$}1\key{,}~\Var
 \]
 Otherwise, a \key{movq} is needed to adapt to the update-in-place
-semantics of x86. Let $\Arg'$ be the result of recursively processing
-$\Arg$. Then we have
+semantics of x86. Let $\Arg$ be the result of translating $\Atm$ to
+x86. Then we have
 \[
-\Var~\key{=}~ \key{(not}\; \Arg\key{);}
+\Var~\key{=}~ \key{(not}\; \Atm\key{);}
 \quad\Rightarrow\quad
 \begin{array}{l}
-\key{movq}~\Arg'\key{,}~\Var\\
+\key{movq}~\Arg\key{,}~\Var\\
 \key{xorq}~\key{\$}1\key{,}~\Var
 \end{array}
 \]
@@ -4297,7 +4396,7 @@ sequence of three instructions. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-|$\Var$| = (eq? |$\Arg_1$| |$\Arg_2$|);
+|$\Var$| = (eq? |$\Atm_1$| |$\Atm_2$|);
 \end{lstlisting}
 \end{minipage}
 &
@@ -4305,7 +4404,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-cmpq |$\Arg'_2$|, |$\Arg'_1$|
+cmpq |$\Arg_2$|, |$\Arg_1$|
 sete %al
 movzbq %al, |$\Var$|
 \end{lstlisting}
@@ -4324,7 +4423,7 @@ to a regular jump (for ``else'').\\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-if (eq? |$\Arg_1$| |$\Arg_2$|) then
+if (eq? |$\Atm_1$| |$\Atm_2$|)
    goto |$\ell_1$|;
 else
    goto |$\ell_2$|;
@@ -4335,7 +4434,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-cmpq |$\Arg'_2$| |$\Arg'_1$|
+cmpq |$\Arg_2$|, |$\Arg_1$|
 je |$\ell_1$|
 jmp |$\ell_2$|
 \end{lstlisting}
@@ -4578,7 +4677,7 @@ Figure~\ref{fig:R2-passes} lists all the passes needed for the
 compilation of $R_2$.
 
 
-\section{Challenge: Optimize Jumps}
+\section{Challenge: Optimize and Remove Jumps}
 \label{sec:opt-jumps}
 
 Recall that in the example output of \code{explicate-control} in
