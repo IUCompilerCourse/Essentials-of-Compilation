@@ -2535,9 +2535,9 @@ point, so \code{x} and \code{y} could share the same register. The
 topic of Section~\ref{sec:liveness-analysis-r1} is how to compute
 where a variable is needed.  Once we have that information, we compute
 which variables are needed at the same time, i.e., which ones
-\emph{interfere}, and represent this relation as an undirected graph
-whose vertices are variables and edges indicate when two variables
-interfere with each other (Section~\ref{sec:build-interference}). We
+\emph{interfere} with each other, and represent this relation as an
+undirected graph whose vertices are variables and edges indicate when
+two variables interfere (Section~\ref{sec:build-interference}). We
 then model register allocation as a graph coloring problem, which we
 discuss in Section~\ref{sec:graph-coloring}.
 
@@ -2548,17 +2548,32 @@ for assigning a variable to a stack location. The process of spilling
 variables is handled as part of the graph coloring process described
 in \ref{sec:graph-coloring}.
 
+We make the simplifying assumption that each variable is assigned to
+one location (a register or stack address). A more sophisticated
+approach is to assign a variable to one or more locations in different
+regions of the program.  For example, if a variable is used many times
+in short sequence and then only used again after many other
+instructions, it could be more efficient to assign the variable to a
+register during the intial sequence and then move it to the stack for
+the rest of its lifetime. We refer the interested reader to
+\citet{Cooper:1998ly} and \citet{Cooper:2011aa} for more information
+about this approach.
+
+% discuss prioritizing variables based on how much they are used.
+
 \section{Registers and Calling Conventions}
 \label{sec:calling-conventions}
 
 As we perform register allocation, we need to be aware of the
 conventions that govern the way in which registers interact with
-function calls, such as calls to the \code{read\_int} function. The
-convention for x86 is that the caller is responsible for freeing up
-some registers, the \emph{caller-saved registers}, prior to the
-function call, and the callee is responsible for saving and restoring
-some other registers, the \emph{callee-saved registers}, before and
-after using them. The caller-saved registers are
+function calls, such as calls to the \code{read\_int} function in our
+generated code and even the call that the operating system makes to
+execute our \code{main} function.  The convention for x86 is that the
+caller is responsible for freeing up some registers, the
+\emph{caller-saved registers}, prior to the function call, and the
+callee is responsible for preserving the values in some other
+registers, the \emph{callee-saved registers}. The caller-saved
+registers are
 \begin{lstlisting}
   rax rcx rdx rsi rdi r8 r9 r10 r11
 \end{lstlisting}
@@ -2566,16 +2581,129 @@ while the callee-saved registers are
 \begin{lstlisting}
   rsp rbp rbx r12 r13 r14 r15
 \end{lstlisting}
-Another way to think about this caller/callee convention is the
-following. The caller should assume that all the caller-saved registers
-get overwritten with arbitrary values by the callee.  On the other
-hand, the caller can safely assume that all the callee-saved registers
-contain the same values after the call that they did before the call.
-The callee can freely use any of the caller-saved registers.  However,
-if the callee wants to use a callee-saved register, the callee must
-arrange to put the original value back in the register prior to
-returning to the caller, which is usually accomplished by saving and
-restoring the value from the stack.
+
+We can think about this caller/callee convention from two points of
+view, the caller view and the callee view:
+\begin{itemize}
+\item The caller should assume that all the caller-saved registers get
+  overwritten with arbitrary values by the callee.  On the other hand,
+  the caller can safely assume that all the callee-saved registers
+  contain the same values after the call that they did before the
+  call.
+\item The callee can freely use any of the caller-saved registers.
+  However, if the callee wants to use a callee-saved register, the
+  callee must arrange to put the original value back in the register
+  prior to returning to the caller, which is usually accomplished by
+  saving the value to the stack in the prelude of the function and
+  restoring the value in the conclusion of the function.
+\end{itemize}
+
+The next question is how these calling conventions impact register
+allocation. Consider the $R_1$ program in
+Figure~\ref{fig:example-calling-conventions}.  We first analyze this
+example from the caller point of view and then from the callee point
+of view.
+
+The program makes two calls to the \code{read} function.  Also, the
+variable \code{x} is in-use during the second call to \code{read}, so
+we need to make sure that the value in \code{x} does not get
+accidentally wiped out by the call to \code{read}.  One obvious
+approach is to save all the values in caller-saved registers to the
+stack prior to each function call, and restore them after each
+call. That way, if the register allocator chooses to assign \code{x}
+to a caller-saved register, its value will be preserved accross the
+call to \code{read}.  However, the disadvantage of this approach is
+that saving and restoring to the stack is relatively slow. If \code{x}
+is not used many times, it may be better to assign \code{x} to a stack
+location in the first place. Or better yet, if we can arrange for
+\code{x} to be placed in a callee-saved register, then it won't need
+to be saved and restored during function calls.
+
+The approach that we recommend is to treat variables differently
+depending on whether they are in-use during a function call.  If a
+variable is in-use during a function call, then we never assign it to
+a caller-saved register: we either assign it to a callee-saved
+register or we spill it to the stack. If a variable is not in-use
+during any function call, then we try the following alternatives in
+order 1) look for an available caller-saved register (to leave room
+for other variables in the callee-saved register), 2) look for a
+callee-saved register, and 3) spill the variable to the stack.
+
+It is straightforward to implement this approach in a graph coloring
+register allocator. First, we know which variables are in-use during
+every function call because we compute that information for every
+instruciton (Section~\ref{sec:liveness-analysis-r1}). Second, when we
+build the interference graph (Section~\ref{sec:build-interference}),
+we can place an edge between each of these variables and the
+caller-saved registers in the interference graph. This will prevent
+the graph coloring algorithm from assigning those variables to
+caller-saved registers.
+
+Returning to the example in
+Figure~\ref{fig:example-calling-conventions}, let us analyze the
+generated x86 code on the right-hand side, focusing on the
+\code{start} block. Notice that variable \code{x} is assigned to
+\code{rbx}, a callee-saved register. Thus, it is already in a safe
+place during the second call to \code{read\_int}. Next, notice that
+variable \code{y} is assigned to \code{rcx}, a caller-saved register,
+because there are no function calls in the remainder of the block.
+
+Next we analyze the example from the callee point of view, focusing on
+the prelude and conclusion of the \code{main} function. As usual the
+prelude begins with saving the \code{rbp} register to the stack and
+setting the \code{rbp} to the current stack pointer. We now know why
+it is necessary to save the \code{rbp}: it is a callee-saved register.
+The prelude then pushes \code{rbx} to the stack because 1) \code{rbx}
+is also a callee-saved register and 2) \code{rbx} is assigned to a
+variable (\code{x}). There are several more callee-saved register that
+are not saved in the prelude because they were not assigned to
+variables. The prelude subtracts 8 bytes from the \code{rsp} to make
+it 16-byte aligned and then jumps to the \code{start} block. Shifting
+attention to the \code{conclusion}, we see that \code{rbx} is restored
+from the stack with a \code{popq} instruction.
+
+\begin{figure}[tp]
+\begin{minipage}{0.45\textwidth}
+Example $R_1$ program:
+%s0_14.rkt
+\begin{lstlisting}
+(let ([x (read)])
+  (let ([y (read)])
+    (+ (+ x y) 42)))
+\end{lstlisting}
+\end{minipage}
+\begin{minipage}{0.45\textwidth}
+Generated x86 assembly:
+\begin{lstlisting}
+start:
+	callq	read_int
+	movq	%rax, %rbx
+	callq	read_int
+	movq	%rax, %rcx
+	addq	%rcx, %rbx
+	movq	%rbx, %rax
+	addq	$42, %rax
+	jmp _conclusion
+
+	.globl main
+main:
+	pushq	%rbp
+	movq	%rsp, %rbp
+	pushq	%rbx
+	subq	$8, %rsp
+	jmp start
+conclusion:
+	addq	$8, %rsp
+	popq	%rbx
+	popq	%rbp
+	retq
+\end{lstlisting}
+\end{minipage}
+\caption{Example with function calls.}
+  \label{fig:example-calling-conventions}
+\end{figure}
+
+
 
 
 \section{Liveness Analysis}
@@ -2685,7 +2813,7 @@ Figure~\ref{fig:live-eg} shows the results of live variables analysis
 for the running example program, with the live-before and live-after
 sets shown between each instruction to make the figure easy to read.
 
-\begin{figure}[tbp]
+\begin{figure}[tp]
 \hspace{20pt}
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
@@ -3278,15 +3406,15 @@ reason for this is that our \code{main} function must adhere to the
 x86 calling conventions that we described in
 Section~\ref{sec:calling-conventions}.  Furthermore, if your register
 allocator assigned variables to other callee-saved registers
-(e.g. rbx, r12, etc.), then those variables must also be saved to the
-stack in the prelude and restored in the conclusion.  The simplest
-approach is to save and restore all of the callee-saved registers. The
-more efficient approach is to keep track of which callee-saved
-registers were used and only save and restore them. Either way, make
-sure to take this use of stack space into account when you are
-calculating the size of the frame and adjusting the \code{rsp} in the
-prelude. Also, don't forget that the size of the frame needs to be a
-multiple of 16 bytes!
+(e.g. \code{rbx}, \code{r12}, etc.), then those variables must also be
+saved to the stack in the prelude and restored in the conclusion.  The
+simplest approach is to save and restore all of the callee-saved
+registers. The more efficient approach is to keep track of which
+callee-saved registers were used and only save and restore
+them. Either way, make sure to take this use of stack space into
+account when you are calculating the size of the frame and adjusting
+the \code{rsp} in the prelude. Also, don't forget that the size of the
+frame needs to be a multiple of 16 bytes!
 
 
 \section{Challenge: Move Biasing}
@@ -3566,7 +3694,7 @@ return control to the operating system.
   % s0_28.rkt
   % (use-minimal-set-of-registers! #t)
   % and only rbx rcx
-% tmp 0
+% tmp 0 rbx
 % z 1  rcx
 % y 0  rbx
 % w 2  16(%rbp)
@@ -3591,6 +3719,7 @@ main:
 	pushq	%rbx
 	subq	$8, %rsp
 	jmp start
+        
 conclusion:
 	addq	$8, %rsp
 	popq	%rbx
