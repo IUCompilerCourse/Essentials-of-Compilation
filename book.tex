@@ -4231,25 +4231,41 @@ addition of \key{if} in $R_2$ this get more interesting.
 
 As a motivating example, consider the following program that has an
 \key{if} expression nested in the predicate of another \key{if}.
-% s1_38.rkt
+% s1_41.rkt
 \begin{center}
 \begin{minipage}{0.96\textwidth}
 \begin{lstlisting}
-(if (if (eq? (read) 1)
-        (eq? (read) 0)
-        (eq? (read) 2))
-    (+ 10 32)
-    (+ 700 77))
+(let ([x (read)])
+  (let ([y (read)])
+    (if (if (< x 1) (eq? x 0)  (eq? x 2))
+        (+ y 2)
+        (+ y 10))))
 \end{lstlisting}
 \end{minipage}
 \end{center}
 %
-The naive way to compile \key{if} and \key{eq?} would be to handle
-each of them in isolation, regardless of their context.  Each
-\key{eq?} would be translated into a \key{cmpq} instruction followed
+The naive way to compile \key{if} and the comparison would be to
+handle each of them in isolation, regardless of their context.  Each
+comparison would be translated into a \key{cmpq} instruction followed
 by a couple instructions to move the result from the EFLAGS register
 into a general purpose register or stack location. Each \key{if} would
-be translated into the combination of a \key{cmpq} and \key{JmpIf}.
+be translated into the combination of a \key{cmpq} and a conditional
+jump. The generated code for the inner \key{if} in the above example
+would be as follows.
+\begin{center}
+\begin{minipage}{0.96\textwidth}
+\begin{lstlisting}
+    ...
+    cmpq $1, x          ;; (< x 1)
+    setl %al
+    movzbq %al, tmp
+    cmpq $1, tmp        ;; (if (< x 1) ...)
+    je then_branch_1
+    jmp else_branch_1
+    ...
+\end{lstlisting}
+\end{minipage}
+\end{center}
 However, if we take context into account we can do better and reduce
 the use of \key{cmpq} and EFLAG-accessing instructions.
 
@@ -4259,13 +4275,15 @@ following code.
 \begin{center}
 \begin{minipage}{0.96\textwidth}
 \begin{lstlisting}
-(if (eq? (read) 1)
-    (if (eq? (read) 0)
-            (+ 10 32)
-            (+ 700 77))
-        (if (eq? (read) 2))
-            (+ 10 32)
-            (+ 700 77))
+(let ([x (read)])
+  (let ([y (read)])
+    (if (< x 1) 
+      (if (eq? x 0)
+        (+ y 2)
+        (+ y 10))
+      (if (eq? x 2)
+        (+ y 2)
+        (+ y 10)))))
 \end{lstlisting}
 \end{minipage}
 \end{center}
@@ -4292,39 +4310,42 @@ Figure~\ref{fig:explicate-control-s1-38} shows the output of the
 the output program and then discuss the algorithm.
 %
 Following the order of evaluation in the output of
-\code{remove-complex-opera*}, we first have the \code{(read)} and
-comparison to \code{1} from the predicate of the inner \key{if}.  In
-the output of \code{explicate-control}, in the \code{start} block,
-this becomes a \code{(read)} followed by a conditional \key{goto} to
-either \code{block61} or \code{block62}. Each of these contains the
-translations of the code \code{(eq? (read) 0)} and \code{(eq? (read)
-  1)}, respectively. Regarding \code{block61}, we start with the
-\code{(read)} and comparison to \code{0} and then have a conditional
-goto, either to \code{block59} or \code{block60}, which indirectly
-take us to \code{block55} and \code{block56}, the two branches of the
-outer \key{if}, i.e., \code{(+ 10 32)} and \code{(+ 700 77)}. The
-story for \code{block62} is similar.
+\code{remove-complex-opera*}, we first have two calls to \code{(read)}
+and then the less-than-comparison to \code{1} in the predicate of the
+inner \key{if}.  In the output of \code{explicate-control}, in the
+\code{start} block, this becomes two assignment statements followed by
+a conditional \key{goto} to either \code{block96} or
+\code{block97}. Each of these contains the translations of the code
+\code{(eq? x 0)} and \code{(eq? x 2)},
+respectively. Regarding \code{block96}, we start with the
+comparison to \code{0} and then have a conditional
+goto, either to \code{block92} or \code{block93}, which indirectly
+take us to \code{block90} and \code{block91}, the two branches of the
+outer \key{if}, i.e., \code{(+ y 2)} and \code{(+ y 10)}. The
+story for \code{block97} is similar.
 
 \begin{figure}[tbp]
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
+% s1_41.rkt
 \begin{lstlisting}
-(if (if (eq? (read) 1)
-        (eq? (read) 0)
-        (eq? (read) 2))
-    (+ 10 32)
-    (+ 700 77))
+(let ([x (read)])
+   (let ([y (read)])
+      (if (if (< x 1)
+             (eq? x 0)
+             (eq? x 2))
+         (+ y 2)
+         (+ y 10))))
 \end{lstlisting}
 \hspace{40pt}$\Downarrow$
 \begin{lstlisting}
-(if (if (let ([tmp52 (read)])
-          (eq? tmp52 1))
-        (let ([tmp53 (read)]) 
-          (eq? tmp53 0))
-        (let ([tmp54 (read)]) 
-          (eq? tmp54 2)))
- (+ 10 32)
- (+ 700 77))
+(let ([x (read)])
+   (let ([y (read)])
+      (if (if (< x 1)
+             (eq? x 0)
+             (eq? x 2))
+         (+ y 2)
+         (+ y 10))))
 \end{lstlisting}
 \end{minipage}
 &
@@ -4332,36 +4353,35 @@ $\Rightarrow$
 &
 \begin{minipage}{0.55\textwidth}
 \begin{lstlisting}
-block62:
-    tmp54 = (read);
-    if (eq? tmp54 2) then
-       goto block59;
-    else
-       goto block60;
-block61:
-    tmp53 = (read);
-    if (eq? tmp53 0) then
-       goto block57;
-    else
-       goto block58;
-block60:
-    goto block56;
-block59:
-    goto block55;
-block58:
-    goto block56;
-block57:
-    goto block55;
-block56:
-    return (+ 700 77);
-block55:
-    return (+ 10 32);
 start:
-    tmp52 = (read);
-    if (eq? tmp52 1) then
-       goto block61;
+    x = (read);
+    y = (read);
+    if (< x 1)
+       goto block96;
     else
-       goto block62;
+       goto block97;
+block96:
+    if (eq? x 0)
+       goto block92;
+    else
+       goto block93;
+block97:
+    if (eq? x 2)
+       goto block94;
+    else
+       goto block95;
+block92:
+    goto block90;
+block93:
+    goto block91;
+block94:
+    goto block90;
+block95:
+    goto block91;
+block90:
+    return (+ y 2);
+block91:
+    return (+ y 10);
 \end{lstlisting}
 \end{minipage}
 \end{tabular} 
@@ -4372,11 +4392,11 @@ start:
 \end{figure}
 
 The nice thing about the output of \code{explicate-control} is that
-there are no unnecessary uses of \code{eq?} and every use of
-\code{eq?} is part of a conditional jump. The down-side of this output
-is that it includes trivial blocks, such as \code{block57} through
-\code{block60}, that only jump to another block. We discuss a solution
-to this problem in Section~\ref{sec:opt-jumps}.
+there are no unnecessary comparisons and every comparison is part of a
+conditional jump. The down-side of this output is that it includes
+trivial blocks, such as \code{block92} through \code{block95}, that
+only jump to another block. We discuss a solution to this problem in
+Section~\ref{sec:opt-jumps}.
 
 Recall that in Section~\ref{sec:explicate-control-r1} we implement
 \code{explicate-control} for $R_1$ using two mutually recursive
