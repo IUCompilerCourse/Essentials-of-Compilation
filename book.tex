@@ -79,7 +79,7 @@
 \lstset{%
 language=Lisp,
 basicstyle=\ttfamily\small,
-morekeywords={seq,assign,program,block,define,lambda,match,goto,if,else,then},
+morekeywords={seq,assign,program,block,define,lambda,match,goto,if,else,then,struct,Integer,Boolean},
 deletekeywords={read},
 escapechar=|,
 columns=flexible,
@@ -6220,6 +6220,16 @@ for the compilation of $R_3$.
 \section{Challenge: Simple Structures}
 \label{sec:simple-structures}
 
+Figure~\ref{fig:r3s-concrete-syntax} defines the concrete syntax for
+$R^s_3$, which extends $R^3$ with support for simple structures.
+Recall that a \code{struct} in Typed Racket is a user-defined data
+type that contains named fields and that is heap allocated, similar to
+a vector. The following is an example of a structure definition, in
+this case the definition of a \code{point} type.
+\begin{lstlisting}
+(struct point ([x : Integer] [y : Integer]) #:mutable)
+\end{lstlisting}
+
 \begin{figure}[tbp]
 \centering
 \fbox{
@@ -6227,7 +6237,7 @@ for the compilation of $R_3$.
 \[
 \begin{array}{lcl}
   \Type &::=& \gray{\key{Integer} \mid \key{Boolean}}
-  \mid (\key{Vector}\;\Type^{+}) \mid \key{Void}\\
+  \mid (\key{Vector}\;\Type \ldots) \mid \key{Void}\\
   \itm{cmp} &::= & \gray{ \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} } \\
   \Exp &::=& \gray{  \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp) \mid (\key{-}\;\Exp\;\Exp) }  \\
   &\mid&  \gray{  \Var \mid (\key{let}~([\Var~\Exp])~\Exp)  }\\
@@ -6237,12 +6247,12 @@ for the compilation of $R_3$.
    \mid (\key{not}\;\Exp) } \\
   &\mid& \gray{  (\itm{cmp}\;\Exp\;\Exp) 
    \mid (\key{if}~\Exp~\Exp~\Exp)  } \\
-  &\mid& \gray{ (\key{vector}\;\Exp^{+}) 
+  &\mid& \gray{ (\key{vector}\;\Exp \ldots) 
    \mid (\key{vector-ref}\;\Exp\;\Int) } \\
   &\mid& \gray{ (\key{vector-set!}\;\Exp\;\Int\;\Exp) }\\
-  &\mid& \gray{ (\key{void}) } \\
-  \Def &::=& (\key{struct}\; \Var \; ([\Var \,\key{:}\, \Type]^{*}))\\
-  R_3 &::=& \Def^{*} \; \Exp
+  &\mid& \gray{ (\key{void}) } \mid (\Var\;\Exp \ldots)\\
+  \Def &::=& (\key{struct}\; \Var \; ([\Var \,\key{:}\, \Type] \ldots)\; \code{\#:mutable})\\
+  R_3 &::=& \Def \ldots \; \Exp
 \end{array}
 \]
 \end{minipage}
@@ -6252,7 +6262,42 @@ for the compilation of $R_3$.
 \label{fig:r3s-concrete-syntax}
 \end{figure}
 
+An instance of a structure is created using function call syntax, with
+the name of the structure in the function position:
+\begin{lstlisting}
+(point 7 12)
+\end{lstlisting}
+Function-call syntax is also used to read the value in a field of a
+structure. The function name is formed by the structure name, a dash,
+and the field name. The following example uses \code{point-x} and
+\code{point-y} to access the \code{x} and \code{y} fields of two point
+instances.
+\begin{center}
+\begin{lstlisting}
+(let ([pt1 (point 7 12)])
+  (let ([pt2 (point 4 3)])
+    (+ (- (point-x pt1) (point-x pt2))
+       (- (point-y pt1) (point-y pt2)))))
+\end{lstlisting}
+\end{center}
+Similarly, to write to a field of a structure, use its set function,
+whose name starts with \code{set-}, followed by the structure name,
+then a dash, then the field name, and conclused with an exclamation
+mark. The folowing example uses \code{set-point-x!} to change the
+\code{x} field from \code{7} to \code{42}.
+\begin{center}
+  \begin{lstlisting}
+(let ([pt (point 7 12)])
+  (let ([_ (set-point-x! pt 42)])
+    (point-x pt)))
+\end{lstlisting}
+\end{center}
 
+\begin{exercise}\normalfont
+  Extend your compiler with support for simple structures, compiling
+  $R^s_3$ to x86 assembly code. Create five new test cases that use
+  structures and test your compiler.
+\end{exercise}
 
 
 \section{Challenge: Generational Collection}
