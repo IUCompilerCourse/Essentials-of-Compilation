@@ -5101,7 +5101,7 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
   &\mid& (\key{vector}\;\Exp^{+}) 
    \mid (\key{vector-ref}\;\Exp\;\Int) \\
   &\mid& (\key{vector-set!}\;\Exp\;\Int\;\Exp)\\
-  &\mid& (\key{void}) \\
+  &\mid& (\key{void}) \mid (\key{has-type}~\Exp~\Type)\\
   R_3 &::=& \Exp
 \end{array}
 \]
@@ -5145,7 +5145,7 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
      &\mid& \VECTOR{\Exp} \\
      &\mid& \VECREF{\Exp}{\Int}\\
      &\mid& \VECSET{\Exp}{\Int}{\Exp}\\
-      &\mid& \VOID{} \\
+      &\mid& \VOID{} \mid \LP\key{HasType}~\Exp~\Type \RP \\
   R_3 &::=& \PROGRAM{\key{'()}}{\Exp}
 \end{array}
 \]
@@ -5627,7 +5627,7 @@ $R_3$ with the three new forms that we use in the translation of the
   \Exp &::=& \cdots
       \mid (\key{collect} \,\itm{int})
       \mid (\key{allocate} \,\itm{int}\,\itm{type})
-      \mid (\key{global-value} \,\itm{name})
+      \mid (\key{global} \,\itm{name})
 \end{array}
 \]
 The $(\key{collect}\,n)$ form runs the garbage collector, requesting
@@ -5636,7 +5636,7 @@ $n$ bytes. It will become a call to the \code{collect} function in
 $(\key{allocate}\,n\,T)$ form creates an tuple of $n$ elements.  The
 $T$ parameter is the type of the tuple: \code{(Vector $\Type_1 \ldots
   \Type_n$)} where $\Type_i$ is the type of the $i$th element in the
-tuple. The $(\key{global-value}\,\itm{name})$ form reads the value of
+tuple. The $(\key{global}\,\itm{name})$ form reads the value of
 a global variable, such as \code{free\_ptr}.
 
 In the following, we show the transformation for the \code{vector}
@@ -5650,8 +5650,8 @@ vector, which is 8 for the tag plus \itm{len} times 8.
   (has-type (vector |$e_0 \ldots e_{n-1}$|) |\itm{type}|)
 |$\Longrightarrow$|
   (let ([|$x_0$| |$e_0$|]) ... (let ([|$x_{n-1}$| |$e_{n-1}$|])
-  (let ([_ (if (< (+ (global-value free_ptr) |\itm{bytes}|)
-                  (global-value fromspace_end))
+  (let ([_ (if (< (+ (global free_ptr) |\itm{bytes}|)
+                  (global fromspace_end))
                (void)
                (collect |\itm{bytes}|))])
   (let ([|$v$| (allocate |\itm{len}| |\itm{type}|)])
@@ -5711,7 +5711,7 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
 \section{Remove Complex Operands}
 \label{sec:remove-complex-opera-R2}
 
-The new forms \code{collect}, \code{allocate}, and \code{global-value}
+The new forms \code{collect}, \code{allocate}, and \code{global}
 should all be treated as complex operands. A new case for
 \code{HasType} is needed and the case for \code{Prim} needs to be
 handled carefully to prevent the \code{Prim} node from being separated
@@ -5720,6 +5720,32 @@ from its enclosing \code{HasType}.
 
 \section{Explicate Control and the $C_2$ language}
 \label{sec:explicate-control-r3}
+
+\begin{figure}[tbp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\small    
+\[
+\begin{array}{lcl}
+\Atm &::=& \gray{ \Int \mid \Var \mid \itm{bool} } \\
+\itm{cmp} &::= & \gray{ \key{eq?} \mid \key{<} } \\
+\Exp &::=& \gray{ \Atm \mid \key{(read)} \mid \key{(-}~\Atm\key{)} \mid \key{(+}~\Atm~\Atm\key{)} } \\
+  &\mid& \gray{ \LP \key{not}~\Atm \RP \mid \LP \itm{cmp}~\Atm~\Atm\RP } \\
+&\mid& \LP \key{allocate}~\Int~\Type \RP \\
+  &\mid& (\key{vector-ref}\;\Atm\;\Int) \mid (\key{vector-set!}\;\Atm\;\Int\;\Atm)\\
+  &\mid& \LP \key{global}~\Var \RP \mid \LP \key{void} \RP \\
+\Stmt &::=& \gray{ \Var~\key{=}~\Exp\key{;} } \mid \LP\key{collect}~\Int \RP\\
+\Tail &::= & \gray{ \key{return}~\Exp\key{;} \mid \Stmt~\Tail } 
+   \mid \gray{ \key{goto}~\itm{label}\key{;} }\\
+   &\mid& \gray{ \key{if}~\LP \itm{cmp}~\Atm~\Atm \RP~ \key{goto}~\itm{label}\key{;} ~\key{else}~\key{goto}~\itm{label}\key{;} } \\
+C_2 & ::= & \gray{ (\itm{label}\key{:}~ \Tail)^{+} }
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The concrete syntax of the $C_2$ intermediate language.}
+\label{fig:c2-concrete-syntax}
+\end{figure}
 
 \begin{figure}[tp]
 \fbox{
@@ -5735,13 +5761,13 @@ from its enclosing \code{HasType}.
    &\mid& (\key{Allocate} \,\itm{int}\,\itm{type}) \\
    &\mid& \BINOP{\key{'vector-ref}}{\Atm}{\Int}  \\
    &\mid& (\key{Prim}~\key{'vector-set!}\,(\key{list}\,\Atm\,\Int\,\Atm))\\
-   &\mid& (\key{GlobalValue} \,\itm{name}) \mid (\key{Void})\\
+   &\mid& (\key{GlobalValue} \,\Var) \mid (\key{Void})\\
 \Stmt &::=& \gray{ \ASSIGN{\VAR{\Var}}{\Exp} } 
        \mid (\key{Collect} \,\itm{int}) \\
 \Tail &::= & \gray{ \RETURN{\Exp} \mid \SEQ{\Stmt}{\Tail} 
        \mid \GOTO{\itm{label}} } \\
       &\mid& \gray{ \IFSTMT{\BINOP{\itm{cmp}}{\Atm}{\Atm}}{\GOTO{\itm{label}}}{\GOTO{\itm{label}}}  }\\
-C_2 & ::= & \PROGRAM{\itm{info}}{\CFG{(\itm{label}\,\key{.}\,\Tail)^{+}}}
+C_2 & ::= & \gray{ \PROGRAM{\itm{info}}{\CFG{(\itm{label}\,\key{.}\,\Tail)^{+}}} }
 \end{array}
 \]
 \end{minipage}
@@ -5752,10 +5778,11 @@ C_2 & ::= & \PROGRAM{\itm{info}}{\CFG{(\itm{label}\,\key{.}\,\Tail)^{+}}}
 \end{figure}
 
 The output of \code{explicate-control} is a program in the
-intermediate language $C_2$, whose abstract syntax is defined in
-Figure~\ref{fig:c2-syntax}.  The new forms of $C_2$ include the
-\key{allocate}, \key{vector-ref}, and \key{vector-set!}, and
-\key{global-value} expressions and the \code{collect} statement.  The
+intermediate language $C_2$, whose concrete syntax is defined in
+Figure~\ref{fig:c2-concrete-syntax} and whose abstract syntax is
+defined in Figure~\ref{fig:c2-syntax}.  The new forms of $C_2$ include
+the \key{allocate}, \key{vector-ref}, and \key{vector-set!}, and
+\key{global} expressions and the \code{collect} statement.  The
 \code{explicate-control} pass can treat these new forms much like the
 other forms.
 
@@ -5839,12 +5866,12 @@ start:
 %% collect (callq collect)
 %% vector-ref
 %% vector-set!
-%% global-value (postpone)
+%% global (postpone)
 
 In this pass we generate x86 code for most of the new operations that
-were needed to compile tuples, including \code{allocate},
-\code{collect}, \code{vector-ref}, \code{vector-set!}, and
-\code{(void)}. We postpone \code{global-value} to \code{print-x86}.
+were needed to compile tuples, including \code{Allocate},
+\code{Collect}, \code{vector-ref}, \code{vector-set!}, and
+\code{void}. We postpone \code{GlobalValue} to \code{print-x86}.
 
 The \code{vector-ref} and \code{vector-set!} forms translate into
 \code{movq} instructions with the appropriate \key{deref}.  (The
@@ -5882,8 +5909,8 @@ pointer mask region of the tag.
 \begin{lstlisting}
    (assign |$\itm{lhs}$| (allocate |$\itm{len}$| (Vector |$\itm{type} \ldots$|)))
    |$\Longrightarrow$|
-   (movq (global-value free_ptr) |$\itm{lhs}'$|)
-   (addq (int |$8(\itm{len}+1)$|) (global-value free_ptr))
+   (movq (global free_ptr) |$\itm{lhs}'$|)
+   (addq (int |$8(\itm{len}+1)$|) (global free_ptr))
    (movq |$\itm{lhs}'$| (reg r11))
    (movq (int |$\itm{tag}$|) (deref r11 0))
 \end{lstlisting}
@@ -5911,7 +5938,7 @@ the register allocator.
 \Arg &::=&  \gray{  \INT{\Int} \mid \REG{\Reg}
     \mid (\key{deref}\,\Reg\,\Int) } \\
    &\mid& \gray{ (\key{byte-reg}\; \Reg)  }
-   \mid (\key{global-value}\; \itm{name}) \\
+   \mid (\key{global}\; \itm{name}) \\
 \itm{cc} & ::= & \gray{  \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge}  } \\
 \Instr &::=& \gray{(\key{addq} \; \Arg\; \Arg) \mid
              (\key{subq} \; \Arg\; \Arg) \mid
@@ -5960,18 +5987,18 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
                (jmp block61)))
   (block62 . (block () (movq (int 0) (var collectret46)) (jmp block61)))
   (block61 . (block ()
-               (movq (global-value free_ptr) (var alloc43))
-               (addq (int 16) (global-value free_ptr))
+               (movq (global free_ptr) (var alloc43))
+               (addq (int 16) (global free_ptr))
                (movq (var alloc43) (reg r11))
                (movq (int 3) (deref r11 0))
                (movq (var alloc43) (reg r11))
                (movq (var vecinit44) (deref r11 8))
                (movq (int 0) (var initret45))
                (movq (var alloc43) (var vecinit48))
-               (movq (global-value free_ptr) (var tmp54))
+               (movq (global free_ptr) (var tmp54))
                (movq (var tmp54) (var tmp55))
                (addq (int 16) (var tmp55))
-               (movq (global-value fromspace_end) (var tmp56))
+               (movq (global fromspace_end) (var tmp56))
                (cmpq (var tmp56) (var tmp55))
                (jmp-if l block59)
                (jmp block60)))
@@ -5984,8 +6011,8 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
                (movq (int 0) (var collectret50)) 
                (jmp block58)))
   (block58 . (block ()
-               (movq (global-value free_ptr) (var alloc47))
-               (addq (int 16) (global-value free_ptr))
+               (movq (global free_ptr) (var alloc47))
+               (addq (int 16) (global free_ptr))
                (movq (var alloc47) (reg r11))
                (movq (int 131) (deref r11 0))
                (movq (var alloc47) (reg r11))
@@ -5998,10 +6025,10 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
                (jmp conclusion)))
   (start . (block ()
              (movq (int 42) (var vecinit44))
-             (movq (global-value free_ptr) (var tmp51))
+             (movq (global free_ptr) (var tmp51))
              (movq (var tmp51) (var tmp52))
              (addq (int 16) (var tmp52))
-             (movq (global-value fromspace_end) (var tmp53))
+             (movq (global fromspace_end) (var tmp53))
              (cmpq (var tmp53) (var tmp52))
              (jmp-if l block62)
              (jmp block63))))))
@@ -6059,7 +6086,7 @@ stack.
 
 
 \margincomment{\scriptsize We need to show the translation to x86 and what
-  to do about global-value. \\ --Jeremy}
+  to do about global. \\ --Jeremy}
 
 Figure~\ref{fig:print-x86-output-gc} shows the output of the
 \code{print-x86} pass on the running example. In the prelude and
@@ -6887,7 +6914,7 @@ the function definitions.
       \mid (\key{not}\;\Arg) \mid (\itm{cmp}\;\Arg\;\Arg)  } \\
    &\mid& \gray{  (\key{allocate}\,\Int\,\Type)
    \mid (\key{vector-ref}\, \Arg\, \Int)  } \\
-   &\mid& \gray{  (\key{vector-set!}\,\Arg\,\Int\,\Arg) \mid (\key{global-value} \,\itm{name}) \mid (\key{void}) } \\
+   &\mid& \gray{  (\key{vector-set!}\,\Arg\,\Int\,\Arg) \mid (\key{global} \,\itm{name}) \mid (\key{void}) } \\
    &\mid& (\key{fun-ref}\,\itm{label}) \mid (\key{call} \,\Arg\,\Arg^{*}) \\
 \Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Exp} 
        \mid (\key{collect} \,\itm{int}) }\\
@@ -6928,7 +6955,7 @@ language, whose syntax is defined in Figure~\ref{fig:x86-3}.
 \Arg &::=&  \gray{  \INT{\Int} \mid \REG{\Reg}
     \mid (\key{deref}\,\Reg\,\Int) } \\
    &\mid& \gray{ (\key{byte-reg}\; \Reg) 
-    \mid   (\key{global-value}\; \itm{name})  } \\
+    \mid   (\key{global}\; \itm{name})  } \\
    &\mid& (\key{fun-ref}\; \itm{label})\\
 \itm{cc} & ::= & \gray{  \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge}  } \\
 \Instr &::=& \gray{  (\key{addq} \; \Arg\; \Arg) \mid
