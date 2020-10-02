@@ -5123,7 +5123,6 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
 \begin{array}{lcl}
   \Type &::=& \gray{\key{Integer} \mid \key{Boolean}}
   \mid (\key{Vector}\;\Type^{+}) \mid \key{Void}\\
-  \itm{cmp} &::= & \gray{ \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} } \\
   \Exp &::=& \gray{  \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp) \mid (\key{-}\;\Exp\;\Exp) }  \\
   &\mid&  \gray{  \Var \mid (\key{let}~([\Var~\Exp])~\Exp)  }\\
   &\mid& \gray{ \key{\#t} \mid \key{\#f} 
@@ -5164,8 +5163,6 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-  \itm{bool} &::=& \key{\#t} \mid \key{\#f} \\
-  \itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
 \Exp &::=& \gray{ \INT{\Int} \mid \READ{} \mid \NEG{\Exp} } \\
      &\mid& \gray{ \ADD{\Exp}{\Exp} 
       \mid \BINOP{\code{'-}}{\Exp}{\Exp} } \\
@@ -5905,7 +5902,9 @@ start:
 In this pass we generate x86 code for most of the new operations that
 were needed to compile tuples, including \code{Allocate},
 \code{Collect}, \code{vector-ref}, \code{vector-set!}, and
-\code{void}. We postpone \code{GlobalValue} to \code{print-x86}.
+\code{void}. We compile \code{GlobalValue} to \code{Global} because
+the later has a different concrete syntax (see
+Figures~\ref{fig:x86-2-concrete} and \ref{fig:x86-2}).
 
 The \code{vector-ref} and \code{vector-set!} forms translate into
 \code{movq} instructions with the appropriate \key{deref}.  (The
@@ -5943,8 +5942,8 @@ pointer mask region of the tag.
 \begin{lstlisting}
    |$\itm{lhs}$| = (allocate |$\itm{len}$| (Vector |$\itm{type} \ldots$|));
    |$\Longrightarrow$|
-   movq (global free_ptr), |$\itm{lhs}'$|
-   addq $|$8(\itm{len}+1)$|, (global free_ptr)
+   movq free_ptr(%rip), |$\itm{lhs}'$|
+   addq $|$8(\itm{len}+1)$|, free_ptr(%rip)
    movq |$\itm{lhs}'$|, %r11
    movq $|$\itm{tag}$|, 0(%r11)
 \end{lstlisting}
@@ -5964,6 +5963,23 @@ the register allocator.
 \end{lstlisting}
 
 
+
+\begin{figure}[tp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{lcl}
+  \Arg &::=& \gray{ \key{\$}\Int \mid \key{\%}\Reg \mid \Int\key{(}\key{\%}\Reg\key{)} \mid \key{\%}\itm{bytereg} } \mid \Var \key{(\%rip)} \\
+x86_1 &::= & \gray{ \key{.globl main} }\\
+      &    & \gray{ \key{main:} \; \Instr^{+} }
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The concrete syntax of x86$_2$  (extends x86$_1$ of Figure~\ref{fig:x86-1-concrete}).}
+\label{fig:x86-2-concrete}
+\end{figure}
+
 \begin{figure}[tp]
 \fbox{
   \begin{minipage}{0.96\textwidth}
@@ -5973,20 +5989,7 @@ the register allocator.
   \Arg &::=&  \gray{  \INT{\Int} \mid \REG{\Reg} \mid \DEREF{\Reg}{\Int}
    \mid \BYTEREG{\Reg}} \\
    &\mid& (\key{Global}~\Var) \\
-\itm{cc} & ::= & \gray{  \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge}  } \\
-\Instr &::=& \gray{ \BININSTR{\code{'addq}}{\Arg}{\Arg} 
-       \mid \BININSTR{\code{'subq}}{\Arg}{\Arg} } \\
-       &\mid& \gray{ \BININSTR{\code{'movq}}{\Arg}{\Arg} 
-       \mid \UNIINSTR{\code{'negq}}{\Arg} } \\
-       &\mid& \gray{ \CALLQ{\itm{label}} \mid \RETQ{} 
-       \mid \PUSHQ{\Arg} \mid \POPQ{\Arg} \mid \JMP{\itm{label}} } \\
-       &\mid& \gray{ \BININSTR{\code{'xorq}}{\Arg}{\Arg}
-       \mid \BININSTR{\code{'cmpq}}{\Arg}{\Arg} }\\
-       &\mid& \gray{ \BININSTR{\code{'set}}{\itm{cc}}{\Arg} 
-       \mid \BININSTR{\code{'movzbq}}{\Arg}{\Arg} }\\
-       &\mid& \gray{ \JMPIF{\itm{cc}}{\itm{label}} } \\
-\Block &::= & \gray{ \BLOCK{\itm{info}}{\Instr^{+}} } \\
-x86_1 &::= & \gray{ \PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label} \,\key{.}\, \Block \key{)}^{+}}} }
+x86_2 &::= & \gray{ \PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label} \,\key{.}\, \Block \key{)}^{+}}} }
 \end{array}
 \]
 \end{minipage}
@@ -5995,21 +5998,21 @@ x86_1 &::= & \gray{ \PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label} \,\key{.}\, \Bl
 \label{fig:x86-2}
 \end{figure}
 
-The syntax of the $x86_2$ language is defined in
-Figure~\ref{fig:x86-2}.  It differs from x86$_1$ just in the addition
-of the form for global variables.
+The concrete and abstract syntax of the $x86_2$ language is defined in
+Figures~\ref{fig:x86-2-concrete} and \ref{fig:x86-2}.  It differs from
+x86$_1$ just in the addition of the form for global variables.
 %
 Figure~\ref{fig:select-instr-output-gc} shows the output of the
 \code{select-instructions} pass on the running example.
 
 \begin{figure}[tbp]
 \centering
-\begin{minipage}{0.75\textwidth}
 % tests/s2_17.rkt
+\begin{minipage}[t]{0.5\textwidth}
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
 block35:
-    movq (global free_ptr), alloc9024
-    addq $16, (global free_ptr)
+    movq free_ptr(%rip), alloc9024
+    addq $16, free_ptr(%rip)
     movq alloc9024, %r11
     movq $131, 0(%r11)
     movq alloc9024, %r11
@@ -6023,44 +6026,48 @@ block35:
 block36:
     movq $0, collectret9027
     jmp block35
-block37:
-    movq %r15, %rdi
-    movq $16, %rsi
-    callq 'collect
-    jmp block35
 block38:
-    movq (global free_ptr), alloc9020
-    addq $16, (global free_ptr)
+    movq free_ptr(%rip), alloc9020
+    addq $16, free_ptr(%rip)
     movq alloc9020, %r11
     movq $3, 0(%r11)
     movq alloc9020, %r11
     movq vecinit9021, 8(%r11)
     movq $0, initret9022
     movq alloc9020, vecinit9025
-    movq (global free_ptr), tmp9031
+    movq free_ptr(%rip), tmp9031
     movq tmp9031, tmp9032
     addq $16, tmp9032
-    movq (global fromspace_end), tmp9033
+    movq fromspace_end(%rip), tmp9033
     cmpq tmp9033, tmp9032
     jl block36
     jmp block37
+block37:
+    movq %r15, %rdi
+    movq $16, %rsi
+    callq 'collect
+    jmp block35
 block39:
     movq $0, collectret9023
     jmp block38
+\end{lstlisting}
+\end{minipage}
+\begin{minipage}[t]{0.45\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+start:
+    movq $42, vecinit9021
+    movq free_ptr(%rip), tmp9028
+    movq tmp9028, tmp9029
+    addq $16, tmp9029
+    movq fromspace_end(%rip), tmp9030
+    cmpq tmp9030, tmp9029
+    jl block39
+    jmp block40
 block40:
     movq %r15, %rdi
     movq $16, %rsi
     callq 'collect
     jmp block38
-start:
-    movq $42, vecinit9021
-    movq (global free_ptr), tmp9028
-    movq tmp9028, tmp9029
-    addq $16, tmp9029
-    movq (global fromspace_end), tmp9030
-    cmpq tmp9030, tmp9029
-    jl block39
-    jmp block40
 \end{lstlisting}
 \end{minipage}
 \caption{Output of the \code{select-instructions} pass.}
@@ -6113,16 +6120,12 @@ stack.
 \section{Print x86}
 \label{sec:print-x86-gc}
 
-
-\margincomment{\scriptsize We need to show the translation to x86 and what
-  to do about global. \\ --Jeremy}
-
 Figure~\ref{fig:print-x86-output-gc} shows the output of the
 \code{print-x86} pass on the running example. In the prelude and
 conclusion of the \code{main} function, we treat the root stack very
 much like the regular stack in that we move the root stack pointer
-(\code{r15}) to make room for all of the spills to the root stack,
-except that the root stack grows up instead of down.  For the running
+(\code{r15}) to make room for the spills to the root stack, except
+that the root stack grows up instead of down.  For the running
 example, there was just one spill so we increment \code{r15} by 8
 bytes. In the conclusion we decrement \code{r15} by 8 bytes.
 
@@ -6195,6 +6198,7 @@ start:
 	movq	$16, %rsi
 	callq	collect
 	jmp block38
+        
 	.globl main
 main:
 	pushq	%rbp
