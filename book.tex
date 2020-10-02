@@ -1310,7 +1310,7 @@ the x86 instructions used in this book.
   &&  \key{callq} \; \mathit{label} \mid
       \key{pushq}\;\Arg \mid \key{popq}\;\Arg \mid \key{retq} \mid \key{jmp}\,\itm{label} \\
   && \itm{label}\key{:}\; \Instr \\
-\Prog &::= & \key{.globl main}\\
+x86_0 &::= & \key{.globl main}\\
       &    & \key{main:} \; \Instr^{+}
 \end{array}
 \]
@@ -1512,7 +1512,7 @@ the $\itm{info}$ field should just contain an empty list.
 \[
 \begin{array}{lcl}
 \Reg &::=& \allregisters{} \\
-\Arg &::=&  \IMM{\Int} \mid \REG{\code{'}\Reg}
+\Arg &::=&  \IMM{\Int} \mid \REG{\Reg}
    \mid \DEREF{\Reg}{\Int} \\
 \Instr &::=& \BININSTR{\code{'addq}}{\Arg}{\Arg} 
        \mid \BININSTR{\code{'subq}}{\Arg}{\Arg} \\
@@ -3841,7 +3841,7 @@ operators to include
      &\mid& \gray{ \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp} } \\
      &\mid& \BOOL{\itm{bool}}  \mid \AND{\Exp}{\Exp}\\
      &\mid& \OR{\Exp}{\Exp} \mid \NOT{\Exp} \\
-      &\mid& \BINOP{\code{'}\itm{cmp}}{\Exp}{\Exp} \mid \IF{\Exp}{\Exp}{\Exp} \\
+      &\mid& \BINOP{\itm{cmp}}{\Exp}{\Exp} \mid \IF{\Exp}{\Exp}{\Exp} \\
   R_2 &::=& \PROGRAM{\key{'()}}{\Exp}
 \end{array}
 \]
@@ -4055,9 +4055,10 @@ modern computer architectures.
 
 To implement the new logical operations, the comparison operations,
 and the \key{if} expression, we need to delve further into the x86
-language. Figure~\ref{fig:x86-1} defines the abstract syntax for a
-larger subset of x86 that includes instructions for logical
-operations, comparisons, and conditional jumps.
+language. Figures~\ref{fig:x86-1-concrete} and \ref{fig:x86-1} define
+the concrete and abstract syntax for a larger subset of x86 that
+includes instructions for logical operations, comparisons, and
+conditional jumps.
 
 One small challenge is that x86 does not provide an instruction that
 directly implements logical negation (\code{not} in $R_2$ and $C_1$).
@@ -4087,14 +4088,48 @@ the first argument:
 \end{array}
 \]
 
+
+\begin{figure}[tp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{lcl}
+  \itm{bytereg} &::=& \key{ah} \mid \key{al} \mid \key{bh} \mid \key{bl}
+    \mid \key{ch} \mid \key{cl} \mid \key{dh} \mid \key{dl} \\
+\Arg &::=& \gray{ \key{\$}\Int \mid \key{\%}\Reg \mid \Int\key{(}\key{\%}\Reg\key{)} } \mid \key{\%}\itm{bytereg}\\
+\itm{cc} & ::= & \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge} \\
+\Instr &::=& \gray{ \key{addq} \; \Arg\key{,} \Arg \mid
+      \key{subq} \; \Arg\key{,} \Arg \mid
+      \key{negq} \; \Arg \mid \key{movq} \; \Arg\key{,} \Arg \mid } \\
+  &&  \gray{ \key{callq} \; \itm{label} \mid
+      \key{pushq}\;\Arg \mid \key{popq}\;\Arg \mid \key{retq} \mid \key{jmp}\,\itm{label} } \\
+  && \gray{ \itm{label}\key{:}\; \Instr }
+     \mid \key{xorq}~\Arg\key{,}~\Arg
+     \mid \key{cmpq}~\Arg\key{,}~\Arg  \mid \\
+  &&  \key{set}cc~\Arg
+     \mid \key{movzbq}~\Arg\key{,}~\Arg
+     \mid \key{j}cc~\itm{label}
+     \\
+x86_1 &::= & \gray{ \key{.globl main} }\\
+      &    & \gray{ \key{main:} \; \Instr^{+} }
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The concrete syntax of x86$_1$  (extends x86$_0$ of Figure~\ref{fig:x86-0-concrete}).}
+\label{fig:x86-1-concrete}
+\end{figure}
+
 \begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \small    
 \[
 \begin{array}{lcl}
-\Arg &::=&  \gray{\IMM{\Int} \mid \REG{\code{'}\Reg} \mid \DEREF{\Reg}{\Int}} 
-     \mid \BYTEREG{\code{'}\Reg} \\
+\itm{bytereg} &::=& \key{ah} \mid \key{al} \mid \key{bh} \mid \key{bl}
+    \mid \key{ch} \mid \key{cl} \mid \key{dh} \mid \key{dl} \\
+\Arg &::=&  \gray{\IMM{\Int} \mid \REG{\Reg} \mid \DEREF{\Reg}{\Int}} 
+     \mid \BYTEREG{\itm{bytereg}} \\
 \itm{cc} & ::= & \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge} \\
 \Instr &::=& \gray{ \BININSTR{\code{'addq}}{\Arg}{\Arg} 
        \mid \BININSTR{\code{'subq}}{\Arg}{\Arg} } \\
@@ -4104,9 +4139,9 @@ the first argument:
        \mid \PUSHQ{\Arg} \mid \POPQ{\Arg} \mid \JMP{\itm{label}} } \\
        &\mid& \BININSTR{\code{'xorq}}{\Arg}{\Arg}
        \mid \BININSTR{\code{'cmpq}}{\Arg}{\Arg}\\
-       &\mid& \BININSTR{\code{'set}}{\code{'}\itm{cc}}{\Arg} 
+       &\mid& \BININSTR{\code{'set}}{\itm{cc}}{\Arg} 
        \mid \BININSTR{\code{'movzbq}}{\Arg}{\Arg}\\
-       &\mid&  \JMPIF{\code{'}\itm{cc}}{\itm{label}} \\
+       &\mid&  \JMPIF{\itm{cc}}{\itm{label}} \\
 \Block &::= & \gray{\BLOCK{\itm{info}}{\Instr^{+}}} \\
 x86_1 &::= & \gray{\PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label} \,\key{.}\, \Block \key{)}^{+}}}}
 \end{array}
@@ -5139,7 +5174,7 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
       \mid \AND{\Exp}{\Exp} }\\
      &\mid& \gray{ \OR{\Exp}{\Exp}
       \mid \NOT{\Exp} } \\
-     &\mid& \gray{ \BINOP{\code{'}\itm{cmp}}{\Exp}{\Exp}
+     &\mid& \gray{ \BINOP{\itm{cmp}}{\Exp}{\Exp}
       \mid \IF{\Exp}{\Exp}{\Exp} } \\
      &\mid& \VECTOR{\Exp} \\
      &\mid& \VECREF{\Exp}{\Int}\\
@@ -5931,33 +5966,32 @@ the register allocator.
 
 \begin{figure}[tp]
 \fbox{
-\begin{minipage}{0.96\textwidth}
+  \begin{minipage}{0.96\textwidth}
+    \small
 \[
 \begin{array}{lcl}
-\Arg &::=&  \gray{  \INT{\Int} \mid \REG{\Reg}
-    \mid (\key{deref}\,\Reg\,\Int) } \\
-   &\mid& \gray{ (\key{byte-reg}\; \Reg)  }
-   \mid (\key{global}\; \itm{name}) \\
+  \Arg &::=&  \gray{  \INT{\Int} \mid \REG{\Reg} \mid \DEREF{\Reg}{\Int}
+   \mid \BYTEREG{\Reg}} \\
+   &\mid& (\key{Global}~\Var) \\
 \itm{cc} & ::= & \gray{  \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge}  } \\
-\Instr &::=& \gray{(\key{addq} \; \Arg\; \Arg) \mid
-             (\key{subq} \; \Arg\; \Arg) \mid
-             (\key{negq} \; \Arg) \mid (\key{movq} \; \Arg\; \Arg)} \\
-      &\mid& \gray{(\key{callq} \; \mathit{label}) \mid
-             (\key{pushq}\;\Arg) \mid
-             (\key{popq}\;\Arg) \mid
-             (\key{retq})} \\
-       &\mid& \gray{  (\key{xorq} \; \Arg\;\Arg)
-       \mid (\key{cmpq} \; \Arg\; \Arg) \mid (\key{set}\itm{cc} \; \Arg)  } \\
-       &\mid& \gray{  (\key{movzbq}\;\Arg\;\Arg)
-       \mid  (\key{jmp} \; \itm{label})
-       \mid (\key{jmp-if}\itm{cc} \; \itm{label})}\\
-       &\mid& \gray{(\key{label} \; \itm{label})  } \\
-x86_2 &::= & \gray{  (\key{program} \;\itm{info} \;(\key{type}\;\itm{type})\; \Instr^{+})  }
+\Instr &::=& \gray{ \BININSTR{\code{'addq}}{\Arg}{\Arg} 
+       \mid \BININSTR{\code{'subq}}{\Arg}{\Arg} } \\
+       &\mid& \gray{ \BININSTR{\code{'movq}}{\Arg}{\Arg} 
+       \mid \UNIINSTR{\code{'negq}}{\Arg} } \\
+       &\mid& \gray{ \CALLQ{\itm{label}} \mid \RETQ{} 
+       \mid \PUSHQ{\Arg} \mid \POPQ{\Arg} \mid \JMP{\itm{label}} } \\
+       &\mid& \gray{ \BININSTR{\code{'xorq}}{\Arg}{\Arg}
+       \mid \BININSTR{\code{'cmpq}}{\Arg}{\Arg} }\\
+       &\mid& \gray{ \BININSTR{\code{'set}}{\itm{cc}}{\Arg} 
+       \mid \BININSTR{\code{'movzbq}}{\Arg}{\Arg} }\\
+       &\mid& \gray{ \JMPIF{\itm{cc}}{\itm{label}} } \\
+\Block &::= & \gray{ \BLOCK{\itm{info}}{\Instr^{+}} } \\
+x86_1 &::= & \gray{ \PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label} \,\key{.}\, \Block \key{)}^{+}}} }
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The x86$_2$ language (extends x86$_1$ of Figure~\ref{fig:x86-1}).}
+\caption{The abstract syntax of x86$_2$ (extends x86$_1$ of Figure~\ref{fig:x86-1}).}
 \label{fig:x86-2}
 \end{figure}
 
