@@ -67,9 +67,9 @@
 %\renewcommand{\ttdefault}{cmtt}
 
 \definecolor{comment-red}{rgb}{0.8,0,0}
-\if{0}
+\if01
 \newcommand{\rn}[1]{{\color{comment-red}{(RRN: #1)}}}
-\newcommand{\margincomment}[1]{\marginpar{#1}}
+\newcommand{\margincomment}[1]{\marginpar{\color{comment-red}\tiny #1}}
 \else
 \newcommand{\rn}[1]{}
 \newcommand{\margincomment}[1]{}
@@ -1974,7 +1974,7 @@ $\Rightarrow$
 \Exp &::=& \Atm \mid \READ{} \\
      &\mid& \NEG{\Atm} \mid \ADD{\Atm}{\Atm}  \\
      &\mid&  \LET{\Var}{\Exp}{\Exp} \\
-R_1  &::=& \PROGRAM{\code{'()}}{\Exp}
+R^{\dagger}_1  &::=& \PROGRAM{\code{'()}}{\Exp}
 \end{array}
 \]
 \end{minipage}
@@ -4255,6 +4255,42 @@ C_1 & ::= & \gray{\PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label}\,\key{.}\,\Tail\k
 \label{fig:c1-syntax}
 \end{figure}
 
+\clearpage
+
+\section{Remove Complex Operands}
+\label{sec:remove-complex-opera-R2}
+
+The additions to \code{remove-complex-opera*} are straightforward: add
+cases for \code{Bool} and \code{If} to the \code{rco-exp} and
+\code{rco-atom} functions according to the definition of the output
+language for this pass, $R_2^{\dagger}$, the administrative normal
+form of $R_2$ (Figure~\ref{fig:r2-anf-syntax}). The \code{Bool} form
+is an atomic expressions but \code{If} is not. All three
+sub-expressions of an \code{If} are allowed to be complex expressions
+in the output of \code{remove-complex-opera*}, but the operands of
+\code{not} and the comparisons must be atoms.
+
+\begin{figure}[tp]
+\centering
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{rcl}
+\Atm &::=& \gray{ \INT{\Int} \mid \VAR{\Var} } \mid \BOOL{\itm{bool}}\\
+\Exp &::=& \gray{ \Atm \mid \READ{} } \\
+     &\mid& \gray{ \NEG{\Atm} \mid \ADD{\Atm}{\Atm} } \\
+     &\mid& \gray{ \LET{\Var}{\Exp}{\Exp} } \\
+     &\mid& \UNIOP{\key{'not}}{\Atm} \\
+      &\mid& \BINOP{\itm{cmp}}{\Atm}{\Atm} \mid \IF{\Exp}{\Exp}{\Exp} \\
+R^{\dagger}_2  &::=& \PROGRAM{\code{'()}}{\Exp}
+\end{array}
+\]
+\end{minipage}
+}
+\caption{$R_2^{\dagger}$ is $R_2$ in administrative normal form (ANF).}
+\label{fig:r2-anf-syntax}
+\end{figure}
+
 
 \section{Explicate Control}
 \label{sec:explicate-control-r2}
@@ -6250,12 +6286,6 @@ conclusion:
 \end{figure}
 
 
-\margincomment{\scriptsize Suggest an implementation strategy
-  in which the students first do the code gen and test that
-  without GC (just use a big heap), then after that is debugged,
-  implement the GC. \\ --Jeremy}
-
-
 \begin{figure}[p]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (R3) at (0,2)  {\large $R_3$};
@@ -6551,8 +6581,8 @@ inside each other.
      &\mid& \gray{ \VECTOR{\Exp} } \\
      &\mid& \gray{ \VECREF{\Exp}{\Int} }\\
      &\mid& \gray{ \VECSET{\Exp}{\Int}{\Exp}} \\
-     &\mid& \gray{ \VOID{} \mid \LP\key{HasType}~\Exp~\Type \RP } \\
-     &\mid& \APPLY{\Exp}{\Exp\ldots}\\
+     &\mid& \gray{ \VOID{} \mid \LP\key{HasType}~\Exp~\Type \RP } 
+     \mid \APPLY{\Exp}{\Exp\ldots}\\
  \Def &::=& \FUNDEF{\Var}{([\Var \code{:} \Type]\ldots)}{\Type}{\code{'()}}{\Exp}\\
   R_4 &::=& \PROGRAMDEFSEXP{\code{'()}}{(\Def\ldots)}{\Exp}
 \end{array}
@@ -6877,16 +6907,15 @@ where $\itm{mainDef}$ is
 \section{Reveal Functions and the $F_1$ language}
 \label{sec:reveal-functions-r4}
 
-Going forward, the syntax of $R_4$ is inconvenient for purposes of
-compilation because it conflates the use of function names and local
+The syntax of $R_4$ is inconvenient for purposes of compilation in one
+respect: it conflates the use of function names and local
 variables. This is a problem because we need to compile the use of a
 function name differently than the use of a local variable; we need to
 use \code{leaq} to convert the function name (a label in x86) to an
 address in a register.  Thus, it is a good idea to create a new pass
 that changes function references from just a symbol $f$ to
-\code{(FunRef $f$)}. A good name for this pass is
-\code{reveal-functions} and the output language, $F_1$, is defined in
-Figure~\ref{fig:f1-syntax}.
+$\FUNREF{f}$. This pass is named \code{reveal-functions} and the
+output language, $F_1$, is defined in Figure~\ref{fig:f1-syntax}.
 
 \begin{figure}[tp]
 \centering
@@ -6894,24 +6923,29 @@ Figure~\ref{fig:f1-syntax}.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-  \Type &::=& \gray{ \key{Integer} \mid \key{Boolean}
-         \mid (\key{Vector}\;\Type \ldots) \mid \key{Void}  \mid (\Type \ldots \; \key{->}\; \Type)} \\
-  \Exp &::=& \gray{ \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)}  \\
-     &\mid&  \gray{ \Var \mid \LET{\Var}{\Exp}{\Exp} }\\
-  &\mid& \gray{ \key{\#t} \mid \key{\#f} \mid
-      (\key{not}\;\Exp)} \mid \gray{(\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
-  &\mid& \gray{(\key{vector}\;\Exp \ldots) \mid
-    (\key{vector-ref}\;\Exp\;\Int)} \\
-  &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void}) \mid
-         (\key{app}\; \Exp \; \Exp \ldots)} \\
-      &\mid& (\key{fun-ref}\, \itm{label}) \\
-  \Def &::=& \gray{(\key{define}\; (\itm{label} \; [\Var \key{:} \Type] \ldots) \key{:} \Type \; \Exp)} \\
-  F_1 &::=& \gray{(\key{program}\;\itm{info} \; \Def \ldots)}
+\Exp &::=& \gray{ \INT{\Int} \mid \READ{} \mid \NEG{\Exp} } \\
+     &\mid& \gray{ \ADD{\Exp}{\Exp} 
+      \mid \BINOP{\code{'-}}{\Exp}{\Exp} } \\
+     &\mid& \gray{ \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp} } \\
+     &\mid& \gray{ \BOOL{\itm{bool}} 
+      \mid \AND{\Exp}{\Exp} }\\
+     &\mid& \gray{ \OR{\Exp}{\Exp}
+      \mid \NOT{\Exp} } \\
+     &\mid& \gray{ \BINOP{\itm{cmp}}{\Exp}{\Exp}
+      \mid \IF{\Exp}{\Exp}{\Exp} } \\
+     &\mid& \gray{ \VECTOR{\Exp} } \\
+     &\mid& \gray{ \VECREF{\Exp}{\Int} }\\
+     &\mid& \gray{ \VECSET{\Exp}{\Int}{\Exp}} \\
+     &\mid& \gray{ \VOID{} \mid \LP\key{HasType}~\Exp~\Type \RP 
+     \mid \APPLY{\Exp}{\Exp\ldots} }\\
+     &\mid& \FUNREF{\Var}\\
+ \Def &::=& \gray{ \FUNDEF{\Var}{([\Var \code{:} \Type]\ldots)}{\Type}{\code{'()}}{\Exp} }\\
+  F_1 &::=& \PROGRAMDEFS{\code{'()}}{\LP \Def\ldots \RP}
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The $F_1$ language, an extension of $R_4$
+\caption{The abstract syntax $F_1$, an extension of $R_4$
   (Figure~\ref{fig:r4-syntax}).}
 \label{fig:f1-syntax}
 \end{figure}
@@ -6921,25 +6955,32 @@ Figure~\ref{fig:f1-syntax}.
 %% two mutually recursive functions, one for processing expressions in
 %% tail position and another for the rest. 
 
-Placing this pass after \code{uniquify} is a good idea, because it
-will make sure that there are no local variables and functions that
-share the same name. On the other hand, \code{reveal-functions} needs
-to come before the \code{explicate-control} pass because that pass
-will help us compile \code{fun-ref} into assignment statements.
+Placing this pass after \code{uniquify} will make sure that there are
+no local variables and functions that share the same name. On the
+other hand, \code{reveal-functions} needs to come before the
+\code{explicate-control} pass because that pass helps us compile
+\code{FunRef} forms into assignment statements.
 
 \section{Limit Functions}
 \label{sec:limit-functions-r4}
 
-This pass transforms functions so that they have at most six
-parameters and transforms all function calls so that they pass at most
-six arguments.  A simple strategy for imposing an argument limit of
-length $n$ is to take all arguments $i$ where $i \geq n$ and pack them
-into a vector, making that subsequent vector the $n$th argument.
+Recall that we wish to limit the number of function parameters to six
+so that we do not need to use the stack for argument passing, which
+makes it easier to implement efficient tail calls.  However, because
+the input language $R_4$ supports arbitrary numbers of function
+arguments, we have some work to do!
+
+This pass transforms functions and function calls that involve more
+than six arguments to pass the first five arguments as usual, but it
+packs the rest of the arguments into a vector and passes it as the
+sixth argument. So for any function call with $n$ arguments more than
+six, the \code{limit-functions} pass transforms it in the following
+way.
 
 \begin{tabular}{lll}
 \begin{minipage}{0.2\textwidth}
 \begin{lstlisting}
-  (|$f$| |$x_1$| |$\ldots$| |$x_n$|) 
+  (|$e_0$| |$e_1$| |$\ldots$| |$e_n$|) 
 \end{lstlisting}
 \end{minipage}
 &
@@ -6947,10 +6988,12 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(|$f$| |$x_1$| |$\ldots$| |$x_5$| (vector |$x_6$| |$\ldots$| |$x_n$|))
+(|$e_0$| |$e_1$| |$\ldots$| |$e_5$| (vector |$e_6$| |$\ldots$| |$e_n$|))
 \end{lstlisting}
 \end{minipage}
 \end{tabular}
+
+\margincomment{UNDER CONSTRUCTION --Jeremy}
 
 In the body of the function, all occurrences of the $i$th argument in
 which $i>5$ must be replaced with a \code{vector-ref}.
