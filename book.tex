@@ -2122,18 +2122,29 @@ We recommend implementing \code{explicate-control} using two mutually
 recursive functions: \code{explicate-tail} and
 \code{explicate-assign}.  The first function should be applied to
 expressions in tail position whereas the second should be applied to
-expressions that occur on the right-hand-side of a \key{let}. The
-\code{explicate-tail} function takes an $R_1$ expression as input and
-produces a $C_0$ $\Tail$ (see Figure~\ref{fig:c0-syntax}) and a list
-of formerly \key{let}-bound variables. The \code{explicate-assign}
-function takes an $R_1$ expression, the variable that it is to be
-assigned to, and $C_0$ code (a $\Tail$) that should come after the
-assignment (e.g., the code generated for the body of the \key{let}).
-It returns a $\Tail$ and a list of variables. The top-level
-\code{explicate-control} function should invoke \code{explicate-tail}
-on the body of the \key{program} and then associate the \code{locals}
-symbol with the resulting list of variables in the $\itm{info}$ field,
-as in the above example.
+expressions that occur on the right-hand-side of a \key{let}.
+%
+The \code{explicate-tail} function takes an $R_1$ expression as input
+and produces a $C_0$ $\Tail$ (see Figure~\ref{fig:c0-syntax}) and a
+list of formerly \key{let}-bound variables.
+%
+The \code{explicate-assign} function takes an $R_1$ expression, the
+variable that it is to be assigned to, and $C_0$ code (a $\Tail$) that
+should come after the assignment (e.g., the code generated for the
+body of the \key{let}).  It returns a $\Tail$ and a list of
+variables. The \code{explicate-assign} function is in
+accumulator-passing style in that its third parameter is some $C_0$
+code which it then adds to and returns. The reader might be tempted to
+instead organize \code{explicate-assign} in a more direct fashion,
+without the third parameter and perhaps using \code{append} to combine
+statements. We warn against that alternative because the
+accumulator-passing style is key to how we generate high-quality code
+for conditional expressions in Chapter~\ref{ch:bool-types}.
+
+The top-level \code{explicate-control} function should invoke
+\code{explicate-tail} on the body of the \key{program} and then
+associate the \code{locals} symbol with the resulting list of
+variables in the $\itm{info}$ field, as in the above example.
 
 \section{Select Instructions}
 \label{sec:select-r1}
@@ -4260,15 +4271,19 @@ C_1 & ::= & \gray{\PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label}\,\key{.}\,\Tail\k
 \section{Remove Complex Operands}
 \label{sec:remove-complex-opera-R2}
 
-The additions to \code{remove-complex-opera*} are straightforward: add
-cases for \code{Bool} and \code{If} to the \code{rco-exp} and
+Add cases for \code{Bool} and \code{If} to the \code{rco-exp} and
 \code{rco-atom} functions according to the definition of the output
 language for this pass, $R_2^{\dagger}$, the administrative normal
-form of $R_2$ (Figure~\ref{fig:r2-anf-syntax}). The \code{Bool} form
-is an atomic expressions but \code{If} is not. All three
-sub-expressions of an \code{If} are allowed to be complex expressions
-in the output of \code{remove-complex-opera*}, but the operands of
-\code{not} and the comparisons must be atoms.
+form of $R_2$, which is defined in Figure~\ref{fig:r2-anf-syntax}. The
+\code{Bool} form is an atomic expressions but \code{If} is not. All
+three sub-expressions of an \code{If} are allowed to be complex
+expressions in the output of \code{remove-complex-opera*}, but the
+operands of \code{not} and the comparisons must be atoms.  Regarding
+the \code{If} form, it is particularly important to \textbf{not}
+replace its condition with a temporary variable because that would
+interfere with the generation of high-quality output in the
+\code{explicate-control} pass.
+
 
 \begin{figure}[tp]
 \centering
