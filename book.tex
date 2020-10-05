@@ -6553,8 +6553,8 @@ inside each other.
      &\mid& \gray{ \VECSET{\Exp}{\Int}{\Exp}} \\
      &\mid& \gray{ \VOID{} \mid \LP\key{HasType}~\Exp~\Type \RP } \\
      &\mid& \APPLY{\Exp}{\Exp\ldots}\\
- \Def &::=& \FUNDEF{\Var}{[\Var \code{:} \Type]\ldots}{\Type}{\code{'()}}{\Exp}\\
-  R_4 &::=& \PROGRAMDEFS{\code{'()}}{\Def\ldots}{\Exp}
+ \Def &::=& \FUNDEF{\Var}{([\Var \code{:} \Type]\ldots)}{\Type}{\code{'()}}{\Exp}\\
+  R_4 &::=& \PROGRAMDEFSEXP{\code{'()}}{(\Def\ldots)}{\Exp}
 \end{array}
 \]
 \end{minipage}
@@ -6590,7 +6590,7 @@ The program applies
 \end{figure}
 
 The definitional interpreter for $R_4$ is in
-Figure~\ref{fig:interp-R4}. The case for the \code{ProgramDefs} form is
+Figure~\ref{fig:interp-R4}. The case for the \code{ProgramDefsExp} form is
 responsible for setting up the mutual recursion between the top-level
 function definitions. We use the classic back-patching approach that
 uses mutable variables and makes two passes over the function
@@ -6626,7 +6626,7 @@ update the \code{lambda} values to use the top-level environment.
 
 (define (interp-R4 p)
   (match p
-    [(ProgramDefs info ds body)
+    [(ProgramDefsExp info ds body)
      (let ([top-level (for/list ([d ds]) (interp-def d))])
        (for/list ([b top-level])
          (set-mcdr! b (match (mcdr b)
@@ -6860,32 +6860,17 @@ preceding conclusion overwrites just about everything else.
 \section{Shrink $R_4$}
 \label{sec:shrink-r4}
 
-The \code{shrink} pass performs a couple minor modifications to the
-grammar to ease the later passes. This pass adds an empty $\itm{info}$
-field to each function definition:
+The \code{shrink} pass performs a minor modifications to ease the
+later passes. This pass introduces an explicit \code{main} function
+and changes the top \code{ProgramDefsExp} form to
+\code{ProgramDefs} as follows.
 \begin{lstlisting}
-    (define (|$f$| [|$x_1 : \Type_1$| ...) : |$\Type_r$| |$\Exp$|)
-|$\Rightarrow$|  (define (|$f$| [|$x_1 : \Type_1$| ...) : |$\Type_r$| () |$\Exp$|)
+   (ProgramDefsExp |$\itm{info}$| (|$\Def\ldots$|) |$\Exp$|)
+|$\Rightarrow$| (ProgramDefs |$\itm{info}$| (|$\Def\ldots$| |$\itm{mainDef}$|))
 \end{lstlisting}
-and introduces an explicit \code{main} function.\\
-\begin{tabular}{lll}
-\begin{minipage}{0.45\textwidth}
-\begin{lstlisting}
-    (program |$\itm{info}$| |$ds$| ... |$\Exp$|)
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.45\textwidth}
-\begin{lstlisting}
-    (program |$\itm{info}$| |$ds'$| |$\itm{mainDef}$|)
-\end{lstlisting}
-\end{minipage}
-\end{tabular}  \\
 where $\itm{mainDef}$ is
 \begin{lstlisting}
-    (define (main) : Integer () |$\Exp'$|)
+(Def main () Integer () |$\Exp'$|)
 \end{lstlisting}
 
 
@@ -6899,7 +6884,7 @@ function name differently than the use of a local variable; we need to
 use \code{leaq} to convert the function name (a label in x86) to an
 address in a register.  Thus, it is a good idea to create a new pass
 that changes function references from just a symbol $f$ to
-\code{(fun-ref $f$)}. A good name for this pass is
+\code{(FunRef $f$)}. A good name for this pass is
 \code{reveal-functions} and the output language, $F_1$, is defined in
 Figure~\ref{fig:f1-syntax}.
 
@@ -8682,7 +8667,7 @@ registers.
 \texttt{negq} $A$ & $- A \to A$ \\
 \texttt{subq} $A$, $B$ &  $B - A \to B$\\
 \texttt{callq} $L$ & Pushes the return address and jumps to label $L$ \\
-\texttt{callq} *$A$ & Calls the function at the address $A$. \\
+\texttt{callq} \texttt{*}$A$ & Calls the function at the address $A$. \\
 %\texttt{leave} & $\texttt{ebp} \to \texttt{esp};$ \texttt{popl \%ebp} \\
 \texttt{retq} & Pops the return address and jumps to it \\
 \texttt{popq} $A$ & $*\mathtt{rsp} \to A; \mathtt{rsp} + 8 \to \mathtt{rsp}$ \\
