@@ -2061,8 +2061,9 @@ produce the following output.\\
 \end{minipage}
 
 \begin{exercise}
-\normalfont Implement the \code{remove-complex-opera*} pass and test
-it on all of the example programs that you created to test the
+\normalfont Implement the \code{remove-complex-opera*} pass.
+The \href{https://docs.racket-lang.org/reference/for.html#%28form._%28%28lib._racket%2Fprivate%2Fbase..rkt%29._for%2Flists%29%29}{\code{for/lists}} looping form in Racket may come in handy.
+Test the new pass on all of the example programs that you created to test the
 \key{uniquify} pass and create three new example programs that are
 designed to exercise the interesting code in the
 \code{remove-complex-opera*} pass. Use the \key{interp-tests} function
@@ -2738,6 +2739,25 @@ line 2 is never used. The variable \code{b} is read on line 5 and
 there is an intervening write to \code{b} on line 4, so the read on
 line 5 receives the value written on line 4, not line 2.
 
+
+\begin{wrapfigure}[21]{l}[1.0in]{0.6\textwidth}
+  \small
+  \begin{tcolorbox}[title=\href{https://docs.racket-lang.org/reference/sets.html}{The Racket Set Package}]
+  A \emph{set} is an unordered collection of elements that does not
+  contain duplicates.
+  \begin{description}
+  \item[$\LP\code{set}\,v\,\ldots\RP$] constructs a set containing the specified elements.
+  \item[$\LP\code{set-union}\,s_1\,s_2\RP$] returns the union of the two sets.
+  \item[$\LP\code{set-subtract}\,s_1\,s_2\RP$] returns the difference of the two sets.
+  \item[$\LP\code{set-member?}\,s\,v\RP$] is element $v$ in set $s$?
+  \item[$\LP\code{set-count}\,s\RP$] how many unique elements are in set $s$?
+  \item[$\LP\code{set-add}\,s\,v\RP$] returns a set with all the
+    elements of $s$ plus the element $v$.
+  \item[$\LP\code{set->list}\,s\RP$] converts the set $s$ to a list.
+  \end{description}
+  \end{tcolorbox}
+\end{wrapfigure}
+
 The live variables can be computed by traversing the instruction
 sequence back to front (i.e., backwards in execution order).  Let
 $I_1,\ldots, I_n$ be the instruction sequence. We write
@@ -2891,6 +2911,33 @@ question easier to answer, we create an explicit data structure, an
 graph that has an edge between two variables if they are live at the
 same time, that is, if they interfere with each other.
 
+\begin{wrapfigure}[27]{r}[1.0in]{0.6\textwidth}
+  \small
+  \begin{tcolorbox}[title=\href{https://docs.racket-lang.org/graph/index.html}{The Racket Graph Library}]
+    A \emph{graph} is a collection of vertices and edges where each
+    edge connects two vertices.  A graph is \emph{directed} if each
+    edge points from a source to a target.  Otherwise the graph is
+    \emph{undirected}.
+        
+  \begin{description}
+  \item[$\LP\code{directed-graph}\,\itm{edges}\RP$] constructs a
+    directed graph from a list of edges. Each edge is a list
+    containing the source and target vertex.
+  \item[$\LP\code{undirected-graph}\,\itm{edges}\RP$] constructs a
+    undirected graph from a list of edges. Each edge is represented by
+    a list containing two vertices.
+  \item[$\LP\code{add-vertex!}\,\itm{graph}\,\itm{vertex}\RP$]
+    inserts a vertex into the graph.
+  \item[$\LP\code{add-edge!}\,\itm{graph}\,\itm{source}\,\itm{target}\RP$]
+    inserts an edge between the two vertices into the graph.
+  \item[$\LP\code{in-neighbors}\,\itm{graph}\,\itm{vertex}\RP$]
+    returns a sequence of all the neighbors of the given vertex.
+  \item[$\LP\code{in-vertices}\,\itm{graph}\RP$]
+    returns a sequence of all the vertices in the graph.
+  \end{description}
+\end{tcolorbox}
+\end{wrapfigure}
+
 The most obvious way to compute the interference graph is to look at
 the set of live variables between each statement in the program and
 add an edge to the graph for every pair of variables in the same set.
@@ -3017,12 +3064,13 @@ Figure~\ref{fig:interfere}.
 
 \begin{exercise}\normalfont
 Implement the compiler pass named \code{build-interference} according
-to the algorithm suggested above. We recommend using the Racket
-\code{graph} package to create and inspect the interference graph.
-The output graph of this pass should be stored in the $\itm{info}$
-field of the program, under the key \code{conflicts}.
+to the algorithm suggested above. We recommend using the \code{graph}
+package to create and inspect the interference graph.  The output
+graph of this pass should be stored in the $\itm{info}$ field of the
+program, under the key \code{conflicts}.
 \end{exercise}
 
+  
 \section{Graph Coloring via Sudoku}
 \label{sec:graph-coloring}
 
@@ -5793,7 +5841,7 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
 
 
 \section{Remove Complex Operands}
-\label{sec:remove-complex-opera-R2}
+\label{sec:remove-complex-opera-R3}
 
 The new forms \code{collect}, \code{allocate}, and \code{global-value}
 should all be treated as complex operands. A new case for
@@ -7128,12 +7176,12 @@ x86_3 &::= & (\key{program} \;\itm{info} \;\Def\ldots)
 \label{fig:x86-3}
 \end{figure}
 
-An assignment of \code{fun-ref} becomes a \code{leaq} instruction
+An assignment of \code{FunRef} becomes a \code{leaq} instruction
 as follows: \\
 \begin{tabular}{lll}
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-  (assign |$\itm{lhs}$| (fun-ref |$f$|))
+  (Assign |$\itm{lhs}$| (FunRef |$f$|))
 \end{lstlisting}
 \end{minipage}
 &
@@ -7141,7 +7189,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(leaq (fun-ref |$f$|) |$\itm{lhs}$|)
+(Instr 'leaq (list (FunRef |$f$|) |$\itm{lhs}'$|))
 \end{lstlisting}
 \end{minipage}
 \end{tabular} \\
@@ -8606,118 +8654,119 @@ algorithm of \citet{Waddell:1997fk}.
 \section{Interpreters}
 \label{appendix:interp}
 
-We provide several interpreters in the \key{interp.rkt} file.  The
-\key{interp-scheme} function takes an AST in one of the Racket-like
-languages considered in this book ($R_1, R_2, \ldots$) and interprets
-the program, returning the result value.  The \key{interp-C} function
-interprets an AST for a program in one of the C-like languages ($C_0,
-C_1, \ldots$), and the \code{interp-x86} function interprets an AST
-for an x86 program.
+We provide interpreters for each of the source languages $R_0$, $R_1$,
+$\ldots$ in the files \code{interp-R1.rkt}, \code{interp-R2.rkt}, etc.
+The interpreters for the intermediate languages $C_0$ and $C_1$ are in
+\code{interp-C0.rkt} and \code{interp-C1.rkt}.  The interpreters for
+the rest of the intermediate languages, including pseudo-x86 and x86
+are in the \key{interp.rkt} file.
 
 \section{Utility Functions}
 \label{appendix:utilities}
 
-The utility function described in this section can be found in the
-\key{utilities.rkt} file.
+The utility functions described here are in the \key{utilities.rkt}
+file.
 
-The \key{read-program} function takes a file path and parses that file
-(it must be a Racket program) into an abstract syntax tree with a
-\key{Program} node at the top.
+\paragraph{\code{interp-tests}}
 
-The \key{parse-program} function takes an S-expression representation
-of an AST and converts it into the struct-based representation.
+The \key{interp-tests} function runs the compiler passes and the
+interpreters on each of the specified tests to check whether each pass
+is correct. The \key{interp-tests} function has the following
+parameters:
+\begin{description}
+\item[name (a string)] a name to identify the compiler,
+\item[typechecker] a function of exactly one argument that either
+  raises an error using the \code{error} function when it encounters a
+  type error, or returns \code{\#f} when it encounters a type
+  error. If there is no type error, the type checker returns the
+  program.
 
-The \key{assert} function displays the error message \key{msg} if the
-Boolean \key{bool} is false.
-\begin{lstlisting}
-(define (assert msg bool) ...)
-\end{lstlisting}
+\item[passes] a list with one entry per pass.  An entry is a list with
+  three things: a string giving the name of the pass, the function
+  that implements the pass (a translator from AST to AST), and a
+  function that implements the interpreter (a function from AST to
+  result value) for the language of the output of the pass.
+
+\item[source-interp] an interpreter for the source language. The
+  interpreters from Appendix~\ref{appendix:interp} make a good choice.
+  
+\item[test-family (a string)] for example, \code{"r1"}, \code{"r2"}, etc.
+\item[tests] a list of test numbers that specifies which tests to
+  run. (see below)
+\end{description}
+%
+The \key{interp-tests} function assumes that the subdirectory
+\key{tests} has a collection of Racket programs whose names all start
+with the family name, followed by an underscore and then the test
+number, ending with the file extension \key{.rkt}. Also, for each test
+program that calls \code{read} one or more times, there is a file with
+the same name except that the file extension is \key{.in} that
+provides the input for the Racket program. If the test program is
+expected to fail type checking, then there should be an empty file of
+the same name but with extension \key{.tyerr}.
+
+
+\paragraph{\code{compiler-tests}}
+
+runs the compiler passes to generate x86 (a \key{.s} file) and then
+runs the GNU C compiler (gcc) to generate machine code.  It runs the
+machine code and checks that the output is $42$. The parameters to the
+\code{compiler-tests} function are similar to those of the
+\code{interp-tests} function, and consist of
+\begin{itemize}
+\item a compiler name (a string),
+\item a type checker,
+\item description of the passes,
+\item name of a test-family, and
+\item a list of test numbers.
+\end{itemize}
+
+
+\paragraph{\code{compile-file}}
+
+takes a description of the compiler passes (see the comment for
+\key{interp-tests}) and returns a function that, given a program file
+name (a string ending in \key{.rkt}), applies all of the passes and
+writes the output to a file whose name is the same as the program file
+name but with \key{.rkt} replaced with \key{.s}.
+
+
+\paragraph{\code{read-program}}
+
+takes a file path and parses that file (it must be a Racket program)
+into an abstract syntax tree.
+
+\paragraph{\code{parse-program}}
+
+takes an S-expression representation of an abstract syntax tree and converts it into
+the struct-based representation.
+
+\paragraph{\code{assert}}
+
+takes two parameters, a string (\code{msg}) and Boolean (\code{bool}),
+and displays the message \key{msg} if the Boolean \key{bool} is false.
+
+\paragraph{\code{lookup}}
 
 % remove discussion of lookup? -Jeremy
-The \key{lookup} function takes a key and an alist, and returns the
-first value that is associated with the given key, if there is one. If
-not, an error is triggered.  The alist may contain both immutable
-pairs (built with \key{cons}) and mutable pairs (built with
-\key{mcons}).
+takes a key and an alist, and returns the first value that is
+associated with the given key, if there is one. If not, an error is
+triggered.  The alist may contain both immutable pairs (built with
+\key{cons}) and mutable pairs (built with \key{mcons}).
 
-The \key{map2} function ...
-
-
-%% \subsection{Graphs}
-
-%% \begin{itemize}
-%% \item The \code{make-graph} function takes a list of vertices
-%%   (symbols) and returns a graph.
-
-%% \item The \code{add-edge} function takes a graph and two vertices and
-%%   adds an edge to the graph that connects the two vertices. The graph
-%%   is updated in-place. There is no return value for this function.
-
-%% \item The \code{adjacent} function takes a graph and a vertex and
-%%   returns the set of vertices that are adjacent to the given
-%%   vertex. The return value is a Racket \code{hash-set} so it can be
-%%   used with functions from the \code{racket/set} module.
-
-%% \item The \code{vertices} function takes a graph and returns the list
-%%   of vertices in the graph.
-%% \end{itemize}
-
-\subsection{Testing}
-
-The \key{interp-tests} function takes a compiler name (a string), a
-description of the passes, an interpreter for the source language, a
-test family name (a string), and a list of test numbers, and runs the
-compiler passes and the interpreters to check whether the passes
-correct. The description of the passes is a list with one entry per
-pass.  An entry is a list with three things: a string giving the name
-of the pass, the function that implements the pass (a translator from
-AST to AST), and a function that implements the interpreter (a
-function from AST to result value) for the language of the output of
-the pass.  The interpreters from Appendix~\ref{appendix:interp} make a
-good choice.  The \key{interp-tests} function assumes that the
-subdirectory \key{tests} has a collection of Scheme programs whose names
-all start with the family name, followed by an underscore and then the
-test number, ending in \key{.scm}. Also, for each Scheme program there
-is a file with the same number except that it ends with \key{.in} that
-provides the input for the Scheme program.
-\begin{lstlisting}
-(define (interp-tests name passes test-family test-nums) ...)
-\end{lstlisting}
-
-The compiler-tests function takes a compiler name (a string) a
-description of the passes (as described above for
-\code{interp-tests}), a test family name (a string), and a list of
-test numbers (see the comment for interp-tests), and runs the compiler
-to generate x86 (a \key{.s} file) and then runs gcc to generate
-machine code.  It runs the machine code and checks that the output is
-42.
-\begin{lstlisting}
-(define (compiler-tests name passes test-family test-nums) ...)
-\end{lstlisting}
-
-The compile-file function takes a description of the compiler passes
-(see the comment for \key{interp-tests}) and returns a function that,
-given a program file name (a string ending in \key{.scm}), applies all
-of the passes and writes the output to a file whose name is the same
-as the program file name but with \key{.scm} replaced with \key{.s}.
-\begin{lstlisting}
-(define (compile-file passes)
-  (lambda (prog-file-name) ...))
-\end{lstlisting}
+%The \key{map2} function ...
 
 \section{x86 Instruction Set Quick-Reference}
 \label{sec:x86-quick-reference}
 
-
 Table~\ref{tab:x86-instr} lists some x86 instructions and what they
 do. We write $A \to B$ to mean that the value of $A$ is written into
 location $B$.  Address offsets are given in bytes. The instruction
-arguments $A, B, C$ can be immediate constants (such as $\$4$),
-registers (such as $\%rax$), or memory references (such as
-$-4(\%ebp)$). Most x86 instructions only allow at most one memory
+arguments $A, B, C$ can be immediate constants (such as \code{\$4}),
+registers (such as \code{\%rax}), or memory references (such as
+\code{-4(\%ebp)}). Most x86 instructions only allow at most one memory
 reference per instruction.  Other operands must be immediates or
 registers.
-
 
 \begin{table}[tbp]
   \centering
@@ -8732,8 +8781,9 @@ registers.
 \texttt{retq} & Pops the return address and jumps to it \\
 \texttt{popq} $A$ & $*\mathtt{rsp} \to A; \mathtt{rsp} + 8 \to \mathtt{rsp}$ \\
 \texttt{pushq} $A$ & $\texttt{rsp} - 8 \to \texttt{rsp}; A \to *\texttt{rsp}$\\
-\texttt{leaq} $A$,$B$ & $A \to B$ ($C$ must be a register) \\
-\texttt{cmpq} $A$, $B$ & compare $A$ and $B$ and set the flag register \\
+\texttt{leaq} $A$,$B$ & $A \to B$ ($B$ must be a register) \\
+\texttt{cmpq} $A$, $B$ & compare $A$ and $B$ and set the flag register ($B$ must not
+   be an immediate) \\
 \texttt{je} $L$ & \multirow{5}{3.7in}{Jump to label $L$ if the flag register
   matches the condition code of the instruction, otherwise go to the
   next instructions. The condition codes are \key{e} for ``equal'',
@@ -8769,7 +8819,6 @@ registers.
   \caption{Quick-reference for the x86 instructions used in this book.}
   \label{tab:x86-instr}
 \end{table}
-
 
 
 \bibliographystyle{plainnat}
