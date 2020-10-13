@@ -491,6 +491,9 @@ programs as abstract syntax trees.
 
 \section{Grammars}
 \label{sec:grammar}
+\index{integer}
+\index{literal}
+\index{constant}
 
 A programming language can be thought of as a \emph{set} of programs.
 The set is typically infinite (one can always create larger and larger
@@ -1065,10 +1068,6 @@ Appendix~\ref{appendix:utilities}.\\
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Integers and Variables}
 \label{ch:int-exp}
-\index{variable}
-\index{integer}
-\index{literal}
-\index{constant}
 
 This chapter is about compiling the subset of Racket that includes
 integer arithmetic and local variable binding, which we name $R_1$, to
@@ -1092,6 +1091,7 @@ code.
 
 \section{The $R_1$ Language}
 \label{sec:s0}
+\index{variable}
 
 The $R_1$ language extends the $R_0$ language with variable
 definitions.  The concrete syntax of the $R_1$ language is defined by
@@ -1299,7 +1299,8 @@ indicate a sequence of items, e.g., $\Instr \ldots$ is a sequence of
 instructions.\index{instruction}
 %
 An x86 program is stored in the computer's memory and the computer has
-a \emph{program counter}\index{program counter} that points to the address of the next
+a \emph{program counter} (PC)\index{program counter}\index{PC}
+that points to the address of the next
 instruction to be executed. For most instructions, once the
 instruction is executed, the program counter is incremented to point
 to the immediately following instruction in memory. Most x86
@@ -2473,6 +2474,7 @@ to compile the provided \key{runtime.c} file to \key{runtime.o} using
 
 \section{Challenge: Partial Evaluator for $R_1$}
 \label{sec:pe-R1}
+\index{partial evaluation}
 
 This section describes optional challenge exercises that involve
 adapting and improving the partial evaluator for $R_0$ that was
@@ -4661,9 +4663,9 @@ expression that can have type \code{Boolean}. We detail a few cases
 here and leave the rest for the reader. The input to this function is
 an expression and two blocks, $B_1$ and $B_2$, for the two branches of
 the enclosing \key{if}. Suppose the expression is the Boolean
-\code{\#t}.  Then we can perform a kind of partial evaluation and
-translate it to the ``then'' branch $B_1$. Likewise, we translate
-\code{\#f} to the ``else`` branch $B_2$.
+\code{\#t}.  Then we can perform a kind of partial evaluation
+\index{partial evaluation} and translate it to the ``then'' branch
+$B_1$. Likewise, we translate \code{\#f} to the ``else`` branch $B_2$.
 \[
 \key{\#t} \quad\Rightarrow\quad B_1,
 \qquad\qquad\qquad
@@ -4823,6 +4825,7 @@ algorithm itself does not change.
 
 \subsection{Liveness Analysis}
 \label{sec:liveness-analysis-r2}
+\index{liveness analysis}
 
 Recall that for $R_1$ we implemented liveness analysis for a single
 basic block (Section~\ref{sec:liveness-analysis-r1}). With the
@@ -5369,6 +5372,7 @@ can be \emph{aliases} for the same entity. Consider the following
 example in which both \code{t1} and \code{t2} refer to the same tuple.
 Thus, the mutation through \code{t2} is visible when referencing the
 tuple from \code{t1}, so the result of this program is \code{42}.
+\index{alias}\index{mutation}
 \begin{center}
 \begin{minipage}{0.96\textwidth}
 \begin{lstlisting}
@@ -6496,8 +6500,8 @@ this case the definition of a \code{point} type.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-  \Type &::=& \gray{\key{Integer} \mid \key{Boolean}}
-  \mid (\key{Vector}\;\Type \ldots) \mid \key{Void}\\
+  \Type &::=& \gray{\key{Integer} \mid \key{Boolean}
+  \mid (\key{Vector}\;\Type \ldots) \mid \key{Void} } \mid \Var \\
   \itm{cmp} &::= & \gray{ \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} } \\
   \Exp &::=& \gray{  \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp) \mid (\key{-}\;\Exp\;\Exp) }  \\
   &\mid&  \gray{  \Var \mid (\key{let}~([\Var~\Exp])~\Exp)  }\\
@@ -6658,7 +6662,8 @@ $R_4$ begin with zero or more function definitions.  The function
 names from these definitions are in-scope for the entire program,
 including all other function definitions (so the ordering of function
 definitions does not matter). The concrete syntax for function
-application is $(\Exp \; \Exp \ldots)$ where the first expression must
+application\index{function application} is $(\Exp \; \Exp \ldots)$
+where the first expression must
 evaluate to a function and the rest are the arguments.
 The abstract syntax for function application is
 $\APPLY{\Exp}{\Exp\ldots}$.
@@ -6776,8 +6781,8 @@ The program applies
 The definitional interpreter for $R_4$ is in
 Figure~\ref{fig:interp-R4}. The case for the \code{ProgramDefsExp} form is
 responsible for setting up the mutual recursion between the top-level
-function definitions. We use the classic back-patching approach that
-uses mutable variables and makes two passes over the function
+function definitions. We use the classic back-patching \index{back-patching}
+approach that uses mutable variables and makes two passes over the function
 definitions~\citep{Kelsey:1998di}.  In the first pass we set up the
 top-level environment using a mutable cons cell for each function
 definition. Note that the \code{lambda} value for each function is
@@ -6839,18 +6844,18 @@ labels so that one can refer to the location of an instruction, as is
 needed for jump instructions. Labels can also be used to mark the
 beginning of the instructions for a function.  Going further, we can
 obtain the address of a label by using the \key{leaq} instruction and
-\key{rip}-relative addressing. For example, the following puts the
+PC-relative addressing. For example, the following puts the
 address of the \code{add1} label into the \code{rbx} register.
 \begin{lstlisting}
    leaq add1(%rip), %rbx
 \end{lstlisting}
 The instruction pointer register \key{rip} (aka. the program counter
-or PC) always points to the next instruction to be executed. When
-combined with an label, as in \code{add1(\%rip)}, the linker computes
-the distance $d$ between the address of \code{add1} and where the
-\code{rip} would be at that moment and then changes \code{add1(\%rip)}
-to \code{$d$(\%rip)}, which at runtime will compute the address of
-\code{add1}.
+\index{program counter}) always points to the next instruction to be
+executed. When combined with an label, as in \code{add1(\%rip)}, the
+linker computes the distance $d$ between the address of \code{add1}
+and where the \code{rip} would be at that moment and then changes
+\code{add1(\%rip)} to \code{$d$(\%rip)}, which at runtime will compute
+the address of \code{add1}.
 
 In Section~\ref{sec:x86} we used of the \code{callq} instruction to
 jump to a function whose location is given by a label. To support
