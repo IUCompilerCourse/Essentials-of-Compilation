@@ -52,6 +52,9 @@
 \usepackage{multirow}
 \usepackage{color}
 \usepackage{upquote}
+\usepackage{makeidx}
+
+\makeindex
 
 \definecolor{lightgray}{gray}{1}
 \newcommand{\black}[1]{{\color{black} #1}}
@@ -305,6 +308,12 @@ write down and talk about programs. Inside the compiler, we use
 \emph{abstract syntax trees} (ASTs) to represent programs in a way
 that efficiently supports the operations that the compiler needs to
 perform.
+\index{concrete syntax}
+\index{abstract syntax}
+\index{abstract syntax tree}
+\index{AST}
+\index{program}
+\index{parse}
 %
 The translation from concrete syntax to abstract syntax is a process
 called \emph{parsing}~\cite{Aho:1986qf}. We do not cover the theory
@@ -315,14 +324,14 @@ abstract syntax for the languages used in this book.
 ASTs can be represented in many different ways inside the compiler,
 depending on the programming language used to write the compiler.
 %
-We use Racket's \code{struct} feature to represent ASTs
-(Section~\ref{sec:ast}). We use grammars to define the abstract syntax
-of programming languages (Section~\ref{sec:grammar}) and pattern
-matching to inspect individual nodes in an AST
+We use Racket's \href{https://docs.racket-lang.org/guide/define-struct.html}{\code{struct}}
+feature to represent ASTs (Section~\ref{sec:ast}). We use grammars to
+define the abstract syntax of programming languages (Section~\ref{sec:grammar})
+and pattern matching to inspect individual nodes in an AST
 (Section~\ref{sec:pattern-matching}).  We use recursion to construct
 and deconstruct entire ASTs (Section~\ref{sec:recursion}).  This
 chapter provides an brief introduction to these ideas.
-
+\index{struct}
 
 \section{Abstract Syntax Trees and Racket Structures}
 \label{sec:ast}
@@ -364,6 +373,12 @@ circle above is called a \emph{node}. The arrows connect a node to its
 \emph{root}.  Every node except for the root has a \emph{parent} (the
 node it is the child of). If a node has no children, it is a
 \emph{leaf} node.  Otherwise it is an \emph{internal} node.
+\index{node}
+\index{children}
+\index{root}
+\index{parent}
+\index{leaf}
+\index{internal node}
 
 %% Recall that an \emph{symbolic expression} (S-expression) is either
 %% \begin{enumerate}
@@ -484,9 +499,11 @@ the programs in the language. Instead we write down a set of rules, a
 \emph{grammar}, for building programs. Grammars are often used to
 define the concrete syntax of a language, but they can also be used to
 describe the abstract syntax. We shall write our rules in a variant of
-Backus-Naur Form (BNF)~\citep{Backus:1960aa,Knuth:1964aa}.  As an
-example, we describe a small language, named $R_0$, that consists of
+Backus-Naur Form (BNF)~\citep{Backus:1960aa,Knuth:1964aa}.
+\index{Backus-Naur Form}\index{BNF}
+As an example, we describe a small language, named $R_0$, that consists of
 integers and arithmetic operations.
+\index{grammar}
 
 The first grammar rule for the abstract syntax of $R_0$ says that an
 instance of the \code{Int} structure is an expression:
@@ -501,6 +518,7 @@ according to the left-hand-side.
 %
 A name such as $\Exp$ that is
 defined by the grammar rules is a \emph{non-terminal}.
+\index{non-terminal}
 %
 The name $\Int$ is a also a non-terminal, but instead of defining it
 with a grammar rule, we define it with the following explanation.  We
@@ -528,6 +546,7 @@ $\Exp$ node by negating it.
 Symbols in typewriter font such as \key{-} and \key{read} are
 \emph{terminal} symbols and must literally appear in the program for
 the rule to be applicable.
+\index{terminal}
 
 We can apply the rules to build ASTs in the $R_0$
 language. For example, by rule \eqref{eq:arith-int}, \texttt{(Int 8)} is an
@@ -642,7 +661,7 @@ R_0  &::=& \PROGRAM{\code{'()}}{\Exp}
 As mentioned in Section~\ref{sec:ast}, compilers often need to access
 the parts of an AST node. Racket provides the \texttt{match} form to
 access the parts of a structure. Consider the following example and
-the output on the right.
+the output on the right. \index{match} \index{pattern matching}
 \begin{center}
 \begin{minipage}{0.5\textwidth}
 \begin{lstlisting}
@@ -664,7 +683,9 @@ In the above example, the \texttt{match} form takes the AST
 \eqref{eq:arith-prog} and binds its parts to the three pattern
 variables \texttt{op}, \texttt{child1}, and \texttt{child2}. In
 general, a match clause consists of a \emph{pattern} and a
-\emph{body}. Patterns are recursively defined to be either a pattern
+\emph{body}.
+\index{pattern}
+Patterns are recursively defined to be either a pattern
 variable, a structure name followed by a pattern for each of the
 structure's arguments, or an S-expression (symbols, lists, etc.).
 (See Chapter 12 of The Racket
@@ -731,6 +752,7 @@ of your choice (e.g. \code{c1} and \code{c2}).
 
 \section{Recursion}
 \label{sec:recursion}
+\index{recursive function}
 
 Programs are inherently recursive. For example, an $R_0$ expression is
 often made of smaller expressions. Thus, the natural way to process an
@@ -749,6 +771,7 @@ by \emph{structural recursion}\footnote{This principle of structuring
 define a second function, named \code{R0?}, that determines whether a
 value is an $R_0$ program.  In general we can expect to write one
 recursive function to handle each non-terminal in a grammar.
+\index{structural recursion}
 %
 \begin{center}
 \begin{minipage}{0.7\textwidth}
@@ -825,6 +848,7 @@ will return true, when it should return false.
 
 \section{Interpreters}
 \label{sec:interp-R0}
+\index{interpreter}
 
 The meaning, or semantics, of a program is typically defined in the
 specification of the language. For example, the Scheme language is
@@ -833,8 +857,9 @@ defined in its reference manual~\citep{plt-tr}. In this book we use an
 interpreter to define the meaning of each language that we consider,
 following Reynolds' advice~\citep{reynolds72:_def_interp}. An
 interpreter that is designated (by some people) as the definition of a
-language is called a \emph{definitional interpreter}.  We warm up by
-creating a definitional interpreter for the $R_0$ language, which
+language is called a \emph{definitional interpreter}.
+\index{definitional interpreter}
+We warm up by creating a definitional interpreter for the $R_0$ language, which
 serves as a second example of structural recursion. The
 \texttt{interp-R0} function is defined in
 Figure~\ref{fig:interp-R0}. The body of the function is a match on the
@@ -912,6 +937,7 @@ produce an executable, and if it does, that executable can do
 anything. This convention applies to the languages defined in this
 book, as a way to simplify the student's task of implementing them,
 but this convention is not applicable to all programming languages.
+\index{unspecified behavior}
 
 Moving on to the last feature of the $R_0$ language, the \key{read}
 operation prompts the user of the program for an integer.  Recall that
@@ -961,8 +987,9 @@ In this section we consider a compiler that translates $R_0$ programs
 into $R_0$ programs that may be more efficient, that is, this compiler
 is an optimizer. This optimizer eagerly computes the parts of the
 program that do not depend on any inputs, a process known as
-\emph{partial evaluation}~\cite{Jones:1993uq}. For example, given the
-following program
+\emph{partial evaluation}~\cite{Jones:1993uq}.
+\index{partial evaluation}
+For example, given the following program
 \begin{lstlisting}
 (+ (read) (- (+ 5 3)))
 \end{lstlisting}
@@ -1038,6 +1065,10 @@ Appendix~\ref{appendix:utilities}.\\
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Integers and Variables}
 \label{ch:int-exp}
+\index{variable}
+\index{integer}
+\index{literal}
+\index{constant}
 
 This chapter is about compiling the subset of Racket that includes
 integer arithmetic and local variable binding, which we name $R_1$, to
@@ -1153,12 +1184,13 @@ $52$ then $10$, the following produces $42$ (not $-42$).
   \begin{tcolorbox}[title=Association Lists as Dictionaries]
   An \emph{association list} (alist) is a list of key-value pairs.
   For example, we can map people to their ages with an alist.
+  \index{alist}\index{association list}
   \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
   (define ages
     '((jane . 25) (sam . 24) (kate . 45)))
   \end{lstlisting}
   The \emph{dictionary} interface is for mapping keys to values.
-  Every alist implements this interface.  The package
+  Every alist implements this interface.  \index{dictionary} The package
   \href{https://docs.racket-lang.org/reference/dicts.html}{\code{racket/dict}}
   provides many functions for working with dictionaries. Here
   are a few of them:
@@ -1188,9 +1220,10 @@ we need a way to communicate the value of a variable to all the uses
 of a variable. To accomplish this, we maintain a mapping from
 variables to values. Throughout the compiler we often need to map
 variables to information about them. We refer to these mappings as
-\emph{environments}
+\emph{environments}\index{environment}
 \footnote{Another common term for environment in the compiler
-  literature is \emph{symbol table}.}. For simplicity, we use an
+  literature is \emph{symbol table}\index{symbol table}.}.
+For simplicity, we use an
 association list (alist) to represent the environment. The sidebar to
 the right gives a brief introduction to alists and the
 \code{racket/dict} package.  The \code{interp-R1} function takes the
@@ -1255,6 +1288,7 @@ language to compile $R_1$.
 
 \section{The x86$_0$ Assembly Language}
 \label{sec:x86}
+\index{x86}
 
 Figure~\ref{fig:x86-0-concrete} defines the concrete syntax for the subset of
 the x86 assembly language needed for this chapter, which we call x86$_0$.
@@ -1262,16 +1296,17 @@ the x86 assembly language needed for this chapter, which we call x86$_0$.
 An x86 program begins with a \code{main} label followed by a sequence
 of instructions.  In the grammar, elipses such as $\ldots$ are used to
 indicate a sequence of items, e.g., $\Instr \ldots$ is a sequence of
-instructions.
+instructions.\index{instruction}
 %
 An x86 program is stored in the computer's memory and the computer has
-a \emph{program counter} that points to the address of the next
+a \emph{program counter}\index{program counter} that points to the address of the next
 instruction to be executed. For most instructions, once the
 instruction is executed, the program counter is incremented to point
 to the immediately following instruction in memory. Most x86
 instructions take two operands, where each operand is either an
-integer constant (called \emph{immediate value}), a \emph{register},
-or a memory location.  A register is a special kind of variable. Each
+integer constant (called \emph{immediate value}\index{immediate value}),
+a \emph{register}\index{register}, or a memory location.
+A register is a special kind of variable. Each
 one holds a 64-bit value; there are 16 registers in the computer and
 their names are given in Figure~\ref{fig:x86-0-concrete}. The computer's memory
 as a mapping of 64-bit addresses to 64-bit values%
@@ -1389,20 +1424,23 @@ We exhibit the use of memory for storing intermediate results in the
 next example.  Figure~\ref{fig:p1-x86} lists an x86 program that is
 equivalent to \code{(+ 52 (- 10))}. This program uses a region of
 memory called the \emph{procedure call stack} (or \emph{stack} for
-short). The stack consists of a separate \emph{frame} for each
-procedure call. The memory layout for an individual frame is shown in
+short). \index{stack}\index{procedure call stack} The stack consists
+of a separate \emph{frame} for each procedure call.\index{frame} The
+memory layout for an individual frame is shown in
 Figure~\ref{fig:frame}.  The register \key{rsp} is called the
-\emph{stack pointer} and points to the item at the top of the
-stack. The stack grows downward in memory, so we increase the size of
-the stack by subtracting from the stack pointer.  In the context of a
-procedure call, the \emph{return address} is the next instruction
-after the call instruction on the caller side. During a function call,
-the return address is pushed onto the stack.  The register \key{rbp}
-is the \emph{base pointer} and is used to access variables associated
-with the current procedure call.  The base pointer of the caller is
-pushed onto the stack after the return address. We number the
-variables from $1$ to $n$. Variable $1$ is stored at address
-$-8\key{(\%rbp)}$, variable $2$ at $-16\key{(\%rbp)}$, etc.
+\emph{stack pointer}\index{stack pointer} and points to the item at
+the top of the stack. The stack grows downward in memory, so we
+increase the size of the stack by subtracting from the stack pointer.
+In the context of a procedure call, the \emph{return
+  address}\index{return address} is the next instruction after the
+call instruction on the caller side. During a function call, the
+return address is pushed onto the stack.  The register \key{rbp} is
+the \emph{base pointer}\index{base pointer} and is used to access
+variables associated with the current procedure call.  The base
+pointer of the caller is pushed onto the stack after the return
+address. We number the variables from $1$ to $n$. Variable $1$ is
+stored at address $-8\key{(\%rbp)}$, variable $2$ at
+$-16\key{(\%rbp)}$, etc.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -1454,9 +1492,9 @@ which pushes its return address on the stack and then jumps to
 by 16 bytes prior to the execution of any \code{callq} instruction, so
 when control arrives at \code{main}, the \code{rsp} is 8 bytes out of
 alignment (because the \code{callq} pushed the return address).  The
-first three instructions are the typical \emph{prelude} for a
-procedure.  The instruction \code{pushq \%rbp} saves the base pointer
-for the caller onto the stack and subtracts $8$ from the stack
+first three instructions are the typical \emph{prelude}\index{prelude}
+for a procedure.  The instruction \code{pushq \%rbp} saves the base
+pointer for the caller onto the stack and subtracts $8$ from the stack
 pointer. At this point the stack pointer is back to being 16-byte
 aligned. The second instruction \code{movq \%rsp, \%rbp} changes the
 base pointer so that it points the location of the old base
@@ -1478,12 +1516,12 @@ finally \code{addq -8(\%rbp), \%rax} adds the contents of variable $1$ to
 \code{rax}, at which point \code{rax} contains $42$.
 
 The three instructions under the label \code{conclusion} are the
-typical \emph{conclusion} of a procedure.  The first two instructions
-are necessary to get the state of the machine back to where it was at
-the beginning of the procedure.  The instruction \key{addq \$16,
-  \%rsp} moves the stack pointer back to point at the old base
-pointer. The amount added here needs to match the amount that was
-subtracted in the prelude of the procedure. Then \key{popq \%rbp}
+typical \emph{conclusion}\index{conclusion} of a procedure.  The first
+two instructions are necessary to get the state of the machine back to
+where it was at the beginning of the procedure.  The instruction
+\key{addq \$16, \%rsp} moves the stack pointer back to point at the
+old base pointer. The amount added here needs to match the amount that
+was subtracted in the prelude of the procedure. Then \key{popq \%rbp}
 returns the old base pointer to \key{rbp} and adds $8$ to the stack
 pointer.  The last instruction, \key{retq}, jumps back to the
 procedure that called this one and adds 8 to the stack pointer, which
@@ -1494,16 +1532,17 @@ programs, so we define an abstract syntax for x86 in
 Figure~\ref{fig:x86-0-ast}. We refer to this language as x86$_0$ with
 a subscript $0$ because later we introduce extended versions of this
 assembly language. The main difference compared to the concrete syntax
-of x86 (Figure~\ref{fig:x86-0-concrete}) is that it does not allow labeled
-instructions to appear anywhere, but instead organizes instructions
-into groups called \emph{blocks} and associates a label with every
-block, which is why the \key{CFG} struct (for control-flow graph)
-includes an alist mapping labels to blocks. The reason for this
-organization becomes apparent in Chapter~\ref{ch:bool-types} when we
-introduce conditional branching. The \code{Block} structure includes
-an $\itm{info}$ field that is not needed for this chapter, but will
-become useful in Chapter~\ref{ch:register-allocation-r1}.  For now,
-the $\itm{info}$ field should just contain an empty list.
+of x86 (Figure~\ref{fig:x86-0-concrete}) is that it does not allow
+labeled instructions to appear anywhere, but instead organizes
+instructions into a group called a \emph{block}\index{block}\index{basic block}
+and associates a label with every block, which is why the \key{CFG} struct
+(for control-flow graph) includes an alist mapping labels to
+blocks. The reason for this organization becomes apparent in
+Chapter~\ref{ch:bool-types} when we introduce conditional
+branching. The \code{Block} structure includes an $\itm{info}$ field
+that is not needed for this chapter, but will become useful in
+Chapter~\ref{ch:register-allocation-r1}.  For now, the $\itm{info}$
+field should just contain an empty list.
 
 \begin{figure}[tp]
 \fbox{
@@ -1566,7 +1605,7 @@ and x86 assembly? Here are some of the most important ones:
 We ease the challenge of compiling from $R_1$ to x86 by breaking down
 the problem into several steps, dealing with the above differences one
 at a time.  Each of these steps is called a \emph{pass} of the
-compiler.
+compiler.\index{pass}\index{compiler pass}
 %
 This terminology comes from each step traverses (i.e. passes over) the
 AST of the program.
@@ -1580,6 +1619,7 @@ convenient for expressing the output of each pass, whether that be
 $R_1$, x86, or new \emph{intermediate languages} of our own design.
 Finally, to implement each pass we write one recursive function per
 non-terminal in the grammar of the input language of the pass.
+\index{intermediate language}
 
 \begin{description}
 \item[Pass \key{select-instructions}] To handle the difference between
@@ -1591,11 +1631,11 @@ non-terminal in the grammar of the input language of the pass.
   subexpression (i.e. operator and operand, and hence the name
   \key{opera*}) is an \emph{atomic} expression (a variable or
   integer), we introduce temporary variables to hold the results
-  of subexpressions.
+  of subexpressions.\index{atomic expression}
   
 \item[Pass \key{explicate-control}] To make the execution order of the
   program explicit, we convert from the abstract syntax tree
-  representation into a \emph{control-flow graph} in which each node
+  representation into a control-flow graph in which each node
   contains a sequence of statements and the edges between nodes say
   where to go at the end of the sequence.
 
@@ -1725,8 +1765,8 @@ of \key{Let} expressions, $C_0$ has assignment statements which can be
 executed in sequence using the \key{Seq} form. A sequence of
 statements always ends with \key{Return}, a guarantee that is baked
 into the grammar rules for the \itm{tail} non-terminal. The naming of
-this non-terminal comes from the term \emph{tail position}, which
-refers to an expression that is the last one to execute within a
+this non-terminal comes from the term \emph{tail position}\index{tail position},
+which refers to an expression that is the last one to execute within a
 function. (A expression in tail position may contain subexpressions,
 and those may or may not be in tail position depending on the kind of
 expression.)
@@ -1881,10 +1921,10 @@ The skeleton of the \code{uniquify-exp} function is shown in
 Figure~\ref{fig:uniquify-s0}.  The function is curried so that it is
 convenient to partially apply it to a symbol table and then apply it
 to different expressions, as in the last clause for primitive
-operations in Figure~\ref{fig:uniquify-s0}.  The \key{for/list} form
-is useful for applying a function to each element of a list to produce
+operations in Figure~\ref{fig:uniquify-s0}.  The \href{https://docs.racket-lang.org/reference/for.html#%28form._%28%28lib._racket%2Fprivate%2Fbase..rkt%29._for%2Flist%29%29}{\key{for/list}}
+form is useful for applying a function to each element of a list to produce
 a new list.
-
+\index{for/list}
 
 \begin{exercise}
 \normalfont % I don't like the italics for exercises. -Jeremy
@@ -1939,12 +1979,13 @@ of how to use \key{interp-tests}.
 
 The \code{remove-complex-opera*} pass compiles $R_1$ programs into
 $R_1$ programs in which the arguments of operations are atomic
-expressions.  Put another way, this pass removes complex operands,
-such as the expression \code{(- 10)} in the program below. This is
-accomplished by introducing a new \key{let}-bound variable, binding
-the complex operand to the new variable, and then using the new
-variable in place of the complex operand, as shown in the output of
-\code{remove-complex-opera*} on the right.\\
+expressions.  Put another way, this pass removes complex
+operands\index{complex operand}, such as the expression \code{(- 10)}
+in the program below. This is accomplished by introducing a new
+\key{let}-bound variable, binding the complex operand to the new
+variable, and then using the new variable in place of the complex
+operand, as shown in the output of \code{remove-complex-opera*} on the
+right.\\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 % s0_19.rkt
@@ -1988,6 +2029,8 @@ this pass, language $R_1^{\dagger}$. The main difference is that
 operator arguments are required to be atomic expressions.  In the
 literature this is called \emph{administrative normal form}, or ANF
 for short~\citep{Danvy:1991fk,Flanagan:1993cg}.
+\index{administrative normal form}
+\index{ANF}
 
 We recommend implementing this pass with two mutually recursive
 functions, \code{rco-atom} and \code{rco-exp}. The idea is to apply
@@ -2001,9 +2044,11 @@ subexpressions. You can return multiple things from a function using
 Racket's \key{values} form and you can receive multiple things from a
 function call using the \key{define-values} form. If you are not
 familiar with these features, review the Racket documentation.  Also,
-the \key{for/lists} form is useful for applying a function to each
+the \href{https://docs.racket-lang.org/reference/for.html#%28form._%28%28lib._racket%2Fprivate%2Fbase..rkt%29._for%2Flists%29%29}{\code{for/lists}}
+form is useful for applying a function to each
 element of a list, in the case where the function returns multiple
 values.
+\index{for/lists}
 
 The following shows the output of \code{rco-atom} on the expression
 \code{(- 10)} (using concrete syntax to be concise).
@@ -2062,7 +2107,6 @@ produce the following output.\\
 
 \begin{exercise}
 \normalfont Implement the \code{remove-complex-opera*} pass.
-The \href{https://docs.racket-lang.org/reference/for.html#%28form._%28%28lib._racket%2Fprivate%2Fbase..rkt%29._for%2Flists%29%29}{\code{for/lists}} looping form in Racket may come in handy.
 Test the new pass on all of the example programs that you created to test the
 \key{uniquify} pass and create three new example programs that are
 designed to exercise the interesting code in the
@@ -2149,6 +2193,7 @@ variables in the $\itm{info}$ field, as in the above example.
 
 \section{Select Instructions}
 \label{sec:select-r1}
+\index{instruction selection}
 
 In the \code{select-instructions} pass we begin the work of
 translating from $C_0$ to $\text{x86}^{*}_0$. The target language of
@@ -2210,9 +2255,9 @@ The \key{read} operation does not have a direct counterpart in x86
 assembly, so we have instead implemented this functionality in the C
 language~\citep{Kernighan:1988nx}, with the function \code{read\_int}
 in the file \code{runtime.c}. In general, we refer to all of the
-functionality in this file as the \emph{runtime system}, or simply the
-\emph{runtime} for short. When compiling your generated x86 assembly
-code, you need to compile \code{runtime.c} to \code{runtime.o} (an
+functionality in this file as the \emph{runtime system}\index{runtime system},
+or simply the \emph{runtime} for short. When compiling your generated x86
+assembly code, you need to compile \code{runtime.c} to \code{runtime.o} (an
 ``object file'', using \code{gcc} option \code{-c}) and link it into
 the executable. For our purposes of code generation, all you need to
 do is translate an assignment of \key{read} into some variable
@@ -2485,6 +2530,8 @@ After all, fast code is useless if it produces incorrect results!
 \chapter{Register Allocation}
 \label{ch:register-allocation-r1}
 
+\index{register allocation}
+
 In Chapter~\ref{ch:int-exp} we placed all variables on the stack to
 make our life easier. However, we can improve the performance of the
 generated code if we instead place some variables into registers.  The
@@ -2574,6 +2621,7 @@ about this approach.
 
 \section{Registers and Calling Conventions}
 \label{sec:calling-conventions}
+\index{calling conventions}
 
 As we perform register allocation, we need to be aware of the
 conventions that govern the way in which registers interact with
@@ -2583,8 +2631,10 @@ execute our \code{main} function.  The convention for x86 is that the
 caller is responsible for freeing up some registers, the
 \emph{caller-saved registers}, prior to the function call, and the
 callee is responsible for preserving the values in some other
-registers, the \emph{callee-saved registers}. The caller-saved
-registers are
+registers, the \emph{callee-saved registers}.
+\index{caller-saved registers}
+\index{callee-saved registers}
+The caller-saved registers are
 \begin{lstlisting}
   rax rcx rdx rsi rdi r8 r9 r10 r11
 \end{lstlisting}
@@ -2672,6 +2722,7 @@ variables. The prelude subtracts 8 bytes from the \code{rsp} to make
 it 16-byte aligned and then jumps to the \code{start} block. Shifting
 attention to the \code{conclusion}, we see that \code{rbx} is restored
 from the stack with a \code{popq} instruction.
+\index{prelude}\index{conclusion}
 
 \begin{figure}[tp]
 \begin{minipage}{0.45\textwidth}
@@ -2715,10 +2766,9 @@ conclusion:
 \end{figure}
 
 
-
-
 \section{Liveness Analysis}
 \label{sec:liveness-analysis-r1}
+\index{liveness analysis}
 
 A variable is \emph{live} if the variable is used at some later point
 in the program and there is not an intervening assignment to the
@@ -2739,21 +2789,18 @@ line 2 is never used. The variable \code{b} is read on line 5 and
 there is an intervening write to \code{b} on line 4, so the read on
 line 5 receives the value written on line 4, not line 2.
 
-
-\begin{wrapfigure}[21]{l}[1.0in]{0.6\textwidth}
+\begin{wrapfigure}[20]{l}[1.0in]{0.6\textwidth}
   \small
   \begin{tcolorbox}[title=\href{https://docs.racket-lang.org/reference/sets.html}{The Racket Set Package}]
-  A \emph{set} is an unordered collection of elements that does not
-  contain duplicates.
+    A \emph{set} is an unordered collection of elements without duplicates.
+    \index{set}
   \begin{description}
   \item[$\LP\code{set}\,v\,\ldots\RP$] constructs a set containing the specified elements.
-  \item[$\LP\code{set-union}\,s_1\,s_2\RP$] returns the union of the two sets.
-  \item[$\LP\code{set-subtract}\,s_1\,s_2\RP$] returns the difference of the two sets.
-  \item[$\LP\code{set-member?}\,s\,v\RP$] is element $v$ in set $s$?
-  \item[$\LP\code{set-count}\,s\RP$] how many unique elements are in set $s$?
-  \item[$\LP\code{set-add}\,s\,v\RP$] returns a set with all the
-    elements of $s$ plus the element $v$.
-  \item[$\LP\code{set->list}\,s\RP$] converts the set $s$ to a list.
+  \item[$\LP\code{set-union}\,set_1\,set_2\RP$] returns the union of the two sets.
+  \item[$\LP\code{set-subtract}\,set_1\,set_2\RP$] returns the difference of the two sets.
+  \item[$\LP\code{set-member?}\,set\,v\RP$] is element $v$ in $set$?
+  \item[$\LP\code{set-count}\,set\RP$] how many unique elements are in $set$?
+  \item[$\LP\code{set->list}\,set\RP$] converts the set to a list.
   \end{description}
   \end{tcolorbox}
 \end{wrapfigure}
@@ -2766,6 +2813,8 @@ instruction $I_k$ and $L_{\mathsf{before}}(k)$ for the set of live
 variables before instruction $I_k$. The live variables after an
 instruction are always the same as the live variables before the next
 instruction.
+\index{live-after}
+\index{live-before}
 \begin{equation} \label{eq:live-after-before-next}
   L_{\mathsf{after}}(k) = L_{\mathsf{before}}(k+1)
 \end{equation}
@@ -2907,9 +2956,10 @@ However, during register allocation, we need to answer questions of
 the specific form: are variables $u$ and $v$ live at the same time?
 (And therefore cannot be assigned to the same register.)  To make this
 question easier to answer, we create an explicit data structure, an
-\emph{interference graph}.  An interference graph is an undirected
-graph that has an edge between two variables if they are live at the
-same time, that is, if they interfere with each other.
+\emph{interference graph}\index{interference graph}.  An interference
+graph is an undirected graph that has an edge between two variables if
+they are live at the same time, that is, if they interfere with each
+other.
 
 \begin{wrapfigure}[27]{r}[1.0in]{0.6\textwidth}
   \small
@@ -2918,7 +2968,7 @@ same time, that is, if they interfere with each other.
     edge connects two vertices.  A graph is \emph{directed} if each
     edge points from a source to a target.  Otherwise the graph is
     \emph{undirected}.
-        
+    \index{graph}\index{directed graph}\index{undirected graph}
   \begin{description}
   \item[$\LP\code{directed-graph}\,\itm{edges}\RP$] constructs a
     directed graph from a list of edges. Each edge is a list
@@ -3073,6 +3123,9 @@ program, under the key \code{conflicts}.
   
 \section{Graph Coloring via Sudoku}
 \label{sec:graph-coloring}
+\index{graph coloring}
+\index{Sudoku}
+\index{color}
 
 We come to the main event, mapping variables to registers (or to stack
 locations in the event that we run out of registers).  We need to make
@@ -3125,7 +3178,8 @@ and region. Many Sudoku computer games provide automatic support for
 Pencil Marks.
 %
 The Pencil Marks technique corresponds to the notion of
-\emph{saturation} due to \cite{Brelaz:1979eu}.  The saturation of a
+\emph{saturation}\index{saturation} due to \cite{Brelaz:1979eu}.
+The saturation of a
 vertex, in Sudoku terms, is the set of numbers that are no longer
 available. In graph terminology, we have the following definition:
 \begin{equation*}
@@ -3458,6 +3512,8 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 
 \section{Print x86 and Conventions for Registers}
 \label{sec:print-x86-reg-alloc}
+\index{calling conventions}
+\index{prelude}\index{conclusion}
 
 Recall that the \code{print-x86} pass generates the prelude and
 conclusion instructions for the \code{main} function.
@@ -3481,6 +3537,7 @@ frame needs to be a multiple of 16 bytes!
 
 \section{Challenge: Move Biasing}
 \label{sec:move-biasing}
+\index{move biasing}
 
 This section describes an optional enhancement to register allocation
 for those students who are looking for an extra challenge or who have
@@ -3537,8 +3594,8 @@ register, we could instead remove three \key{movq} instructions.  We
 can accomplish this by taking into account which variables appear in
 \key{movq} instructions with which other variables.
 
-We say that two variables $p$ and $q$ are \emph{move related} if they
-participate together in a \key{movq} instruction, that is, \key{movq}
+We say that two variables $p$ and $q$ are \emph{move related}\index{move related}
+if they participate together in a \key{movq} instruction, that is, \key{movq}
 $p$\key{,} $q$ or \key{movq} $q$\key{,} $p$. When the register
 allocator chooses a color for a variable, it should prefer a color
 that has already been used for a move-related variable (assuming that
@@ -3724,6 +3781,7 @@ programs to make sure that your move biasing is working properly.
 
 \section{Output of the Running Example}
 \label{sec:reg-alloc-output}
+\index{prelude}\index{conclusion}
 
 Figure~\ref{fig:running-example-x86} shows the x86 code generated for
 the running example (Figure~\ref{fig:reg-eg}) with register allocation
@@ -3797,6 +3855,9 @@ conclusion:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Booleans and Control Flow}
 \label{ch:bool-types}
+\index{Boolean}
+\index{control flow}
+\index{conditional expression}
 
 The $R_0$ and $R_1$ languages only have a single kind of value, the
 integers. In this chapter we add a second kind of value, the Booleans,
@@ -4113,6 +4174,7 @@ modern computer architectures.
 \section{The x86$_1$ Language}
 \label{sec:x86-1}
 
+\index{x86}
 To implement the new logical operations, the comparison operations,
 and the \key{if} expression, we need to delve further into the x86
 language. Figures~\ref{fig:x86-1-concrete} and \ref{fig:x86-1} define
@@ -4432,8 +4494,9 @@ and insert jumps in all the places that need to execute the
 branches. Put another way, we need to move away from abstract syntax
 \emph{trees} and instead use \emph{graphs}. In particular, we shall
 use a standard program representation called a \emph{control flow
-  graph} (CFG), due to Frances Elizabeth \citet{Allen:1970uq}.  Each
-vertex is a labeled sequence of code, called a \emph{basic block}, and
+  graph} (CFG), due to Frances Elizabeth \citet{Allen:1970uq}.
+\index{control-flow graph}
+Each vertex is a labeled sequence of code, called a \emph{basic block}, and
 each edge represents a jump to another block. The \key{Program}
 construct of $C_0$ and $C_1$ contains a control flow graph represented
 as an alist mapping labels to basic blocks. Each basic block is
@@ -4647,6 +4710,7 @@ B_5
 
 \section{Select Instructions}
 \label{sec:select-r2}
+\index{instruction selection}
 
 Recall that the \code{select-instructions} pass lowers from our
 $C$-like intermediate representation to the pseudo-x86 language, which
@@ -4750,6 +4814,7 @@ the output using the \code{interp-x86} interpreter
 \section{Register Allocation}
 \label{sec:register-allocation-r2}
 
+\index{register allocation}
 The changes required for $R_2$ affect liveness analysis, building the
 interference graph, and assigning homes, but the graph coloring
 algorithm itself does not change.
@@ -4780,6 +4845,8 @@ Returning to the question of what order should we process the basic
 blocks, the answer is reverse topological order. We recommend using
 the \code{tsort} (topological sort) and \code{transpose} functions of
 the Racket \code{graph} package to obtain this ordering.
+\index{topological order}
+\index{topological sort}
 
 The next question is how to compute the live-after set of a block
 given the live-before sets of all its successor blocks.  (There can be
@@ -5157,6 +5224,8 @@ block7952:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Tuples and Garbage Collection}
 \label{ch:tuples}
+\index{tuple}
+\index{vector}
 
 \margincomment{\scriptsize To do: challenge assignments: mark-and-sweep,
   add simple structures. \\ --Jeremy}
@@ -5172,11 +5241,12 @@ block7952:
 
 In this chapter we study the implementation of mutable tuples (called
 ``vectors'' in Racket). This language feature is the first to use the
-computer's \emph{heap} because the lifetime of a Racket tuple is
+computer's \emph{heap}\index{heap} because the lifetime of a Racket tuple is
 indefinite, that is, a tuple lives forever from the programmer's
 viewpoint. Of course, from an implementer's viewpoint, it is important
 to reclaim the space associated with a tuple when it is no longer
 needed, which is why we also study \emph{garbage collection}
+\emph{garbage collection}
 techniques in this chapter.
 
 Section~\ref{sec:r3} introduces the $R_3$ language including its
@@ -5389,7 +5459,7 @@ Subsequently, in the \code{uncover-locals} pass
 propagated to all variables (including the temporaries generated by
 \code{remove-complex-opera*}).
 
-\begin{figure}[hb]
+\begin{figure}[tp]
 \begin{lstlisting}
 (define (type-check-exp env)
   (lambda (e)
@@ -5438,7 +5508,10 @@ collectors~\citep{Lieberman:1983aa,Ungar:1984aa,Jones:1996aa,Detlefs:2004aa,Dybv
 particular, we describe a two-space copying
 collector~\citep{Wilson:1992fk} that uses Cheney's algorithm to
 perform the
-copy~\citep{Cheney:1970aa}. Figure~\ref{fig:copying-collector} gives a
+copy~\citep{Cheney:1970aa}.
+\index{copying collector}
+\index{two-space copying collector}
+Figure~\ref{fig:copying-collector} gives a
 coarse-grained depiction of what happens in a two-space collector,
 showing two time steps, prior to garbage collection (on the top) and
 after garbage collection (on the bottom). In a two-space collector,
@@ -5446,6 +5519,8 @@ the heap is divided into two parts named the FromSpace and the
 ToSpace. Initially, all allocations go to the FromSpace until there is
 not enough room for the next allocation request. At that point, the
 garbage collector goes to work to make more room.
+\index{ToSpace}
+\index{FromSpace}
 
 The garbage collector must be careful not to reclaim tuples that will
 be used by the program in the future. Of course, it is impossible in
@@ -5454,7 +5529,7 @@ the will-be-used tuples by preserving all tuples that could be
 accessed by \emph{any} program given the current computer state.  A
 program could access any tuple whose address is in a register or on
 the procedure call stack. These addresses are called the \emph{root
-  set}. In addition, a program could access any tuple that is
+  set}\index{root set}. In addition, a program could access any tuple that is
 transitively reachable from the root set. Thus, it is safe for the
 garbage collector to reclaim the tuples that are not reachable in this
 way.
@@ -5516,7 +5591,7 @@ present these findings.
 
 \subsection{Graph Copying via Cheney's Algorithm}
 \label{sec:cheney}
-
+\index{Cheney's algorithm}
 Let us take a closer look at the copying of the live objects. The
 allocated objects and pointers can be viewed as a graph and we need to
 copy the part of the graph that is reachable from the root set. To
@@ -5558,8 +5633,8 @@ Getting back to Figure~\ref{fig:cheney}, in the first step we copy the
 tuple whose second element is $42$ to the back of the queue. The other
 pointer goes to a tuple that has already been copied, so we do not
 need to copy it again, but we do need to update the pointer to the new
-location. This can be accomplished by storing a \emph{forwarding}
-pointer to the new location in the old tuple, back when we initially
+location. This can be accomplished by storing a \emph{forwarding
+pointer} to the new location in the old tuple, back when we initially
 copied the tuple into the ToSpace. This completes one step of the
 algorithm. The algorithm continues in this way until the front of the
 queue is empty, that is, until the front catches up with the back.
@@ -5593,7 +5668,7 @@ within a 2-week time budget, we recommend a combination of options 1
 and 2, using separate strategies for the stack and the heap.
 
 Regarding the stack, we recommend using a separate stack for pointers,
-which we call a \emph{root stack} (a.k.a. ``shadow
+which we call a \emph{root stack}\index{root stack} (a.k.a. ``shadow
 stack'')~\citep{Siebert:2001aa,Henderson:2002aa,Baker:2009aa}. That
 is, when a local variable needs to be spilled and is of type
 \code{(Vector $\Type_1 \ldots \Type_n$)}, then we put it on the root
@@ -5607,7 +5682,7 @@ pointers from the regular stack and also the pointer in the second
 register.
 
 \begin{figure}[tbp]
-\centering \includegraphics[width=0.65\textwidth]{figs/root-stack}
+\centering \includegraphics[width=0.60\textwidth]{figs/root-stack}
 \caption{Maintaining a root stack to facilitate garbage collection.}
 \label{fig:shadow-stack}
 \end{figure}
@@ -5643,6 +5718,7 @@ aligned.)
 
 \subsection{Implementation of the Garbage Collector}
 \label{sec:organize-gz}
+\index{prelude}
 
 An implementation of the copying collector is provided in the
 \code{runtime.c} file. Figure~\ref{fig:gc-header} defines the
@@ -5992,6 +6068,7 @@ start:
 
 \section{Select Instructions and the x86$_2$ Language}
 \label{sec:select-instructions-gc}
+\index{instruction selection}
 
 %% void (rep as zero)
 %% allocate
@@ -6006,6 +6083,7 @@ were needed to compile tuples, including \code{Allocate},
 \code{void}. We compile \code{GlobalValue} to \code{Global} because
 the later has a different concrete syntax (see
 Figures~\ref{fig:x86-2-concrete} and \ref{fig:x86-2}).
+\index{x86}
 
 The \code{vector-ref} and \code{vector-set!} forms translate into
 \code{movq} instructions.  (The plus one in the offset is to get past
@@ -6014,16 +6092,16 @@ the tag at the beginning of the tuple representation.)
 |$\itm{lhs}$| = (vector-ref |$\itm{vec}$| |$n$|);
 |$\Longrightarrow$|
 movq |$\itm{vec}'$|, %r11
-movq |$-8(n+1)$|(%r11), |$\itm{lhs}$|
+movq |$-8(n+1)$|(%r11), |$\itm{lhs'}$|
 
 |$\itm{lhs}$| = (vector-set! |$\itm{vec}$| |$n$| |$\itm{arg}$|);
 |$\Longrightarrow$|
 movq |$\itm{vec}'$|, %r11
 movq |$\itm{arg}'$|, |$8(n+1)$|(%r11)
-movq $0, |$\itm{lhs}$|
+movq $0, |$\itm{lhs'}$|
 \end{lstlisting}
-The $\itm{vec}'$ and $\itm{arg}'$ are obtained by translating
-$\itm{vec}$ and $\itm{arg}$ to x86.  The move of $\itm{vec}'$ to
+The $\itm{lhs}'$, $\itm{vec}'$, and $\itm{arg}'$ are obtained by
+translating $\itm{vec}$ and $\itm{arg}$ to x86.  The move of $\itm{vec}'$ to
 register \code{r11} ensures that offset expression
 \code{$-8(n+1)$(\%r11)} contains a register operand.  This requires
 removing \code{r11} from consideration by the register allocating.
@@ -6033,7 +6111,7 @@ Why not use \code{rax} instead of \code{r11}? Suppose we instead used
 \begin{lstlisting}
 movq |$\itm{vec}'$|, %rax
 movq |$\itm{arg}'$|, |$8(n+1)$|(%rax)
-movq $0, |$\itm{lhs}$|
+movq $0, |$\itm{lhs}'$|
 \end{lstlisting}
 Next, suppose that $\itm{arg}'$ ends up as a stack location, so
 \code{patch-instructions} would insert a move through \code{rax}
@@ -6042,7 +6120,7 @@ as follows.
 movq |$\itm{vec}'$|, %rax
 movq |$\itm{arg}'$|, %rax
 movq %rax, |$8(n+1)$|(%rax)
-movq $0, |$\itm{lhs}$|
+movq $0, |$\itm{lhs}'$|
 \end{lstlisting}
 But the above sequence of instructions does not work because we're
 trying to use \code{rax} for two different values ($\itm{vec}'$ and
@@ -6063,7 +6141,7 @@ used to determine the pointer mask region of the tag.
    |$\itm{lhs}$| = (allocate |$\itm{len}$| (Vector |$\itm{type} \ldots$|));
    |$\Longrightarrow$|
    movq free_ptr(%rip), |$\itm{lhs}'$|
-   addq $|$8(\itm{len}+1)$|, free_ptr(%rip)
+   addq |$8(\itm{len}+1)$|, free_ptr(%rip)
    movq |$\itm{lhs}'$|, %r11
    movq $|$\itm{tag}$|, 0(%r11)
 \end{lstlisting}
@@ -6198,6 +6276,7 @@ block40:
 
 \section{Register Allocation}
 \label{sec:reg-alloc-gc}
+\index{register allocation}
 
 As discussed earlier in this chapter, the garbage collector needs to
 access all the pointers in the root set, that is, all variables that
@@ -6239,6 +6318,7 @@ stack.
 
 \section{Print x86}
 \label{sec:print-x86-gc}
+\index{prelude}\index{conclusion}
 
 Figure~\ref{fig:print-x86-output-gc} shows the output of the
 \code{print-x86} pass on the running example. In the prelude and
@@ -6483,7 +6563,8 @@ overhead is to reduce how much data is inspected in each call to
 \code{collect}. In particular, researchers have observed that recently
 allocated data is more likely to become garbage then data that has
 survived one or more previous calls to \code{collect}. This insight
-motivated the creation of \emph{generational garbage collectors} that
+motivated the creation of \emph{generational garbage collectors}
+\index{generational garbage collector} that
 1) segragates data according to its age into two or more generations,
 2) allocates less space for younger generations, so collecting them is
 faster, and more space for the older generations, and 3) performs
@@ -6553,6 +6634,7 @@ from the set.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Functions}
 \label{ch:functions}
+\index{function}
 
 This chapter studies the compilation of functions similar to those
 found in the C language. This corresponds to a subset of Typed Racket
@@ -6580,9 +6662,10 @@ $\APPLY{\Exp}{\Exp\ldots}$.
 %% this problem, we translate the syntax from $(\Exp \; \Exp \ldots)$ to
 %% $(\key{app}\; \Exp \; \Exp \ldots)$ during type checking.
 
-Functions are first-class in the sense that a function pointer is data
-and can be stored in memory or passed as a parameter to another
-function.  Thus, we introduce a function type, written
+Functions are first-class in the sense that a function pointer
+\index{function pointer} is data and can be stored in memory or passed
+as a parameter to another function.  Thus, we introduce a function
+type, written
 \begin{lstlisting}
    (|$\Type_1$| |$\cdots$| |$\Type_n$| -> |$\Type_r$|)
 \end{lstlisting}
@@ -6769,7 +6852,7 @@ function calls in this chapter we instead will be jumping to a
 function whose location is given by an address in a register, that is,
 we need to make an \emph{indirect function call}. The x86 syntax for
 this is a \code{callq} instruction but with an asterisk before the
-register name.
+register name.\index{indirect function call}
 \begin{lstlisting}
    callq *%rbx
 \end{lstlisting}
@@ -6777,12 +6860,15 @@ register name.
 
 \subsection{Calling Conventions}
 
+\index{calling conventions}
+
 The \code{callq} instruction provides partial support for implementing
 functions: it pushes the return address on the stack and it jumps to
 the target. However, \code{callq} does not handle
 \begin{enumerate}
 \item parameter passing,
-\item saving and restoring frames on the procedure call stack, or
+\item pushing frames on the procedure call stack and popping them off,
+  or
 \item determining how registers are shared by different functions.
 \end{enumerate}
 These issues require coordination between the caller and the callee,
@@ -6803,6 +6889,8 @@ than six arguments.
 %
 The register \code{rax} is for the return value of the function.
 
+\index{prelude}\index{conclusion}
+
 Regarding (2) frames and the procedure call stack, recall from
 Section~\ref{sec:x86} that the stack grows down, with each function
 call using a chunk of space called a frame. The caller sets the stack
@@ -6810,6 +6898,15 @@ pointer, register \code{rsp}, to the last data item in its frame. The
 callee must not change anything in the caller's frame, that is,
 anything that is at or above the stack pointer. The callee is free to
 use locations that are below the stack pointer.
+
+Recall that we are storing variables of vector type on the root stack.
+So the prelude needs to move the root stack pointer \code{r15} up and
+the conclusion needs to move the root stack pointer back down.  Also,
+the prelude must initialize to \code{0} this frame's slots in the root
+stack to signal to the garbage collector that those slots do not yet
+contain a pointer to a vector. Otherwise the garbage collector will
+interpret the garbage bits in those slots as memory addresses and try
+to traverse them, causing serious mayhem!
 
 Regarding (3) the sharing of registers between different functions,
 recall from Section~\ref{sec:calling-conventions} that the registers
@@ -6909,13 +7006,25 @@ recursive functions. However, in some cases we can arrange to use only
 constant space, i.e. $O(1)$, instead of $O(n)$.
 
 If a function call is the last action in a function body, then that
-call is said to be a \emph{tail call}. In such situations, the frame
-of the caller is no longer needed, so we can pop the caller's frame
-before making the tail call. With this approach, a recursive function
-that only makes tail calls will only use $O(1)$ stack space.
-Functional languages like Racket typically rely heavily on recursive
-functions, so they typically guarantee that all tail calls will be
-optimized in this way.
+call is said to be a \emph{tail call}\index{tail call}.
+For example, in the following
+program, the recursive call to \code{tail-sum} is a tail call.
+\begin{center}
+\begin{lstlisting}
+(define (tail-sum [n : Integer] [r : Integer]) : Integer
+  (if (eq? n 0) 
+      r
+      (tail-sum (- n 1) (+ n r))))
+
+(+ (tail-sum 5 0) 27)
+\end{lstlisting}
+\end{center}
+At a tail call, the frame of the caller is no longer needed, so we
+can pop the caller's frame before making the tail call. With this
+approach, a recursive function that only makes tail calls will only
+use $O(1)$ stack space.  Functional languages like Racket typically
+rely heavily on recursive functions, so they typically guarantee that
+all tail calls will be optimized in this way.
 
 However, some care is needed with regards to argument passing in tail
 calls.  As mentioned above, for arguments beyond the sixth, the
@@ -6945,9 +7054,10 @@ one. Thus, the return address that is already on the stack is the
 right one, and we should not use \key{callq} to make the tail call, as
 that would unnecessarily overwrite the return address. Instead we can
 simply use the \key{jmp} instruction. Like the indirect function call,
-we write an indirect jump with a register prefixed with an asterisk.
-We recommend using \code{rax} to hold the jump target because the
-preceding conclusion overwrites just about everything else.
+we write an \emph{indirect jump}\index{indirect jump} with a register
+prefixed with an asterisk.  We recommend using \code{rax} to hold the
+jump target because the preceding conclusion overwrites just about
+everything else.
 \begin{lstlisting}
    jmp *%rax
 \end{lstlisting}
@@ -6955,7 +7065,7 @@ preceding conclusion overwrites just about everything else.
 \section{Shrink $R_4$}
 \label{sec:shrink-r4}
 
-The \code{shrink} pass performs a minor modifications to ease the
+The \code{shrink} pass performs a minor modification to ease the
 later passes. This pass introduces an explicit \code{main} function
 and changes the top \code{ProgramDefsExp} form to
 \code{ProgramDefs} as follows.
@@ -7135,9 +7245,11 @@ should be similar to the case for the \code{program} form in $C_2$.
 
 \section{Select Instructions and the x86$_3$ Language}
 \label{sec:select-r4}
+\index{instruction selection}
 
 The output of select instructions is a program in the x86$_3$
 language, whose syntax is defined in Figure~\ref{fig:x86-3}.
+\index{x86}
 
 \begin{figure}[tp]
 \fbox{
@@ -7175,6 +7287,8 @@ x86_3 &::= & (\key{program} \;\itm{info} \;\Def\ldots)
 \caption{The x86$_3$ language (extends x86$_2$ of Figure~\ref{fig:x86-2}).}
 \label{fig:x86-3}
 \end{figure}
+
+\margincomment{TODO: abstract syntax for $x86_3$. -Jeremy}
 
 An assignment of \code{FunRef} becomes a \code{leaq} instruction
 as follows: \\
@@ -7514,6 +7628,8 @@ the compilation of $R_4$.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Lexically Scoped Functions}
 \label{ch:lambdas}
+\index{lambda}
+\index{lexical scoping}
 
 This chapter studies lexically scoped functions as they appear in
 functional languages such as Racket. By lexical scoping we mean that a
@@ -7607,7 +7723,7 @@ free variable.
 \begin{definition}
 A variable is \emph{free with respect to an expression} $e$ if the
 variable occurs inside $e$ but does not have an enclosing binding in
-$e$.
+$e$.\index{free variable}
 \end{definition}
 
 For example, the variables \code{x}, \code{y}, and \code{z} are all
@@ -7630,7 +7746,9 @@ binding of \code{x} to \code{3} needs to be used in the application of
 \citet{Cardelli:1983aa}, is to bundle into a vector the values of the
 free variables together with the function pointer for the lambda's
 code, an arrangement called a \emph{flat closure} (which we shorten to
-just ``closure'') . Fortunately, we have all the ingredients to make
+just ``closure'').
+\index{closure}\index{flat closure}
+Fortunately, we have all the ingredients to make
 closures, Chapter~\ref{ch:tuples} gave us vectors and
 Chapter~\ref{ch:functions} gave us function pointers. The function
 pointer shall reside at index $0$ and the values for free variables
@@ -7932,6 +8050,7 @@ your previously created test programs.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Dynamic Typing}
 \label{ch:type-dynamic}
+\index{dynamic typing}
 
 In this chapter we discuss the compilation of a dynamically typed
 language, named $R_7$, that is a subset of the Racket
@@ -7947,7 +8066,7 @@ program.
 Languages that allow expressions to produce different kinds of values
 are called \emph{polymorphic}. There are many kinds of polymorphism,
 such as subtype polymorphism and parametric
-polymorphism~\citep{Cardelli:1985kx}. The kind of polymorphism are
+polymorphism~\citep{Cardelli:1985kx}. The kind of polymorphism we are
 talking about here does not have a special name, but it is the usual
 kind that arises in dynamically typed languages.
 
@@ -8443,6 +8562,7 @@ $\Rightarrow$
 
 \section{Register Allocation for $R_6$}
 \label{sec:register-allocation-r6}
+\index{register allocation}
 
 As mentioned above, a variable of type \code{Any} might refer to a
 vector. Thus, the register allocator for $R_6$ needs to treat variable
@@ -8626,12 +8746,15 @@ completion without error.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Gradual Typing}
 \label{ch:gradual-typing}
+\index{gradual typing}
 
 This chapter will be based on the ideas of \citet{Siek:2006bh}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Parametric Polymorphism}
 \label{ch:parametric-polymorphism}
+\index{parametric polymorphism}
+\index{generics}
 
 This chapter may be based on ideas from \citet{Cardelli:1984aa},
 \citet{Leroy:1992qb}, \citet{Shao:1997uj}, or \citet{Harper:1995um}.
@@ -8653,6 +8776,7 @@ algorithm of \citet{Waddell:1997fk}.
 
 \section{Interpreters}
 \label{appendix:interp}
+\index{interpreter}
 
 We provide interpreters for each of the source languages $R_0$, $R_1$,
 $\ldots$ in the files \code{interp-R1.rkt}, \code{interp-R2.rkt}, etc.
@@ -8758,6 +8882,7 @@ triggered.  The alist may contain both immutable pairs (built with
 
 \section{x86 Instruction Set Quick-Reference}
 \label{sec:x86-quick-reference}
+\index{x86}
 
 Table~\ref{tab:x86-instr} lists some x86 instructions and what they
 do. We write $A \to B$ to mean that the value of $A$ is written into
@@ -8820,9 +8945,17 @@ registers.
   \label{tab:x86-instr}
 \end{table}
 
+\cleardoublepage
+
+\addcontentsline{toc}{chapter}{Index}
+\printindex
+
+\cleardoublepage
 
 \bibliographystyle{plainnat}
 \bibliography{all}
+\addcontentsline{toc}{chapter}{Bibliography}
+
 
 \end{document}
 
