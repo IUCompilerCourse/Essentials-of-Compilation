@@ -85,7 +85,8 @@ morekeywords={seq,assign,program,block,define,lambda,match,goto,if,else,then,str
 deletekeywords={read},
 escapechar=|,
 columns=flexible,
-moredelim=[is][\color{red}]{~}{~}
+moredelim=[is][\color{red}]{~}{~},
+showstringspaces=false
 }
 
 \newtheorem{theorem}{Theorem}
@@ -6037,8 +6038,8 @@ C_2 & ::= & \gray{ \PROGRAM{\itm{info}}{\CFG{(\itm{label}\,\key{.}\,\Tail)\ldots
 \]
 \end{minipage}
 }
-\caption{The abstract syntax of $C_2$, an extention of $C_1$
-  (Figure~\ref{fig:c1-syntax}).}
+\caption{The abstract syntax of $C_2$, extending $C_1$
+   (Figure~\ref{fig:c1-syntax}).}
 \label{fig:c2-syntax}
 \end{figure}
 
@@ -6878,6 +6879,66 @@ update the \code{lambda} values to use the top-level environment.
 \end{figure}
 
 
+\margincomment{TODO: explain type checker}
+
+The type checker for $R_4$ is is in Figure~\ref{fig:type-check-R4}.
+
+\begin{figure}[tp]
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+(define (fun-def-name d)
+  (match d [(Def f (list `[,xs : ,ps] ...) rt info body)  f]))
+
+(define (fun-def-type d)
+  (match d
+    [(Def f (list `[,xs : ,ps] ...) rt info body)  `(,@ps -> ,rt)]))
+
+(define (type-check-exp env)
+  (lambda (e)
+    (match e
+      ...
+      [(Apply e es)
+       (define-values (e^ ty) ((type-check-exp env) e))
+       (define-values (e* ty*) (for/lists (e* ty*) ([e (in-list es)])
+                                     ((type-check-exp env) e)))
+       (match ty
+         [`(,ty^* ... -> ,rt)
+          (for ([arg-ty ty*] [prm-ty ty^*])
+            (unless (equal? arg-ty prm-ty)
+              (error "argument ~a not equal to parameter ~a" arg-ty prm-ty)))
+          (values (HasType (Apply e^ e*) rt) rt)]
+         [else (error "expected a function, not" ty)])])))
+
+(define (type-check-def env)
+  (lambda (e)
+    (match e
+      [(Def f (and p:t* (list `[,xs : ,ps] ...)) rt info body)
+       (define new-env (append (map cons xs ps) env))
+       (define-values (body^ ty^) ((type-check-exp new-env) body))
+       (unless (equal? ty^ rt)
+         (error "body type ~a not equal to return type ~a" ty^ rt))
+       (Def f p:t* rt info body^)])))	 
+
+(define (type-check env)
+  (lambda (e)
+    (match e
+      [(ProgramDefsExp info ds body)
+       (define new-env (for/list ([d ds]) 
+                          (cons (fun-def-name d) (fun-def-type d))))
+       (define ds^ (for/list ([d ds])
+                      ((type-check-def new-env) d)))
+       (define-values (body^ ty) ((type-check-exp new-env) body))
+       (unless (equal? ty 'Integer)
+         (error "result of the program must be an integer, not " ty))
+       (ProgramDefsExp info ds^ body^)]
+      [else (error 'type-check "R4/type-check unmatched ~a" e)])))
+\end{lstlisting}
+\caption{Type checker for the $R_4$ language.}
+\label{fig:type-check-R4}
+\end{figure}
+
+
+
+
 \section{Functions in x86}
 \label{sec:fun-x86}
 
@@ -7210,9 +7271,23 @@ arguments, we have some work to do!
 This pass transforms functions and function calls that involve more
 than six arguments to pass the first five arguments as usual, but it
 packs the rest of the arguments into a vector and passes it as the
-sixth argument. So for any function call with $n$ arguments more than
-six, the \code{limit-functions} pass transforms it in the following
-way.
+sixth argument.
+
+Each function definition with too many parameters is transformed as
+follows.
+\begin{lstlisting}
+  (Def |$f$| ([|$x_1$|:|$T_1$|] |$\ldots$| [|$x_n$|:|$T_n$|]) |$T_r$| |$\itm{info}$| |$\itm{body}$|) 
+|$\Rightarrow$|
+  (Def |$f$| ([|$x_1$|:|$T_1$|] |$\ldots$| [|$x_5$|:|$T_5$|] [vec : (Vector |$T_6 \ldots T_n$|)]) |$T_r$| |$\itm{info}$| |$\itm{body}'$|) 
+\end{lstlisting}
+where the $\itm{body}$ is transformed into $\itm{body}'$ by replacing
+the occurences of the later parameters with vector references.
+\begin{lstlisting}
+  (Var |$x_i$|) |$\Rightarrow$| (Prim 'vector-ref (list vec (Int |$(i - 6)$|)))
+\end{lstlisting}
+
+For function calls with too many arguments, the \code{limit-functions}
+pass transforms them in the following way.
 
 \begin{tabular}{lll}
 \begin{minipage}{0.2\textwidth}
@@ -7225,28 +7300,24 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(|$e_0$| |$e_1$| |$\ldots$| |$e_5$| (vector |$e_6$| |$\ldots$| |$e_n$|))
+(|$e_0$| |$e_1 \ldots e_5$| (vector |$e_6 \ldots e_n$|))
 \end{lstlisting}
 \end{minipage}
 \end{tabular}
 
-\margincomment{UNDER CONSTRUCTION --Jeremy}
-
-In the body of the function, all occurrences of the $i$th argument in
-which $i>5$ must be replaced with a \code{vector-ref}.
 
 \section{Remove Complex Operators and Operands}
 \label{sec:rco-r4}
 
 The primary decisions to make for this pass is whether to classify
-\code{fun-ref} and \code{app} as either simple or complex
+\code{FunRef} and \code{Apply} as either simple or complex
 expressions. Recall that a simple expression will eventually end up as
 just an ``immediate'' argument of an x86 instruction. Function
 application will be translated to a sequence of instructions, so
-\code{app} must be classified as complex expression. Regarding
-\code{fun-ref}, as discussed above, the function label needs to
+\code{Apply} must be classified as complex expression. Regarding
+\code{FunRef}, as discussed above, the function label needs to
 be converted to an address using the \code{leaq} instruction. Thus,
-even though \code{fun-ref} seems rather simple, it needs to be
+even though \code{FunRef} seems rather simple, it needs to be
 classified as a complex expression so that we generate an assignment
 statement with a left-hand side that can serve as the target of the
 \code{leaq}.
@@ -7254,17 +7325,18 @@ statement with a left-hand side that can serve as the target of the
 \section{Explicate Control and the $C_3$ language}
 \label{sec:explicate-control-r4}
 
-Figure~\ref{fig:c3-syntax} defines the syntax for $C_3$, the output of
+Figures~\ref{fig:c3-concrete-syntax} and \ref{fig:c3-syntax} define
+the concrete and abstract syntax for $C_3$, the output of
 \key{explicate-control}. The three mutually recursive functions for
 this pass, for assignment, tail, and predicate contexts, must all be
-updated with cases for \code{fun-ref} and \code{app}. In
-assignment and predicate contexts, \code{app} becomes \code{call},
-whereas in tail position \code{app} becomes \code{tailcall}.  We
-recommend defining a new function for processing function definitions.
-This code is similar to the case for \code{program} in $R_3$.  The
-top-level \code{explicate-control} function that handles the
-\code{program} form of $R_4$ can then apply this new function to all
-the function definitions.
+updated with cases for \code{FunRef} and \code{Apply}. In assignment
+and predicate contexts, \code{Apply} becomes \code{Call} in $C_3$,
+whereas in tail position \code{Apply} becomes \code{TailCall} in
+$C_3$.  We recommend defining a new function for processing function
+definitions.  This code is similar to the case for \code{Program} in
+$R_3$.  The top-level \code{explicate-control} function that handles
+the \code{ProgramDefs} form of $R_4$ can then apply this new function
+to all the function definitions.
 
 \begin{figure}[tp]
 \fbox{
@@ -7279,20 +7351,30 @@ the function definitions.
    &\mid& \gray{  (\key{allocate}\,\Int\,\Type)
    \mid (\key{vector-ref}\, \Arg\, \Int)  } \\
    &\mid& \gray{  (\key{vector-set!}\,\Arg\,\Int\,\Arg) \mid (\key{global-value} \,\itm{name}) \mid (\key{void}) } \\
-   &\mid& (\key{fun-ref}\,\itm{label}) \mid (\key{call} \,\Arg\,\Arg\ldots) \\
+   &\mid& \itm{label} \mid (\key{call} \,\Arg\,\Arg\ldots) \\
 \Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Exp} 
        \mid (\key{collect} \,\itm{int}) }\\
 \Tail &::= & \gray{\RETURN{\Exp} \mid (\key{seq}\;\Stmt\;\Tail)} \\
       &\mid& \gray{(\key{goto}\,\itm{label})
        \mid \IF{(\itm{cmp}\, \Arg\,\Arg)}{(\key{goto}\,\itm{label})}{(\key{goto}\,\itm{label})}} \\
-      &\mid& (\key{tailcall} \,\Arg\,\Arg\ldots) \\
+      &\mid& (\Arg\,\Arg\ldots) \\
   \Def &::=& (\key{define}\; (\itm{label} \; [\Var \key{:} \Type]\ldots) \key{:} \Type \; ((\itm{label}\,\key{.}\,\Tail)\ldots)) \\
-C_3 & ::= & (\key{program}\;\itm{info}\;\Def\ldots)
+C_3 & ::= & \Def\ldots
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The $C_3$ language, extending $C_2$ (Figure~\ref{fig:c2-syntax}) with functions.}
+\caption{The $C_3$ language, extending $C_2$ (Figure~\ref{fig:c2-concrete-syntax}) with functions.}
+\label{fig:c3-concrete-syntax}
+\end{figure}
+
+\begin{figure}[tp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+UNDER CONSTRUCTION
+\end{minipage}
+}
+\caption{The abstract syntax of $C_3$, extending $C_2$ (Figure~\ref{fig:c2-syntax}).}
 \label{fig:c3-syntax}
 \end{figure}
 
@@ -7300,10 +7382,10 @@ C_3 & ::= & (\key{program}\;\itm{info}\;\Def\ldots)
 \label{sec:uncover-locals-r4}
 
 The function for processing $\Tail$ should be updated with a case for
-\code{tailcall}. We also recommend creating a new function for
+\code{TailCall}. We also recommend creating a new function for
 processing function definitions. Each function definition in $C_3$ has
 its own set of local variables, so the code for function definitions
-should be similar to the case for the \code{program} form in $C_2$.
+should be similar to the case for the \code{Program} form in $C_2$.
 
 \section{Select Instructions and the x86$_3$ Language}
 \label{sec:select-r4}
@@ -7350,7 +7432,7 @@ x86_3 &::= & (\key{program} \;\itm{info} \;\Def\ldots)
 \label{fig:x86-3}
 \end{figure}
 
-\margincomment{TODO: abstract syntax for $x86_3$. -Jeremy}
+\margincomment{TODO: abstract syntax for $x86_3$.}
 
 An assignment of \code{FunRef} becomes a \code{leaq} instruction
 as follows: \\
@@ -7370,6 +7452,8 @@ $\Rightarrow$
 \end{minipage}
 \end{tabular} \\
 
+
+\margincomment{TODO: show AST transformation for function definitions.}
 
 Regarding function definitions, we need to remove their parameters and
 instead perform parameter passing in terms of the conventions
@@ -7493,22 +7577,19 @@ see any ways to improve the translation?
 \begin{minipage}{0.45\textwidth}
 % s3_2.rkt
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-(program
- (define (add [x : Integer]
-                [y : Integer])
-    : Integer (+ x y))
- (add 40 2))
+(define (add [x : Integer]
+              [y : Integer]) : Integer (+ x y))
+(add 40 2)
 \end{lstlisting}
 $\Downarrow$
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-(program ()
- (define (add86 [x87 : Integer]
+(define (add86 [x87 : Integer]
            [y88 : Integer]) : Integer ()
    ((add86start . (return (+ x87 y88)))))
- (define (main) : Integer ()
+(define (main) : Integer ()
    ((mainstart . 
       (seq (assign tmp89 (fun-ref add86))
-           (tailcall tmp89 40 2))))))
+           (tailcall tmp89 40 2)))))
 \end{lstlisting}
 \end{minipage}
 &
@@ -7832,7 +7913,7 @@ in the values for the free variable \code{x}.
 
 Figure~\ref{fig:interp-R5} shows the definitional interpreter for
 $R_5$. The clause for \key{lambda} saves the current environment
-inside the returned \key{lambda}. Then the clause for \key{app} uses
+inside the returned \key{lambda}. Then the clause for \key{Apply} uses
 the environment from the \key{lambda}, the \code{lam-env}, when
 interpreting the body of the \key{lambda}.  The \code{lam-env}
 environment is extended with the mapping of parameters to argument
@@ -7903,7 +7984,7 @@ that comes after \code{reveal-functions} and before
 
 As usual, we shall implement the pass as a recursive function over the
 AST. All of the action is in the clauses for \key{lambda} and
-\key{app}. We transform a \key{lambda} expression into an expression
+\key{Apply}. We transform a \key{lambda} expression into an expression
 that creates a closure, that is, creates a vector whose first element
 is a function pointer and the rest of the elements are the free
 variables of the \key{lambda}.  The \itm{name} is a unique symbol
