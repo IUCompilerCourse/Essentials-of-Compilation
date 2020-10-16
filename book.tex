@@ -2639,11 +2639,11 @@ registers, the \emph{callee-saved registers}.
 \index{callee-saved registers}
 The caller-saved registers are
 \begin{lstlisting}
-  rax rcx rdx rsi rdi r8 r9 r10 r11
+rax rcx rdx rsi rdi r8 r9 r10 r11
 \end{lstlisting}
 while the callee-saved registers are
 \begin{lstlisting}
-  rsp rbp rbx r12 r13 r14 r15
+rsp rbp rbx r12 r13 r14 r15
 \end{lstlisting}
 
 We can think about this caller/callee convention from two points of
@@ -2683,12 +2683,10 @@ location in the first place. Or better yet, if we can arrange for
 \code{x} to be placed in a callee-saved register, then it won't need
 to be saved and restored during function calls.
 
-The approach that we recommend is to treat variables differently
-depending on whether they are in-use during a function call.  If a
-variable is in-use during a function call, then we never assign it to
-a caller-saved register: we either assign it to a callee-saved
-register or we spill it to the stack. If a variable is not in-use
-during any function call, then we try the following alternatives in
+The approach that we recommend for variables that are in-use during a
+function call is to either assign them to callee-saved registers or to
+spill them to the stack. On the other hand, for variables that are not
+in-use during a function call, we try the following alternatives in
 order 1) look for an available caller-saved register (to leave room
 for other variables in the callee-saved register), 2) look for a
 callee-saved register, and 3) spill the variable to the stack.
@@ -2696,7 +2694,7 @@ callee-saved register, and 3) spill the variable to the stack.
 It is straightforward to implement this approach in a graph coloring
 register allocator. First, we know which variables are in-use during
 every function call because we compute that information for every
-instruciton (Section~\ref{sec:liveness-analysis-r1}). Second, when we
+instruction (Section~\ref{sec:liveness-analysis-r1}). Second, when we
 build the interference graph (Section~\ref{sec:build-interference}),
 we can place an edge between each of these variables and the
 caller-saved registers in the interference graph. This will prevent
@@ -2768,18 +2766,18 @@ conclusion:
   \label{fig:example-calling-conventions}
 \end{figure}
 
+\clearpage
 
 \section{Liveness Analysis}
 \label{sec:liveness-analysis-r1}
 \index{liveness analysis}
 
-A variable is \emph{live} if the variable is used at some later point
-in the program and there is not an intervening assignment to the
-variable.
+A variable or register is \emph{live} at a program point if its
+current value is used at some later point in the program.  We shall
+refer to variables and registers collectively as \emph{locations}.
 %
-To understand the latter condition, consider the following code
-fragment in which there are two writes to \code{b}. Are \code{a} and
-\code{b} both live at the same time?
+Consider the following code fragment in which there are two writes to
+\code{b}. Are \code{a} and \code{b} both live at the same time?
 \begin{lstlisting}[numbers=left,numberstyle=\tiny]
 movq $5, a
 movq $30, b
@@ -2808,21 +2806,20 @@ line 5 receives the value written on line 4, not line 2.
   \end{tcolorbox}
 \end{wrapfigure}
 
-The live variables can be computed by traversing the instruction
+The live locations can be computed by traversing the instruction
 sequence back to front (i.e., backwards in execution order).  Let
 $I_1,\ldots, I_n$ be the instruction sequence. We write
-$L_{\mathsf{after}}(k)$ for the set of live variables after
+$L_{\mathsf{after}}(k)$ for the set of live locations after
 instruction $I_k$ and $L_{\mathsf{before}}(k)$ for the set of live
-variables before instruction $I_k$. The live variables after an
-instruction are always the same as the live variables before the next
-instruction.
-\index{live-after}
-\index{live-before}
+locations before instruction $I_k$. The live locations after an
+instruction are always the same as the live locations before the next
+instruction.  \index{live-after} \index{live-before}
 \begin{equation} \label{eq:live-after-before-next}
   L_{\mathsf{after}}(k) = L_{\mathsf{before}}(k+1)
 \end{equation}
-To start things off, there are no live variables after the last
-instruction, so
+To start things off, there are no live locations after the last
+instruction\footnote{Technically, the \code{rax} register is live
+but we do not use it for register allocation.}, so
 \begin{equation}\label{eq:live-last-empty}
   L_{\mathsf{after}}(n) = \emptyset
 \end{equation}
@@ -2831,39 +2828,39 @@ instruction sequence back to front.
 \begin{equation}\label{eq:live-before-after-minus-writes-plus-reads}
   L_{\mathtt{before}}(k) = (L_{\mathtt{after}}(k) - W(k)) \cup R(k),
 \end{equation}
-where $W(k)$ are the variables written to by instruction $I_k$ and
-$R(k)$ are the variables read by instruction $I_k$.
+where $W(k)$ are the locations written to by instruction $I_k$ and
+$R(k)$ are the locations read by instruction $I_k$.
 
 Let us walk through the above example, applying these formulas
 starting with the instruction on line 5. We collect the answers in the
 below listing.  The $L_{\mathsf{after}}$ for the \code{addq b, c}
 instruction is $\emptyset$ because it is the last instruction
 (formula~\ref{eq:live-last-empty}).  The $L_{\mathsf{before}}$ for
-this instruction is $\{b,c\}$ because it reads from variables $b$ and
-$c$ (formula~\ref{eq:live-before-after-minus-writes-plus-reads}), that
-is
+this instruction is $\{\ttm{b},\ttm{c}\}$ because it reads from
+variables \code{b} and \code{c}
+(formula~\ref{eq:live-before-after-minus-writes-plus-reads}), that is
 \[
-   L_{\mathsf{before}}(5) = (\emptyset - \{c\}) \cup \{ b, c \} = \{ b, c \}
+   L_{\mathsf{before}}(5) = (\emptyset - \{\ttm{c}\}) \cup \{ \ttm{b}, \ttm{c} \} = \{ \ttm{b}, \ttm{c} \}
 \]
 Moving on the the instruction \code{movq \$10, b} at line 4, we copy
 the live-before set from line 5 to be the live-after set for this
 instruction (formula~\ref{eq:live-after-before-next}).
 \[
-  L_{\mathsf{after}}(4) = \{ b, c \}
+  L_{\mathsf{after}}(4) = \{ \ttm{b}, \ttm{c} \}
 \]
-This move instruction writes to $b$ and does not read from any
+This move instruction writes to \code{b} and does not read from any
 variables, so we have the following live-before set
 (formula~\ref{eq:live-before-after-minus-writes-plus-reads}).
 \[
-  L_{\mathsf{before}}(4) = (\{b,c\} - \{b\}) \cup \emptyset = \{ c \}
+  L_{\mathsf{before}}(4) = (\{\ttm{b},\ttm{c}\} - \{\ttm{b}\}) \cup \emptyset = \{ \ttm{c} \}
 \]
-Moving on more quickly, the live-before for instruction \code{movq a, c}
-is $\{a\}$ because it writes to $\{c\}$ and reads from $\{a\}$
+The live-before for instruction \code{movq a, c}
+is $\{\ttm{a}\}$ because it writes to $\{\ttm{c}\}$ and reads from $\{\ttm{a}\}$
 (formula~\ref{eq:live-before-after-minus-writes-plus-reads}).  The
-live-before for \code{movq \$30, b} is $\{a\}$ because it writes to a
+live-before for \code{movq \$30, b} is $\{\ttm{a}\}$ because it writes to a
 variable that is not live and does not read from a variable.
 Finally, the live-before for \code{movq \$5, a} is $\emptyset$
-because it writes to variable $a$.
+because it writes to variable \code{a}.
 \begin{center}
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}[numbers=left,numberstyle=\tiny]
@@ -2878,22 +2875,22 @@ addq b, c
 \begin{minipage}{0.45\textwidth}
 \begin{align*}
 L_{\mathsf{before}}(1)=  \emptyset, 
-L_{\mathsf{after}}(1)=  \{a\}\\
-L_{\mathsf{before}}(2)=  \{a\},
-L_{\mathsf{after}}(2)=  \{a\}\\
-L_{\mathsf{before}}(3)=  \{a\},
-L_{\mathsf{after}}(2)=  \{c\}\\
-L_{\mathsf{before}}(4)=  \{c\},
-L_{\mathsf{after}}(4)=  \{b,c\}\\
-L_{\mathsf{before}}(5)=  \{b,c\},
+L_{\mathsf{after}}(1)=  \{\ttm{a}\}\\
+L_{\mathsf{before}}(2)=  \{\ttm{a}\},
+L_{\mathsf{after}}(2)=  \{\ttm{a}\}\\
+L_{\mathsf{before}}(3)=  \{\ttm{a}\},
+L_{\mathsf{after}}(2)=  \{\ttm{c}\}\\
+L_{\mathsf{before}}(4)=  \{\ttm{c}\},
+L_{\mathsf{after}}(4)=  \{\ttm{b},\ttm{c}\}\\
+L_{\mathsf{before}}(5)=  \{\ttm{b},\ttm{c}\},
 L_{\mathsf{after}}(5)=  \emptyset
 \end{align*}
 \end{minipage}
 \end{center}
 
-Figure~\ref{fig:live-eg} shows the results of live variables analysis
-for the running example program, with the live-before and live-after
-sets shown between each instruction to make the figure easy to read.
+Figure~\ref{fig:live-eg} shows the results of liveness analysis for
+the running example program, with the live-before and live-after sets
+shown between each instruction to make the figure easy to read.
 
 \begin{figure}[tp]
 \hspace{20pt}
@@ -2901,25 +2898,25 @@ sets shown between each instruction to make the figure easy to read.
 \begin{lstlisting}
                        |$\{\}$|    
     movq $1, v
-                       |$\{v\}$|    
+                       |$\{\ttm{v}\}$|    
     movq $42, w
-                       |$\{v,w\}$|    
+                       |$\{\ttm{v},\ttm{w}\}$|    
     movq v, x
-                       |$\{w,x\}$|    
+                       |$\{\ttm{w},\ttm{x}\}$|    
     addq $7, x
-                       |$\{w,x\}$|    
+                       |$\{\ttm{w},\ttm{x}\}$|    
     movq x, y
-                       |$\{w,x,y\}$|    
+                       |$\{\ttm{w},\ttm{x},\ttm{y}\}$|    
     movq x, z
-                       |$\{w,y,z\}$|    
+                       |$\{\ttm{w},\ttm{y},\ttm{z}\}$|    
     addq w, z
-                       |$\{y,z\}$|    
+                       |$\{\ttm{y},\ttm{z}\}$|    
     movq y, t
-                       |$\{t,z\}$|    
+                       |$\{\ttm{t},\ttm{z}\}$|    
     negq t
-                       |$\{t,z\}$|    
+                       |$\{\ttm{t},\ttm{z}\}$|    
     movq z, %rax
-                       |$\{t\}$|    
+                       |$\{\ttm{t}\}$|    
     addq t, %rax
                        |$\{\}$|
     jmp conclusion
@@ -2935,34 +2932,26 @@ sets shown between each instruction to make the figure easy to read.
 Implement the compiler pass named \code{uncover-live} that computes
 the live-after sets. We recommend storing the live-after sets (a list
 of a set of variables) in the $\itm{info}$ field of the \key{Block}
-structure. We recommend using the
-\href{https://docs.racket-lang.org/reference/sets.html}{\code{racket/set}}
-package for representing sets of variables.
+structure.
 %
 We recommend organizing your code to use a helper function that takes
 a list of instructions and an initial live-after set (typically empty)
 and returns the list of live-after sets.
 %
 We recommend creating helper functions to 1) compute the set of
-variables that appear in an argument (of an instruction), 2) compute
-the variables read by an instruction which corresponds to the $R$
-function discussed above, and 3) the variables written by an
-instruction which corresponds to $W$.
+locations that appear in an argument (of an instruction), 2) compute
+the locations read by an instruction which corresponds to the $R$
+function discussed above, and 3) the locations written by an
+instruction which corresponds to $W$. The \key{callq} instruction
+should include all of the caller-saved registers in its $W$ because
+the calling convention says that those registers may be written to
+during the function call.
+
 \end{exercise}
 
 
 \section{Building the Interference Graph}
 \label{sec:build-interference}
-
-Based on the liveness analysis, we know where each variable is needed.
-However, during register allocation, we need to answer questions of
-the specific form: are variables $u$ and $v$ live at the same time?
-(And therefore cannot be assigned to the same register.)  To make this
-question easier to answer, we create an explicit data structure, an
-\emph{interference graph}\index{interference graph}.  An interference
-graph is an undirected graph that has an edge between two variables if
-they are live at the same time, that is, if they interfere with each
-other.
 
 \begin{wrapfigure}[27]{r}[1.0in]{0.6\textwidth}
   \small
@@ -2991,54 +2980,68 @@ other.
 \end{tcolorbox}
 \end{wrapfigure}
 
+Based on the liveness analysis, we know where each variable is needed.
+However, during register allocation, we need to answer questions of
+the specific form: are variables $u$ and $v$ live at the same time?
+(And therefore cannot be assigned to the same register.)  To make this
+question easier to answer, we create an explicit data structure, an
+\emph{interference graph}\index{interference graph}.  An interference
+graph is an undirected graph that has an edge between two variables if
+they are live at the same time, that is, if they interfere with each
+other.
+
 The most obvious way to compute the interference graph is to look at
-the set of live variables between each statement in the program and
-add an edge to the graph for every pair of variables in the same set.
+the set of live location between each statement in the program and add
+an edge to the graph for every pair of variables in the same set.
 This approach is less than ideal for two reasons. First, it can be
 expensive because it takes $O(n^2)$ time to look at every pair in a
-set of $n$ live variables. Second, there is a special case in which
-two variables that are live at the same time do not actually interfere
+set of $n$ live locations. Second, there is a special case in which
+two locations that are live at the same time do not actually interfere
 with each other: when they both contain the same value because we have
 assigned one to the other.
 
 A better way to compute the interference graph is to focus on the
-writes~\cite{Appel:2003fk}. We do not want the write performed by an
-instruction to overwrite something in a live variable. So for each
-instruction, we create an edge between the variable being written to
-and all the \emph{other} live variables.  (One should not create self
-edges.) For a \key{callq} instruction, think of all caller-saved
-registers as being written to, so an edge must be added between every
-live variable and every caller-saved register. For \key{movq}, we deal
-with the above-mentioned special case by not adding an edge between a
-live variable $v$ and destination $d$ if $v$ matches the source of the
-move. So we have the following three rules.
+writes~\cite{Appel:2003fk}. We do not want the writes performed by an
+instruction to overwrite something in a live location. So for each
+instruction, we create an edge between the locations being written to
+and all the other live locations. (Except that one should not create
+self edges.)  Recall that for a \key{callq} instruction, we consider
+all of the caller-saved registers as being written to, so an edge will
+be added between every live variable and every caller-saved
+register. For \key{movq}, we deal with the above-mentioned special
+case by not adding an edge between a live variable $v$ and destination
+$d$ if $v$ matches the source of the move. So we have the following
+two rules.
 
 \begin{enumerate}
-\item If instruction $I_k$ is an arithmetic instruction such as
-  \code{addq} $s$\key{,} $d$, then add the edge $(d,v)$ for every $v \in
-  L_{\mathsf{after}}(k)$ unless $v = d$.
+\item If instruction $I_k$ is a move such as \key{movq} $s$\key{,}
+  $d$, then add the edge $(d,v)$ for every $v \in
+  L_{\mathsf{after}}(k)$ unless $v = d$ or $v = s$.
 
-\item If instruction $I_k$ is of the form \key{callq}
-  $\mathit{label}$, then add an edge $(r,v)$ for every caller-saved
-  register $r$ and every variable $v \in L_{\mathsf{after}}(k)$.
+\item For any other instruction $I_k$, for every $d \in W(k)$
+  add an edge $(d,v)$ for every $v \in L_{\mathsf{after}}(k)$ unless $v = d$.
+  
+%% \item If instruction $I_k$ is an arithmetic instruction such as
+%%   \code{addq} $s$\key{,} $d$, then add the edge $(d,v)$ for every $v \in
+%%   L_{\mathsf{after}}(k)$ unless $v = d$.
 
-\item If instruction $I_k$ is a move: \key{movq} $s$\key{,} $d$, then add
-  the edge $(d,v)$ for every $v \in L_{\mathsf{after}}(k)$ unless $v =
-  d$ or $v = s$.
+%% \item If instruction $I_k$ is of the form \key{callq}
+%%   $\mathit{label}$, then add an edge $(r,v)$ for every caller-saved
+%%   register $r$ and every variable $v \in L_{\mathsf{after}}(k)$.
 \end{enumerate}
 
-Working from the top to bottom of Figure~\ref{fig:live-eg}, apply the
-above rules to each instruction. We highlight a few of the
+Working from the top to bottom of Figure~\ref{fig:live-eg}, we apply
+the above rules to each instruction. We highlight a few of the
 instructions and then refer the reader to
-Figure~\ref{fig:interference-results} all the interference results.
-The first instruction is \lstinline{movq $1, v}, so rule 3 applies,
-and the live-after set is $\{v\}$. We do not add any interference
-edges because the one live variable $v$ is also the destination of
-this instruction.
+Figure~\ref{fig:interference-results} for all the interference
+results.  The first instruction is \lstinline{movq $1, v}, so rule 3
+applies, and the live-after set is $\{\ttm{v}\}$. We do not add any
+interference edges because the one live variable \code{v} is also the
+destination of this instruction.
 %
 For the second instruction, \lstinline{movq $42, w}, so rule 3 applies
-again, and the live-after set is $\{v,w\}$. So the target $w$ of
-\key{movq} interferes with $v$.
+again, and the live-after set is $\{\ttm{v},\ttm{w}\}$. So the target
+$\ttm{w}$ of \key{movq} interferes with $\ttm{v}$.
 %
 Next we skip forward to the instruction \lstinline{movq x, y}.
 
@@ -3046,14 +3049,14 @@ Next we skip forward to the instruction \lstinline{movq x, y}.
 \begin{quote}
 \begin{tabular}{ll}
 \lstinline{movq $1, v}& no interference by rule 3,\\
-\lstinline{movq $42, w}& $w$ interferes with $v$ by rule 3,\\
-\lstinline{movq v, x}& $x$ interferes with $w$ by rule 3,\\
-\lstinline{addq $7, x}& $x$ interferes with $w$ by rule 1,\\
-\lstinline{movq x, y}& $y$ interferes with $w$ but not $x$ by rule 3,\\
-\lstinline{movq x, z}& $z$ interferes with $w$ and $y$ by rule 3,\\
-\lstinline{addq w, z}& $z$ interferes with $y$ by rule 1, \\
-\lstinline{movq y, t}& $t$ interferes with $z$ by rule 3, \\
-\lstinline{negq t}& $t$ interferes with $z$ by rule 1, \\
+\lstinline{movq $42, w}& $\ttm{w}$ interferes with $\ttm{v}$ by rule 3,\\
+\lstinline{movq v, x}& $\ttm{x}$ interferes with $\ttm{w}$ by rule 3,\\
+\lstinline{addq $7, x}& $\ttm{x}$ interferes with $\ttm{w}$ by rule 1,\\
+\lstinline{movq x, y}& $\ttm{y}$ interferes with $\ttm{w}$ but not $\ttm{x}$ by rule 3,\\
+\lstinline{movq x, z}& $\ttm{z}$ interferes with $\ttm{w}$ and $\ttm{y}$ by rule 3,\\
+\lstinline{addq w, z}& $\ttm{z}$ interferes with $\ttm{y}$ by rule 1, \\
+\lstinline{movq y, t}& $\ttm{t}$ interferes with $\ttm{z}$ by rule 3, \\
+\lstinline{negq t}& $\ttm{t}$ interferes with $\ttm{z}$ by rule 1, \\
 \lstinline{movq z, %rax}   & no interference (ignore rax), \\
 \lstinline{addq t, %rax} & no interference (ignore rax). \\
   \lstinline{jmp conclusion}& no interference.
@@ -3070,12 +3073,12 @@ Figure~\ref{fig:interfere}.
 \large
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (t1) at (0,2) {$t$};
-\node (z) at (3,2)  {$z$};
-\node (x) at (6,2)  {$x$};
-\node (y) at (3,0)  {$y$};
-\node (w) at (6,0)  {$w$};
-\node (v) at (9,0)  {$v$};
+\node (t1) at (0,2) {$\ttm{t}$};
+\node (z) at (3,2)  {$\ttm{z}$};
+\node (x) at (6,2)  {$\ttm{x}$};
+\node (y) at (3,0)  {$\ttm{y}$};
+\node (w) at (6,0)  {$\ttm{w}$};
+\node (v) at (9,0)  {$\ttm{v}$};
 
 
 \draw (t1) to (z);
@@ -3248,12 +3251,12 @@ colored and they are unsaturated, so we annotate each of them with a
 dash for their color and an empty set for the saturation.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (t1) at (0,2) {$t:-,\{\}$};
-\node (z) at (3,2)  {$z:-,\{\}$};
-\node (x) at (6,2)  {$x:-,\{\}$};
-\node (y) at (3,0)  {$y:-,\{\}$};
-\node (w) at (6,0)  {$w:-,\{\}$};
-\node (v) at (9,0)  {$v:-,\{\}$};
+\node (t1) at (0,2) {$\ttm{t}:-,\{\}$};
+\node (z) at (3,2)  {$\ttm{z}:-,\{\}$};
+\node (x) at (6,2)  {$\ttm{x}:-,\{\}$};
+\node (y) at (3,0)  {$\ttm{y}:-,\{\}$};
+\node (w) at (6,0)  {$\ttm{w}:-,\{\}$};
+\node (v) at (9,0)  {$\ttm{v}:-,\{\}$};
 
 \draw (t1) to (z);
 \draw (z) to (y);
@@ -3265,16 +3268,16 @@ dash for their color and an empty set for the saturation.
 \]
 The algorithm says to select a maximally saturated vertex and color it
 $0$. In this case we have a 6-way tie, so we arbitrarily pick
-$t$. We then mark color $0$ as no longer available for $z$ because
-it interferes with $t$.
+$\ttm{t}$. We then mark color $0$ as no longer available for $\ttm{z}$
+because it interferes with $\ttm{t}$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (t1) at (0,2) {$t:0,\{\}$};
-\node (z) at (3,2)  {$z:-,\{0\}$};
-\node (x) at (6,2)  {$x:-,\{\}$};
-\node (y) at (3,0)  {$y:-,\{\}$};
-\node (w) at (6,0)  {$w:-,\{\}$};
-\node (v) at (9,0)  {$v:-,\{\}$};
+\node (t1) at (0,2) {$\ttm{t}:0,\{\}$};
+\node (z) at (3,2)  {$\ttm{z}:-,\{0\}$};
+\node (x) at (6,2)  {$\ttm{x}:-,\{\}$};
+\node (y) at (3,0)  {$\ttm{y}:-,\{\}$};
+\node (w) at (6,0)  {$\ttm{w}:-,\{\}$};
+\node (v) at (9,0)  {$\ttm{v}:-,\{\}$};
 
 \draw (t1) to (z);
 \draw (z) to (y);
@@ -3285,16 +3288,16 @@ it interferes with $t$.
 \end{tikzpicture}
 \]
 Next we repeat the process, selecting another maximally saturated
-vertex, which is $z$, and color it with the first available number,
+vertex, which is \code{z}, and color it with the first available number,
 which is $1$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (t1) at (0,2) {$t:0,\{1\}$};
-\node (z) at (3,2)  {$z:1,\{0\}$};
-\node (x) at (6,2)  {$x:-,\{\}$};
-\node (y) at (3,0)  {$y:-,\{1\}$};
-\node (w) at (6,0)  {$w:-,\{1\}$};
-\node (v) at (9,0)  {$v:-,\{\}$};
+\node (t1) at (0,2) {$\ttm{t}:0,\{1\}$};
+\node (z) at (3,2)  {$\ttm{z}:1,\{0\}$};
+\node (x) at (6,2)  {$\ttm{x}:-,\{\}$};
+\node (y) at (3,0)  {$\ttm{y}:-,\{1\}$};
+\node (w) at (6,0)  {$\ttm{w}:-,\{1\}$};
+\node (v) at (9,0)  {$\ttm{v}:-,\{\}$};
 
 \draw (t1) to (z);
 \draw (z) to (y);
@@ -3304,16 +3307,16 @@ which is $1$.
 \draw (v) to (w);
 \end{tikzpicture}
 \]
-The most saturated vertices are now $w$ and $y$. We color $w$ with the
-first available color, which is $0$.
+The most saturated vertices are now \code{w} and \code{y}. We color
+\code{w} with the first available color, which is $0$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (t1) at (0,2) {$t:0,\{1\}$};
-\node (z) at (3,2)  {$z:1,\{0\}$};
-\node (x) at (6,2)  {$x:-,\{0\}$};
-\node (y) at (3,0)  {$y:-,\{0,1\}$};
-\node (w) at (6,0)  {$w:0,\{1\}$};
-\node (v) at (9,0)  {$v:-,\{0\}$};
+\node (t1) at (0,2) {$\ttm{t}:0,\{1\}$};
+\node (z) at (3,2)  {$\ttm{z}:1,\{0\}$};
+\node (x) at (6,2)  {$\ttm{x}:-,\{0\}$};
+\node (y) at (3,0)  {$\ttm{y}:-,\{0,1\}$};
+\node (w) at (6,0)  {$\ttm{w}:0,\{1\}$};
+\node (v) at (9,0)  {$\ttm{v}:-,\{0\}$};
 
 \draw (t1) to (z);
 \draw (z) to (y);
@@ -3323,18 +3326,18 @@ first available color, which is $0$.
 \draw (v) to (w);
 \end{tikzpicture}
 \]
-Vertex $y$ is now the most highly saturated, so we color $y$ with $2$.
-We cannot choose $0$ or $1$ because those numbers are in $y$'s
-saturation set. Indeed, $y$ interferes with $w$ and $z$, whose colors
-are $0$ and $1$ respectively.
+Vertex \code{y} is now the most highly saturated, so we color \code{y}
+with $2$.  We cannot choose $0$ or $1$ because those numbers are in
+\code{y}'s saturation set. Indeed, \code{y} interferes with \code{w}
+and \code{z}, whose colors are $0$ and $1$ respectively.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (t1) at (0,2) {$t:0,\{1\}$};
-\node (z) at (3,2)  {$z:1,\{0,2\}$};
-\node (x) at (6,2)  {$x:-,\{0\}$};
-\node (y) at (3,0)  {$y:2,\{0,1\}$};
-\node (w) at (6,0)  {$w:0,\{1,2\}$};
-\node (v) at (9,0)  {$v:-,\{0\}$};
+\node (t1) at (0,2) {$\ttm{t}:0,\{1\}$};
+\node (z) at (3,2)  {$\ttm{z}:1,\{0,2\}$};
+\node (x) at (6,2)  {$\ttm{x}:-,\{0\}$};
+\node (y) at (3,0)  {$\ttm{y}:2,\{0,1\}$};
+\node (w) at (6,0)  {$\ttm{w}:0,\{1,2\}$};
+\node (v) at (9,0)  {$\ttm{v}:-,\{0\}$};
 
 \draw (t1) to (z);
 \draw (z) to (y);
@@ -3344,15 +3347,15 @@ are $0$ and $1$ respectively.
 \draw (v) to (w);
 \end{tikzpicture}
 \]
-Now $x$ and $v$ are the most saturated, so we color $v$ it $1$.
+Now \code{x} and \code{v} are the most saturated, so we color \code{v} it $1$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (t1) at (0,2) {$t:0,\{1\}$};
-\node (z) at (3,2)  {$z:1,\{0,2\}$};
-\node (x) at (6,2)  {$x:-,\{0\}$};
-\node (y) at (3,0)  {$y:2,\{0,1\}$};
-\node (w) at (6,0)  {$w:0,\{1,2\}$};
-\node (v) at (9,0)  {$v:1,\{0\}$};
+\node (t1) at (0,2) {$\ttm{t}:0,\{1\}$};
+\node (z) at (3,2)  {$\ttm{z}:1,\{0,2\}$};
+\node (x) at (6,2)  {$\ttm{x}:-,\{0\}$};
+\node (y) at (3,0)  {$\ttm{y}:2,\{0,1\}$};
+\node (w) at (6,0)  {$\ttm{w}:0,\{1,2\}$};
+\node (v) at (9,0)  {$\ttm{v}:1,\{0\}$};
 
 \draw (t1) to (z);
 \draw (z) to (y);
@@ -3362,15 +3365,15 @@ Now $x$ and $v$ are the most saturated, so we color $v$ it $1$.
 \draw (v) to (w);
 \end{tikzpicture}
 \]
-In the last step of the algorithm, we color $x$ with $1$.
+In the last step of the algorithm, we color \code{x} with $1$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (t1) at (0,2) {$t:0,\{1,\}$};
-\node (z) at (3,2)  {$z:1,\{0,2\}$};
-\node (x) at (6,2)  {$x:1,\{0\}$};
-\node (y) at (3,0)  {$y:2,\{0,1\}$};
-\node (w) at (6,0)  {$w:0,\{1,2\}$};
-\node (v) at (9,0)  {$v:1,\{0\}$};
+\node (t1) at (0,2) {$\ttm{t}:0,\{1,\}$};
+\node (z) at (3,2)  {$\ttm{z}:1,\{0,2\}$};
+\node (x) at (6,2)  {$\ttm{x}:1,\{0\}$};
+\node (y) at (3,0)  {$\ttm{y}:2,\{0,1\}$};
+\node (w) at (6,0)  {$\ttm{w}:0,\{1,2\}$};
+\node (v) at (9,0)  {$\ttm{v}:1,\{0\}$};
 
 \draw (t1) to (z);
 \draw (z) to (y);
@@ -3394,12 +3397,12 @@ Putting this mapping together with the above coloring of the
 variables, we arrive at the following assignment of variables to
 registers and stack locations.
 \begin{gather*}
-  \{ v \mapsto \key{\%rcx}, \,
-     w \mapsto \key{\%rcx},  \,
-     x \mapsto \key{-8(\%rbp)}, \\
-     y \mapsto \key{-16(\%rbp)},  \,
-     z\mapsto \key{-8(\%rbp)}, 
-     t\mapsto \key{\%rcx} \}
+  \{ \ttm{v} \mapsto \key{\%rcx}, \,
+     \ttm{w} \mapsto \key{\%rcx},  \,
+     \ttm{x} \mapsto \key{-8(\%rbp)}, \,
+     \ttm{y} \mapsto \key{-16(\%rbp)}, \\
+     \ttm{z} \mapsto \key{-8(\%rbp)}, \,
+     \ttm{t} \mapsto \key{\%rcx} \}
 \end{gather*}
 Applying this assignment to our running example, on the left, yields
 the program on the right.
@@ -3597,27 +3600,28 @@ register, we could instead remove three \key{movq} instructions.  We
 can accomplish this by taking into account which variables appear in
 \key{movq} instructions with which other variables.
 
-We say that two variables $p$ and $q$ are \emph{move related}\index{move related}
-if they participate together in a \key{movq} instruction, that is, \key{movq}
-$p$\key{,} $q$ or \key{movq} $q$\key{,} $p$. When the register
-allocator chooses a color for a variable, it should prefer a color
-that has already been used for a move-related variable (assuming that
-they do not interfere). Of course, this preference should not override
-the preference for registers over stack locations. This preference
-should be used as a tie breaker when choosing between registers or
-when choosing between stack locations.
+We say that two variables $p$ and $q$ are \emph{move
+  related}\index{move related} if they participate together in a
+\key{movq} instruction, that is, \key{movq} $p$\key{,} $q$ or
+\key{movq} $q$\key{,} $p$. When the register allocator chooses a color
+for a variable, it should prefer a color that has already been used
+for a move-related variable (assuming that they do not interfere). Of
+course, this preference should not override the preference for
+registers over stack locations. This preference should be used as a
+tie breaker when choosing between registers or when choosing between
+stack locations.
 
 We recommend representing the move relationships in a graph, similar
 to how we represented interference.  The following is the \emph{move
   graph} for our running example.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (t) at (0,2) {$t$};
-\node (z) at (3,2)  {$z$};
-\node (x) at (6,2)  {$x$};
-\node (y) at (3,0)  {$y$};
-\node (w) at (6,0)  {$w$};
-\node (v) at (9,0)  {$v$};
+\node (t) at (0,2) {$\ttm{t}$};
+\node (z) at (3,2)  {$\ttm{z}$};
+\node (x) at (6,2)  {$\ttm{x}$};
+\node (y) at (3,0)  {$\ttm{y}$};
+\node (w) at (6,0)  {$\ttm{w}$};
+\node (v) at (9,0)  {$\ttm{v}$};
 
 \draw (v) to (x);
 \draw (x) to (y);
@@ -3627,16 +3631,16 @@ to how we represented interference.  The following is the \emph{move
 \]
 
 Now we replay the graph coloring, pausing to see the coloring of
-$y$. Recall the following configuration. The most saturated vertices
-were $w$ and $y$.
+\code{y}. Recall the following configuration. The most saturated vertices
+were \code{w} and \code{y}.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (t1) at (0,2) {$t:0,\{1\}$};
-\node (z) at (3,2)  {$z:1,\{0\}$};
-\node (x) at (6,2)  {$x:-,\{\}$};
-\node (y) at (3,0)  {$y:-,\{1\}$};
-\node (w) at (6,0)  {$w:-,\{1\}$};
-\node (v) at (9,0)  {$v:-,\{\}$};
+\node (t1) at (0,2) {$\ttm{t}:0,\{1\}$};
+\node (z) at (3,2)  {$\ttm{z}:1,\{0\}$};
+\node (x) at (6,2)  {$\ttm{x}:-,\{\}$};
+\node (y) at (3,0)  {$\ttm{y}:-,\{1\}$};
+\node (w) at (6,0)  {$\ttm{w}:-,\{1\}$};
+\node (v) at (9,0)  {$\ttm{v}:-,\{\}$};
 
 \draw (t1) to (z);
 \draw (z) to (y);
@@ -3647,17 +3651,18 @@ were $w$ and $y$.
 \end{tikzpicture}
 \]
 %
-Last time we chose to color $w$ with $0$. But this time we note that
-$w$ is not move related to any vertex, and $y$ is move related to $t$.
-So we choose to color $y$ the same color, $0$.
+Last time we chose to color \code{w} with $0$. But this time we note
+that \code{w} is not move related to any vertex, and \code{y} is move
+related to \code{t}.  So we choose to color \code{y} the same color,
+$0$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (t1) at (0,2) {$t:0,\{1\}$};
-\node (z) at (3,2)  {$z:1,\{0\}$};
-\node (x) at (6,2)  {$x:-,\{\}$};
-\node (y) at (3,0)  {$y:0,\{1\}$};
-\node (w) at (6,0)  {$w:-,\{0,1\}$};
-\node (v) at (9,0)  {$v:-,\{\}$};
+\node (t1) at (0,2) {$\ttm{t}:0,\{1\}$};
+\node (z) at (3,2)  {$\ttm{z}:1,\{0\}$};
+\node (x) at (6,2)  {$\ttm{x}:-,\{\}$};
+\node (y) at (3,0)  {$\ttm{y}:0,\{1\}$};
+\node (w) at (6,0)  {$\ttm{w}:-,\{0,1\}$};
+\node (v) at (9,0)  {$\ttm{v}:-,\{\}$};
 
 \draw (t1) to (z);
 \draw (z) to (y);
@@ -3667,15 +3672,15 @@ So we choose to color $y$ the same color, $0$.
 \draw (v) to (w);
 \end{tikzpicture}
 \]
-Now $w$ is the most saturated, so we color it $2$.
+Now \code{w} is the most saturated, so we color it $2$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (t1) at (0,2) {$t:0,\{1\}$};
-\node (z) at (3,2)  {$z:1,\{0,2\}$};
-\node (x) at (6,2)  {$x:-,\{2\}$};
-\node (y) at (3,0)  {$y:0,\{1,2\}$};
-\node (w) at (6,0)  {$w:2,\{0,1\}$};
-\node (v) at (9,0)  {$v:-,\{2\}$};
+\node (t1) at (0,2) {$\ttm{t}:0,\{1\}$};
+\node (z) at (3,2)  {$\ttm{z}:1,\{0,2\}$};
+\node (x) at (6,2)  {$\ttm{x}:-,\{2\}$};
+\node (y) at (3,0)  {$\ttm{y}:0,\{1,2\}$};
+\node (w) at (6,0)  {$\ttm{w}:2,\{0,1\}$};
+\node (v) at (9,0)  {$\ttm{v}:-,\{2\}$};
 
 \draw (t1) to (z);
 \draw (z) to (y);
@@ -3685,17 +3690,17 @@ Now $w$ is the most saturated, so we color it $2$.
 \draw (v) to (w);
 \end{tikzpicture}
 \]
-At this point, vertices $x$ and $v$ are most saturated,
-but $x$ is move related to $y$ and $z$, so we color $x$ to $0$
-to match $y$. Finally, we color $v$ to $0$.
+At this point, vertices \code{x} and \code{v} are most saturated, but
+\code{x} is move related to \code{y} and \code{z}, so we color
+\code{x} to $0$ to match \code{y}. Finally, we color \code{v} to $0$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (t) at (0,2) {$t:0,\{1\}$};
-\node (z) at (3,2)  {$z:1,\{0,2\}$};
-\node (x) at (6,2)  {$x:0,\{2\}$};
-\node (y) at (3,0)  {$y:0,\{1,2\}$};
-\node (w) at (6,0)  {$w:2,\{0,1\}$};
-\node (v) at (9,0)  {$v:0,\{2\}$};
+\node (t) at (0,2) {$\ttm{t}:0,\{1\}$};
+\node (z) at (3,2)  {$\ttm{z}:1,\{0,2\}$};
+\node (x) at (6,2)  {$\ttm{x}:0,\{2\}$};
+\node (y) at (3,0)  {$\ttm{y}:0,\{1,2\}$};
+\node (w) at (6,0)  {$\ttm{w}:2,\{0,1\}$};
+\node (v) at (9,0)  {$\ttm{v}:0,\{2\}$};
 
 \draw (t) to (z);
 \draw (z) to (y);
@@ -3708,12 +3713,12 @@ to match $y$. Finally, we color $v$ to $0$.
 
 So we have the following assignment of variables to registers.
 \begin{gather*}
-  \{ v \mapsto \key{\%rbx}, \,
-     w \mapsto \key{\%rdx},  \,
-     x \mapsto \key{\%rbx}, \\
-     y \mapsto \key{\%rbx},  \,
-     z\mapsto \key{\%rcx}, 
-     t\mapsto \key{\%rbx} \}
+  \{ \ttm{v} \mapsto \key{\%rbx}, \,
+     \ttm{w} \mapsto \key{\%rdx}, \,
+     \ttm{x} \mapsto \key{\%rbx}, \,
+     \ttm{y} \mapsto \key{\%rbx}, \,
+     \ttm{z} \mapsto \key{\%rcx}, \,
+     \ttm{t} \mapsto \key{\%rbx} \}
 \end{gather*}
 
 We apply this register assignment to the running example, on the left,
@@ -3767,7 +3772,6 @@ negq %rbx
 movq %rcx, %rax
 addq %rbx, %rax
 jmp conclusion
-
 \end{lstlisting}
 \end{minipage}
 
@@ -6351,13 +6355,13 @@ The later responsibility can be handled during construction of the
 inference graph, by adding interference edges between the call-live
 vector-typed variables and all the callee-saved registers. (They
 already interfere with the caller-saved registers.)  The type
-information for variables is in the \code{program} form, so we
+information for variables is in the \code{Program} form, so we
 recommend adding another parameter to the \code{build-interference}
 function to communicate this alist.
 
 The spilling of vector-typed variables to the root stack can be
 handled after graph coloring, when choosing how to assign the colors
-(integers) to registers and stack locations. The \code{program} output
+(integers) to registers and stack locations. The \code{Program} output
 of this pass changes to also record the number of spills to the root
 stack.
 
@@ -7000,13 +7004,15 @@ Here we use conventions that are compatible with those of the
 \code{gcc} compiler~\citep{Matz:2013aa}.
 
 Regarding (1) parameter passing, the convention is to use the
-following six registers: \code{rdi}, \code{rsi}, \code{rdx},
-\code{rcx}, \code{r8}, and \code{r9}, in that order, to pass arguments
-to a function. If there are more than six arguments, then the
-convention is to use space on the frame of the caller for the rest of
-the arguments. However, to ease the implementation of efficient tail
-calls (Section~\ref{sec:tail-call}), we arrange to never need more
-than six arguments.
+following six registers:
+\begin{lstlisting}
+rdi rsi rdx rcx r8 r9
+\end{lstlisting}
+in that order, to pass arguments to a function. If there are more than
+six arguments, then the convention is to use space on the frame of the
+caller for the rest of the arguments. However, to ease the
+implementation of efficient tail calls (Section~\ref{sec:tail-call}),
+we arrange to never need more than six arguments.
 %
 The register \code{rax} is for the return value of the function.
 
@@ -7428,7 +7434,13 @@ x86_3 &::= & (\key{program} \;\itm{info} \;\Def\ldots)
 \]
 \end{minipage}
 }
-\caption{The x86$_3$ language (extends x86$_2$ of Figure~\ref{fig:x86-2}).}
+\caption{The concrete syntax of x86$_3$ (extends x86$_2$ of Figure~\ref{fig:x86-2}).}
+\label{fig:x86-3-concrete}
+\end{figure}
+
+\begin{figure}[tp]
+UNDER CONSTRUCTION
+  \caption{The abstract syntax of x86$_3$ (extends x86$_2$ of Figure~\ref{fig:x86-2}).}
 \label{fig:x86-3}
 \end{figure}
 
@@ -7437,7 +7449,7 @@ x86_3 &::= & (\key{program} \;\itm{info} \;\Def\ldots)
 An assignment of \code{FunRef} becomes a \code{leaq} instruction
 as follows: \\
 \begin{tabular}{lll}
-\begin{minipage}{0.45\textwidth}
+\begin{minipage}{0.35\textwidth}
 \begin{lstlisting}
   (Assign |$\itm{lhs}$| (FunRef |$f$|))
 \end{lstlisting}
@@ -7466,7 +7478,7 @@ with the same name as the old parameter.
 Next, consider the compilation of function calls, which have the
 following form upon input to \code{select-instructions}.
 \begin{lstlisting}
-  (assign |\itm{lhs}| (call |\itm{fun}| |\itm{args}| |$\ldots$|))
+  (Assign |\itm{lhs}| (Call |\itm{fun}| |\itm{args}| |$\ldots$|))
 \end{lstlisting}
 In the mirror image of handling the parameters of function
 definitions, the arguments \itm{args} need to be moved to the argument
@@ -7478,8 +7490,8 @@ for which I recommend creating the new instruction
 \code{indirect-callq}. Of course, the return value from the function
 is stored in \code{rax}, so it needs to be moved into the \itm{lhs}.
 \begin{lstlisting}
-  (indirect-callq |\itm{fun}|)
-  (movq (reg rax) |\itm{lhs}|)
+  (IndirectCallq |\itm{fun}|)
+  (Instr 'movq (Reg rax) |\itm{lhs}|)
 \end{lstlisting}
 
 Regarding tail calls, the parameter passing is the same as non-tail
@@ -7489,12 +7501,12 @@ the procedure call stack.  However, we do not yet know how big the
 frame is; that gets determined during register allocation. So instead
 of generating those instructions here, we invent a new instruction
 that means ``pop the frame and then do an indirect jump'', which we
-name \code{tail-jmp}.
+name \code{TailJmp}.
 
 Recall that in Section~\ref{sec:explicate-control-r1} we recommended
 using the label \code{start} for the initial block of a program, and
 in Section~\ref{sec:select-r1} we recommended labeling the conclusion
-of the program with \code{conclusion}, so that $(\key{return}\;\Arg)$
+of the program with \code{conclusion}, so that $(\key{Return}\;\Arg)$
 can be compiled to an assignment to \code{rax} followed by a jump to
 \code{conclusion}. With the addition of function definitions, we will
 have a starting block and conclusion for each function, but their
@@ -7511,11 +7523,11 @@ function definition.)
 %% kinds of AST nodes: \code{fun-ref}, \code{indirect-callq}, and
 %% \code{leaq}. 
 
-Inside \code{uncover-live}, when computing the $W$ set (written
-variables) for an \code{indirect-callq} instruction, we recommend
-including all the caller-saved registers, which will have the affect
-of making sure that no caller-saved register actually needs to be
-saved.
+The \code{IndirectCallq} instruction should be treated like
+\code{Callq} regarding its written locations $W$, in that they should
+include all the caller-saved registers. Recall that the reason for
+that is to force call-live variables to be assigned to callee-saved
+registers or to be spilled to the stack.
 
 \section{Build Interference Graph}
 
@@ -7540,7 +7552,7 @@ registers).
 In \code{patch-instructions}, you should deal with the x86
 idiosyncrasy that the destination argument of \code{leaq} must be a
 register. Additionally, you should ensure that the argument of
-\code{tail-jmp} is \itm{rax}, our reserved register---this is to make
+\code{TailJmp} is \itm{rax}, our reserved register---this is to make
 code generation more convenient, because we will be trampling many
 registers before the tail call (as explained below).
 
@@ -7548,11 +7560,11 @@ registers before the tail call (as explained below).
 
 For the \code{print-x86} pass, we recommend the following translations:
 \begin{lstlisting}
-  (fun-ref |\itm{label}|) |$\Rightarrow$| |\itm{label}|(%rip)
-  (indirect-callq |\itm{arg}|) |$\Rightarrow$| callq *|\itm{arg}|
+  (FunRef |\itm{label}|) |$\Rightarrow$| |\itm{label}|(%rip)
+  (IndirectCallq |\itm{arg}|) |$\Rightarrow$| callq *|\itm{arg}|
 \end{lstlisting}
-Handling \code{tail-jmp} requires a bit more care. A straightforward
-translation of \code{tail-jmp} would be \code{jmp *$\itm{arg}$}, which
+Handling \code{TailJmp} requires a bit more care. A straightforward
+translation of \code{TailJmp} would be \code{jmp *$\itm{arg}$}, which
 is what we will want to do, but before the jump we need to pop the
 current frame. So we need to restore the state of the registers to the
 point they were at when the current function was called.  This
