@@ -7534,8 +7534,6 @@ $\Rightarrow$
 \end{tabular} \\
 
 
-\margincomment{TODO: show AST transformation for function definitions.}
-
 Regarding function definitions, we need to remove their parameters and
 instead perform parameter passing in terms of the conventions
 discussed in Section~\ref{sec:fun-x86}. That is, the arguments will be
@@ -7543,6 +7541,37 @@ in the argument passing registers, and inside the function we should
 generate a \code{movq} instruction for each parameter, to move the
 argument value from the appropriate register to a new local variable
 with the same name as the old parameter.
+\begin{lstlisting}
+  (Def |$f$| '([|$x_1$| : |$T_1$|] |$\ldots$| [|$x_n$| : |$T_n$|]) |$T_r$| |$\itm{info}$| |$G$|)
+  |$\Rightarrow$|
+  (Def |$f$| '() 'Integer |$\itm{info}'$| |$G'$|)
+\end{lstlisting}
+where $G'$ is the same as $G$ except that the \code{start} block is
+modified to add the instructions for moving from the argument
+registers to the parameter variables. So the \code{start} block of $G$
+shown on the left is changed to the code on the right.
+\begin{center}
+\begin{minipage}{0.3\textwidth}
+\begin{lstlisting}
+start:
+  |$\itm{instr}_1$|
+  |$\vdots$|
+  |$\itm{instr}_n$|
+\end{lstlisting}
+\end{minipage}
+$\Rightarrow$
+\begin{minipage}{0.3\textwidth}
+\begin{lstlisting}
+start:
+  movq %rdi, |$x_1$|
+  movq %rsi, |$x_2$|
+  |$\vdots$|
+  |$\itm{instr}_1$|
+  |$\vdots$|
+  |$\itm{instr}_n$|
+\end{lstlisting}
+\end{minipage}
+\end{center}
 
 Next, consider the compilation of function calls, which have the
 following form upon input to \code{select-instructions}.
