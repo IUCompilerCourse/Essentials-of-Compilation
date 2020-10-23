@@ -7500,8 +7500,8 @@ language, whose syntax is defined in Figure~\ref{fig:x86-3}.
 \Arg &::=&  \gray{  \INT{\Int} \mid \REG{\Reg}
     \mid (\key{deref}\,\Reg\,\Int) } \\
    &\mid& \gray{ (\key{byte-reg}\; \Reg) 
-    \mid   (\key{global}\; \itm{name})  } \\
-   &\mid& (\key{fun-ref}\; \itm{label})\\
+   \mid   (\key{global}\; \itm{name})  }
+   \mid (\key{fun-ref}\; \itm{label})\\
 \itm{cc} & ::= & \gray{  \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge}  } \\
 \Instr &::=& \gray{  (\key{addq} \; \Arg\; \Arg) \mid
              (\key{subq} \; \Arg\; \Arg) \mid
@@ -7517,7 +7517,7 @@ language, whose syntax is defined in Figure~\ref{fig:x86-3}.
        \mid (\key{j}\itm{cc} \; \itm{label})
        \mid (\key{label} \; \itm{label})  } \\
      &\mid& (\key{indirect-callq}\;\Arg ) \mid (\key{tail-jmp}\;\Arg) \\
-     &\mid& (\key{leaq}\;\Arg\;\Arg)\\
+     &\mid& (\key{leaq}\;\Arg\;\Reg)\\
 \Block &::= & \gray{(\key{block} \;\itm{info}\; \Instr\ldots)} \\
 \Def &::= & (\key{define} \; (\itm{label}) \;\itm{info}\; ((\itm{label} \,\key{.}\, \Block)\ldots))\\
 x86_3 &::= & (\key{program} \;\itm{info} \;\Def\ldots)
@@ -7530,12 +7530,28 @@ x86_3 &::= & (\key{program} \;\itm{info} \;\Def\ldots)
 \end{figure}
 
 \begin{figure}[tp]
-UNDER CONSTRUCTION
+\fbox{
+  \begin{minipage}{0.96\textwidth}
+    \small
+\[
+\begin{array}{lcl}
+  \Arg &::=&  \gray{  \INT{\Int} \mid \REG{\Reg} \mid \DEREF{\Reg}{\Int}
+     \mid \BYTEREG{\Reg} } \\
+     &\mid& \gray{ (\key{Global}~\Var) } \mid \FUNREF{\itm{label}} \\
+  \Instr &::=& \ldots \mid \INDCALLQ{\itm{label}}
+    \mid \TAILJMP{\Arg}\\
+    &\mid& \BININSTR{\code{'leaq}}{\Arg}{\REG{\Reg}}\\
+  \Def &::= & \DEF{\itm{label}}{([\Var\key{:}\Type]\ldots)}{\Type}{((\itm{label}\,\key{.}\,\Block)\ldots)} \\
+x86_3 &::= & \PROGRAMDEFS{\itm{info}}{(\Def\ldots)}
+\end{array}
+\]
+\end{minipage}
+}
   \caption{The abstract syntax of x86$_3$ (extends x86$_2$ of Figure~\ref{fig:x86-2}).}
 \label{fig:x86-3}
 \end{figure}
 
-\margincomment{TODO: abstract syntax for $x86_3$.}
+
 
 An assignment of a function reference to a variable becomes a
 load-effective-address instruction as follows: \\
@@ -7598,12 +7614,16 @@ use for them. If you implemented the move-biasing challenge
 (Section~\ref{sec:move-biasing}), the register allocator will try to
 assign the parameter variables to the corresponding argument register,
 in which case the \code{patch-instructions} pass will remove the
-\code{movq} instruction. Also, note that the register allocator will
-perform liveness analysis on this sequence of move instructions and
-build the interference graph. So, for example, $x_1$ will be marked as
-interfering with \code{rsi} and that will prevent the assignment of
-$x_1$ to \code{rsi}, which is good, because that would overwrite the
-argument that needs to move into $x_2$.
+\code{movq} instruction. This happens in the example translation in
+Figure~\ref{fig:add-fun} of Section~\ref{sec:functions-example}, in
+the \code{add} function.
+%
+Also, note that the register allocator will perform liveness analysis
+on this sequence of move instructions and build the interference
+graph. So, for example, $x_1$ will be marked as interfering with
+\code{rsi} and that will prevent the assignment of $x_1$ to
+\code{rsi}, which is good, because that would overwrite the argument
+that needs to move into $x_2$.
 
 Next, consider the compilation of function calls. In the mirror image
 of handling the parameters of function definitions, the arguments need
@@ -7664,7 +7684,7 @@ graph for each function (not just one for the whole program).
 Recall that in Section~\ref{sec:reg-alloc-gc} we discussed the need to
 spill vector-typed variables that are live during a call to the
 \code{collect}.  With the addition of functions to our language, we
-need to revisit this issue. Many functions will perform allocation and
+need to revisit this issue. Many functions perform allocation and
 therefore have calls to the collector inside of them. Thus, we should
 not only spill a vector-typed variable when it is live during a call
 to \code{collect}, but we should spill the variable if it is live
@@ -7680,35 +7700,100 @@ In \code{patch-instructions}, you should deal with the x86
 idiosyncrasy that the destination argument of \code{leaq} must be a
 register. Additionally, you should ensure that the argument of
 \code{TailJmp} is \itm{rax}, our reserved register---this is to make
-code generation more convenient, because we will be trampling many
-registers before the tail call (as explained below).
+code generation more convenient, because we trample many registers
+before the tail call (as explained in the next section).
 
 \section{Print x86}
 
-For the \code{print-x86} pass, we recommend the following translations:
+For the \code{print-x86} pass, the cases for \code{FunRef} and
+\code{IndirectCallq} are straightforward: output their concrete
+syntax.
 \begin{lstlisting}
   (FunRef |\itm{label}|) |$\Rightarrow$| |\itm{label}|(%rip)
-  (IndirectCallq |\itm{arg}|) |$\Rightarrow$| callq *|\itm{arg}|
+  (IndirectCallq |\itm{arg}|) |$\Rightarrow$| callq *|\itm{arg}'|
 \end{lstlisting}
-Handling \code{TailJmp} requires a bit more care. A straightforward
-translation of \code{TailJmp} would be \code{jmp *$\itm{arg}$}, which
-is what we will want to do, but before the jump we need to pop the
-current frame. So we need to restore the state of the registers to the
-point they were at when the current function was called.  This
-sequence of instructions is the same as the code for the conclusion of
-a function.
+
+The \code{TailJmp} node requires a bit work. A straightforward
+translation of \code{TailJmp} would be \code{jmp *$\itm{arg}$}, but
+before the jump we need to pop the current frame. This sequence of
+instructions is the same as the code for the conclusion of a function,
+except the \code{retq} is replaced with \code{jmp *$\itm{arg}$}.
 
 Note that your \code{print-x86} pass needs to add the code for saving
 and restoring callee-saved registers, if you have not already
 implemented that. This is necessary when generating code for function
 definitions.
 
+\begin{exercise}\normalfont
+Expand your compiler to handle $R_4$ as outlined in this chapter.
+Create 5 new programs that use functions, including examples that pass
+functions and return functions from other functions and including
+recursive functions. Test your compiler on these new programs and all
+of your previously created test programs.
+\end{exercise}
+
+
+\begin{figure}[tbp]
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (R4) at (0,2)  {\large $R_4$};
+\node (R4-2) at (3,2)  {\large $R_4$};
+\node (R4-3) at (6,2)  {\large $R_4$};
+\node (F1-1) at (12,0)  {\large $F_1$};
+\node (F1-2) at (9,0)  {\large $F_1$};
+\node (F1-3) at (6,0)  {\large $F_1$};
+\node (F1-4) at (3,0)  {\large $F_1$};
+\node (C3-1) at (6,-2)  {\large $C_3$};
+\node (C3-2) at (3,-2)  {\large $C_3$};
+
+\node (x86-2) at (3,-4)  {\large $\text{x86}^{*}_3$};
+\node (x86-3) at (6,-4)  {\large $\text{x86}^{*}_3$};
+\node (x86-4) at (9,-4) {\large $\text{x86}_3$};
+\node (x86-5) at (9,-6) {\large $\text{x86}^{\dagger}_3$};
+
+\node (x86-2-1) at (3,-6)  {\large $\text{x86}^{*}_3$};
+\node (x86-2-2) at (6,-6)  {\large $\text{x86}^{*}_3$};
+
+\path[->,bend left=15] (R4) edge [above] node
+     {\ttfamily\footnotesize\color{red} typecheck} (R4-2);
+\path[->,bend left=15] (R4-2) edge [above] node
+     {\ttfamily\footnotesize uniquify} (R4-3);
+\path[->,bend left=15] (R4-3) edge [right] node
+     {\ttfamily\footnotesize\color{red} reveal-functions} (F1-1);
+\path[->,bend left=15] (F1-1) edge [below] node
+     {\ttfamily\footnotesize\color{red} limit-functions} (F1-2);
+\path[->,bend right=15] (F1-2) edge [above] node
+     {\ttfamily\footnotesize expose-alloc.} (F1-3);
+\path[->,bend right=15] (F1-3) edge [above] node
+     {\ttfamily\footnotesize\color{red} remove-complex.} (F1-4);
+\path[->,bend left=15] (F1-4) edge [right] node
+     {\ttfamily\footnotesize\color{red} explicate-control} (C3-1);
+\path[->,bend left=15] (C3-1) edge [below] node
+     {\ttfamily\footnotesize\color{red} uncover-locals} (C3-2);
+\path[->,bend right=15] (C3-2) edge [left] node
+     {\ttfamily\footnotesize\color{red} select-instr.} (x86-2);
+\path[->,bend left=15] (x86-2) edge [left] node
+     {\ttfamily\footnotesize\color{red} uncover-live} (x86-2-1);
+\path[->,bend right=15] (x86-2-1) edge [below] node 
+     {\ttfamily\footnotesize \color{red}build-inter.} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [left] node
+     {\ttfamily\footnotesize allocate-reg.} (x86-3);
+\path[->,bend left=15] (x86-3) edge [above] node
+     {\ttfamily\footnotesize\color{red} patch-instr.} (x86-4);
+\path[->,bend right=15] (x86-4) edge [left] node {\ttfamily\footnotesize\color{red} print-x86} (x86-5);
+\end{tikzpicture}
+\caption{Diagram of the passes for $R_4$, a language with functions.}
+\label{fig:R4-passes}
+\end{figure}
+
+Figure~\ref{fig:R4-passes} gives an overview of the passes for
+compiling $R_4$ to x86.
+
 \section{An Example Translation}
+\label{sec:functions-example}
 
 Figure~\ref{fig:add-fun} shows an example translation of a simple
 function in $R_4$ to x86. The figure also includes the results of the
-\code{explicate-control} and \code{select-instructions} passes.  We
-have omitted the \code{HasType} AST nodes for readability.
+\code{explicate-control} and \code{select-instructions} passes.
 
 \begin{figure}[tbp]
 \begin{tabular}{ll}
@@ -7805,68 +7890,7 @@ mainconclusion:
 \label{fig:add-fun}
 \end{figure}
 
-\begin{exercise}\normalfont
-Expand your compiler to handle $R_4$ as outlined in this chapter.
-Create 5 new programs that use functions, including examples that pass
-functions and return functions from other functions and including
-recursive functions. Test your compiler on these new programs and all
-of your previously created test programs.
-\end{exercise}
 
-\begin{figure}[p]
-\begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (R4) at (0,2)  {\large $R_4$};
-\node (R4-2) at (3,2)  {\large $R_4$};
-\node (R4-3) at (6,2)  {\large $R_4$};
-\node (F1-1) at (12,0)  {\large $F_1$};
-\node (F1-2) at (9,0)  {\large $F_1$};
-\node (F1-3) at (6,0)  {\large $F_1$};
-\node (F1-4) at (3,0)  {\large $F_1$};
-\node (C3-1) at (6,-2)  {\large $C_3$};
-\node (C3-2) at (3,-2)  {\large $C_3$};
-
-\node (x86-2) at (3,-4)  {\large $\text{x86}^{*}_3$};
-\node (x86-3) at (6,-4)  {\large $\text{x86}^{*}_3$};
-\node (x86-4) at (9,-4) {\large $\text{x86}_3$};
-\node (x86-5) at (9,-6) {\large $\text{x86}^{\dagger}_3$};
-
-\node (x86-2-1) at (3,-6)  {\large $\text{x86}^{*}_3$};
-\node (x86-2-2) at (6,-6)  {\large $\text{x86}^{*}_3$};
-
-\path[->,bend left=15] (R4) edge [above] node
-     {\ttfamily\footnotesize\color{red} typecheck} (R4-2);
-\path[->,bend left=15] (R4-2) edge [above] node
-     {\ttfamily\footnotesize uniquify} (R4-3);
-\path[->,bend left=15] (R4-3) edge [right] node
-     {\ttfamily\footnotesize\color{red} reveal-functions} (F1-1);
-\path[->,bend left=15] (F1-1) edge [below] node
-     {\ttfamily\footnotesize\color{red} limit-functions} (F1-2);
-\path[->,bend right=15] (F1-2) edge [above] node
-     {\ttfamily\footnotesize expose-alloc.} (F1-3);
-\path[->,bend right=15] (F1-3) edge [above] node
-     {\ttfamily\footnotesize\color{red} remove-complex.} (F1-4);
-\path[->,bend left=15] (F1-4) edge [right] node
-     {\ttfamily\footnotesize\color{red} explicate-control} (C3-1);
-\path[->,bend left=15] (C3-1) edge [below] node
-     {\ttfamily\footnotesize\color{red} uncover-locals} (C3-2);
-\path[->,bend right=15] (C3-2) edge [left] node
-     {\ttfamily\footnotesize\color{red} select-instr.} (x86-2);
-\path[->,bend left=15] (x86-2) edge [left] node
-     {\ttfamily\footnotesize\color{red} uncover-live} (x86-2-1);
-\path[->,bend right=15] (x86-2-1) edge [below] node 
-     {\ttfamily\footnotesize \color{red}build-inter.} (x86-2-2);
-\path[->,bend right=15] (x86-2-2) edge [left] node
-     {\ttfamily\footnotesize allocate-reg.} (x86-3);
-\path[->,bend left=15] (x86-3) edge [above] node
-     {\ttfamily\footnotesize\color{red} patch-instr.} (x86-4);
-\path[->,bend right=15] (x86-4) edge [left] node {\ttfamily\footnotesize\color{red} print-x86} (x86-5);
-\end{tikzpicture}
-\caption{Diagram of the passes for $R_4$, a language with functions.}
-\label{fig:R4-passes}
-\end{figure}
-
-Figure~\ref{fig:R4-passes} gives an overview of the passes needed for
-the compilation of $R_4$.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
