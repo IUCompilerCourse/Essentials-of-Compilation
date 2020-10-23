@@ -7418,21 +7418,21 @@ to all the function definitions.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-\Arg &::=& \gray{ \Int \mid \Var \mid \key{\#t} \mid \key{\#f} }
+\Atm &::=& \gray{ \Int \mid \Var \mid \key{\#t} \mid \key{\#f} }
   \\
 \itm{cmp} &::= & \gray{  \key{eq?} \mid \key{<} } \\
-\Exp &::= & \gray{ \Arg \mid (\key{read}) \mid (\key{-}\;\Arg) \mid (\key{+} \; \Arg\;\Arg)
-      \mid (\key{not}\;\Arg) \mid (\itm{cmp}\;\Arg\;\Arg)  } \\
+\Exp &::= & \gray{ \Atm \mid (\key{read}) \mid (\key{-}\;\Atm) \mid (\key{+} \; \Atm\;\Atm)
+      \mid (\key{not}\;\Atm) \mid (\itm{cmp}\;\Atm\;\Atm)  } \\
    &\mid& \gray{  (\key{allocate}\,\Int\,\Type)
-   \mid (\key{vector-ref}\, \Arg\, \Int)  } \\
-   &\mid& \gray{  (\key{vector-set!}\,\Arg\,\Int\,\Arg) \mid (\key{global-value} \,\itm{name}) \mid (\key{void}) } \\
-   &\mid& \itm{label} \mid (\key{call} \,\Arg\,\Arg\ldots) \\
+   \mid (\key{vector-ref}\, \Atm\, \Int)  } \\
+   &\mid& \gray{  (\key{vector-set!}\,\Atm\,\Int\,\Atm) \mid (\key{global-value} \,\itm{name}) \mid (\key{void}) } \\
+   &\mid& (\key{fun-ref}~\itm{label}) \mid (\key{call} \,\Atm\,\Atm\ldots) \\
 \Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Exp} 
        \mid (\key{collect} \,\itm{int}) }\\
 \Tail &::= & \gray{\RETURN{\Exp} \mid (\key{seq}\;\Stmt\;\Tail)} \\
       &\mid& \gray{(\key{goto}\,\itm{label})
-       \mid \IF{(\itm{cmp}\, \Arg\,\Arg)}{(\key{goto}\,\itm{label})}{(\key{goto}\,\itm{label})}} \\
-      &\mid& (\Arg\,\Arg\ldots) \\
+       \mid \IF{(\itm{cmp}\, \Atm\,\Atm)}{(\key{goto}\,\itm{label})}{(\key{goto}\,\itm{label})}} \\
+      &\mid& (\key{tail-call}\,\Atm\,\Atm\ldots) \\
   \Def &::=& (\key{define}\; (\itm{label} \; [\Var \key{:} \Type]\ldots) \key{:} \Type \; ((\itm{label}\,\key{.}\,\Tail)\ldots)) \\
 C_3 & ::= & \Def\ldots
 \end{array}
@@ -7446,7 +7446,29 @@ C_3 & ::= & \Def\ldots
 \begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
-UNDER CONSTRUCTION
+    \small
+\[
+\begin{array}{lcl}
+\Atm &::=& \gray{ \INT{\Int} \mid \VAR{\Var} \mid \BOOL{\itm{bool}} }\\
+\itm{cmp} &::= & \gray{  \key{eq?} \mid \key{<} } \\
+\Exp &::= & \gray{ \Atm \mid \READ{} } \\
+   &\mid& \gray{ \NEG{\Atm} \mid \ADD{\Atm}{\Atm} }\\
+   &\mid& \gray{ \UNIOP{\key{not}}{\Atm} \mid \BINOP{\itm{cmp}}{\Atm}{\Atm}  } \\
+   &\mid& \gray{ (\key{Allocate} \,\itm{int}\,\itm{type}) } \\
+   &\mid& \gray{ \BINOP{\key{'vector-ref}}{\Atm}{\INT{\Int}}  }\\
+   &\mid& \gray{ (\key{Prim}~\key{'vector-set!}\,(\key{list}\,\Atm\,\INT{\Int}\,\Atm)) }\\
+   &\mid& \gray{ (\key{GlobalValue} \,\Var) \mid (\key{Void}) }\\
+   &\mid& \FUNREF{\itm{label}} \mid \CALL{\Atm}{\Atm\ldots} \\
+\Stmt &::=& \gray{ \ASSIGN{\VAR{\Var}}{\Exp} 
+       \mid (\key{Collect} \,\itm{int}) } \\
+\Tail &::= & \gray{ \RETURN{\Exp} \mid \SEQ{\Stmt}{\Tail} 
+       \mid \GOTO{\itm{label}} } \\
+    &\mid& \gray{ \IFSTMT{\BINOP{\itm{cmp}}{\Atm}{\Atm}}{\GOTO{\itm{label}}}{\GOTO{\itm{label}}}  }\\
+    &\mid& \TAILCALL{\Atm}{\Atm\ldots} \\
+\Def &::=& \DEF{\itm{label}}{([\Var\key{:}\Type]\ldots)}{\Type}{((\itm{label}\,\key{.}\,\Tail)\ldots)}\\
+C_3 & ::= & \PROGRAMDEFS{\itm{info}}{(\Def\ldots)} 
+\end{array}
+\]
 \end{minipage}
 }
 \caption{The abstract syntax of $C_3$, extending $C_2$ (Figure~\ref{fig:c2-syntax}).}
@@ -7515,32 +7537,30 @@ UNDER CONSTRUCTION
 
 \margincomment{TODO: abstract syntax for $x86_3$.}
 
-An assignment of \code{FunRef} becomes a \code{leaq} instruction
-as follows: \\
-\begin{tabular}{lll}
+An assignment of a function reference to a variable becomes a
+load-effective-address instruction as follows: \\
+\begin{tabular}{lcl}
 \begin{minipage}{0.35\textwidth}
 \begin{lstlisting}
-  (Assign |$\itm{lhs}$| (FunRef |$f$|))
+  |$\itm{lhs}$| = (fun-ref |$f$|);
 \end{lstlisting}
 \end{minipage}
 &
-$\Rightarrow$
+$\Rightarrow$\qquad\qquad
 &
-\begin{minipage}{0.4\textwidth}
+\begin{minipage}{0.3\textwidth}
 \begin{lstlisting}
-(Instr 'leaq (list (FunRef |$f$|) |$\itm{lhs}'$|))
+leaq (fun-ref |$f$|), |$\itm{lhs}'$|
 \end{lstlisting}
 \end{minipage}
 \end{tabular} \\
 
-
 Regarding function definitions, we need to remove the parameters and
-instead perform parameter passing in terms of the conventions
-discussed in Section~\ref{sec:fun-x86}. That is, the arguments will be
-in the argument passing registers. We recommend turning the parameters
-into local variables and generating instructions at the beginning of
-the function to move from the argument passing registers to these
-local variables.
+instead perform parameter passing using the conventions discussed in
+Section~\ref{sec:fun-x86}. That is, the arguments are passed in
+registers. We recommend turning the parameters into local variables
+and generating instructions at the beginning of the function to move
+from the argument passing registers to these local variables.
 \begin{lstlisting}
   (Def |$f$| '([|$x_1$| : |$T_1$|] [|$x_2$| : |$T_2$|]  |$\ldots$| ) |$T_r$| |$\itm{info}$| |$G$|)
   |$\Rightarrow$|
