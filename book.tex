@@ -7534,22 +7534,22 @@ $\Rightarrow$
 \end{tabular} \\
 
 
-Regarding function definitions, we need to remove their parameters and
+Regarding function definitions, we need to remove the parameters and
 instead perform parameter passing in terms of the conventions
 discussed in Section~\ref{sec:fun-x86}. That is, the arguments will be
-in the argument passing registers, and inside the function we should
-generate a \code{movq} instruction for each parameter, to move the
-argument value from the appropriate register to a new local variable
-with the same name as the old parameter.
+in the argument passing registers. We recommend turning the parameters
+into local variables and generating instructions at the beginning of
+the function to move from the argument passing registers to these
+local variables.
 \begin{lstlisting}
-  (Def |$f$| '([|$x_1$| : |$T_1$|] |$\ldots$| [|$x_n$| : |$T_n$|]) |$T_r$| |$\itm{info}$| |$G$|)
+  (Def |$f$| '([|$x_1$| : |$T_1$|] [|$x_2$| : |$T_2$|]  |$\ldots$| ) |$T_r$| |$\itm{info}$| |$G$|)
   |$\Rightarrow$|
   (Def |$f$| '() 'Integer |$\itm{info}'$| |$G'$|)
 \end{lstlisting}
-where $G'$ is the same as $G$ except that the \code{start} block is
-modified to add the instructions for moving from the argument
-registers to the parameter variables. So the \code{start} block of $G$
-shown on the left is changed to the code on the right.
+The $G'$ control-flow graph is the same as $G$ except that the
+\code{start} block is modified to add the instructions for moving from
+the argument registers to the parameter variables. So the \code{start}
+block of $G$ shown on the left is changed to the code on the right.
 \begin{center}
 \begin{minipage}{0.3\textwidth}
 \begin{lstlisting}
@@ -7572,24 +7572,33 @@ start:
 \end{lstlisting}
 \end{minipage}
 \end{center}
+By changing the parameters to local variables, we are giving the
+register allocator control over which registers or stack locations to
+use for them. If you implemented the move-biasing challenge
+(Section~\ref{sec:move-biasing}), the register allocator will try to
+assign the parameter variables to the corresponding argument register,
+in which case the \code{patch-instructions} pass will remove the
+\code{movq} instruction. Also, note that the register allocator will
+perform liveness analysis on this sequence of move instructions and
+build the interference graph. So, for example, $x_1$ will be marked as
+interfering with \code{rsi} and that will prevent the assignment of
+$x_1$ to \code{rsi}, which is good, because that would overwrite the
+argument that needs to move into $x_2$.
 
-Next, consider the compilation of function calls, which have the
-following form upon input to \code{select-instructions}.
+Next, consider the compilation of function calls. In the mirror image
+of handling the parameters of function definitions, the arguments need
+to be moved to the argument passing registers.  The function call
+itself is performed with an indirect function call. The return value
+from the function is stored in \code{rax}, so it needs to be moved
+into the \itm{lhs}.
 \begin{lstlisting}
-  (Assign |\itm{lhs}| (Call |\itm{fun}| |\itm{args}| |$\ldots$|))
-\end{lstlisting}
-In the mirror image of handling the parameters of function
-definitions, the arguments \itm{args} need to be moved to the argument
-passing registers.
-%
-Once the instructions for parameter passing have been generated, the
-function call itself can be performed with an indirect function call,
-for which I recommend creating the new instruction
-\code{indirect-callq}. Of course, the return value from the function
-is stored in \code{rax}, so it needs to be moved into the \itm{lhs}.
-\begin{lstlisting}
-  (IndirectCallq |\itm{fun}|)
-  (Instr 'movq (Reg rax) |\itm{lhs}|)
+  |\itm{lhs}| = (call |\itm{fun}| |$\itm{arg}_1~\itm{arg}_2\ldots$|));
+  |$\Rightarrow$|
+  movq |$\itm{arg}_1$|, %rdi
+  movq |$\itm{arg}_2$|, %rsi
+  |$\vdots$|
+  callq *|\itm{fun}|
+  movq %rax, |\itm{lhs}|
 \end{lstlisting}
 
 Regarding tail calls, the parameter passing is the same as non-tail
@@ -7679,132 +7688,94 @@ definitions.
 Figure~\ref{fig:add-fun} shows an example translation of a simple
 function in $R_4$ to x86. The figure also includes the results of the
 \code{explicate-control} and \code{select-instructions} passes.  We
-have omitted the \code{has-type} AST nodes for readability.  Can you
-see any ways to improve the translation?
+have omitted the \code{HasType} AST nodes for readability.
 
 \begin{figure}[tbp]
 \begin{tabular}{ll}
-\begin{minipage}{0.45\textwidth}
+\begin{minipage}{0.5\textwidth}
 % s3_2.rkt
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-(define (add [x : Integer]
-              [y : Integer]) : Integer (+ x y))
+(define (add [x : Integer] [y : Integer])
+   : Integer
+   (+ x y))
 (add 40 2)
 \end{lstlisting}
 $\Downarrow$
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
 (define (add86 [x87 : Integer]
-           [y88 : Integer]) : Integer ()
-   ((add86start . (return (+ x87 y88)))))
+                 [y88 : Integer]) : Integer
+   add86start:
+      return (+ x87 y88);
+   )
 (define (main) : Integer ()
-   ((mainstart . 
-      (seq (assign tmp89 (fun-ref add86))
-           (tailcall tmp89 40 2)))))
+   mainstart:
+      tmp89 = (fun-ref add86);
+      (tail-call tmp89 40 2)
+   )
 \end{lstlisting}
 \end{minipage}
 &
 $\Rightarrow$
 \begin{minipage}{0.5\textwidth}
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-(define (add86)
-  ((locals (x87 . Integer) (y88 . Integer)) 
-   (num-params . 2))
-  ((add86start .
-     (block ()
-       (movq (reg rcx) (var x87))
-       (movq (reg rdx) (var y88))
-       (movq (var x87) (reg rax))
-       (addq (var y88) (reg rax))
-       (jmp add86conclusion)))))
-(define (main)
-  ((locals . ((tmp89 . (Integer Integer
-                        -> Integer))))
-   (num-params . 0))
-  ((mainstart .
-     (block ()
-       (leaq (fun-ref add86) (var tmp89))
-       (movq (int 40) (reg rcx))
-       (movq (int 2) (reg rdx))
-       (tail-jmp (var tmp89)))))
+(define (add86) : Integer
+   add86start:
+      movq %rdi, x87
+      movq %rsi, y88
+      movq x87, %rax
+      addq y88, %rax
+      jmp add11389conclusion
+   )
+(define (main) : Integer
+   mainstart:
+      leaq (fun-ref add86), tmp89
+      movq $40, %rdi
+      movq $2, %rsi
+      tail-jmp tmp89
+   )
 \end{lstlisting}
 $\Downarrow$
 \end{minipage}
 \end{tabular}
-\begin{tabular}{lll}
+\begin{tabular}{ll}
 \begin{minipage}{0.3\textwidth}
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-_add90start:
-	movq	%rcx, %rsi
-	movq	%rdx, %rcx
-	movq	%rsi, %rax
-	addq	%rcx, %rax
-	jmp _add90conclusion
-	.globl _add90
+	.globl add86
 	.align 16
-_add90:
+add86:
 	pushq	%rbp
 	movq	%rsp, %rbp
-	pushq	%r12
-	pushq	%rbx
-	pushq	%r13
-	pushq	%r14
-	subq	$0, %rsp
-	jmp _add90start
-_add90conclusion:
-	addq	$0, %rsp
-	popq	%r14
-	popq	%r13
-	popq	%rbx
-	popq	%r12
-	subq $0, %r15
+	jmp	add86start
+add86start:
+	movq	%rdi, %rax
+	addq	%rsi, %rax
+	jmp add86conclusion
+add86conclusion:
 	popq	%rbp
 	retq
 \end{lstlisting}
 \end{minipage}
 &
-\begin{minipage}{0.3\textwidth}
+\begin{minipage}{0.5\textwidth}
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-_mainstart:
-	leaq	_add90(%rip), %rsi
-	movq	$40, %rcx
-	movq	$2, %rdx
-	movq	%rsi, %rax
-	addq	$0, %rsp
-	popq	%r14
-	popq	%r13
-	popq	%rbx
-	popq	%r12
-	subq $0, %r15
-	popq	%rbp
-	jmp	*%rax
-
-	.globl _main
+	.globl main
 	.align 16
-_main:
+main:
 	pushq	%rbp
 	movq	%rsp, %rbp
-	pushq	%r12
-	pushq	%rbx
-	pushq	%r13
-	pushq	%r14
-	subq	$0, %rsp
-	movq $16384, %rdi
-	movq $16, %rsi
-	callq _initialize
-	movq _rootstack_begin(%rip), %r15
-	jmp _mainstart
-\end{lstlisting}
-\end{minipage}
-&
-\begin{minipage}{0.3\textwidth}
-\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-_mainconclusion:
-	addq	$0, %rsp
-	popq	%r14
-	popq	%r13
-	popq	%rbx
-	popq	%r12
-	subq $0, %r15
+	movq	$16384, %rdi
+	movq	$16384, %rsi
+	callq	initialize
+	movq	rootstack_begin(%rip), %r15
+	jmp	mainstart
+mainstart:
+	leaq	add86(%rip), %rcx
+	movq	$40, %rdi
+	movq	$2, %rsi
+	movq	%rcx, %rax
+	popq	%rbp
+	jmp	*%rax
+mainconclusion:
 	popq	%rbp
 	retq
 \end{lstlisting}
