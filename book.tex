@@ -1378,7 +1378,11 @@ stores the result in $d$.
 %
 The $\key{callq}\,\itm{label}$ instruction executes the procedure
 specified by the label and $\key{retq}$ returns from a procedure to
-its caller. We discuss procedure calls in more detail later in this
+its caller. The abstract syntax for \code{callq} includes an extra
+integer field that represents the arity (number of parameters) of the
+function being called.
+%
+We discuss procedure calls in more detail later in this
 chapter and in Chapter~\ref{ch:functions}. The
 $\key{jmp}\,\itm{label}$ instruction updates the program counter to
 the address of the instruction after the specified label.
@@ -1559,7 +1563,7 @@ field should just contain an empty list.
        \mid \BININSTR{\code{'subq}}{\Arg}{\Arg} \\
        &\mid& \BININSTR{\code{'movq}}{\Arg}{\Arg}
        \mid \UNIINSTR{\code{'negq}}{\Arg}\\
-       &\mid& \CALLQ{\itm{label}} \mid \RETQ{} 
+       &\mid& \CALLQ{\itm{label}}{\itm{int}} \mid \RETQ{} 
        \mid \PUSHQ{\Arg} \mid \POPQ{\Arg} \mid \JMP{\itm{label}} \\
 \Block &::= & \BLOCK{\itm{info}}{\Instr\ldots} \\
 x86_0 &::= & \PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label} \,\key{.}\, \Block \key{)}\ldots}}
@@ -2630,14 +2634,13 @@ As we perform register allocation, we need to be aware of the
 conventions that govern the way in which registers interact with
 function calls, such as calls to the \code{read\_int} function in our
 generated code and even the call that the operating system makes to
-execute our \code{main} function.  The convention for x86 is that the
-caller is responsible for freeing up some registers, the
-\emph{caller-saved registers}, prior to the function call, and the
-callee is responsible for preserving the values in some other
-registers, the \emph{callee-saved registers}.
-\index{caller-saved registers}
-\index{callee-saved registers}
-The caller-saved registers are
+execute our \code{main} function.  The convention for x86 regarding
+how functions share the use of registers is that the caller is
+responsible for freeing up some registers, the \emph{caller-saved
+  registers}, prior to the function call, and the callee is
+responsible for preserving the values of some other registers, the
+\emph{callee-saved registers}.  \index{caller-saved registers}
+\index{callee-saved registers} The caller-saved registers are
 \begin{lstlisting}
 rax rcx rdx rsi rdi r8 r9 r10 r11
 \end{lstlisting}
@@ -2661,6 +2664,21 @@ view, the caller view and the callee view:
   saving the value to the stack in the prelude of the function and
   restoring the value in the conclusion of the function.
 \end{itemize}
+
+In x86, registers are also used for passing arguments to a function
+and for the return value.  In particular, the first six arguments of a
+function are passed in the following six registers, in the order
+given.
+\begin{lstlisting}
+rdi rsi rdx rcx r8 r9
+\end{lstlisting}
+If there are more than six arguments, then the convention is to use
+space on the frame of the caller for the rest of the
+arguments. However, in Chapter~\ref{ch:functions} we arrange to never
+need more than six arguments. For now, the only function we care about
+is \code{read\_int} and it takes zero argument.
+%
+The register \code{rax} is for the return value of a function.
 
 The next question is how these calling conventions impact register
 allocation. Consider the $R_1$ program in
@@ -2931,7 +2949,7 @@ shown between each instruction to make the figure easy to read.
 \begin{exercise}\normalfont
 Implement the compiler pass named \code{uncover-live} that computes
 the live-after sets. We recommend storing the live-after sets (a list
-of a set of variables) in the $\itm{info}$ field of the \key{Block}
+of a set of variables) in the $\itm{info}$ field of the \code{Block}
 structure.
 %
 We recommend organizing your code to use a helper function that takes
@@ -2942,10 +2960,14 @@ We recommend creating helper functions to 1) compute the set of
 locations that appear in an argument (of an instruction), 2) compute
 the locations read by an instruction which corresponds to the $R$
 function discussed above, and 3) the locations written by an
-instruction which corresponds to $W$. The \key{callq} instruction
-should include all of the caller-saved registers in its $W$ because
-the calling convention says that those registers may be written to
-during the function call.
+instruction which corresponds to $W$. The \code{callq} instruction
+should include all of the caller-saved registers in its write-set $W$
+because the calling convention says that those registers may be
+written to during the function call. Likewise, the \code{callq}
+instruction should include the appropriate number of argument passing
+registers in its read-set $R$, depending on the arity of the function
+being called. (This is why the abstract syntax for \code{callq}
+includes the arity.)
 
 \end{exercise}
 
@@ -4326,7 +4348,7 @@ x86_1 &::= & \gray{ \key{.globl main} }\\
        \mid \BININSTR{\code{'subq}}{\Arg}{\Arg} } \\
        &\mid& \gray{ \BININSTR{\code{'movq}}{\Arg}{\Arg} 
        \mid \UNIINSTR{\code{'negq}}{\Arg} } \\
-       &\mid& \gray{ \CALLQ{\itm{label}} \mid \RETQ{} 
+       &\mid& \gray{ \CALLQ{\itm{label}}{\itm{int}} \mid \RETQ{} 
        \mid \PUSHQ{\Arg} \mid \POPQ{\Arg} \mid \JMP{\itm{label}} } \\
        &\mid& \BININSTR{\code{'xorq}}{\Arg}{\Arg}
        \mid \BININSTR{\code{'cmpq}}{\Arg}{\Arg}\\
@@ -7072,18 +7094,20 @@ generated by different compilers. As a result, people have developed
 Here we use conventions that are compatible with those of the
 \code{gcc} compiler~\citep{Matz:2013aa}.
 
-Regarding (1) parameter passing, the convention is to use the
-following six registers:
+Regarding (1) parameter passing, recall that the following six
+registers:
 \begin{lstlisting}
 rdi rsi rdx rcx r8 r9
 \end{lstlisting}
-in that order, to pass arguments to a function. If there are more than
-six arguments, then the convention is to use space on the frame of the
-caller for the rest of the arguments. However, to ease the
-implementation of efficient tail calls (Section~\ref{sec:tail-call}),
-we arrange to never need more than six arguments.
+in that order, are used to pass arguments to a function. If there are
+more than six arguments, then the convention is to use space on the
+frame of the caller for the rest of the arguments. However, to ease
+the implementation of efficient tail calls
+(Section~\ref{sec:tail-call}), we arrange to never need more than six
+arguments.
 %
-The register \code{rax} is for the return value of the function.
+Also recall that the register \code{rax} is for the return value of
+the function.
 
 \index{prelude}\index{conclusion}
 
@@ -7538,8 +7562,8 @@ x86_3 &::= & (\key{program} \;\itm{info} \;\Def\ldots)
   \Arg &::=&  \gray{  \INT{\Int} \mid \REG{\Reg} \mid \DEREF{\Reg}{\Int}
      \mid \BYTEREG{\Reg} } \\
      &\mid& \gray{ (\key{Global}~\Var) } \mid \FUNREF{\itm{label}} \\
-  \Instr &::=& \ldots \mid \INDCALLQ{\itm{label}}
-    \mid \TAILJMP{\Arg}\\
+  \Instr &::=& \ldots \mid \INDCALLQ{\itm{label}}{\itm{int}}
+    \mid \TAILJMP{\Arg}{\itm{int}}\\
     &\mid& \BININSTR{\code{'leaq}}{\Arg}{\REG{\Reg}}\\
   \Def &::= & \DEF{\itm{label}}{([\Var\key{:}\Type]\ldots)}{\Type}{((\itm{label}\,\key{.}\,\Block)\ldots)} \\
 x86_3 &::= & \PROGRAMDEFS{\itm{info}}{(\Def\ldots)}
@@ -7550,7 +7574,6 @@ x86_3 &::= & \PROGRAMDEFS{\itm{info}}{(\Def\ldots)}
   \caption{The abstract syntax of x86$_3$ (extends x86$_2$ of Figure~\ref{fig:x86-2}).}
 \label{fig:x86-3}
 \end{figure}
-
 
 
 An assignment of a function reference to a variable becomes a
@@ -7648,7 +7671,9 @@ the procedure call stack.  However, we do not yet know how big the
 frame is; that gets determined during register allocation. So instead
 of generating those instructions here, we invent a new instruction
 that means ``pop the frame and then do an indirect jump'', which we
-name \code{TailJmp}.
+name \code{TailJmp}. The abstract syntax for this instruction includes
+an argument that specifies where to jump and an integer that
+represents the arity of the function being called.
 
 Recall that in Section~\ref{sec:explicate-control-r1} we recommended
 using the label \code{start} for the initial block of a program, and
@@ -7710,7 +7735,7 @@ For the \code{print-x86} pass, the cases for \code{FunRef} and
 syntax.
 \begin{lstlisting}
   (FunRef |\itm{label}|) |$\Rightarrow$| |\itm{label}|(%rip)
-  (IndirectCallq |\itm{arg}|) |$\Rightarrow$| callq *|\itm{arg}'|
+  (IndirectCallq |\itm{arg}| |\itm{int}|) |$\Rightarrow$| callq *|\itm{arg}'|
 \end{lstlisting}
 
 The \code{TailJmp} node requires a bit work. A straightforward
@@ -7795,7 +7820,7 @@ Figure~\ref{fig:add-fun} shows an example translation of a simple
 function in $R_4$ to x86. The figure also includes the results of the
 \code{explicate-control} and \code{select-instructions} passes.
 
-\begin{figure}[tbp]
+\begin{figure}[htbp]
 \begin{tabular}{ll}
 \begin{minipage}{0.5\textwidth}
 % s3_2.rkt
