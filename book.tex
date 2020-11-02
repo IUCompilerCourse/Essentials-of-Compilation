@@ -8690,21 +8690,8 @@ extend our compiler to handle the new features of $R_6$
   \FType &::=& \key{Integer} \mid \key{Boolean} \mid \key{Void} \mid \LP\key{Vectorof}\;\key{Any}\RP \mid \LP\key{Vector}\; \key{Any}\ldots\RP \\
     &\mid& \LP\key{Any}\ldots \; \key{->}\; \key{Any}\RP\\
   \itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
-  \Exp &::=& \gray{\Int \mid \CREAD{} \mid \CNEG{\Exp}
-     \mid \CADD{\Exp}{\Exp} \mid \CSUB{\Exp}{\Exp} }  \\
-    &\mid&  \gray{\Var \mid \CLET{\Var}{\Exp}{\Exp} } \\
-    &\mid& \gray{\key{\#t} \mid \key{\#f} 
-     \mid \CBINOP{\key{and}}{\Exp}{\Exp} 
-     \mid \CBINOP{\key{or}}{\Exp}{\Exp} 
-     \mid \CUNIOP{\key{not}}{\Exp} } \\
-     &\mid& \gray{ \CBINOP{\itm{cmp}}{\Exp}{\Exp}
-     \mid \CIF{\Exp}{\Exp}{\Exp}} \\
-    &\mid& \gray{\LP\key{vector}\;\Exp\ldots\RP \mid
-          \LP\key{vector-ref}\;\Exp\;\Int\RP} \\
-    &\mid& \gray{\LP\key{vector-set!}\;\Exp\;\Int\;\Exp\RP\mid \LP\key{void}\RP} \\
-    &\mid& \gray{ \LP\Exp \; \Exp\ldots\RP
-    \mid \CLAMBDA{\LP\LS\Var \key{:} \Type\LS\ldots\LP}{\Type}{\Exp} } \\
-  & \mid & \LP\key{inject}\; \Exp \; \FType\RP \mid \LP\key{project}\;\Exp\;\FType\RP \\
+  \Exp &::=& \ldots 
+   \mid \CINJECT{\Exp}{\FType}\RP \mid \CPROJECT{\Exp}{\FType} \\
   & \mid & \LP\key{boolean?}\;\Exp\RP \mid \LP\key{integer?}\;\Exp\RP\\
   & \mid & \LP\key{vector?}\;\Exp\RP \mid \LP\key{procedure?}\;\Exp\RP \mid \LP\key{void?}\;\Exp\RP \\
   \Def &::=& \gray{ \CDEF{\Var}{\LS\Var \key{:} \Type\RS\ldots}{\Type}{\Exp} } \\
@@ -8713,71 +8700,114 @@ extend our compiler to handle the new features of $R_6$
 \]
 \end{minipage}
 }
-\caption{Syntax of $R_6$, extending $R_5$ (Figure~\ref{fig:r5-syntax})
+\caption{Concrete syntax of $R_6$, extending $R_5$ (Figure~\ref{fig:r5-syntax})
   with \key{Any}.}
+\label{fig:r6-concrete-syntax}
+\end{figure}
+
+\begin{figure}[tp]
+\centering
+\fbox{
+  \begin{minipage}{0.96\textwidth}
+    \small
+\[
+\begin{array}{lcl}
+  \itm{op} &::= & \code{boolean?} \mid \code{integer?} \mid \code{vector?}
+    \mid \code{procedure?} \mid \code{void?} \\
+  \Exp &::=& \gray{ \INT{\Int} \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp} } \\
+       &\mid& \gray{ \PRIM{\itm{op}}{\Exp\ldots} }\\
+     &\mid& \gray{ \BOOL{\itm{bool}}
+      \mid \IF{\Exp}{\Exp}{\Exp} } \\
+     &\mid& \gray{ \VOID{} \mid \LP\key{HasType}~\Exp~\Type \RP 
+     \mid \APPLY{\Exp}{\Exp\ldots} }\\
+  &\mid& \gray{ \LAMBDA{\LP[\Var\code{:}\Type]\ldots\RP}{\Type}{\Exp} }\\
+   &\mid& \INJECT{\Exp}{\FType} \mid \PROJECT{\Exp}{\FType} \\
+ \Def &::=& \gray{ \FUNDEF{\Var}{\LP[\Var \code{:} \Type]\ldots\RP}{\Type}{\code{'()}}{\Exp} }\\
+  R_5 &::=& \gray{ \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp} }
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The abstract syntax of $R_6$, extending $R_5$ (Figure~\ref{fig:r5-syntax}).}
 \label{fig:r6-syntax}
 \end{figure}
 
-The syntax of $R_6$ is defined in Figure~\ref{fig:r6-syntax}.  The
+
+The concrete and abstract syntax of $R_6$ is defined in
+Figures~\ref{fig:r6-concrete-syntax} and \ref{fig:r6-syntax}.  The
 $\LP\key{inject}\; e\; T\RP$ form converts the value produced by
 expression $e$ of type $T$ into a tagged value.  The
 $\LP\key{project}\;e\;T\RP$ form converts the tagged value produced by
 expression $e$ into a value of type $T$ or else halts the program if
-the type tag is equivalent to $T$. We treat
+the type tag is not equivalent to $T$. We treat
 $\LP\key{Vectorof}\;\key{Any}\RP$ as equivalent to
 $\LP\key{Vector}\;\key{Any}\;\ldots\RP$.
-
-Note that in both \key{inject} and
-\key{project}, the type $T$ is restricted to the flat types $\FType$,
-which simplifies the implementation and corresponds with what is
-needed for compiling untyped Racket. The type predicates,
-$\LP\key{boolean?}\,e\RP$ etc., expect a tagged value and return \key{\#t}
-if the tag corresponds to the predicate, and return \key{\#f}
-otherwise.
 %
-Selections from the type checker for $R_6$ are shown in
-Figure~\ref{fig:type-check-R6} and the interpreter for $R_6$ is in
-Figure~\ref{fig:interp-R6}.
+Note that in both \key{inject} and \key{project}, the type $T$ is
+restricted to the flat types $\FType$, which simplifies the
+implementation and corresponds with what is needed for compiling
+untyped Racket.
+
+The type predicates such as $\LP\key{boolean?}\,e\RP$ expect the
+expression $e$ to produce a tagged value; they return \key{\#t} if the
+tag corresponds to the predicate and they return \key{\#f} otherwise.
+
+The type checker for $R_6$ is shown in Figure~\ref{fig:type-check-R6}
+and the interpreter for $R_6$ is in Figure~\ref{fig:interp-R6}.
 
 \begin{figure}[btp]
-\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define (flat-ty? ty) ...)
-
-(define (type-check-R6 env)
+ \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+(define (operator-types)
+  '(...
+    (integer? . ((Any) . Boolean))
+    (vector? . ((Any) . Boolean))
+    (procedure? . ((Any) . Boolean))
+    (void? . ((Any) . Boolean))
+    ))
+    
+(define (type-check-exp env)
   (lambda (e)
-    (define recur (type-check-R6 env))
+    (define recur (type-check-exp env))
     (match e
-       [`(inject ,e ,ty)
-        (unless (flat-ty? ty)
-          (error "may only inject a value of flat type, not ~a" ty))
-        (define-values (new-e e-ty) (recur e))
-        (cond
-         [(equal? e-ty ty)
-          (values `(inject ,new-e ,ty) 'Any)]
+      ...  
+      [(Inject e ty)
+       (unless (flat-ty? ty)
+         (error 'type-check-exp
+                "may only inject a value of flat type, not ~a" ty))
+       (define-values (new-e e-ty) (recur e))
+       (cond
+        [(type-equal? e-ty ty)
+         (values (Inject new-e ty) 'Any)]
+        [else
+         (error 'type-check-exp
+                "injected expression does not have expected type" 
+                e e-ty ty)])]
+      [(Project e ty)
+       (unless (flat-ty? ty)
+         (error 'type-check-exp
+                "may only project to a flat type, not ~a" ty))
+       (define-values (new-e e-ty) (recur e))
+       (cond
+         [(type-equal? e-ty 'Any)
+          (values (Project new-e ty) ty)]
+        [else
+         (error 'type-check-exp
+                "project expression does not have type Any" e)])]
+      [(Prim pred (list e))
+       #:when (set-member? type-predicates pred)
+       (define-values (new-e e-ty) (recur e))
+       (cond
+         [(type-equal? e-ty 'Any)
+          (values (Prim pred (list new-e)) 'Boolean)]
          [else
-          (error "inject expected ~a to have type ~a" e ty)])]
-       [`(project ,e ,ty)
-        (unless (flat-ty? ty)
-          (error "may only project to a flat type, not ~a" ty))
-        (define-values (new-e e-ty) (recur e))
-        (cond
-         [(equal? e-ty 'Any)
-          (values `(project ,new-e ,ty) ty)]
-         [else
-          (error "project expected ~a to have type Any" e)])]
-       [`(vector-ref ,e ,i)
-        (define-values (new-e e-ty) (recur e))
-        (match e-ty
-          [`(Vector ,ts ...) ...]
-          [`(Vectorof ,ty)
-           (unless (exact-nonnegative-integer? i)
-             (error 'type-check "invalid index ~a" i))
-           (values `(vector-ref ,new-e ,i) ty)]
-          [else (error "expected a vector in vector-ref, not" e-ty)])]
-        ...
+          (error 'type-check-exp
+                 "type predicate expected argument of type Any, not ~a" e-ty)])]
+      ...
+      [else 
+       (error 'type-check-exp "R6/unmatched ~a" e)]
       )))
 \end{lstlisting}
-\caption{Type checker for parts of the $R_6$ language.}
+\caption{Type checker for the $R_6$ language.}
 \label{fig:type-check-R6}
 \end{figure}
 
@@ -8786,41 +8816,49 @@ Figure~\ref{fig:interp-R6}.
 
 \begin{figure}[btp]
 \begin{lstlisting}
-(define primitives (set 'boolean? ...))
-
 (define (interp-op op)
   (match op
-     ['boolean? (lambda (v)
-                  (match v
-                     [`(tagged ,v1 Boolean) #t]
-                     [else #f]))]
-     ...))
+    ...
+    ['boolean? (lambda (v)
+		 (match v
+		   [`(tagged ,v1 ,tg)
+                    (equal? tg (any-tag 'Boolean))]
+		   [else #f]))]
+    ['integer? (lambda (v)
+		 (match v
+		   [`(tagged ,v1 ,tg)
+                    (equal? tg (any-tag 'Integer))]
+		   [else #f]))]
+    ['vector? (lambda (v)
+		(match v
+		  [`(tagged ,v1 ,tg)
+                   (equal? tg (any-tag `(Vector Any)))]
+		  [else #f]))]
+    ['procedure? (lambda (v)
+		   (match v
+		     [`(tagged ,v1 ,tg)
+                      (equal? tg (any-tag `(Any -> Any)))]
+		     [else #f]))]
+    ...
+    ))
 
-;; Equivalence of flat types
-(define (tyeq? t1 t2)
-  (match `(,t1 ,t2)
-    [`((Vectorof Any) (Vector ,t2s ...))
-     (for/and ([t2 t2s]) (eq? t2 'Any))]
-    [`((Vector ,t1s ...) (Vectorof Any))
-     (for/and ([t1 t1s]) (eq? t1 'Any))]
-    [else (equal? t1 t2)]))
-
-(define (interp-R6 env)
-  (lambda (ast)
-    (match ast
-       [`(inject ,e ,t)
-        `(tagged ,((interp-R6 env) e) ,t)]
-       [`(project ,e ,t2)
-        (define v ((interp-R6 env) e))
-        (match v
-           [`(tagged ,v1 ,t1)
-            (cond [(tyeq? t1 t2)
-                   v1]
-                  [else
-                   (error "in project, type mismatch" t1 t2)])]
-           [else
-            (error "in project, expected tagged value" v)])]
-       ...)))
+(define (interp-exp env)
+  (lambda (e)
+    (define recur (interp-exp env))
+    (let ([ret
+           (match e
+             ...
+             [(Inject e ty)
+              (apply-inject ((interp-exp env) e) (any-tag ty))]
+             [(Project e ty2)
+              (define v (recur e))
+              (apply-project v ty2)]
+             [(Exit)
+              (error 'interp-exp "exiting")]
+             [else (error 'interp-exp "unrecognized expression ~a" e)]
+             )])
+      (verbose "R6/interp-exp ==>" ret)
+      ret)))
 \end{lstlisting}
 \caption{Interpreter for $R_6$.}
 \label{fig:interp-R6}
@@ -8831,38 +8869,42 @@ Figure~\ref{fig:interp-R6}.
 \section{Shrinking $R_6$}
 \label{sec:shrink-r6}
 
-In the \code{shrink} pass we recommend compiling \code{project} into
-an explicit \code{if} expression that uses three new operations:
-\code{tag-of-any}, \code{value-of-any}, and \code{exit}.  The
-\code{tag-of-any} operation retrieves the type tag from a tagged value
-of type \code{Any}.  The \code{value-of-any} retrieves the underlying
-value from a tagged value. Finally, the \code{exit} operation ends the
+In the \code{shrink} pass we recommend compiling \code{Project} into
+an explicit \code{If} expression that uses two new forms,
+\code{ValueOf} and \code{Exit}, and a new primitive operation,
+\code{tag-of-any}.  The \code{tag-of-any} operation retrieves the type
+tag from a tagged value of type \code{Any}.  The \code{ValueOf} form
+retrieves the underlying value from a tagged value.  The
+\code{ValueOf} form includes the type for the underlying value, which
+is needed by the type checker.  Finally, the \code{Exit} form ends the
 execution of the program by invoking the operating system's
-\code{exit} function. So the translation for \code{project} is as
-follows. (We have omitted the \code{has-type} AST nodes to make this
-output more readable.)
+\code{exit} function. So the translation for \code{Project} is as
+follows.
+%(We have omitted the \code{has-type} AST nodes to make this
+%output more readable.)
 
-\begin{tabular}{lll}
-\begin{minipage}{0.3\textwidth}
 \begin{lstlisting}
-   (project |$e$| |$\Type$|)
+(Project |$e$| |$\FType$|)
+|$\Rightarrow$|
+(Let |$\itm{tmp}$| |$e'$|
+   (If (Prim 'eq? (list (Prim 'tag-of-any (list (Var |$\itm{tmp}$|)))
+                           (Int |$\itm{tagof}(\FType)$|)))
+      (ValueOf |$\itm{tmp}$| |$\FType$|)
+      (Exit)))
 \end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.5\textwidth}
-\begin{lstlisting}
-(let ([|$\itm{tmp}$| |$e'$|])
-  (if (eq? (tag-of-any |$\itm{tmp}$|) |$\itm{tag}$|)
-      (value-of-any |$\itm{tmp}$|)
-      (exit)))
-\end{lstlisting}
-\end{minipage}
-\end{tabular}  \\
 
-Similarly, we recommend translating the type predicates
-(\code{boolean?}, etc.) into uses of \code{tag-of-any} and \code{eq?}.
+Regarding \code{Inject}, we recommend compiling it to a slightly
+lower-level primitive operation named \code{make-any}. This operation
+takes the tag instead of the type of the injected value.
+
+\begin{lstlisting}
+(Inject |$e$| |$\FType$|)
+|$\Rightarrow$|
+(Prim 'make-any (list |$e'$| (Int |$\itm{tagof}(\FType)$|)))
+\end{lstlisting}
+
+We recommend translating the type predicates (\code{boolean?}, etc.)
+into uses of \code{tag-of-any} and \code{eq?}.
 
 \section{Instruction Selection for $R_6$}
 \label{sec:select-r6}
