@@ -1115,8 +1115,8 @@ exhibit several compilation techniques.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{rcl}
-  \Exp &::=& \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp)\\
-       &\mid& \Var \mid (\key{let}~([\Var~\Exp])~\Exp) \\
+  \Exp &::=& \Int \mid \CREAD{} \mid \CNEG{\Exp} \mid \CADD{\Exp}{\Exp}\\
+       &\mid& \Var \mid \CLET{\Var}{\Exp}{\Exp} \\
   R_1 &::=& \Exp
 \end{array}
 \]
@@ -3989,6 +3989,12 @@ operators to include
 \item the \key{<}, \key{<=}, \key{>}, and \key{>=} operations for
   comparing integers.
 \end{enumerate}
+We reorganize the abstract syntax for the primitive operations in
+Figure~\ref{fig:r2-syntax}, using only one grammar rule for all of
+them. This means that the grammar no longer checks whether the arity
+of an operators matches the number of arguments. That responsibility
+is moved to the type checker for $R_2$, which we introduce in
+Section~\ref{sec:type-check-r2}.
 
 \begin{figure}[tp]
 \centering
@@ -3998,12 +4004,12 @@ operators to include
 \begin{array}{lcl}
   \itm{bool} &::=& \key{\#t} \mid \key{\#f} \\  
   \itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
-  \Exp &::=& \gray{ \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp) }  \mid (\key{-}\;\Exp\;\Exp) \\
-     &\mid&  \gray{ \Var \mid (\key{let}~([\Var~\Exp])~\Exp) } \\
+  \Exp &::=& \gray{ \Int \mid \CREAD{} \mid \CNEG{\Exp} \mid \CADD{\Exp}{\Exp} }  \mid \CSUB{\Exp}{\Exp} \\
+     &\mid&  \gray{ \Var \mid \CLET{\Var}{\Exp}{\Exp} } \\
      &\mid& \itm{bool}
       \mid (\key{and}\;\Exp\;\Exp) \mid (\key{or}\;\Exp\;\Exp)
       \mid (\key{not}\;\Exp) \\
-      &\mid& (\itm{cmp}\;\Exp\;\Exp) \mid (\key{if}~\Exp~\Exp~\Exp) \\
+      &\mid& (\itm{cmp}\;\Exp\;\Exp) \mid \CIF{\Exp}{\Exp}{\Exp} \\
   R_2 &::=& \Exp
 \end{array}
 \]
@@ -4020,16 +4026,14 @@ operators to include
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-  \itm{bool} &::=& \key{\#t} \mid \key{\#f} \\
-  \itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
-  \Exp &::=& \gray{ \INT{\Int} \mid \READ{} } \\
-    &\mid& \gray{ \NEG{\Exp} \mid \ADD{\Exp}{\Exp} }\\
-     &\mid& \BINOP{\code{'-}}{\Exp}{\Exp} \\
-     &\mid& \gray{ \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp} } \\
-     &\mid& \BOOL{\itm{bool}}  \mid \AND{\Exp}{\Exp}\\
-     &\mid& \OR{\Exp}{\Exp} \mid \NOT{\Exp} \\
-      &\mid& \BINOP{\itm{cmp}}{\Exp}{\Exp} \mid \IF{\Exp}{\Exp}{\Exp} \\
-  R_2 &::=& \PROGRAM{\key{'()}}{\Exp}
+  \itm{bool} &::=& \code{\#t} \mid \code{\#f} \\
+  \itm{cmp} &::= & \code{eq?} \mid \code{<} \mid \code{<=} \mid \code{>} \mid \code{>=} \\
+  \itm{op} &::= & \itm{cmp} \mid \code{read} \mid \code{+} \mid \code{-}
+    \mid \code{and} \mid \code{or} \mid \code{not} \\
+  \Exp &::=& \gray{ \INT{\Int} \mid \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp} } \\
+     &\mid& \PRIM{\itm{op}}{\Exp\ldots}\\
+     &\mid& \BOOL{\itm{bool}} \mid \IF{\Exp}{\Exp}{\Exp} \\
+  R_2 &::=& \PROGRAM{\code{'()}}{\Exp}
 \end{array}
 \]
 \end{minipage}
@@ -4051,15 +4055,14 @@ short-circuiting. That is, given the expression
 $(\key{and}\,e_1\,e_2)$, the expression $e_2$ is not evaluated if
 $e_1$ evaluates to \code{\#f}.
 
-With the addition of the comparison operations, there are quite a few
-primitive operations and the interpreter code for them could become
-repetitive without some care. In Figure~\ref{fig:interp-R2} we factor
-out the different parts of the code for primitive operations into the
-\code{interp-op} function and the similar parts of the code into the
-match clause for \code{Prim} shown in Figure~\ref{fig:interp-R2}. We
-do not use \code{interp-op} for the \code{and} operation because of
-the short-circuiting behavior in the order of evaluation of its
-arguments.
+With the increase in the number of primitive operations, the
+interpreter code for them could become repetitive without some
+care. In Figure~\ref{fig:interp-R2} we factor out the different parts
+of the code for primitive operations into the \code{interp-op}
+function and the similar parts of the code into the match clause for
+\code{Prim} shown in Figure~\ref{fig:interp-R2}. We do not use
+\code{interp-op} for the \code{and} operation because of the
+short-circuiting behavior in the order of evaluation of its arguments.
 
 
 \begin{figure}[tbp]
@@ -4143,64 +4146,128 @@ checker enforces the rule that the argument of \code{not} must be a
 \end{lstlisting}
 
 The type checker for $R_2$ is a structurally recursive function over
-the AST. Figure~\ref{fig:type-check-R2} shows many of the clauses for
-the \code{type-check-exp} function.  Given an input expression
-\code{e}, the type checker either returns a type (\key{Integer} or
-\key{Boolean}) or it signals an error.  The type of an integer literal
-is \code{Integer} and the type of a Boolean literal is \code{Boolean}.
-To handle variables, the type checker uses an environment that maps
-variables to types. Consider the clause for \key{let}.  We type check
-the initializing expression to obtain its type \key{T} and then
-associate type \code{T} with the variable \code{x} in the
-environment. When the type checker encounters a use of variable
-\code{x} in the body of the \key{let}, it can find its type in the
-environment.
+the AST. Figure~\ref{fig:type-check-R2} defines the
+\code{type-check-exp} function. The code for the type checker is
+included in the student support code.
+%
+Given an input expression \code{e}, the type checker either returns a
+type (\key{Integer} or \key{Boolean}) or it signals an error.  The
+type of an integer literal is \code{Integer} and the type of a Boolean
+literal is \code{Boolean}.  To handle variables, the type checker uses
+the environment \code{env} to map variables to types. Consider the
+clause for \key{let}.  We type check the initializing expression to
+obtain its type \key{T} and then associate type \code{T} with the
+variable \code{x} in the environment used to type check the body of
+the \key{let}. Thus, when the type checker encounters a use of
+variable \code{x}, it can find its type in the environment.
 
 \begin{figure}[tbp]
-\begin{lstlisting}
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define (type-check-exp env)
   (lambda (e)
     (match e
-      [(Var x) (dict-ref env x)]
-      [(Int n) 'Integer]
-      [(Bool b) 'Boolean]
+      [(Var x)
+       (let ([t (dict-ref env x)])
+         (values (Var x) t))]
+      [(Int n) (values (Int n) 'Integer)]
+      [(Bool b) (values (Bool b) 'Boolean)]
       [(Let x e body)
-        (define Te ((type-check-exp env) e))
-        (define Tb ((type-check-exp (dict-set env x Te)) body))
-        Tb]
-      ...
+       (define-values (e^ Te) ((type-check-exp env) e))
+       (define-values (b Tb) ((type-check-exp (dict-set env x Te)) body))
+       (values (Let x e^ b) Tb)]
+      [(If cnd thn els)
+       (define-values (c Tc) ((type-check-exp env) cnd))
+       (define-values (t Tt) ((type-check-exp env) thn))
+       (define-values (e Te) ((type-check-exp env) els))
+       (unless (type-equal? Tc 'Boolean)
+         (error 'type-check-exp "condition should be Boolean, not ~a" Tc))
+       (unless (type-equal? Tt Te)
+         (error 'type-check-exp "types of branches not equal, ~a != ~a" Tt Te))
+       (values (If c t e) Te)]
+      [(Prim 'eq? (list e1 e2))
+       (define-values (e1^ T1) ((type-check-exp env) e1))
+       (define-values (e2^ T2) ((type-check-exp env) e2))
+       (unless (type-equal? T1 T2)
+         (error 'type-check-exp "argument types of eq?: ~a != ~a" T1 T2))
+       (values (Prim 'eq? (list e1^ e2^)) 'Boolean)]
+      [(Prim op es)
+        (define-values (new-es ts)
+          (for/lists (exprs types) ([e es]) ((type-check-exp env) e)))
+        (define t-ret (type-check-op op ts))
+        (values (Prim op new-es) t-ret)]
       [else
-       (error "type-check-exp couldn't match" e)])))
+       (error 'type-check-exp "couldn't match" e)])))
 
-(define (type-check env)
-  (lambda (e)
-    (match e
-      [(Program info body)
-       (define Tb ((type-check-exp '()) body))
-       (unless (equal? Tb 'Integer)
-         (error "result of the program must be an integer, not " Tb))
-       (Program info body)]
-      )))
+(define (type-check-R2 e)
+  (match e
+    [(Program info body)
+     (define-values (body^ Tb) ((type-check-exp '()) body))
+     (unless (type-equal? Tb 'Integer)
+       (error 'type-check-R2 "result type must be Integer, not ~a" Tb))
+     (Program info body^)]
+    [else (error 'type-check-R2 "couldn't match ~a" e)]))
 \end{lstlisting}
-\caption{Skeleton of a type checker for the $R_2$ language.}
+\caption{Type checker for the $R_2$ language.}
 \label{fig:type-check-R2}
 \end{figure}
 
+
+Figure~\ref{fig:type-check-aux-R2} defines three auxilliary functions
+that are used in the type checker. The \code{operator-types} function
+defines a dictionary that maps the operator names to their parameter
+and return types. The \code{type-equal?} function determines whether
+two types are equal, which for now simply dispatches to \code{equal?}
+(deep equality). The \code{type-check-op} function looks up the
+operator in the \code{operator-types} dictionary and then checks
+whether the argument types are equal to the parameter types.  The
+result is the return type of the operator.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+(define (operator-types)
+  '((+ . ((Integer Integer) . Integer))
+    (- . ((Integer Integer) . Integer))
+    (and . ((Boolean Boolean) . Boolean))
+    (or . ((Boolean Boolean) . Boolean))
+    (< . ((Integer Integer) . Boolean))
+    (<= . ((Integer Integer) . Boolean))
+    (> . ((Integer Integer) . Boolean))
+    (>= . ((Integer Integer) . Boolean))
+    (- . ((Integer) . Integer))
+    (not . ((Boolean) . Boolean))
+    (read . (() . Integer))
+    ))
+
+(define (type-equal? t1 t2)
+  (equal? t1 t2))
+
+(define (type-check-op op arg-types)
+  (match (dict-ref (operator-types) op)
+    [`(,param-types . ,return-type)
+     (for ([at arg-types] [pt param-types]) 
+       (unless (type-equal? at pt)
+         (error 'type-check-op
+                "argument and parameter mismatch, ~a != ~a" at pt)))
+     return-type]
+    [else
+     (error 'type-check-op "unrecognized operator ~a" op)]))
+\end{lstlisting}
+\caption{Auxilliary functions for type checking.}
+\label{fig:type-check-aux-R2}
+\end{figure}
+
+
+
 \begin{exercise}\normalfont
-Complete the implementation of \code{type-check}.  Test your type
-checker using \code{interp-tests} and \code{compiler-tests} by passing
-the \code{type-check} function as the second argument.  Create 10 new
-example programs in $R_2$ that you choose based on how thoroughly they
-test you type checking function. Half of the example programs should
-have a type error to make sure that your type checker properly rejects
-them. For those programs, to signal that a type error is expected,
-create an empty file with the same base name but with file extension
-\code{.tyerr}. For example, if the test \code{r2\_14.rkt} is expected
-to error, then create an empty file named \code{r2\_14.tyerr}.  The
-other half of the example programs should not have type errors. Note
-that if your type checker does not signal an error for a program, then
-interpreting that program should not encounter an error.  If it does,
-there is something wrong with your type checker.
+Create 10 new example programs in $R_2$. Half of the example programs
+should have a type error. For those programs, to signal that a type
+error is expected, create an empty file with the same base name but
+with file extension \code{.tyerr}. For example, if the test
+\code{r2\_14.rkt} is expected to error, then create an empty file
+named \code{r2\_14.tyerr}.  The other half of the example programs
+should not have type errors. Note that if the type checker does not
+signal an error for a program, then interpreting that program should
+not encounter an error.
 \end{exercise}
 
 
@@ -5413,17 +5480,18 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
 \begin{array}{lcl}
   \Type &::=& \gray{\key{Integer} \mid \key{Boolean}}
   \mid (\key{Vector}\;\Type\ldots) \mid \key{Void}\\
-  \Exp &::=& \gray{  \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp) \mid (\key{-}\;\Exp\;\Exp) }  \\
-  &\mid&  \gray{  \Var \mid (\key{let}~([\Var~\Exp])~\Exp)  }\\
+  \Exp &::=& \gray{  \Int \mid \CREAD{} \mid \CNEG{\Exp} \mid \CADD{\Exp}{\Exp} \mid \CSUB{\Exp}{\Exp} }  \\
+  &\mid&  \gray{  \Var \mid \CLET{\Var}{\Exp}{\Exp}  }\\
   &\mid& \gray{ \key{\#t} \mid \key{\#f} 
    \mid (\key{and}\;\Exp\;\Exp) 
    \mid (\key{or}\;\Exp\;\Exp)
    \mid (\key{not}\;\Exp) } \\
   &\mid& \gray{  (\itm{cmp}\;\Exp\;\Exp) 
-   \mid (\key{if}~\Exp~\Exp~\Exp)  } \\
+   \mid \CIF{\Exp}{\Exp}{\Exp}  } \\
   &\mid& (\key{vector}\;\Exp\ldots) 
    \mid (\key{vector-ref}\;\Exp\;\Int) \\
-  &\mid& (\key{vector-set!}\;\Exp\;\Int\;\Exp)\\
+  &\mid& (\key{vector-set!}\;\Exp\;\Int\;\Exp) 
+   \mid (\key{vector-length}\;\Exp) \\
   &\mid& (\key{void}) \mid (\key{has-type}~\Exp~\Type)\\
   R_3 &::=& \Exp
 \end{array}
@@ -5453,20 +5521,14 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{lcl}
-\Exp &::=& \gray{ \INT{\Int} \mid \READ{} \mid \NEG{\Exp} } \\
-     &\mid& \gray{ \ADD{\Exp}{\Exp} 
-      \mid \BINOP{\code{'-}}{\Exp}{\Exp} } \\
-     &\mid& \gray{ \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp} } \\
-     &\mid& \gray{ \BOOL{\itm{bool}} 
-      \mid \AND{\Exp}{\Exp} }\\
-     &\mid& \gray{ \OR{\Exp}{\Exp}
-      \mid \NOT{\Exp} } \\
-     &\mid& \gray{ \BINOP{\itm{cmp}}{\Exp}{\Exp}
+  \itm{op} &::=& \ldots
+   \mid \code{vector} \mid \code{vector-ref} \mid \code{vector-set!}
+   \mid \code{vector-length} \\
+\Exp &::=& \gray{ \INT{\Int} \mid \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp} } \\
+     &\mid& \gray{ \PRIM{\itm{op}}{\Exp\ldots}
+      \mid \BOOL{\itm{bool}}
       \mid \IF{\Exp}{\Exp}{\Exp} } \\
-     &\mid& \VECTOR{\Exp} \\
-     &\mid& \VECREF{\Exp}{\INT{\Int}}\\
-     &\mid& \VECSET{\Exp}{\INT{\Int}}{\Exp}\\
-      &\mid& \VOID{} \mid \LP\key{HasType}~\Exp~\Type \RP \\
+     &\mid& \VOID{} \mid \LP\key{HasType}~\Exp~\Type \RP \\
   R_3 &::=& \PROGRAM{\key{'()}}{\Exp}
 \end{array}
 \]
@@ -5588,7 +5650,7 @@ start and end parentheses.  \index{unquote-slicing}
 
 
 \begin{figure}[tp]
-\begin{lstlisting}
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define (type-check-exp env)
   (lambda (e)
     (define recur (type-check-exp env))
@@ -5612,6 +5674,28 @@ start and end parentheses.  \index{unquote-slicing}
                   t)
              t))]
          [else (error "expected a vector in vector-ref, not" t)])]
+      [(Prim 'vector-set! (list e (Int i) arg) )
+       (define-values (e-vec t-vec) (recur e))
+       (define-values (e-arg^ t-arg) (recur arg))
+       (match t-vec
+         [`(Vector ,ts ...)
+          (unless (and (exact-nonnegative-integer? i)
+                       (i . < . (length ts)))
+            (error 'type-check-exp "invalid index ~a" i))
+          (unless (type-equal? (list-ref ts i) t-arg)
+            (error 'type-check-exp "type mismatch in vector-set! ~a ~a" 
+                   (list-ref ts i) t-arg))
+          (values (Prim 'vector-set! (list e-vec (Int i) e-arg^))  'Void)]
+         [else (error 'type-check-exp
+                      "expected a vector in vector-set!, not ~a"
+                      t-vec)])]
+      [(Prim 'vector-length (list e))
+       (define-values (e^ t) (recur e))
+       (match t
+         [`(Vector ,ts ...)
+          (values (Prim 'vector-length (list e^))  'Integer)]
+         [else (error 'type-check-exp
+                      "expected a vector in vector-lenfth, not ~a" t)])]
       [(Prim 'eq? (list e1 e2))
        (define-values (e1^ T1) (recur e1))
        (define-values (e2^ T2) (recur e2))
@@ -6822,19 +6906,19 @@ inside each other.
   \Type &::=& \gray{ \key{Integer} \mid \key{Boolean}
          \mid (\key{Vector}\;\Type\ldots) \mid \key{Void}  } \mid (\Type \ldots \; \key{->}\; \Type) \\
 \itm{cmp} &::= & \gray{  \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=}  } \\
-  \Exp &::=& \gray{ \Int \mid (\key{read}) \mid (\key{-}\;\Exp) \mid (\key{+} \; \Exp\;\Exp) \mid (\key{-}\;\Exp\;\Exp)}  \\
-    &\mid&  \gray{ \Var \mid \LET{\Var}{\Exp}{\Exp} }\\
+  \Exp &::=& \gray{ \Int \mid \CREAD{} \mid \CNEG{\Exp} \mid \CADD{\Exp}{\Exp} \mid \CSUB{\Exp}{\Exp} } \\
+    &\mid&  \gray{ \Var \mid \CLET{\Var}{\Exp}{\Exp} }\\
     &\mid& \gray{ \key{\#t} \mid \key{\#f} 
     \mid (\key{and}\;\Exp\;\Exp)
     \mid (\key{or}\;\Exp\;\Exp)
     \mid (\key{not}\;\Exp)} \\
-   &\mid& \gray{(\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
+   &\mid& \gray{(\itm{cmp}\;\Exp\;\Exp) \mid \CIF{\Exp}{\Exp}{\Exp} } \\
   &\mid& \gray{(\key{vector}\;\Exp\ldots) \mid
     (\key{vector-ref}\;\Exp\;\Int)} \\
   &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})
-      \mid (\key{has-type}~\Exp~\Type)} \\
-      &\mid& (\Exp \; \Exp \ldots) \\
-  \Def &::=& (\key{define}\; (\Var \; [\Var \key{:} \Type] \ldots) \key{:} \Type \; \Exp) \\
+      \mid \LP\key{has-type}~\Exp~\Type\RP } \\
+      &\mid& \LP\Exp \; \Exp \ldots\RP \\
+  \Def &::=& \CDEF{\Var}{\LS\Var \key{:} \Type\RS \ldots}{\Type}{\Exp} \\
   R_4 &::=& \Def \ldots \; \Exp
 \end{array}
 \]
@@ -6851,23 +6935,14 @@ inside each other.
     \small
 \[
 \begin{array}{lcl}
-\Exp &::=& \gray{ \INT{\Int} \mid \READ{} \mid \NEG{\Exp} } \\
-     &\mid& \gray{ \ADD{\Exp}{\Exp} 
-      \mid \BINOP{\code{'-}}{\Exp}{\Exp} } \\
-     &\mid& \gray{ \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp} } \\
+\Exp &::=& \gray{ \INT{\Int} \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp} } \\
+     &\mid& \gray{ \PRIM{\itm{op}}{\Exp\ldots} }\\
      &\mid& \gray{ \BOOL{\itm{bool}} 
-      \mid \AND{\Exp}{\Exp} }\\
-     &\mid& \gray{ \OR{\Exp}{\Exp}
-      \mid \NOT{\Exp} } \\
-     &\mid& \gray{ \BINOP{\itm{cmp}}{\Exp}{\Exp}
       \mid \IF{\Exp}{\Exp}{\Exp} } \\
-     &\mid& \gray{ \VECTOR{\Exp} } \\
-     &\mid& \gray{ \VECREF{\Exp}{\INT{\Int}} }\\
-     &\mid& \gray{ \VECSET{\Exp}{\INT{\Int}}{\Exp}} \\
      &\mid& \gray{ \VOID{} \mid \LP\key{HasType}~\Exp~\Type \RP } 
      \mid \APPLY{\Exp}{\Exp\ldots}\\
- \Def &::=& \FUNDEF{\Var}{([\Var \code{:} \Type]\ldots)}{\Type}{\code{'()}}{\Exp}\\
-  R_4 &::=& \PROGRAMDEFSEXP{\code{'()}}{(\Def\ldots)}{\Exp}
+ \Def &::=& \FUNDEF{\Var}{\LP[\Var \code{:} \Type]\ldots\RP}{\Type}{\code{'()}}{\Exp}\\
+  R_4 &::=& \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP)}{\Exp}
 \end{array}
 \]
 \end{minipage}
@@ -8042,21 +8117,21 @@ syntax for function application.
   \Type &::=& \gray{\key{Integer} \mid \key{Boolean}
      \mid (\key{Vector}\;\Type\ldots) \mid \key{Void}
      \mid (\Type\ldots \; \key{->}\; \Type)} \\
-  \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp)
-     \mid (\key{+} \; \Exp\;\Exp) \mid (\key{-} \; \Exp\;\Exp)}  \\
-    &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp}}\\
+  \Exp &::=& \gray{ \Int \mid \CREAD{} \mid \CNEG{\Exp}
+     \mid \CADD{\Exp}{\Exp} \mid \CSUB{\Exp}{\Exp} }  \\
+    &\mid&  \gray{ \Var \mid \CLET{\Var}{\Exp}{\Exp} }\\
     &\mid& \gray{\key{\#t} \mid \key{\#f} 
      \mid (\key{and}\;\Exp\;\Exp) 
      \mid (\key{or}\;\Exp\;\Exp) 
      \mid (\key{not}\;\Exp) } \\
-    &\mid& \gray{(\key{eq?}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
-    &\mid& \gray{(\key{vector}\;\Exp\ldots) \mid
+    &\mid& \gray{ (\key{eq?}\;\Exp\;\Exp) \mid \CIF{\Exp}{\Exp}{\Exp} } \\
+    &\mid& \gray{ (\key{vector}\;\Exp\ldots) \mid
           (\key{vector-ref}\;\Exp\;\Int)} \\
     &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})
      \mid (\Exp \; \Exp\ldots) } \\
-    &\mid& (\key{lambda:}\; ([\Var \key{:} \Type]\ldots) \key{:} \Type \; \Exp) \\
-  \Def &::=& \gray{(\key{define}\; (\Var \; [\Var \key{:} \Type]\ldots) \key{:} \Type \; \Exp)} \\
-  R_5 &::=& \gray{(\key{program} \; \Def\ldots \; \Exp)}
+    &\mid& \CLAMBDA{\LP\LS\Var \key{:} \Type\RS\ldots\RP}{\Type}{\Exp} \\
+  \Def &::=& \gray{ \CDEF{\Var}{\LS\Var \key{:} \Type\RS\ldots}{\Type}{\Exp} } \\
+  R_5 &::=& \gray{\Def\ldots \; \Exp}
 \end{array}
 \]
 \end{minipage}
@@ -8073,24 +8148,15 @@ syntax for function application.
     \small
 \[
 \begin{array}{lcl}
-\Exp &::=& \gray{ \INT{\Int} \mid \READ{} \mid \NEG{\Exp} } \\
-     &\mid& \gray{ \ADD{\Exp}{\Exp} 
-      \mid \BINOP{\code{'-}}{\Exp}{\Exp} } \\
-     &\mid& \gray{ \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp} } \\
-     &\mid& \gray{ \BOOL{\itm{bool}} 
-      \mid \AND{\Exp}{\Exp} }\\
-     &\mid& \gray{ \OR{\Exp}{\Exp}
-      \mid \NOT{\Exp} } \\
-     &\mid& \gray{ \BINOP{\itm{cmp}}{\Exp}{\Exp}
+  \Exp &::=& \gray{ \INT{\Int} \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp} } \\
+       &\mid& \gray{ \PRIM{\itm{op}}{\Exp\ldots} }\\
+     &\mid& \gray{ \BOOL{\itm{bool}}
       \mid \IF{\Exp}{\Exp}{\Exp} } \\
-     &\mid& \gray{ \VECTOR{\Exp} } \\
-     &\mid& \gray{ \VECREF{\Exp}{\INT{\Int}} }\\
-     &\mid& \gray{ \VECSET{\Exp}{\INT{\Int}}{\Exp}} \\
      &\mid& \gray{ \VOID{} \mid \LP\key{HasType}~\Exp~\Type \RP 
      \mid \APPLY{\Exp}{\Exp\ldots} }\\
-     &\mid& \LAMBDA{[\Var\code{:}\Type]\ldots}{\Type}{\Exp}\\
- \Def &::=& \gray{ \FUNDEF{\Var}{([\Var \code{:} \Type]\ldots)}{\Type}{\code{'()}}{\Exp} }\\
-  R_5 &::=& \gray{ \PROGRAMDEFSEXP{\code{'()}}{(\Def\ldots)}{\Exp} }
+     &\mid& \LAMBDA{\LP[\Var\code{:}\Type]\ldots\RP}{\Type}{\Exp}\\
+ \Def &::=& \gray{ \FUNDEF{\Var}{\LP[\Var \code{:} \Type]\ldots\RP}{\Type}{\code{'()}}{\Exp} }\\
+  R_5 &::=& \gray{ \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp} }
 \end{array}
 \]
 \end{minipage}
@@ -8428,32 +8494,59 @@ must be in integer, not a Boolean such as \code{\#t}.
 \[
 \begin{array}{rcl}
   \itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
-\Exp &::=& \Int \mid (\key{read}) \mid (\key{-}\;\Exp) 
-      \mid (\key{+} \; \Exp\;\Exp) \mid (\key{-} \; \Exp\;\Exp)  \\
-     &\mid&  \Var \mid \LET{\Var}{\Exp}{\Exp} \\
+\Exp &::=& \Int \mid \CREAD{} \mid \CNEG{\Exp}
+      \mid \CADD{\Exp}{\Exp} \mid \CSUB{\Exp}{\Exp}  \\
+     &\mid&  \Var \mid \CLET{\Var}{\Exp}{\Exp} \\
      &\mid& \key{\#t} \mid \key{\#f} 
-      \mid (\key{and}\;\Exp\;\Exp) 
-      \mid (\key{or}\;\Exp\;\Exp) 
-      \mid (\key{not}\;\Exp) \\
-     &\mid& (\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp} \\
-     &\mid& (\key{vector}\;\Exp\ldots) \mid
-      (\key{vector-ref}\;\Exp\;\Exp) \\
-     &\mid& (\key{vector-set!}\;\Exp\;\Exp\;\Exp) \mid (\key{void}) \\
-     &\mid& (\Exp \; \Exp\ldots) \mid (\key{lambda}\; (\Var\ldots) \; \Exp) \\
-     & \mid & (\key{boolean?}\;\Exp) \mid (\key{integer?}\;\Exp)\\
-     & \mid & (\key{vector?}\;\Exp) \mid (\key{procedure?}\;\Exp) \mid (\key{void?}\;\Exp) \\
-  \Def &::=& (\key{define}\; (\Var \; \Var\ldots) \; \Exp) \\
-R_7  &::=& (\key{program} \; \Def\ldots\; \Exp)
+      \mid \CBINOP{\key{and}}{\Exp}{\Exp} 
+     \mid \CBINOP{\key{or}}{\Exp}{\Exp} 
+     \mid \CUNIOP{\key{not}}{\Exp} \\
+     &\mid& \LP\itm{cmp}\;\Exp\;\Exp\RP \mid \CIF{\Exp}{\Exp}{\Exp} \\
+     &\mid& \LP\key{vector}\;\Exp\ldots\RP \mid
+      \LP\key{vector-ref}\;\Exp\;\Exp\RP \\
+     &\mid& \LP\key{vector-set!}\;\Exp\;\Exp\;\Exp\RP \mid \LP\key{void}\RP \\
+      &\mid& \LP\Exp \; \Exp\ldots\RP
+      \mid \LP\key{lambda}\;\LP\Var\ldots\RP\;\Exp\RP \\
+     & \mid & \LP\key{boolean?}\;\Exp\RP \mid \LP\key{integer?}\;\Exp\RP\\
+     & \mid & \LP\key{vector?}\;\Exp\RP \mid \LP\key{procedure?}\;\Exp\RP \mid \LP\key{void?}\;\Exp\RP \\
+  \Def &::=& \LP\key{define}\; \LP\Var \; \Var\ldots\RP \; \Exp\RP \\
+R_7  &::=& \Def\ldots\; \Exp
 \end{array}
 \]
 \end{minipage}
 }
 \caption{Syntax of $R_7$, an untyped language (a subset of Racket).}
+\label{fig:r7-concrete-syntax}
+\end{figure}
+
+
+\begin{figure}[tp]
+\centering
+\fbox{
+  \begin{minipage}{0.96\textwidth}
+    \small
+\[
+\begin{array}{lcl}
+  \Exp &::=& \INT{\Int} \mid \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp} \\
+       &\mid& \PRIM{\itm{op}}{\Exp\ldots} \\
+     &\mid& \BOOL{\itm{bool}}
+      \mid \IF{\Exp}{\Exp}{\Exp}  \\
+     &\mid& \VOID{} \mid \APPLY{\Exp}{\Exp\ldots} \\
+     &\mid& \LAMBDA{\LP\Var\ldots\RP}{\code{'Any}}{\Exp}\\
+ \Def &::=& \FUNDEF{\Var}{\LP\Var\ldots\RP}{\code{'Any}}{\code{'()}}{\Exp} \\
+  R_7 &::=& \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp} 
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The abstract syntax of $R_7$.}
 \label{fig:r7-syntax}
 \end{figure}
 
-The syntax of $R_7$, our subset of Racket, is defined in
-Figure~\ref{fig:r7-syntax}.
+
+The concrete and abstract syntax of $R_7$, our subset of Racket, is
+defined in Figures~\ref{fig:r7-concrete-syntax} and
+\ref{fig:r7-syntax}.
 %
 There is no type checker for $R_7$ because it is not a statically
 typed language (it's dynamically typed!).
@@ -8570,10 +8663,11 @@ stack.  But this means that the garbage collector needs to be able to
 differentiate between (1) plain old pointers to tuples, (2) a tagged
 value that points to a tuple, and (3) a tagged value that is not a
 tuple. We enable this differentiation by choosing not to use the tag
-$000$. Instead, that bit pattern is reserved for identifying plain old
-pointers to tuples. On the other hand, if one of the first three bits
-is set, then we have a tagged value, and inspecting the tag can
-differentiation between vectors ($010$) and the other kinds of values.
+$000$ in $\itm{tagof}$. Instead, that bit pattern is reserved for
+identifying plain old pointers to tuples. That way, if one of the
+first three bits is set, then we have a tagged value and inspecting
+the tag can differentiation between vectors ($010$) and the other
+kinds of values.
 
 We implement our untyped language $R_7$ by compiling it to $R_6$
 (Section~\ref{sec:compile-r7}), but first we describe the how to
@@ -8587,33 +8681,34 @@ extend our compiler to handle the new features of $R_6$
 \begin{figure}[tp]
 \centering
 \fbox{
-\begin{minipage}{0.97\textwidth}
+\begin{minipage}{0.97\textwidth}\small
 \[
 \begin{array}{lcl}
   \Type &::=& \gray{\key{Integer} \mid \key{Boolean}
-     \mid (\key{Vector}\;\Type\ldots) \mid (\key{Vectorof}\;\Type) \mid \key{Void}} \\
-    &\mid& \gray{(\Type\ldots \; \key{->}\; \Type)} \mid \key{Any} \\
-  \FType &::=& \key{Integer} \mid \key{Boolean} \mid \key{Void} \mid (\key{Vectorof}\;\key{Any}) \mid (\key{Vector}\; \key{Any}\ldots) \\
-    &\mid& (\key{Any}\ldots \; \key{->}\; \key{Any})\\
+     \mid \LP\key{Vector}\;\Type\ldots\RP \mid \LP\key{Vectorof}\;\Type\RP \mid \key{Void}} \\
+    &\mid& \gray{\LP\Type\ldots \; \key{->}\; \Type\RP} \mid \key{Any} \\
+  \FType &::=& \key{Integer} \mid \key{Boolean} \mid \key{Void} \mid \LP\key{Vectorof}\;\key{Any}\RP \mid \LP\key{Vector}\; \key{Any}\ldots\RP \\
+    &\mid& \LP\key{Any}\ldots \; \key{->}\; \key{Any}\RP\\
   \itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
-  \Exp &::=& \gray{\Int \mid (\key{read}) \mid (\key{-}\;\Exp)
-     \mid (\key{+} \; \Exp\;\Exp) \mid (\key{-} \; \Exp\;\Exp)}  \\
-    &\mid&  \gray{\Var \mid \LET{\Var}{\Exp}{\Exp}} \\
+  \Exp &::=& \gray{\Int \mid \CREAD{} \mid \CNEG{\Exp}
+     \mid \CADD{\Exp}{\Exp} \mid \CSUB{\Exp}{\Exp} }  \\
+    &\mid&  \gray{\Var \mid \CLET{\Var}{\Exp}{\Exp} } \\
     &\mid& \gray{\key{\#t} \mid \key{\#f} 
-     \mid (\key{and}\;\Exp\;\Exp) 
-     \mid (\key{or}\;\Exp\;\Exp) 
-     \mid (\key{not}\;\Exp)} \\
-    &\mid& \gray{(\itm{cmp}\;\Exp\;\Exp) \mid \IF{\Exp}{\Exp}{\Exp}} \\
-    &\mid& \gray{(\key{vector}\;\Exp\ldots) \mid
-          (\key{vector-ref}\;\Exp\;\Int)} \\
-    &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})} \\
-    &\mid& \gray{(\Exp \; \Exp\ldots)
-    \mid (\key{lambda:}\; ([\Var \key{:} \Type]\ldots) \key{:} \Type \; \Exp)} \\
-  & \mid & (\key{inject}\; \Exp \; \FType) \mid (\key{project}\;\Exp\;\FType) \\
-  & \mid & (\key{boolean?}\;\Exp) \mid (\key{integer?}\;\Exp)\\
-  & \mid & (\key{vector?}\;\Exp) \mid (\key{procedure?}\;\Exp) \mid (\key{void?}\;\Exp) \\
-  \Def &::=& \gray{(\key{define}\; (\Var \; [\Var \key{:} \Type]\ldots) \key{:} \Type \; \Exp)} \\
-  R_6 &::=& \gray{(\key{program} \; \Def\ldots \; \Exp)}
+     \mid \CBINOP{\key{and}}{\Exp}{\Exp} 
+     \mid \CBINOP{\key{or}}{\Exp}{\Exp} 
+     \mid \CUNIOP{\key{not}}{\Exp} } \\
+     &\mid& \gray{ \CBINOP{\itm{cmp}}{\Exp}{\Exp}
+     \mid \CIF{\Exp}{\Exp}{\Exp}} \\
+    &\mid& \gray{\LP\key{vector}\;\Exp\ldots\RP \mid
+          \LP\key{vector-ref}\;\Exp\;\Int\RP} \\
+    &\mid& \gray{\LP\key{vector-set!}\;\Exp\;\Int\;\Exp\RP\mid \LP\key{void}\RP} \\
+    &\mid& \gray{ \LP\Exp \; \Exp\ldots\RP
+    \mid \CLAMBDA{\LP\LS\Var \key{:} \Type\LS\ldots\LP}{\Type}{\Exp} } \\
+  & \mid & \LP\key{inject}\; \Exp \; \FType\RP \mid \LP\key{project}\;\Exp\;\FType\RP \\
+  & \mid & \LP\key{boolean?}\;\Exp\RP \mid \LP\key{integer?}\;\Exp\RP\\
+  & \mid & \LP\key{vector?}\;\Exp\RP \mid \LP\key{procedure?}\;\Exp\RP \mid \LP\key{void?}\;\Exp\RP \\
+  \Def &::=& \gray{ \CDEF{\Var}{\LS\Var \key{:} \Type\RS\ldots}{\Type}{\Exp} } \\
+  R_6 &::=& \gray{\Def\ldots \; \Exp}
 \end{array}
 \]
 \end{minipage}
@@ -8624,19 +8719,19 @@ extend our compiler to handle the new features of $R_6$
 \end{figure}
 
 The syntax of $R_6$ is defined in Figure~\ref{fig:r6-syntax}.  The
-$(\key{inject}\; e\; T)$ form converts the value produced by
+$\LP\key{inject}\; e\; T\RP$ form converts the value produced by
 expression $e$ of type $T$ into a tagged value.  The
-$(\key{project}\;e\;T)$ form converts the tagged value produced by
+$\LP\key{project}\;e\;T\RP$ form converts the tagged value produced by
 expression $e$ into a value of type $T$ or else halts the program if
 the type tag is equivalent to $T$. We treat
-$(\key{Vectorof}\;\key{Any})$ as equivalent to
-$(\key{Vector}\;\key{Any}\;\ldots)$.
+$\LP\key{Vectorof}\;\key{Any}\RP$ as equivalent to
+$\LP\key{Vector}\;\key{Any}\;\ldots\RP$.
 
 Note that in both \key{inject} and
 \key{project}, the type $T$ is restricted to the flat types $\FType$,
 which simplifies the implementation and corresponds with what is
 needed for compiling untyped Racket. The type predicates,
-$(\key{boolean?}\,e)$ etc., expect a tagged value and return \key{\#t}
+$\LP\key{boolean?}\,e\RP$ etc., expect a tagged value and return \key{\#t}
 if the tag corresponds to the predicate, and return \key{\#f}
 otherwise.
 %
