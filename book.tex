@@ -2142,7 +2142,6 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-locals: y x.1 x.2
 start:
   x.1 = 20;
   x.2 = 22;
@@ -2159,26 +2158,23 @@ expressions in tail position whereas the second should be applied to
 expressions that occur on the right-hand-side of a \key{let}.
 %
 The \code{explicate-tail} function takes an $R_1$ expression as input
-and produces a $C_0$ $\Tail$ (see Figure~\ref{fig:c0-syntax}) and a
-list of formerly \key{let}-bound variables.
+and produces a $C_0$ $\Tail$ (see Figure~\ref{fig:c0-syntax}).
 %
 The \code{explicate-assign} function takes an $R_1$ expression, the
 variable that it is to be assigned to, and $C_0$ code (a $\Tail$) that
 should come after the assignment (e.g., the code generated for the
-body of the \key{let}).  It returns a $\Tail$ and a list of
-variables. The \code{explicate-assign} function is in
-accumulator-passing style in that its third parameter is some $C_0$
-code which it then adds to and returns. The reader might be tempted to
-instead organize \code{explicate-assign} in a more direct fashion,
-without the third parameter and perhaps using \code{append} to combine
-statements. We warn against that alternative because the
-accumulator-passing style is key to how we generate high-quality code
-for conditional expressions in Chapter~\ref{ch:bool-types}.
+body of the \key{let}) and returns a $\Tail$. The
+\code{explicate-assign} function is in accumulator-passing style in
+that its third parameter is some $C_0$ code that it adds to and
+returns. The reader might be tempted to instead organize
+\code{explicate-assign} in a more direct fashion, without the third
+parameter and perhaps using \code{append} to combine statements. We
+warn against that alternative because the accumulator-passing style is
+key to how we generate high-quality code for conditional expressions
+in Chapter~\ref{ch:bool-types}.
 
 The top-level \code{explicate-control} function should invoke
-\code{explicate-tail} on the body of the \key{program} and then
-associate the \code{locals} symbol with the resulting list of
-variables in the $\itm{info}$ field, as in the above example.
+\code{explicate-tail} on the body of the \key{Program} AST node.
 
 \section{Select Instructions}
 \label{sec:select-r1}
@@ -2312,15 +2308,19 @@ Consider again the following $R_1$ program.
 \end{lstlisting}
 For reference, we repeat the output of \code{select-instructions} on
 the left and show the output of \code{assign-homes} on the right.
-Recall that \key{explicate-control} associated the list of
-variables with the \code{locals} symbol in the program's $\itm{info}$
-field, so \code{assign-homes} has convenient access to the them.  In
-this example, we assign variable \code{a} to stack location
-\code{-8(\%rbp)} and variable \code{b} to location \code{-16(\%rbp)}.\\
+%
+%% Recall that \key{explicate-control} associated the list of
+%% variables with the \code{locals} symbol in the program's $\itm{info}$
+%% field, so \code{assign-homes} has convenient access to the them.
+%
+In this example, we assign variable \code{a} to stack location
+\code{-8(\%rbp)} and variable \code{b} to location
+\code{-16(\%rbp)}.\\
 \begin{tabular}{l}
   \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-locals: a b
+locals-types:
+    a : 'Integer, b : 'Integer
 start: 
     movq $42, a
     movq a, b
@@ -2341,13 +2341,22 @@ start:
 \end{minipage}
 \end{tabular} \\
 
+In the output of \code{select-instructions}, there is a entry for
+\code{locals-types} in the $\itm{info}$ of the \code{Program} node,
+which is needed here so that we have the list of variables that should
+be assigned to homes. The the support code computes the
+\code{locals-types} entry. In particular, \code{type-check-C0}
+installs it in the $\itm{info}$ field of the \code{Program} node.
+When using \code{interp-tests} or \code{compiler-tests} (see Appendix,
+Section~\ref{appendix:utilities}), specify \code{type-check-C0} as the
+type checker to use after \code{explicate-control}.
+
 In the process of assigning variables to stack locations, it is
-convenient to compute and store the size of the frame (in bytes) in
-the $\itm{info}$ field of the \key{Program} node, with the key
-\code{stack-space}, which will be needed later to generate the
-procedure conclusion. The x86-64 standard requires the frame size to
-be a multiple of 16 bytes.
-\index{frame}
+convenient for you to compute and store the size of the frame (in
+bytes) in the $\itm{info}$ field of the \key{Program} node, with the
+key \code{stack-space}, which is needed later to generate the
+conclusion of the \code{main} procedure. The x86-64 standard requires
+the frame size to be a multiple of 16 bytes. \index{frame}
 
 \begin{exercise}
 \normalfont Implement the \key{assign-homes} pass and test it on all
@@ -2550,7 +2559,10 @@ Example $R_1$ program:
 \begin{minipage}{0.45\textwidth}
 After instruction selection:
 \begin{lstlisting}
-locals: (v w x y z t)
+locals-types:
+    x : Integer, y : Integer,
+    z : Integer, t : Integer,
+    v : Integer, w : Integer
 start:
     movq $1, v
     movq $42, w
@@ -8749,8 +8761,9 @@ The type predicates such as $\LP\key{boolean?}\,e\RP$ expect the
 expression $e$ to produce a tagged value; they return \key{\#t} if the
 tag corresponds to the predicate and they return \key{\#f} otherwise.
 
-The type checker for $R_6$ is shown in Figure~\ref{fig:type-check-R6}
-and the interpreter for $R_6$ is in Figure~\ref{fig:interp-R6}.
+The type checker for $R_6$ is shown in Figures~\ref{fig:type-check-R6-part-1}
+and \ref{fig:type-check-R6-part-2}.
+The interpreter for $R_6$ is in Figure~\ref{fig:interp-R6}.
 
 \begin{figure}[btp]
  \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
@@ -8800,13 +8813,23 @@ and the interpreter for $R_6$ is in Figure~\ref{fig:interp-R6}.
           (error 'type-check-exp
                  "type predicate expected argument of type Any, not ~a" e-ty)])]
       ...
+\end{lstlisting}
+\caption{Type checker for the $R_6$ language, part 1.}
+\label{fig:type-check-R6-part-1}
+\end{figure}
+
+\begin{figure}[btp]
+ \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]U
+UNDER CONSTRUCTION (vectors)
+   
       [else 
        (error 'type-check-exp "R6/unmatched ~a" e)]
       )))
 \end{lstlisting}
-\caption{Type checker for the $R_6$ language.}
-\label{fig:type-check-R6}
+\caption{Type checker for the $R_6$ language, part 2.}
+\label{fig:type-check-R6-part-2}
 \end{figure}
+
 
 % to do: add rules for vector-ref, etc. for Vectorof
 %Also, \key{eq?} is extended to operate on values of type \key{Any}.
@@ -9294,10 +9317,19 @@ parameters:
   program.
 
 \item[passes] a list with one entry per pass.  An entry is a list with
-  three things: a string giving the name of the pass, the function
-  that implements the pass (a translator from AST to AST), and a
-  function that implements the interpreter (a function from AST to
-  result value) for the language of the output of the pass.
+  four things:
+  \begin{enumerate}
+  \item a string giving the name of the pass,
+  \item the function that implements the pass (a translator from AST
+    to AST),
+  \item a function that implements the interpreter (a function from
+    AST to result value) for the output language,
+  \item and a type checker for the output language.  Type checkers for
+    the $R$ and $C$ languages are provided in the support code.  For
+    example, the type checkers for $R_1$ and $C_0$ are in
+    \code{type-check-R1.rkt}. The type checker entry is optional.  The
+    support code does not provide type checkers for the x86 languages.
+  \end{enumerate}
 
 \item[source-interp] an interpreter for the source language. The
   interpreters from Appendix~\ref{appendix:interp} make a good choice.
