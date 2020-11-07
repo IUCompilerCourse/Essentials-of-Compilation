@@ -4179,7 +4179,7 @@ checker enforces the rule that the argument of \code{not} must be a
 The type checker for $R_2$ is a structurally recursive function over
 the AST. Figure~\ref{fig:type-check-R2} defines the
 \code{type-check-exp} function. The code for the type checker is in
-the file \code{type-check-R2.rkt} of support code.
+the file \code{type-check-R2.rkt} of the support code.
 %
 Given an input expression \code{e}, the type checker either returns a
 type (\key{Integer} or \key{Boolean}) or it signals an error.  The
@@ -4655,19 +4655,20 @@ Unfortunately, this approach duplicates the two branches, and a
 compiler must never duplicate code!
 
 We need a way to perform the above transformation, but without
-duplicating code. The solution is straightforward if we think at the
-level of x86 assembly: we can label the code for each of the branches
-and insert jumps in all the places that need to execute the
-branches. Put another way, we need to move away from abstract syntax
-\emph{trees} and instead use \emph{graphs}. In particular, we 
-use a standard program representation called a \emph{control flow
-  graph} (CFG), due to Frances Elizabeth \citet{Allen:1970uq}.
-\index{control-flow graph}
-Each vertex is a labeled sequence of code, called a \emph{basic block}, and
-each edge represents a jump to another block. The \key{Program}
-construct of $C_0$ and $C_1$ contains a control flow graph represented
-as an alist mapping labels to basic blocks. Each basic block is
-represented by the $\Tail$ non-terminal.
+duplicating code. That is, we need a way for different parts of a
+program to refer to the same piece of code, that is, to \emph{share}
+code. At the level of x86 assembly this is straightforward because we
+can label the code for each of the branches and insert jumps in all
+the places that need to execute the branches. At the higher level of
+our intermediate languages, we need to move away from abstract syntax
+\emph{trees} and instead use \emph{graphs}. In particular, we use a
+standard program representation called a \emph{control flow graph}
+(CFG), due to Frances Elizabeth \citet{Allen:1970uq}.
+\index{control-flow graph} Each vertex is a labeled sequence of code,
+called a \emph{basic block}, and each edge represents a jump to
+another block. The \key{Program} construct of $C_0$ and $C_1$ contains
+a control flow graph represented as an alist mapping labels to basic
+blocks. Each basic block is represented by the $\Tail$ non-terminal.
 
 Figure~\ref{fig:explicate-control-s1-38} shows the output of the
 \code{remove-complex-opera*} pass and then the
@@ -4679,15 +4680,15 @@ Following the order of evaluation in the output of
 and then the less-than-comparison to \code{1} in the predicate of the
 inner \key{if}.  In the output of \code{explicate-control}, in the
 block labeled \code{start}, this becomes two assignment statements
-followed by a conditional \key{goto} to label \code{block96} or
-\code{block97}. The blocks associated with those labels contain the
+followed by a conditional \key{goto} to label \code{block40} or
+\code{block41}. The blocks associated with those labels contain the
 translations of the code \code{(eq? x 0)} and \code{(eq? x 2)},
-respectively. Regarding the block labeled with \code{block96}, we
+respectively. Regarding the block labeled with \code{block40}, we
 start with the comparison to \code{0} and then have a conditional
-goto, either to label \code{block92} or label \code{block93}, which
-indirectly take us to labels \code{block90} and \code{block91}, the
-two branches of the outer \key{if}, i.e., \code{(+ y 2)} and \code{(+
-  y 10)}. The story for the block labeled \code{block97} is similar.
+goto, either to label \code{block38} or label \code{block39}, which
+are the two branches of the outer \key{if}, i.e., \code{(+ y 2)} and
+\code{(+ y 10)}. The story for the block labeled \code{block41} is
+similar.
 
 \begin{figure}[tbp]
 \begin{tabular}{lll}
@@ -4722,46 +4723,40 @@ start:
     x = (read);
     y = (read);
     if (< x 1)
-       goto block96;
+       goto block40;
     else
-       goto block97;
-block96:
+       goto block41;
+block40:
     if (eq? x 0)
-       goto block92;
+       goto block38;
     else
-       goto block93;
-block97:
+       goto block39;
+block41:
     if (eq? x 2)
-       goto block94;
+       goto block38;
     else
-       goto block95;
-block92:
-    goto block90;
-block93:
-    goto block91;
-block94:
-    goto block90;
-block95:
-    goto block91;
-block90:
+       goto block39;
+block38:
     return (+ y 2);
-block91:
+block39:
     return (+ y 10);
 \end{lstlisting}
 \end{minipage}
 \end{tabular} 
 
-\caption{Example translation from $R_2$ to $C_1$
+\caption{Translation from $R_2$ to $C_1$
   via the \code{explicate-control}.}
 \label{fig:explicate-control-s1-38}
 \end{figure}
 
 The nice thing about the output of \code{explicate-control} is that
 there are no unnecessary comparisons and every comparison is part of a
-conditional jump. The down-side of this output is that it includes
-trivial blocks, such as the blocks labeled \code{block92} through
-\code{block95}, that only jump to another block. We discuss a solution
-to this problem in Section~\ref{sec:opt-jumps}.
+conditional jump.
+
+%% The down-side of this output is that it includes
+%% trivial blocks, such as the blocks labeled \code{block92} through
+%% \code{block95}, that only jump to another block. We discuss a solution
+%% to this problem in Section~\ref{sec:opt-jumps}.
 
 Recall that in Section~\ref{sec:explicate-control-r1} we implement
 \code{explicate-control} for $R_1$ using two mutually recursive
@@ -4771,61 +4766,23 @@ later function translates expressions on the right-hand-side of a
 \key{let}. With the addition of \key{if} expression in $R_2$ we have a
 new kind of context to deal with: the predicate position of the
 \key{if}. We need another function, \code{explicate-pred}, that takes
-an $R_2$ expression and two blocks (two $C_1$ $\Tail$ AST nodes) for
-the then-branch and else-branch. The output of \code{explicate-pred}
-is a block and a list of formerly \key{let}-bound variables.
-
-Note that the three explicate functions need to construct a
-control-flow graph, which we recommend they do via updates to a global
-variable.
-
-In the following paragraphs we consider the specific additions to the
-\code{explicate-tail} and \code{explicate-assign} functions, and some
-of cases for the \code{explicate-pred} function.
-
-The \code{explicate-tail} function needs an additional case for
-\key{if}. The branches of the \key{if} inherit the current context, so
-they are in tail position.  Let $B_1$ be the result of
-\code{explicate-tail} on the ``then'' branch of the \key{if}, so $B_1$
-is a $\Tail$ AST node.  Let $B_2$ be the result of applying
-\code{explicate-tail} to the ``else'' branch. Finally, let $B_3$ be
-the $\Tail$ that results from applying \code{explicate-pred} to the
-predicate $\itm{cnd}$ and the blocks $B_1$ and $B_2$.  Then the
-\key{if} as a whole translates to block $B_3$.
-\[
-    (\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els}) \quad\Rightarrow\quad B_3
-\]
-In the above discussion, we use the metavariables $B_1$, $B_2$, and
-$B_3$ to refer to blocks for the purposes of our discussion, but they
-should not be confused with the labels for the blocks that appear in
-the generated code. We initially construct unlabeled blocks; we only
-attach labels to blocks when we add them to the control-flow graph, as
-we see in the next case.
-
-Next consider the case for \key{if} in the \code{explicate-assign}
-function. The context of the \key{if} is an assignment to some
-variable $x$ and then the control continues to some block $B_1$.  The
-code that we generate for both the ``then'' and ``else'' branches
-needs to continue to $B_1$, so to avoid duplicating $B_1$ we instead
-add it to the control flow graph with a fresh label $\ell_1$. The
-branches of the \key{if} inherit the current context, so they are in
-assignment positions.  Let $B_2$ be the result of applying
-\code{explicate-assign} to the ``then'' branch, variable $x$, and the
-block \GOTO{$\ell_1$}.  Let $B_3$ be the result of applying
-\code{explicate-assign} to the ``else'' branch, variable $x$, and the
-block \GOTO{$\ell_1$}. Finally, let $B_4$ be the result of applying
-\code{explicate-pred} to the predicate $\itm{cnd}$ and the blocks
-$B_2$ and $B_3$. The \key{if} as a whole translates to the block
-$B_4$.
-\[
-(\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els}) \quad\Rightarrow\quad B_4
-\]
+an $R_2$ expression and two blocks for the then-branch and
+else-branch. The output of \code{explicate-pred} is a block.
+%
+%% Note that the three explicate functions need to construct a
+%% control-flow graph, which we recommend they do via updates to a global
+%% variable.
+%
+In the following paragraphs we discuss specific cases in the
+\code{explicate-pred} function as well as the additions to the
+\code{explicate-tail} and \code{explicate-assign} functions.
 
 The function \code{explicate-pred} will need a case for every
 expression that can have type \code{Boolean}. We detail a few cases
 here and leave the rest for the reader. The input to this function is
 an expression and two blocks, $B_1$ and $B_2$, for the two branches of
-the enclosing \key{if}. Suppose the expression is the Boolean
+the enclosing \key{if}, though some care will be needed regarding how
+we represent the blocks. Suppose the expression is the Boolean
 \code{\#t}.  Then we can perform a kind of partial evaluation
 \index{partial evaluation} and translate it to the ``then'' branch
 $B_1$. Likewise, we translate \code{\#f} to the ``else`` branch $B_2$.
@@ -4834,43 +4791,149 @@ $B_1$. Likewise, we translate \code{\#f} to the ``else`` branch $B_2$.
 \qquad\qquad\qquad
 \key{\#f} \quad\Rightarrow\quad B_2
 \]
-Next, suppose the expression is a less-than comparison. We translate
-it to a conditional \code{goto}. We need labels for the two branches
-$B_1$ and $B_2$, so we add those blocks to the control flow graph and
-obtain their labels $\ell_1$ and $\ell_2$. The translation of the
-less-than comparison is as follows.
-\[
-(\key{<}~e_1~e_2) \quad\Rightarrow\quad
-\begin{array}{l}
-\key{if}~(\key{<}~e_1~e_2) \\
-\qquad\key{goto}~\ell_1\key{;}\\
-\key{else}\\
-\qquad\key{goto}~\ell_2\key{;}
-\end{array}
-\]
+These two cases demonstrate that we sometimes discard one of the
+blocks that are input to \code{explicate-pred}. We will need to
+arrange for the blocks that we actually use to appear in the resulting
+control-flow graph, but not the discarded blocks.
 
 The case for \key{if} in \code{explicate-pred} is particularly
 illuminating as it deals with the challenges that we discussed above
-regarding the example of the nested \key{if} expressions.  Again, we
-add the two branches $B_1$ and $B_2$ to the control flow graph and
-obtain their labels $\ell_1$ and $\ell_2$.  The ``then'' and ``else''
-branches of the current \key{if} inherit their context from the
-current one, that is, predicate context. So we apply
-\code{explicate-pred} to the ``then'' branch with the two blocks
-\GOTO{$\ell_1$} and \GOTO{$\ell_2$} to obtain $B_3$.  Proceed in a
-similar way with the ``else'' branch to obtain $B_4$.  Finally, we
-apply \code{explicate-pred} to the predicate of the \code{if} and the
-blocks $B_3$ and $B_4$ to obtain the result $B_5$.
+regarding the example of the nested \key{if} expressions.  The
+``then'' and ``else'' branches of the current \key{if} inherit their
+context from the current one, that is, predicate context. So we
+recursively apply \code{explicate-pred} to the ``then'' and ``else''
+branches. For both of those recursive calls, we shall pass the blocks
+$B_1$ and $B_2$. Thus, $B_1$ may get used twice, once inside each
+recursive call, and likewise for $B_2$. As discussed above, to avoid
+duplicating code, we need to add these blocks to the control-flow
+graph so that we can instead refer to them by name and execute them
+with a \key{goto}. However, as we saw in the cases above for \key{\#t}
+and \key{\#f}, the blocks $B_1$ or $B_2$ may not get used at all and
+we don't want to prematurely add them to the control-flow graph if
+they end up being discarded.
+
+The solution to this conundrum is to use \emph{lazy evaluation} to
+delay adding the blocks to the control-flow graph until the points
+where we know they will be used~\citep{Friedman:1976aa}.\index{lazy
+  evaluation} Racket provides support for lazy evaluation with the
+\href{https://docs.racket-lang.org/reference/Delayed_Evaluation.html}{\code{racket/promise}}
+package. The expression \key{(delay} $e_1 \ldots e_n$\key{)}
+\index{delay} creates a \emph{promise}\index{promise} in which the
+evaluation of the expressions is postponed. When \key{(force}
+$p$\key{)}\index{force} is applied to a promise $p$ for the first
+time, the expressions $e_1 \ldots e_n$ are evaluated and the result of
+$e_n$ is cached in the promise and returned. If \code{force} is
+applied again to the same promise, then the cached result is returned.
+
+We use lazy evaluation for the input and output blocks of the
+functions \code{explicate-pred} and \code{explicate-assign} and for
+the output block of \code{explicate-tail}. So instead of taking and
+returns blocks, they take and return promised blocks. Furthermore,
+when we come to a situation in which we a block might be used more
+than once, as in the case for \code{if} above, we can transform the
+promise into a new promise that will add the block to the control-flow
+graph and return a \code{goto}.  The following auxiliary function
+accomplishes this task. It begins with \code{delay} to create a
+promise. When forced, it will in turn force the input block. If that
+block is already a \code{goto} (because it was already added to the
+control-flow graph), then we return that \code{goto}. Otherwise we add
+the block to the control-flow graph with another auxiliary function
+named \code{add-node} that returns the new label, and then return the
+\code{goto}.
+\begin{lstlisting}
+(define (block->goto block)
+  (delay
+    (define b (force block))
+    (match b
+      [(Goto label) (Goto label)]
+      [else (Goto (add-node b))]
+      )))
+\end{lstlisting}
+
+Getting back to the case for \code{if} in \code{explicate-pred}, we
+make the recursive calls to \code{explicate-pred} on the ``then'' and
+``else'' branches with the arguments \code{(block->goto} $B_1$\code{)}
+and \code{(block->goto} $B_2$\code{)}. Let $B_3$ and $B_4$ be the
+results from the two recursive calls.  We complete the case for
+\code{if} by recursively apply \code{explicate-pred} to the condition
+of the \code{if} with the promised blocks $B_3$ and $B_4$ to obtain
+the result $B_5$.
 \[
 (\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els})
 \quad\Rightarrow\quad
 B_5
 \]
 
-Finally, note that the way in which the \code{shrink} pass transforms
-logical operations such as \code{and} and \code{or} can impact the
-quality of code generated by \code{explicate-control}. For example,
-consider the following program.
+Next, consider the case for a less-than comparison in
+\code{explicate-pred}. We translate it to an \code{if} statement,
+whose two branches are required to be \code{goto}'s.  So we apply
+\code{block->goto} to $B_1$ and $B_2$ to obtain two promised goto's,
+which we can \code{force} to obtain the two actual goto's $G_1$ and
+$G_2$. The translation of the less-than comparison is as follows.
+\[
+(\key{<}~e_1~e_2) \quad\Rightarrow\quad
+\begin{array}{l}
+\key{if}~(\key{<}~e_1~e_2) \; G_1\\
+\key{else} \; G_2
+\end{array}
+\]
+
+The \code{explicate-tail} function needs to be updated to use lazy
+evaluation and it needs an additional case for \key{if}.  Each of the
+cases that return an AST node need use \code{delay} to instead return
+a promise of an AST node. Recall that \code{explicate-tail} has an
+accumulator parameter that is a block, which now becomes a promise of
+a block, which we refer to as $B_0$.
+
+In the case for \code{if} in \code{explicate-tail}, the two branches
+inherit the current context, so they are in tail position. Thus, the
+recursive calls on the ``then'' and ``else'' branch should be calls to
+\code{explicate-tail}.
+%
+We need to pass $B_0$ as the accumulator argument for both of these
+recursive calls, but we need to be careful not to duplicate $B_0$.
+Thus, we first apply \code{block->goto} to $B_0$ so that it gets added
+to the control-flow graph and obtain a promised goto $G_0$.
+%
+Let $B_1$ be the result of \code{explicate-tail} on the ``then''
+branch and $G_0$ and let $B_2$ be the result of \code{explicate-tail}
+on the ``else'' branch and $G_0$.  Let $B_3$ be the result of applying
+\code{explicate-pred} to the condition of the \key{if}, $B_1$, and
+$B_2$.  Then the \key{if} as a whole translates to $B_3$.
+\[
+    (\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els}) \quad\Rightarrow\quad B_3
+\]
+%% In the above discussion, we use the metavariables $B_1$, $B_2$, and
+%% $B_3$ to refer to blocks for the purposes of our discussion, but they
+%% should not be confused with the labels for the blocks that appear in
+%% the generated code. We initially construct unlabeled blocks; we only
+%% attach labels to blocks when we add them to the control-flow graph, as
+%% we see in the next case.
+
+Next consider the case for \key{if} in the \code{explicate-assign}
+function. The context of the \key{if} is an assignment to some
+variable $x$ and then the control continues to some promised block
+$B_1$.  The code that we generate for both the ``then'' and ``else''
+branches needs to continue to $B_1$, so to avoid duplicating $B_1$ we
+apply \code{block->goto} to it and obtain a promised goto $G_1$.  The
+branches of the \key{if} inherit the current context, so they are in
+assignment positions.  Let $B_2$ be the result of applying
+\code{explicate-assign} to the ``then'' branch, variable $x$, and
+$G_1$.  Let $B_3$ be the result of applying \code{explicate-assign} to
+the ``else'' branch, variable $x$, and $G_1$. Finally, let $B_4$ be
+the result of applying \code{explicate-pred} to the predicate
+$\itm{cnd}$ and the blocks $B_2$ and $B_3$. The \key{if} as a whole
+translates to the block $B_4$.
+\[
+(\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els}) \quad\Rightarrow\quad B_4
+\]
+This completes the description of \code{explicate-control} for $R_2$.
+
+The way in which the \code{shrink} pass transforms logical operations
+such as \code{and} and \code{or} can impact the quality of code
+generated by \code{explicate-control}. For example, consider the
+following program.
+% s1_21.rkt
 \begin{lstlisting}
 (if (and (eq? (read) 0) (eq? (read) 1))
     0
@@ -4880,40 +4943,26 @@ The \code{and} operation should transform into something that the
 \code{explicat-pred} function can still analyze and descend through to
 reach the underlying \code{eq?} conditions. Ideally, your
 \code{explicate-control} pass should generate code similar to the
-following for the above program.\footnote{If the trivial blocks 17,
-  18, and 20 bother you, take a look at the challenge problem in
-  Section~\ref{sec:opt-jumps}.}
+following for the above program.
 \begin{center}
-\begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
 start:
-    tmp13 = (read);
-    if (eq? tmp13 0)
-       goto block19;
+    tmp1 = (read);
+    if (eq? tmp1 0)
+       goto block40;
     else
-       goto block20;
-block19:
-    tmp14 = (read);
-    if (eq? tmp14 1)
-       goto block17;
+       goto block39;
+block40:
+    tmp2 = (read);
+    if (eq? tmp2 1)
+       goto block38;
     else
-       goto block18;
-\end{lstlisting}
-\end{minipage}
-\begin{minipage}{0.45\textwidth}
-\begin{lstlisting}
-block20:
-    goto block16;
-block17:
-    goto block15;
-block18:
-    goto block16;
-block15:
+       goto block39;
+block38:
     return 0;
-block16:
+block39:
     return 42;
 \end{lstlisting}
-\end{minipage}
 \end{center}
 
 \begin{exercise}\normalfont
