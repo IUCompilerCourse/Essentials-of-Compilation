@@ -7556,16 +7556,17 @@ statement with a left-hand side that can serve as the target of the
 
 Figures~\ref{fig:c3-concrete-syntax} and \ref{fig:c3-syntax} define
 the concrete and abstract syntax for $C_3$, the output of
-\key{explicate-control}. The three mutually recursive functions for
-this pass, for assignment, tail, and predicate contexts, must all be
-updated with cases for \code{FunRef} and \code{Apply}. In assignment
-and predicate contexts, \code{Apply} becomes \code{Call} in $C_3$,
-whereas in tail position \code{Apply} becomes \code{TailCall} in
-$C_3$.  We recommend defining a new function for processing function
-definitions.  This code is similar to the case for \code{Program} in
-$R_3$.  The top-level \code{explicate-control} function that handles
-the \code{ProgramDefs} form of $R_4$ can then apply this new function
-to all the function definitions.
+\key{explicate-control}. The auxiliary functions for assignment and
+tail contexts should be updated with cases for \code{Apply} and
+\code{FunRef} and the function for predicate context should be updated
+for \code{Apply} but not \code{FunRef}.  (A \code{FunRef} can't be a
+Boolean.)  In assignment and predicate contexts, \code{Apply} becomes
+\code{Call}, whereas in tail position \code{Apply} becomes
+\code{TailCall}.  We recommend defining a new auxiliary function for
+processing function definitions.  This code is similar to the case for
+\code{Program} in $R_3$.  The top-level \code{explicate-control}
+function that handles the \code{ProgramDefs} form of $R_4$ can then
+apply this new function to all the function definitions.
 
 \begin{figure}[tp]
 \fbox{
@@ -7649,29 +7650,15 @@ language, whose syntax is defined in Figure~\ref{fig:x86-3}.
 \begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
+\small
 \[
 \begin{array}{lcl}
-\Arg &::=&  \gray{  \INT{\Int} \mid \REG{\Reg}
-    \mid \LP\key{deref}\,\Reg\,\Int\RP } \\
-   &\mid& \gray{ \LP\key{byte-reg}\; \Reg\RP 
-   \mid   \LP\key{global}\; \itm{name}\RP  }
+  \Arg &::=& \gray{ \key{\$}\Int \mid \key{\%}\Reg \mid \Int\key{(}\key{\%}\Reg\key{)} \mid \key{\%}\itm{bytereg} } \mid \Var \key{(\%rip)} 
    \mid \LP\key{fun-ref}\; \itm{label}\RP\\
 \itm{cc} & ::= & \gray{  \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge}  } \\
-\Instr &::=& \gray{  \LP\key{addq} \; \Arg\; \Arg\RP \mid
-             \LP\key{subq} \; \Arg\; \Arg\RP \mid
-             \LP\key{negq} \; \Arg\RP \mid \LP\key{movq} \; \Arg\; \Arg\RP  } \\
-      &\mid& \gray{  \LP\key{callq} \; \mathit{label}\RP \mid
-             \LP\key{pushq}\;\Arg\RP \mid
-             \LP\key{popq}\;\Arg\RP \mid
-             \LP\key{retq}\RP  } \\
-       &\mid& \gray{  \LP\key{xorq} \; \Arg\;\Arg\RP
-       \mid \LP\key{cmpq} \; \Arg\; \Arg\RP \mid \LP\key{set}\itm{cc} \; \Arg\RP  } \\
-       &\mid& \gray{  \LP\key{movzbq}\;\Arg\;\Arg\RP
-       \mid  \LP\key{jmp} \; \itm{label}\RP
-       \mid \LP\key{j}\itm{cc} \; \itm{label}\RP
-       \mid \LP\key{label} \; \itm{label}\RP  } \\
-     &\mid& \LP\key{indirect-callq}\;\Arg \RP \mid \LP\key{tail-jmp}\;\Arg\RP \\
-     &\mid& \LP\key{leaq}\;\Arg\;\Reg\RP\\
+\Instr &::=& \ldots
+     \mid \key{callq}\;\key{*}\Arg \mid \key{tailjmp}\;\Arg 
+     \mid \key{leaq}\;\Arg\key{,}\;\key{\%}\Reg \\
 \Block &::= & \Instr\ldots \\
 \Def &::= & \LP\key{define} \; \LP\itm{label}\RP \;\LP\LP\itm{label} \,\key{.}\, \Block\RP\ldots\RP\RP\\
 x86_3 &::= & \Def\ldots
@@ -7692,7 +7679,7 @@ x86_3 &::= & \Def\ldots
   \Arg &::=&  \gray{  \INT{\Int} \mid \REG{\Reg} \mid \DEREF{\Reg}{\Int}
      \mid \BYTEREG{\Reg} } \\
      &\mid& \gray{ (\key{Global}~\Var) } \mid \FUNREF{\itm{label}} \\
-  \Instr &::=& \ldots \mid \INDCALLQ{\itm{label}}{\itm{int}}
+  \Instr &::=& \ldots \mid \INDCALLQ{\Arg}{\itm{int}}
     \mid \TAILJMP{\Arg}{\itm{int}}\\
     &\mid& \BININSTR{\code{'leaq}}{\Arg}{\REG{\Reg}}\\
   \Block &::= & \BLOCK{\itm{info}}{\LP\Instr\ldots\RP}\\
@@ -7794,17 +7781,21 @@ into the \itm{lhs}.
   callq *|\itm{fun}|
   movq %rax, |\itm{lhs}|
 \end{lstlisting}
+The \code{IndirectCallq} AST node includes an integer for the arity of
+the function, i.e., the number of parameters. That information is
+useful in the \code{uncover-live} pass for determining which
+argument-passing registers are potentially read during the call.
 
-Regarding tail calls, the parameter passing is the same as non-tail
-calls: generate instructions to move the arguments into to the
-argument passing registers.  After that we need to pop the frame from
-the procedure call stack.  However, we do not yet know how big the
-frame is; that gets determined during register allocation. So instead
-of generating those instructions here, we invent a new instruction
-that means ``pop the frame and then do an indirect jump'', which we
-name \code{TailJmp}. The abstract syntax for this instruction includes
-an argument that specifies where to jump and an integer that
-represents the arity of the function being called.
+For tail calls, the parameter passing is the same as non-tail calls:
+generate instructions to move the arguments into to the argument
+passing registers.  After that we need to pop the frame from the
+procedure call stack.  However, we do not yet know how big the frame
+is; that gets determined during register allocation. So instead of
+generating those instructions here, we invent a new instruction that
+means ``pop the frame and then do an indirect jump'', which we name
+\code{TailJmp}. The abstract syntax for this instruction includes an
+argument that specifies where to jump and an integer that represents
+the arity of the function being called.
 
 Recall that in Section~\ref{sec:explicate-control-r1} we recommended
 using the label \code{start} for the initial block of a program, and
@@ -7830,7 +7821,9 @@ The \code{IndirectCallq} instruction should be treated like
 \code{Callq} regarding its written locations $W$, in that they should
 include all the caller-saved registers. Recall that the reason for
 that is to force call-live variables to be assigned to callee-saved
-registers or to be spilled to the stack.
+registers or to be spilled to the stack. Also, the arity field of
+\code{IndirectCallq} determines how many of the argument-passing
+registers should be considered in the set of read locations $R$.
 
 \section{Build Interference Graph}
 
