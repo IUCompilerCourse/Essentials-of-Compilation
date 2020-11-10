@@ -7765,6 +7765,18 @@ variables and the callee-saved registers (in addition to the usual
 addition of edges between call-live variables and the caller-saved
 registers).
 
+
+\section{Allocate Registers}
+
+The primary change to the \code{allocate-registers} pass is adding an
+auxiliary function for handling definitions (the \Def{} non-terminal
+in Figure~\ref{fig:x86-3}) with one case for function definitions. The
+logic is the same as described in
+Chapter~\ref{ch:register-allocation-r1}, except now register
+allocation is performed many times, once for each function definition,
+instead of just once for the whole program.
+
+
 \section{Patch Instructions}
 
 In \code{patch-instructions}, you should deal with the x86
@@ -7790,17 +7802,54 @@ before the jump we need to pop the current frame. This sequence of
 instructions is the same as the code for the conclusion of a function,
 except the \code{retq} is replaced with \code{jmp *$\itm{arg}$}.
 
-Note that your \code{print-x86} pass needs to add the code for saving
-and restoring callee-saved registers, if you have not already
-implemented that. This is necessary when generating code for function
-definitions.
+Regarding function definitions, you will need to generate a prelude
+and conclusion for each one. This code is similar to the prelude and
+conclusion that you generated for the \code{main} function in
+Chapter~\ref{ch:tuples}. To review, the prelude of every function
+should carry out the following steps.
+\begin{enumerate}
+\item Start with \code{.global} and \code{.align} directives followed
+  by the label for the function.  (See Figure~\ref{fig:add-fun} for an
+  example.)
+\item Push \code{rbp} to the stack and set \code{rbp} to current stack
+  pointer.
+\item Push to the stack all of the callee-saved registers that were
+  used for register allocation.
+\item Move the stack pointer \code{rsp} down by the size of the stack
+  frame for this function, which depends on the number of regular
+  spills. (Aligned to 16 bytes.)
+\item Move the root stack pointer \code{r15} up by the size of the
+  root-stack frame for this function, which depends on the number of
+  spilled vectors. \label{root-stack-init}
+\item Initialize to zero all of the entries in the root-stack frame.
+\item Jump to the start block.
+\end{enumerate}
+The prelude of the \code{main} function has one additional task: call
+the \code{initialize} function to set up the garbage collector and
+move the value of the global \code{rootstack\_begin} in
+\code{r15}. This should happen before step \ref{root-stack-init}
+above, which depends on \code{r15}.
+
+The conclusion of every function should do the following.
+\begin{enumerate}
+\item Move the stack pointer back up by the size of the stack frame
+  for this function.
+\item Restore the callee-saved registers by popping them from the
+  stack.
+\item Move the root stack pointer back down by the size of the
+  root-stack frame for this function.
+\item Restore \code{rbp} by popping it from the stack.
+\item Return to the caller with the \code{retq} instruction.
+\end{enumerate}
+
 
 \begin{exercise}\normalfont
 Expand your compiler to handle $R_4$ as outlined in this chapter.
 Create 5 new programs that use functions, including examples that pass
-functions and return functions from other functions and including
-recursive functions. Test your compiler on these new programs and all
-of your previously created test programs.
+functions and return functions from other functions, recursive
+functions, functions that create vectors, and functions that make tail
+calls. Test your compiler on these new programs and all of your
+previously created test programs.
 \end{exercise}
 
 
@@ -8361,7 +8410,7 @@ $\Downarrow$
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (R4) at (0,2)  {\large $R_4$};
 \node (R4-2) at (3,2)  {\large $R_4$};
-\node (R4-3) at (6,2)  {\large $R_4$};
+%\node (R4-3) at (6,2)  {\large $R_4$};
 \node (F1-1) at (12,0)  {\large $F_1$};
 \node (F1-2) at (9,0)  {\large $F_1$};
 \node (F1-3) at (6,0)  {\large $F_1$};
@@ -8377,11 +8426,11 @@ $\Downarrow$
 \node (x86-2-1) at (3,-6)  {\large $\text{x86}^{*}_3$};
 \node (x86-2-2) at (6,-6)  {\large $\text{x86}^{*}_3$};
 
+%% \path[->,bend left=15] (R4) edge [above] node
+%%      {\ttfamily\footnotesize\color{red} type-check} (R4-2);
 \path[->,bend left=15] (R4) edge [above] node
-     {\ttfamily\footnotesize\color{red} type-check} (R4-2);
-\path[->,bend left=15] (R4-2) edge [above] node
-     {\ttfamily\footnotesize uniquify} (R4-3);
-\path[->] (R4-3) edge [right] node
+     {\ttfamily\footnotesize uniquify} (R4-2);
+\path[->,bend left=15] (R4-2) edge [right] node
      {\ttfamily\footnotesize reveal-functions} (F1-1);
 \path[->,bend left=15] (F1-1) edge [below] node
      {\ttfamily\footnotesize\color{red} convert-to-clos.} (F1-2);
