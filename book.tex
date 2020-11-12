@@ -4879,9 +4879,9 @@ block39:
 \label{fig:explicate-control-s1-38}
 \end{figure}
 
-The nice thing about the output of \code{explicate-control} is that
-there are no unnecessary comparisons and every comparison is part of a
-conditional jump.
+%% The nice thing about the output of \code{explicate-control} is that
+%% there are no unnecessary comparisons and every comparison is part of a
+%% conditional jump.
 
 %% The down-side of this output is that it includes
 %% trivial blocks, such as the blocks labeled \code{block92} through
@@ -4958,13 +4958,13 @@ applied again to the same promise, then the cached result is returned.
 We use lazy evaluation for the input and output blocks of the
 functions \code{explicate-pred} and \code{explicate-assign} and for
 the output block of \code{explicate-tail}. So instead of taking and
-returns blocks, they take and return promised blocks. Furthermore,
+returning blocks, they take and return promised blocks. Furthermore,
 when we come to a situation in which we a block might be used more
-than once, as in the case for \code{if} above, we can transform the
+than once, as in the case for \code{if} above, we transform the
 promise into a new promise that will add the block to the control-flow
 graph and return a \code{goto}.  The following auxiliary function
 accomplishes this task. It begins with \code{delay} to create a
-promise. When forced, it will in turn force the input block. If that
+promise. When forced, this promise will force the input block. If that
 block is already a \code{goto} (because it was already added to the
 control-flow graph), then we return that \code{goto}. Otherwise we add
 the block to the control-flow graph with another auxiliary function
@@ -5311,6 +5311,41 @@ Test your compiler using your previously created programs on the
 \code{interp-x86} interpreter (Appendix~\ref{appendix:interp}).
 \end{exercise}
 
+\begin{figure}[tbp]
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (R2) at (0,2)  {\large $R_2$};
+\node (R2-2) at (3,2)  {\large $R_2$};
+\node (R2-3) at (6,2)  {\large $R_2$};
+\node (R2-4) at (9,2)  {\large $R_2$};
+\node (R2-5) at (9,0)  {\large $R_2$};
+\node (C1-1) at (3,-2)  {\large $C_1$};
+
+\node (x86-2) at (3,-4)  {\large $\text{x86}^{*}_1$};
+\node (x86-3) at (6,-4)  {\large $\text{x86}^{*}_1$};
+\node (x86-4) at (9,-4) {\large $\text{x86}^{*}_1$};
+\node (x86-5) at (9,-6) {\large $\text{x86}^{\dagger}_1$};
+
+\node (x86-2-1) at (3,-6)  {\large $\text{x86}^{*}_1$};
+\node (x86-2-2) at (6,-6)  {\large $\text{x86}^{*}_1$};
+
+\path[->,bend left=15] (R2) edge [above] node {\ttfamily\footnotesize\color{red} type-check} (R2-2);
+\path[->,bend left=15] (R2-2) edge [above] node {\ttfamily\footnotesize\color{red} shrink} (R2-3);
+\path[->,bend left=15] (R2-3) edge [above] node {\ttfamily\footnotesize uniquify} (R2-4);
+\path[->,bend left=15] (R2-4) edge [right] node {\ttfamily\footnotesize remove-complex.} (R2-5);
+\path[->,bend right=15] (R2-5) edge [left] node {\ttfamily\footnotesize\color{red} explicate-control} (C1-1);
+\path[->,bend right=15] (C1-1) edge [left] node {\ttfamily\footnotesize\color{red} select-instructions} (x86-2);
+\path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize\color{red} uncover-live} (x86-2-1);
+\path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build-inter.} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate-reg.} (x86-3);
+\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize\color{red} patch-instr.} (x86-4);
+\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize\color{red} print-x86 } (x86-5);
+\end{tikzpicture}
+\caption{Diagram of the passes for $R_2$, a language with conditionals.}
+ \label{fig:R2-passes}
+\end{figure}
+
+Figure~\ref{fig:R2-passes} lists all the passes needed for the
+compilation of $R_2$.
 
 \section{An Example Translation}
 
@@ -5396,43 +5431,6 @@ conclusion:
 \caption{Example compilation of an \key{if} expression to x86.}
 \label{fig:if-example-x86}
 \end{figure}
-
-
-\begin{figure}[p]
-\begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (R2) at (0,2)  {\large $R_2$};
-\node (R2-2) at (3,2)  {\large $R_2$};
-\node (R2-3) at (6,2)  {\large $R_2$};
-\node (R2-4) at (9,2)  {\large $R_2$};
-\node (R2-5) at (9,0)  {\large $R_2$};
-\node (C1-1) at (3,-2)  {\large $C_1$};
-
-\node (x86-2) at (3,-4)  {\large $\text{x86}^{*}_1$};
-\node (x86-3) at (6,-4)  {\large $\text{x86}^{*}_1$};
-\node (x86-4) at (9,-4) {\large $\text{x86}^{*}_1$};
-\node (x86-5) at (9,-6) {\large $\text{x86}^{\dagger}_1$};
-
-\node (x86-2-1) at (3,-6)  {\large $\text{x86}^{*}_1$};
-\node (x86-2-2) at (6,-6)  {\large $\text{x86}^{*}_1$};
-
-\path[->,bend left=15] (R2) edge [above] node {\ttfamily\footnotesize\color{red} type-check} (R2-2);
-\path[->,bend left=15] (R2-2) edge [above] node {\ttfamily\footnotesize\color{red} shrink} (R2-3);
-\path[->,bend left=15] (R2-3) edge [above] node {\ttfamily\footnotesize uniquify} (R2-4);
-\path[->,bend left=15] (R2-4) edge [right] node {\ttfamily\footnotesize remove-complex.} (R2-5);
-\path[->,bend right=15] (R2-5) edge [left] node {\ttfamily\footnotesize\color{red} explicate-control} (C1-1);
-\path[->,bend right=15] (C1-1) edge [left] node {\ttfamily\footnotesize\color{red} select-instructions} (x86-2);
-\path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize\color{red} uncover-live} (x86-2-1);
-\path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build-inter.} (x86-2-2);
-\path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate-reg.} (x86-3);
-\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize\color{red} patch-instr.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize\color{red} print-x86 } (x86-5);
-\end{tikzpicture}
-\caption{Diagram of the passes for $R_2$, a language with conditionals.}
- \label{fig:R2-passes}
-\end{figure}
-
-Figure~\ref{fig:R2-passes} lists all the passes needed for the
-compilation of $R_2$.
 
 
 \section{Challenge: Remove Jumps}
