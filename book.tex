@@ -2863,11 +2863,12 @@ $R(k)$ are the locations read by instruction $I_k$.
 There is a special case for \code{jmp} instructions.  The locations
 that are live before a \code{jmp} should be the locations that are
 live before the instruction that follows the target label. So we
-recommend maintaining an alist that maps each label to a set of
-locations. Recall that for now, the only \code{jmp} in a pseudo-x86
-program is the one at the end, to the \code{conclusion}. (For example,
-see Figure~\ref{fig:reg-eg}.) So the alist should map
-\code{conclusion} to the set $\{\ttm{rax},\ttm{rsp}\}$.
+recommend maintaining an alist, perhaps called \code{label->live},
+that maps each label to a set of such locations. Recall that for now,
+the only \code{jmp} in a pseudo-x86 program is the one at the end, to
+the \code{conclusion}. (For example, see Figure~\ref{fig:reg-eg}.) So
+the alist should map \code{conclusion} to the set
+$\{\ttm{rax},\ttm{rsp}\}$.
 
 Let us walk through the above example, applying these formulas
 starting with the instruction on line 5. We collect the answers in the
@@ -5223,17 +5224,16 @@ basic block (Section~\ref{sec:liveness-analysis-r1}). With the
 addition of \key{if} expressions to $R_2$, \code{explicate-control}
 produces many basic blocks arranged in a control-flow graph. The first
 question we need to consider is: what order should we process the
-basic blocks? Recall that to perform liveness analysis, we need to
-know the live-after set. If a basic block has no successor blocks
+basic blocks? To perform liveness analysis on a basic block, we need
+to know its live-after set. If a basic block has no successor blocks
 (i.e. no out-edges in the control flow graph), then it has an empty
 live-after set and we can immediately apply liveness analysis to
 it. If a basic block has some successors, then we need to complete
-liveness analysis on those blocks first.  Furthermore, we know that
-the control flow graph does not contain any cycles because $R_2$ does
-not include loops
+liveness analysis on those blocks first. Thankfully, the control flow
+graph does not contain any cycles because $R_2$ does not include loops
 %
 \footnote{If we were to add loops to the language, then the CFG could
-  contain cycles and we would instead need to use the classic worklist
+  contain cycles and we would need to use an iterative worklist
   algorithm for computing the fixed point of the liveness
   analysis~\citep{Aho:1986qf}.}.
 %
@@ -5244,19 +5244,31 @@ the Racket \code{graph} package to obtain this ordering.
 \index{topological order}
 \index{topological sort}
 
-The next question is how to compute the live-after set of a block
-given the live-before sets of all its successor blocks.  (There can be
-more than one because of conditional jumps.)  During compilation we do
-not know which way a conditional jump will go, so we do not know which
-of the successor's live-before set to use.  The solution to this
-challenge is based on the observation that there is no harm to the
-correctness of the compiler if we classify more variables as live than
-the ones that are truly live during a particular execution of the
-block. Thus, we can take the union of the live-before sets from all
-the successors to be the live-after set for the block. Once we have
-computed the live-after set, we can proceed to perform liveness
-analysis on the block just as we did in
-Section~\ref{sec:liveness-analysis-r1}.
+The next question is how to analyze the jump instructions.  In
+Section~\ref{sec:liveness-analysis-r1} we recommended that you
+maintain an alist named \code{label->live} that maps each label to the
+set of live locations at the beginning of the associated block.  Now
+that we have many basic blocks, the alist needs to be extended as we
+process the blocks. In particular, after performing liveness analysis
+on a block, we can take the live-before set for its first instruction
+and associate that with the block's label in the alist.
+%
+As discussed in Section~\ref{sec:liveness-analysis-r1}, the
+live-before set for a $\JMP{\itm{label}}$ instruction is given by the
+mapping for $\itm{label}$ in \code{label->live}.
+
+Now for $x86_1$ we also have the conditional jump
+$\JMPIF{\itm{cc}}{\itm{label}}$ to deal with.  This one is
+particularly interesting because during compilation we do not know, in
+general, which way a conditional jump will go, so we do not know
+whether to use the live-before set for the following instruction or
+the live-before set for $\itm{label}$.  The solution to this challenge
+is based on the observation that there is no harm to the correctness
+of the compiler if we classify more locations as live than the ones
+that are truly live during a particular execution of the
+instruction. Thus, we can take the union of the live-before sets from
+the following instruction and from the mapping fro $\itm{label}$ in
+\code{label->live}.
 
 The helper functions for computing the variables in an instruction's
 argument and for computing the variables read-from ($R$) or written-to
