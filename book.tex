@@ -2590,7 +2590,7 @@ start:
 
 The goal of register allocation is to fit as many variables into
 registers as possible. A program sometimes has more variables than
-registers, so we cannot map each variable to a different
+registers, so we cannot always map each variable to a different
 register. Fortunately, it is common for different variables to be
 needed during different periods of time during program execution, and
 in such cases several variables can be mapped to the same register.
@@ -2607,12 +2607,12 @@ two variables interfere (Section~\ref{sec:build-interference}). We
 then model register allocation as a graph coloring problem, which we
 discuss in Section~\ref{sec:graph-coloring}.
 
-In the event that we run out of registers despite these efforts, we
-place the remaining variables on the stack, similar to what we did in
+If we run out of registers despite these efforts, we place the
+remaining variables on the stack, similar to what we did in
 Chapter~\ref{ch:int-exp}. It is common to use the verb \emph{spill}
-for assigning a variable to a stack location. The process of spilling
-variables is handled as part of the graph coloring process described
-in \ref{sec:graph-coloring}.
+for assigning a variable to a stack location. The decision to spill a
+variable is handled as part of the graph coloring process described in
+Section~\ref{sec:graph-coloring}.
 
 We make the simplifying assumption that each variable is assigned to
 one location (a register or stack address). A more sophisticated
@@ -2623,7 +2623,7 @@ instructions, it could be more efficient to assign the variable to a
 register during the intial sequence and then move it to the stack for
 the rest of its lifetime. We refer the interested reader to
 \citet{Cooper:1998ly} and \citet{Cooper:2011aa} for more information
-about this approach.
+about that approach.
 
 % discuss prioritizing variables based on how much they are used.
 
@@ -2796,7 +2796,6 @@ conclusion:
   \label{fig:example-calling-conventions}
 \end{figure}
 
-\clearpage
 
 \section{Liveness Analysis}
 \label{sec:liveness-analysis-r1}
@@ -2820,7 +2819,7 @@ line 2 is never used. The variable \code{b} is read on line 5 and
 there is an intervening write to \code{b} on line 4, so the read on
 line 5 receives the value written on line 4, not line 2.
 
-\begin{wrapfigure}[18]{l}[1.0in]{0.6\textwidth}
+\begin{wrapfigure}[19]{l}[1.0in]{0.6\textwidth}
   \small
   \begin{tcolorbox}[title=\href{https://docs.racket-lang.org/reference/sets.html}{The Racket Set Package}]
     A \emph{set} is an unordered collection of elements without duplicates.
@@ -2860,6 +2859,15 @@ instruction sequence back to front.
 \end{equation}
 where $W(k)$ are the locations written to by instruction $I_k$ and
 $R(k)$ are the locations read by instruction $I_k$.
+
+There is a special case for \code{jmp} instructions.  The locations
+that are live before a \code{jmp} should be the locations that are
+live before the instruction that follows the target label. So we
+recommend maintaining an alist that maps each label to a set of
+locations. Recall that for now, the only \code{jmp} in a pseudo-x86
+program is the one at the end, to the \code{conclusion}. (For example,
+see Figure~\ref{fig:reg-eg}.) So the alist should map
+\code{conclusion} to the set $\{\ttm{rax},\ttm{rsp}\}$.
 
 Let us walk through the above example, applying these formulas
 starting with the instruction on line 5. We collect the answers in the
@@ -2926,31 +2934,30 @@ shown between each instruction to make the figure easy to read.
 \hspace{20pt}
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-                       |$\{\}$|    
+                       |$\{\ttm{rsp}\}$|    
     movq $1, v
-                       |$\{\ttm{v}\}$|    
+                       |$\{\ttm{v},\ttm{rsp}\}$|    
     movq $42, w
-                       |$\{\ttm{v},\ttm{w}\}$|    
+                       |$\{\ttm{v},\ttm{w},\ttm{rsp}\}$|    
     movq v, x
-                       |$\{\ttm{w},\ttm{x}\}$|    
+                       |$\{\ttm{w},\ttm{x},\ttm{rsp}\}$|    
     addq $7, x
-                       |$\{\ttm{w},\ttm{x}\}$|    
+                       |$\{\ttm{w},\ttm{x},\ttm{rsp}\}$|    
     movq x, y
-                       |$\{\ttm{w},\ttm{x},\ttm{y}\}$|    
+                       |$\{\ttm{w},\ttm{x},\ttm{y},\ttm{rsp}\}$|    
     movq x, z
-                       |$\{\ttm{w},\ttm{y},\ttm{z}\}$|    
+                       |$\{\ttm{w},\ttm{y},\ttm{z},\ttm{rsp}\}$|    
     addq w, z
-                       |$\{\ttm{y},\ttm{z}\}$|    
+                       |$\{\ttm{y},\ttm{z},\ttm{rsp}\}$|
     movq y, t
-                       |$\{\ttm{t},\ttm{z}\}$|    
+                       |$\{\ttm{t},\ttm{z},\ttm{rsp}\}$|    
     negq t
-                       |$\{\ttm{t},\ttm{z}\}$|    
+                       |$\{\ttm{t},\ttm{z},\ttm{rsp}\}$|    
     movq z, %rax
-                       |$\{\ttm{rax},\ttm{t}\}$|    
+                       |$\{\ttm{rax},\ttm{t},\ttm{rsp}\}$|    
     addq t, %rax
-                       |$\{\}$|
+                       |$\{\ttm{rax},\ttm{rsp}\}$|
     jmp conclusion
-                       |$\{\}$|
 \end{lstlisting}
 \end{minipage}
 
@@ -3082,17 +3089,17 @@ Next we skip forward to the instruction \lstinline{movq x, y}.
 \begin{figure}[tbp]
 \begin{quote}
 \begin{tabular}{ll}
-\lstinline!movq $1, v!& no interference by rule 3,\\
-\lstinline!movq $42, w!& $w$ interferes with $v$ by rule 3,\\
-\lstinline!movq v, x!& $x$ interferes with $w$ by rule 3,\\
-\lstinline!addq $7, x!& $x$ interferes with $w$ by rule 1,\\
-\lstinline!movq x, y!& $y$ interferes with $w$ but not $x$ by rule 3,\\
-\lstinline!movq x, z!& $z$ interferes with $w$ and $y$ by rule 3,\\
-\lstinline!addq w, z!& $z$ interferes with $y$ by rule 1, \\
-\lstinline!movq y, t!& $t$ interferes with $z$ by rule 3, \\
-\lstinline!negq t!& $t$ interferes with $z$ by rule 1, \\
-\lstinline!movq z, %rax!   & no interference (ignore rax), \\
-\lstinline!addq t, %rax! & no interference (ignore rax). \\
+\lstinline!movq $1, v!& \ttm{v} interferes with \ttm{rsp},\\
+\lstinline!movq $42, w!& \ttm{w} interferes with \ttm{v} and \ttm{rsp},\\
+\lstinline!movq v, x!& \ttm{x} interferes with \ttm{w} and \ttm{rsp},\\
+\lstinline!addq $7, x!& \ttm{x} interferes with \ttm{w} and \ttm{rsp},\\
+\lstinline!movq x, y!& \ttm{y} interferes with \ttm{w} and \ttm{rsp} but not \ttm{x},\\
+\lstinline!movq x, z!& \ttm{z} interferes with \ttm{w}, \ttm{y}, and \ttm{rsp},\\
+\lstinline!addq w, z!& \ttm{z} interferes with \ttm{y} and \ttm{rsp}, \\
+\lstinline!movq y, t!& \ttm{t} interferes with \ttm{z} and \ttm{rsp}, \\
+\lstinline!negq t!& \ttm{t} interferes with \ttm{z} and \ttm{rsp}, \\
+\lstinline!movq z, %rax!   & \ttm{rax} interferes with \ttm{t} and \ttm{rsp}, \\
+\lstinline!addq t, %rax! & \ttm{rax} interferes with \ttm{rsp}. \\
 \lstinline!jmp conclusion!& no interference.
 \end{tabular}
 \end{quote}
@@ -3108,6 +3115,7 @@ Figure~\ref{fig:interfere}.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (rax) at (0,0) {$\ttm{rax}$};
+\node (rsp) at (9,2) {$\ttm{rsp}$};
 \node (t1) at (0,2) {$\ttm{t}$};
 \node (z) at (3,2)  {$\ttm{z}$};
 \node (x) at (6,2)  {$\ttm{x}$};
@@ -3123,6 +3131,14 @@ Figure~\ref{fig:interfere}.
 \draw (x) to (w);
 \draw (y) to (w);
 \draw (v) to (w);
+
+\draw (v) to (rsp);
+\draw (w) to (rsp);
+\draw (x) to (rsp);
+\draw (y) to (rsp);
+\path[-.,bend left=15] (z) edge node {} (rsp);
+\path[-.,bend left=10] (t1) edge node {} (rsp);
+\draw (rax) to (rsp);
 \end{tikzpicture}
 \]
 \caption{The interference graph of the example program.}
@@ -3262,7 +3278,21 @@ $0$ through $k-1$ correspond to the $k$ registers that we use for
 register allocation. The integers $k$ and larger correspond to stack
 locations. The registers that are not used for register allocation,
 such as \code{rax}, are assigned to negative integers. In particular,
-we assign $-1$ to \code{rax}.
+we assign $-1$ to \code{rax} and $-2$ to \code{rsp}.
+
+One might wonder why we include registers at all in the liveness
+analysis and interference graph, for example, we never allocate a
+variable to \code{rax} and \code{rsp}, so it would be harmless to
+leave them out.  As we see in Chapter~\ref{ch:tuples}, when we begin
+to use register for passing arguments to functions, it will be
+necessary for those registers to appear in the interference graph
+because those registers will also be assigned to variables, and we
+don't want those two uses to encroach on each other. Regarding
+registers such as \code{rax} and \code{rsp} that are not used for
+variables, we could omit them from the interference graph but that
+would require adding special cases to our algorithm, which would
+complicate the logic for little gain.
+
 
 \begin{figure}[btp]
   \centering
@@ -3283,24 +3313,26 @@ while |$W \neq \emptyset$| do
   \label{fig:satur-algo}
 \end{figure}
 
-With this algorithm in hand, let us return to the running example and
-consider how to color the interference graph in
+With the DSATUR algorithm in hand, let us return to the running
+example and consider how to color the interference graph in
 Figure~\ref{fig:interfere}.
 %
 We color the vertices for registers with their own color. For example,
-\code{rax} is assigned the color $-1$.  We then update the saturation
-for their neighboring vertices.  In this case, the saturation for
-\code{t} includes $-1$.  The remaining vertices are not yet colored,
-so they annotated with a dash, and their saturation sets are empty.
+\code{rax} is assigned the color $-1$ and \code{rsp} is assigned $-2$.
+The vertices for variables are not yet colored, so they annotated with
+a dash. We then update the saturation for vertices that are adjacent
+to a register. For example, the saturation for \code{t} is $\{-1,-2\}$
+because it interferes with both \code{rax} and \code{rsp}.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (rax) at (0,0) {$\ttm{rax}:-1,\{\}$};
-\node (t1) at (0,2) {$\ttm{t}:-,\{-1\}$};
-\node (z) at (3,2)  {$\ttm{z}:-,\{\}$};
-\node (x) at (6,2)  {$\ttm{x}:-,\{\}$};
-\node (y) at (3,0)  {$\ttm{y}:-,\{\}$};
-\node (w) at (6,0)  {$\ttm{w}:-,\{\}$};
-\node (v) at (9,0)  {$\ttm{v}:-,\{\}$};
+\node (rax) at (0,0) {$\ttm{rax}:-1,\{-2\}$};
+\node (rsp) at (10,2) {$\ttm{rsp}:-2,\{-1\}$};
+\node (t1) at (0,2) {$\ttm{t}:-,\{-1,-2\}$};
+\node (z) at (3,2)  {$\ttm{z}:-,\{-2\}$};
+\node (x) at (6,2)  {$\ttm{x}:-,\{-2\}$};
+\node (y) at (3,0)  {$\ttm{y}:-,\{-2\}$};
+\node (w) at (6,0)  {$\ttm{w}:-,\{-2\}$};
+\node (v) at (10,0)  {$\ttm{v}:-,\{-2\}$};
 
 \draw (t1) to (rax);
 \draw (t1) to (z);
@@ -3309,21 +3341,30 @@ so they annotated with a dash, and their saturation sets are empty.
 \draw (x) to (w);
 \draw (y) to (w);
 \draw (v) to (w);
+
+\draw (v) to (rsp);
+\draw (w) to (rsp);
+\draw (x) to (rsp);
+\draw (y) to (rsp);
+\path[-.,bend left=15] (z) edge node {} (rsp);
+\path[-.,bend left=10] (t1) edge node {} (rsp);
+\draw (rax) to (rsp);
 \end{tikzpicture}
 \]
 The algorithm says to select a maximally saturated vertex. So we pick
 $\ttm{t}$ and color it with the first available integer, which is
-$0$. We mark $0$ as no longer available for $\ttm{z}$ and $\ttm{rax}$
-because they interfere with $\ttm{t}$.
+$0$. We mark $0$ as no longer available for $\ttm{z}$, $\ttm{rax}$,
+and \ttm{rsp} because they interfere with $\ttm{t}$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (rax) at (0,0) {$\ttm{rax}:-1,\{0\}$};
-\node (t1) at (0,2) {$\ttm{t}:0,\{-1\}$};
-\node (z) at (3,2)  {$\ttm{z}:-,\{0\}$};
-\node (x) at (6,2)  {$\ttm{x}:-,\{\}$};
-\node (y) at (3,0)  {$\ttm{y}:-,\{\}$};
-\node (w) at (6,0)  {$\ttm{w}:-,\{\}$};
-\node (v) at (9,0)  {$\ttm{v}:-,\{\}$};
+\node (rax) at (0,0) {$\ttm{rax}:-1,\{0,-2\}$};
+\node (rsp) at (10,2) {$\ttm{rsp}:-2,\{-1,0\}$};
+\node (t1) at (0,2) {$\ttm{t}:0,\{-1,-2\}$};
+\node (z) at (3,2)  {$\ttm{z}:-,\{0,-2\}$};
+\node (x) at (6,2)  {$\ttm{x}:-,\{-2\}$};
+\node (y) at (3,0)  {$\ttm{y}:-,\{-2\}$};
+\node (w) at (6,0)  {$\ttm{w}:-,\{-2\}$};
+\node (v) at (10,0)  {$\ttm{v}:-,\{-2\}$};
 
 \draw (t1) to (rax);
 \draw (t1) to (z);
@@ -3332,21 +3373,30 @@ because they interfere with $\ttm{t}$.
 \draw (x) to (w);
 \draw (y) to (w);
 \draw (v) to (w);
+
+\draw (v) to (rsp);
+\draw (w) to (rsp);
+\draw (x) to (rsp);
+\draw (y) to (rsp);
+\path[-.,bend left=15] (z) edge node {} (rsp);
+\path[-.,bend left=10] (t1) edge node {} (rsp);
+\draw (rax) to (rsp);
 \end{tikzpicture}
 \]
 We repeat the process, selecting another maximally saturated
 vertex, which is \code{z}, and color it with the first available
 number, which is $1$. We add $1$ to the saturations for the
-neighboring vertices \code{t}, \code{y}, and \code{w}.
+neighboring vertices \code{t}, \code{y}, \code{w}, and \code{rsp}.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (rax) at (0,0) {$\ttm{rax}:-1,\{0\}$};
-\node (t1) at (0,2) {$\ttm{t}:0,\{-1,1\}$};
-\node (z) at (3,2)  {$\ttm{z}:1,\{0\}$};
-\node (x) at (6,2)  {$\ttm{x}:-,\{\}$};
-\node (y) at (3,0)  {$\ttm{y}:-,\{1\}$};
-\node (w) at (6,0)  {$\ttm{w}:-,\{1\}$};
-\node (v) at (9,0)  {$\ttm{v}:-,\{\}$};
+\node (rax) at (0,0) {$\ttm{rax}:-1,\{0,-2\}$};
+\node (rsp) at (10,2) {$\ttm{rsp}:-2,\{-1,0,1\}$};
+\node (t1) at (0,2) {$\ttm{t}:0,\{-1,1,-2\}$};
+\node (z) at (3,2)  {$\ttm{z}:1,\{0,-2\}$};
+\node (x) at (6,2)  {$\ttm{x}:-,\{-2\}$};
+\node (y) at (3,0)  {$\ttm{y}:-,\{1,-2\}$};
+\node (w) at (6,0)  {$\ttm{w}:-,\{1,-2\}$};
+\node (v) at (10,0)  {$\ttm{v}:-,\{-2\}$};
 
 \draw (t1) to (rax);
 \draw (t1) to (z);
@@ -3355,19 +3405,28 @@ neighboring vertices \code{t}, \code{y}, and \code{w}.
 \draw (x) to (w);
 \draw (y) to (w);
 \draw (v) to (w);
+
+\draw (v) to (rsp);
+\draw (w) to (rsp);
+\draw (x) to (rsp);
+\draw (y) to (rsp);
+\path[-.,bend left=15] (z) edge node {} (rsp);
+\path[-.,bend left=10] (t1) edge node {} (rsp);
+\draw (rax) to (rsp);
 \end{tikzpicture}
 \]
 The most saturated vertices are now \code{w} and \code{y}. We color
 \code{w} with the first available color, which is $0$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (rax) at (0,0) {$\ttm{rax}:-1,\{0\}$};
-\node (t1) at (0,2) {$\ttm{t}:0,\{-1,1\}$};
-\node (z) at (3,2)  {$\ttm{z}:1,\{0\}$};
-\node (x) at (6,2)  {$\ttm{x}:-,\{0\}$};
-\node (y) at (3,0)  {$\ttm{y}:-,\{0,1\}$};
-\node (w) at (6,0)  {$\ttm{w}:0,\{1\}$};
-\node (v) at (9,0)  {$\ttm{v}:-,\{0\}$};
+\node (rax) at (0,0) {$\ttm{rax}:-1,\{0,-2\}$};
+\node (rsp) at (10,2) {$\ttm{rsp}:-2,\{-1,0,1\}$};
+\node (t1) at (0,2) {$\ttm{t}:0,\{-1,1,-2\}$};
+\node (z) at (3,2)  {$\ttm{z}:1,\{0,-2\}$};
+\node (x) at (6,2)  {$\ttm{x}:-,\{0,-2\}$};
+\node (y) at (3,0)  {$\ttm{y}:-,\{0,1,-2\}$};
+\node (w) at (6,0)  {$\ttm{w}:0,\{1,-2\}$};
+\node (v) at (10,0)  {$\ttm{v}:-,\{0,-2\}$};
 
 \draw (t1) to (rax);
 \draw (t1) to (z);
@@ -3376,6 +3435,14 @@ The most saturated vertices are now \code{w} and \code{y}. We color
 \draw (x) to (w);
 \draw (y) to (w);
 \draw (v) to (w);
+
+\draw (v) to (rsp);
+\draw (w) to (rsp);
+\draw (x) to (rsp);
+\draw (y) to (rsp);
+\path[-.,bend left=15] (z) edge node {} (rsp);
+\path[-.,bend left=10] (t1) edge node {} (rsp);
+\draw (rax) to (rsp);
 \end{tikzpicture}
 \]
 Vertex \code{y} is now the most highly saturated, so we color \code{y}
@@ -3384,13 +3451,14 @@ with $2$.  We cannot choose $0$ or $1$ because those numbers are in
 and \code{z}, whose colors are $0$ and $1$ respectively.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (rax) at (0,0) {$\ttm{rax}:-1,\{0\}$};
-\node (t1) at (0,2) {$\ttm{t}:0,\{-1,1\}$};
-\node (z) at (3,2)  {$\ttm{z}:1,\{0,2\}$};
-\node (x) at (6,2)  {$\ttm{x}:-,\{0\}$};
-\node (y) at (3,0)  {$\ttm{y}:2,\{0,1\}$};
-\node (w) at (6,0)  {$\ttm{w}:0,\{1,2\}$};
-\node (v) at (9,0)  {$\ttm{v}:-,\{0\}$};
+\node (rax) at (0,0) {$\ttm{rax}:-1,\{0,-2\}$};
+\node (rsp) at (10,2) {$\ttm{rsp}:-2,\{-1,0,1,2\}$};
+\node (t1) at (0,2) {$\ttm{t}:0,\{-1,1,-2\}$};
+\node (z) at (3,2)  {$\ttm{z}:1,\{0,2,-2\}$};
+\node (x) at (6,2)  {$\ttm{x}:-,\{0,-2\}$};
+\node (y) at (3,0)  {$\ttm{y}:2,\{0,1,-2\}$};
+\node (w) at (6,0)  {$\ttm{w}:0,\{1,2,-2\}$};
+\node (v) at (10,0)  {$\ttm{v}:-,\{0,-2\}$};
 
 \draw (t1) to (rax);
 \draw (t1) to (z);
@@ -3399,18 +3467,27 @@ and \code{z}, whose colors are $0$ and $1$ respectively.
 \draw (x) to (w);
 \draw (y) to (w);
 \draw (v) to (w);
+
+\draw (v) to (rsp);
+\draw (w) to (rsp);
+\draw (x) to (rsp);
+\draw (y) to (rsp);
+\path[-.,bend left=15] (z) edge node {} (rsp);
+\path[-.,bend left=10] (t1) edge node {} (rsp);
+\draw (rax) to (rsp);
 \end{tikzpicture}
 \]
-Now \code{x} and \code{v} are the most saturated, so we color \code{v} it $1$.
+Now \code{x} and \code{v} are the most saturated, so we color \code{v} with $1$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (rax) at (0,0) {$\ttm{rax}:-1,\{0\}$};
-\node (t1) at (0,2) {$\ttm{t}:0,\{-1,1\}$};
-\node (z) at (3,2)  {$\ttm{z}:1,\{0,2\}$};
-\node (x) at (6,2)  {$\ttm{x}:-,\{0\}$};
-\node (y) at (3,0)  {$\ttm{y}:2,\{0,1\}$};
-\node (w) at (6,0)  {$\ttm{w}:0,\{1,2\}$};
-\node (v) at (9,0)  {$\ttm{v}:1,\{0\}$};
+\node (rax) at (0,0) {$\ttm{rax}:-1,\{0,-2\}$};
+\node (rsp) at (10,2) {$\ttm{rsp}:-2,\{-1,0,1,2\}$};
+\node (t1) at (0,2) {$\ttm{t}:0,\{-1,1,-2\}$};
+\node (z) at (3,2)  {$\ttm{z}:1,\{0,2,-2\}$};
+\node (x) at (6,2)  {$\ttm{x}:-,\{0,-2\}$};
+\node (y) at (3,0)  {$\ttm{y}:2,\{0,1,-2\}$};
+\node (w) at (6,0)  {$\ttm{w}:0,\{1,2,-2\}$};
+\node (v) at (10,0)  {$\ttm{v}:1,\{0,-2\}$};
 
 \draw (t1) to (rax);
 \draw (t1) to (z);
@@ -3419,18 +3496,27 @@ Now \code{x} and \code{v} are the most saturated, so we color \code{v} it $1$.
 \draw (x) to (w);
 \draw (y) to (w);
 \draw (v) to (w);
+
+\draw (v) to (rsp);
+\draw (w) to (rsp);
+\draw (x) to (rsp);
+\draw (y) to (rsp);
+\path[-.,bend left=15] (z) edge node {} (rsp);
+\path[-.,bend left=10] (t1) edge node {} (rsp);
+\draw (rax) to (rsp);
 \end{tikzpicture}
 \]
 In the last step of the algorithm, we color \code{x} with $1$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (rax) at (0,0) {$\ttm{rax}:-1,\{0\}$};
-\node (t1) at (0,2) {$\ttm{t}:0,\{-1,1,\}$};
-\node (z) at (3,2)  {$\ttm{z}:1,\{0,2\}$};
-\node (x) at (6,2)  {$\ttm{x}:1,\{0\}$};
-\node (y) at (3,0)  {$\ttm{y}:2,\{0,1\}$};
-\node (w) at (6,0)  {$\ttm{w}:0,\{1,2\}$};
-\node (v) at (9,0)  {$\ttm{v}:1,\{0\}$};
+\node (rax) at (0,0) {$\ttm{rax}:-1,\{0,-2\}$};
+\node (rsp) at (10,2) {$\ttm{rsp}:-2,\{-1,0,1,2\}$};
+\node (t1) at (0,2) {$\ttm{t}:0,\{-1,1,-2\}$};
+\node (z) at (3,2)  {$\ttm{z}:1,\{0,2,-2\}$};
+\node (x) at (6,2)  {$\ttm{x}:1,\{0,-2\}$};
+\node (y) at (3,0)  {$\ttm{y}:2,\{0,1,-2\}$};
+\node (w) at (6,0)  {$\ttm{w}:0,\{1,2,-2\}$};
+\node (v) at (10,0)  {$\ttm{v}:1,\{0,-2\}$};
 
 \draw (t1) to (rax);
 \draw (t1) to (z);
@@ -3439,6 +3525,14 @@ In the last step of the algorithm, we color \code{x} with $1$.
 \draw (x) to (w);
 \draw (y) to (w);
 \draw (v) to (w);
+
+\draw (v) to (rsp);
+\draw (w) to (rsp);
+\draw (x) to (rsp);
+\draw (y) to (rsp);
+\path[-.,bend left=15] (z) edge node {} (rsp);
+\path[-.,bend left=10] (t1) edge node {} (rsp);
+\draw (rax) to (rsp);
 \end{tikzpicture}
 \]
 
@@ -3447,13 +3541,12 @@ registers and stack locations. Recall that if we have $k$ registers to
 use for allocation, we map the first $k$ colors to registers and the
 rest to stack locations.  Suppose for the moment that we have just one
 register to use for register allocation, \key{rcx}. Then the following
-is the mapping of colors to registers and stack allocations.
+maps of colors to registers and stack allocations.
 \[
   \{ 0 \mapsto \key{\%rcx}, \; 1 \mapsto \key{-8(\%rbp)}, \; 2 \mapsto \key{-16(\%rbp)} \}
 \]
 Putting this mapping together with the above coloring of the
-variables, we arrive at the following assignment of variables to
-registers and stack locations.
+variables, we arrive at the following assignment.
 \begin{gather*}
   \{ \ttm{v} \mapsto \key{\%rcx}, \,
      \ttm{w} \mapsto \key{\%rcx},  \,
@@ -3511,6 +3604,87 @@ movq -8(%rbp), %rax
 addq %rax, -16(%rbp)
 \end{lstlisting}
 
+We recommend creating a helper function named \code{color-graph} that
+takes an interference graph and a list of all the variables in the
+program. This function should return a mapping of variables to their
+colors (represented as natural numbers). By creating this helper
+function, you will be able to reuse it in Chapter~\ref{ch:functions}
+when you add support for functions.  To prioritize the processing of
+highly saturated nodes inside your \code{color-graph} function, we
+recommend using the priority queue data structure (see the side bar on
+the right). Note that you will also need to maintain a mapping from
+variables to their ``handles'' in the priority queue so that you can
+notify the priority queue when their saturation changes.
+
+\begin{wrapfigure}[23]{r}[1.0in]{0.6\textwidth}
+  \small
+  \begin{tcolorbox}[title=Priority Queue]
+    A \emph{priority queue} is a collection of items in which the
+    removal of items is governed by priority. In a ``min'' queue,
+    lower priority items are removed first. An implementation is in
+    \code{priority\_queue.rkt} of the support code.  \index{priority
+      queue} \index{minimum priority queue}
+  \begin{description}
+  \item[$\LP\code{make-pqueue}\,\itm{cmp}\RP$] constructs an empty
+    priority queue that uses the $\itm{cmp}$ predicate to determine
+    whether its first argument has lower or equal priority to its
+    second argument.
+  \item[$\LP\code{pqueue-count}\,\itm{queue}\RP$] returns the number of
+    items in the queue.
+  \item[$\LP\code{pqueue-push!}\,\itm{queue}\,\itm{item}\RP$] inserts
+    the item into the queue and returns a handle for the item in the
+    queue.
+  \item[$\LP\code{pqueue-pop!}\,\itm{queue}\RP$] returns the item with
+    the lowest priority.
+  \item[$\LP\code{pqueue-decrease-key!}\,\itm{queue}\,\itm{handle}\RP$]
+    notifices the queue the the priority has decreased for the item
+    associated with the given handle.
+  \end{description}
+\end{tcolorbox}
+\end{wrapfigure}
+
+Once you have obtained the coloring from \code{color-graph}, you can
+assign the variables to registers or stack locations and then reuse
+code from the \code{assign-homes} pass from
+Section~\ref{sec:assign-r1} to replace the variables with their
+assigned location. 
+  
+\begin{exercise}\normalfont
+  Implement the compiler pass \code{allocate-registers}, which should
+  come after the \code{build-interference} pass. The three new passes
+  described in this chapter replace the \code{assign-homes} pass of
+  Section~\ref{sec:assign-r1}.  
+%  
+  Test your updated compiler by creating new example programs that
+  exercise all of the register allocation algorithm, such as forcing
+  variables to be spilled to the stack.
+\end{exercise}
+
+
+\section{Print x86}
+\label{sec:print-x86-reg-alloc}
+\index{calling conventions}
+\index{prelude}\index{conclusion}
+
+Recall that the \code{print-x86} pass generates the prelude and
+conclusion instructions for the \code{main} function.
+%
+The prelude saved the values in \code{rbp} and \code{rsp} and the
+conclusion returned those values to \code{rbp} and \code{rsp}.  The
+reason for this is that our \code{main} function must adhere to the
+x86 calling conventions that we described in
+Section~\ref{sec:calling-conventions}.  Furthermore, if your register
+allocator assigned variables to other callee-saved registers
+(e.g. \code{rbx}, \code{r12}, etc.), then those variables must also be
+saved to the stack in the prelude and restored in the conclusion.  The
+simplest approach is to save and restore all of the callee-saved
+registers. The more efficient approach is to keep track of which
+callee-saved registers were used and only save and restore
+them. Either way, make sure to take this use of stack space into
+account when you are calculating the size of the frame and adjusting
+the \code{rsp} in the prelude. Also, don't forget that the size of the
+frame needs to be a multiple of 16 bytes!
+
 An overview of all of the passes involved in register allocation is
 shown in Figure~\ref{fig:reg-alloc-passes}.
 
@@ -3542,89 +3716,6 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \caption{Diagram of the passes for $R_1$ with register allocation.}
 \label{fig:reg-alloc-passes}
 \end{figure}
-
-\begin{wrapfigure}[24]{r}[1.0in]{0.6\textwidth}
-  \small
-  \begin{tcolorbox}[title=Priority Queue]
-    A \emph{priority queue} is a collection of items in which the
-    removal of items is governed by priority. In a ``min'' queue,
-    lower priority items are removed first. An implementation is in
-    \code{priority\_queue.rkt} of the support code.  \index{priority
-      queue} \index{minimum priority queue}
-  \begin{description}
-  \item[$\LP\code{make-pqueue}\,\itm{cmp}\RP$] constructs an empty
-    priority queue that uses the $\itm{cmp}$ predicate to determine
-    whether its first argument has lower or equal priority to its
-    second argument.
-  \item[$\LP\code{pqueue-count}\,\itm{queue}\RP$] returns the number of
-    items in the queue.
-  \item[$\LP\code{pqueue-push!}\,\itm{queue}\,\itm{item}\RP$] inserts
-    the item into the queue and returns a handle for the item in the
-    queue.
-  \item[$\LP\code{pqueue-pop!}\,\itm{queue}\RP$] returns the item with
-    the lowest priority.
-  \item[$\LP\code{pqueue-decrease-key!}\,\itm{queue}\,\itm{handle}\RP$]
-    notifices the queue the the priority has decreased for the item
-    associated with the given handle.
-  \end{description}
-\end{tcolorbox}
-\end{wrapfigure}
-
-We recommend creating a helper function named \code{color-graph} that
-takes an interference graph and a list of all the variables in the
-program. This function should return a mapping of variables to their
-colors (represented as natural numbers). By creating this helper
-function, you will be able to reuse it in Chapter~\ref{ch:functions}
-when you add support for functions.  To prioritize the processing of
-highly saturated nodes inside your \code{color-graph} function, we
-recommend using the priority queue data structure (see the side bar on
-the right). Note that you will also need to maintain a mapping from
-variables to their ``handles'' in the priority queue so that you can
-notify the priority queue when their saturation changes.
-
-Once you have obtained the coloring from \code{color-graph}, you can
-assign the variables to registers or stack locations and then reuse
-code from the \code{assign-homes} pass from
-Section~\ref{sec:assign-r1} to replace the variables with their
-assigned location.
-
-\begin{exercise}\normalfont
-  Implement the compiler pass \code{allocate-registers}, which should come
-  after the \code{build-interference} pass. The three new passes,
-  \code{uncover-live}, \code{build-interference}, and
-  \code{allocate-registers} replace the \code{assign-homes} pass of
-  Section~\ref{sec:assign-r1}.
-  
-  Test your updated compiler by creating new example programs that
-  exercise all of the register allocation algorithm, such as forcing
-  variables to be spilled to the stack.
-\end{exercise}
-
-
-\section{Print x86 and Conventions for Registers}
-\label{sec:print-x86-reg-alloc}
-\index{calling conventions}
-\index{prelude}\index{conclusion}
-
-Recall that the \code{print-x86} pass generates the prelude and
-conclusion instructions for the \code{main} function.
-%
-The prelude saved the values in \code{rbp} and \code{rsp} and the
-conclusion returned those values to \code{rbp} and \code{rsp}.  The
-reason for this is that our \code{main} function must adhere to the
-x86 calling conventions that we described in
-Section~\ref{sec:calling-conventions}.  Furthermore, if your register
-allocator assigned variables to other callee-saved registers
-(e.g. \code{rbx}, \code{r12}, etc.), then those variables must also be
-saved to the stack in the prelude and restored in the conclusion.  The
-simplest approach is to save and restore all of the callee-saved
-registers. The more efficient approach is to keep track of which
-callee-saved registers were used and only save and restore
-them. Either way, make sure to take this use of stack space into
-account when you are calculating the size of the frame and adjusting
-the \code{rsp} in the prelude. Also, don't forget that the size of the
-frame needs to be a multiple of 16 bytes!
-
 
 \section{Challenge: Move Biasing}
 \label{sec:move-biasing}
@@ -3702,6 +3793,7 @@ to how we represented interference.  The following is the \emph{move
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (rax) at (0,0) {$\ttm{rax}$};
+\node (rsp) at (9,2) {$\ttm{rsp}$};
 \node (t) at (0,2) {$\ttm{t}$};
 \node (z) at (3,2)  {$\ttm{z}$};
 \node (x) at (6,2)  {$\ttm{x}$};
@@ -3721,13 +3813,14 @@ Now we replay the graph coloring, pausing to see the coloring of
 were \code{w} and \code{y}.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (rax) at (0,0) {$\ttm{rax}:-1,\{0\}$};
-\node (t1) at (0,2) {$\ttm{t}:0,\{1\}$};
-\node (z) at (3,2)  {$\ttm{z}:1,\{0\}$};
-\node (x) at (6,2)  {$\ttm{x}:-,\{\}$};
-\node (y) at (3,0)  {$\ttm{y}:-,\{1\}$};
-\node (w) at (6,0)  {$\ttm{w}:-,\{1\}$};
-\node (v) at (9,0)  {$\ttm{v}:-,\{\}$};
+\node (rax) at (0,0) {$\ttm{rax}:-1,\{0,-2\}$};
+\node (rsp) at (9,2) {$\ttm{rsp}:-2,\{-1,0,1,2\}$};
+\node (t1) at (0,2) {$\ttm{t}:0,\{1,-2\}$};
+\node (z) at (3,2)  {$\ttm{z}:1,\{0,-2\}$};
+\node (x) at (6,2)  {$\ttm{x}:-,\{-2\}$};
+\node (y) at (3,0)  {$\ttm{y}:-,\{1,-2\}$};
+\node (w) at (6,0)  {$\ttm{w}:-,\{1,-2\}$};
+\node (v) at (9,0)  {$\ttm{v}:-,\{-2\}$};
 
 \draw (t1) to (rax);
 \draw (t1) to (z);
@@ -3736,22 +3829,31 @@ were \code{w} and \code{y}.
 \draw (x) to (w);
 \draw (y) to (w);
 \draw (v) to (w);
+
+\draw (v) to (rsp);
+\draw (w) to (rsp);
+\draw (x) to (rsp);
+\draw (y) to (rsp);
+\path[-.,bend left=15] (z) edge node {} (rsp);
+\path[-.,bend left=10] (t1) edge node {} (rsp);
+\draw (rax) to (rsp);
 \end{tikzpicture}
 \]
 %
 Last time we chose to color \code{w} with $0$. But this time we see
 that \code{w} is not move related to any vertex, but \code{y} is move
-related to \code{t}.  So we choose to color \code{y} the same color,
-$0$.
+related to \code{t}.  So we choose to color \code{y} the same color as
+\code{t}, $0$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (rax) at (0,0) {$\ttm{rax}:-1,\{0\}$};
-\node (t1) at (0,2) {$\ttm{t}:0,\{1\}$};
-\node (z) at (3,2)  {$\ttm{z}:1,\{0\}$};
-\node (x) at (6,2)  {$\ttm{x}:-,\{\}$};
-\node (y) at (3,0)  {$\ttm{y}:0,\{1\}$};
-\node (w) at (6,0)  {$\ttm{w}:-,\{0,1\}$};
-\node (v) at (9,0)  {$\ttm{v}:-,\{\}$};
+\node (rax) at (0,0) {$\ttm{rax}:-1,\{0,-2\}$};
+\node (rsp) at (9,2) {$\ttm{rsp}:-2,\{-1,0,1,2\}$};
+\node (t1) at (0,2) {$\ttm{t}:0,\{1,-2\}$};
+\node (z) at (3,2)  {$\ttm{z}:1,\{0,-2\}$};
+\node (x) at (6,2)  {$\ttm{x}:-,\{-2\}$};
+\node (y) at (3,0)  {$\ttm{y}:0,\{1,-2\}$};
+\node (w) at (6,0)  {$\ttm{w}:-,\{0,1,-2\}$};
+\node (v) at (9,0)  {$\ttm{v}:-,\{-2\}$};
 
 \draw (t1) to (rax);
 \draw (t1) to (z);
@@ -3760,18 +3862,27 @@ $0$.
 \draw (x) to (w);
 \draw (y) to (w);
 \draw (v) to (w);
+
+\draw (v) to (rsp);
+\draw (w) to (rsp);
+\draw (x) to (rsp);
+\draw (y) to (rsp);
+\path[-.,bend left=15] (z) edge node {} (rsp);
+\path[-.,bend left=10] (t1) edge node {} (rsp);
+\draw (rax) to (rsp);
 \end{tikzpicture}
 \]
 Now \code{w} is the most saturated, so we color it $2$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (rax) at (0,0) {$\ttm{rax}:-1,\{0\}$};
-\node (t1) at (0,2) {$\ttm{t}:0,\{1\}$};
-\node (z) at (3,2)  {$\ttm{z}:1,\{0,2\}$};
-\node (x) at (6,2)  {$\ttm{x}:-,\{2\}$};
-\node (y) at (3,0)  {$\ttm{y}:0,\{1,2\}$};
-\node (w) at (6,0)  {$\ttm{w}:2,\{0,1\}$};
-\node (v) at (9,0)  {$\ttm{v}:-,\{2\}$};
+\node (rax) at (0,0) {$\ttm{rax}:-1,\{0,-2\}$};
+\node (rsp) at (9,2) {$\ttm{rsp}:-2,\{-1,0,1,2\}$};
+\node (t1) at (0,2) {$\ttm{t}:0,\{1,-2\}$};
+\node (z) at (3,2)  {$\ttm{z}:1,\{0,2,-2\}$};
+\node (x) at (6,2)  {$\ttm{x}:-,\{2,-2\}$};
+\node (y) at (3,0)  {$\ttm{y}:0,\{1,2,-2\}$};
+\node (w) at (6,0)  {$\ttm{w}:2,\{0,1,-2\}$};
+\node (v) at (9,0)  {$\ttm{v}:-,\{2,-2\}$};
 
 \draw (t1) to (rax);
 \draw (t1) to (z);
@@ -3780,6 +3891,14 @@ Now \code{w} is the most saturated, so we color it $2$.
 \draw (x) to (w);
 \draw (y) to (w);
 \draw (v) to (w);
+
+\draw (v) to (rsp);
+\draw (w) to (rsp);
+\draw (x) to (rsp);
+\draw (y) to (rsp);
+\path[-.,bend left=15] (z) edge node {} (rsp);
+\path[-.,bend left=10] (t1) edge node {} (rsp);
+\draw (rax) to (rsp);
 \end{tikzpicture}
 \]
 At this point, vertices \code{x} and \code{v} are most saturated, but
@@ -3787,13 +3906,14 @@ At this point, vertices \code{x} and \code{v} are most saturated, but
 \code{x} to $0$ to match \code{y}. Finally, we color \code{v} to $0$.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (rax) at (0,0) {$\ttm{rax}:-1,\{0\}$};
-\node (t) at (0,2) {$\ttm{t}:0,\{1\}$};
-\node (z) at (3,2)  {$\ttm{z}:1,\{0,2\}$};
-\node (x) at (6,2)  {$\ttm{x}:0,\{2\}$};
-\node (y) at (3,0)  {$\ttm{y}:0,\{1,2\}$};
-\node (w) at (6,0)  {$\ttm{w}:2,\{0,1\}$};
-\node (v) at (9,0)  {$\ttm{v}:0,\{2\}$};
+\node (rax) at (0,0) {$\ttm{rax}:-1,\{0,-2\}$};
+\node (rsp) at (9,2) {$\ttm{rsp}:-2,\{-1,0,1,2\}$};
+\node (t) at (0,2) {$\ttm{t}:0,\{1,-2\}$};
+\node (z) at (3,2)  {$\ttm{z}:1,\{0,2,-2\}$};
+\node (x) at (6,2)  {$\ttm{x}:0,\{2,-2\}$};
+\node (y) at (3,0)  {$\ttm{y}:0,\{1,2,-2\}$};
+\node (w) at (6,0)  {$\ttm{w}:2,\{0,1,-2\}$};
+\node (v) at (9,0)  {$\ttm{v}:0,\{2,-2\}$};
 
 \draw (t1) to (rax);
 \draw (t) to (z);
@@ -3802,6 +3922,14 @@ At this point, vertices \code{x} and \code{v} are most saturated, but
 \draw (x) to (w);
 \draw (y) to (w);
 \draw (v) to (w);
+
+\draw (v) to (rsp);
+\draw (w) to (rsp);
+\draw (x) to (rsp);
+\draw (y) to (rsp);
+\path[-.,bend left=15] (z) edge node {} (rsp);
+\path[-.,bend left=10] (t1) edge node {} (rsp);
+\draw (rax) to (rsp);
 \end{tikzpicture}
 \]
 
@@ -3816,9 +3944,11 @@ So we have the following assignment of variables to registers.
 \end{gather*}
 
 We apply this register assignment to the running example, on the left,
-to obtain the code on right.
+to obtain the code in the middle.  The \code{patch-instructions} then
+removes the three trivial moves from \key{rbx} to \key{rbx} to obtain
+the code on the right.
 
-\begin{minipage}{0.3\textwidth}
+\begin{minipage}{0.25\textwidth}
 \begin{lstlisting}
 movq $1, v
 movq $42, w
@@ -3835,7 +3965,7 @@ jmp conclusion
 \end{lstlisting}
 \end{minipage}
 $\Rightarrow\qquad$
-\begin{minipage}{0.45\textwidth}
+\begin{minipage}{0.25\textwidth}
   \begin{lstlisting}
 movq $1, %rbx
 movq $42, %rdx
@@ -3851,11 +3981,8 @@ addq %rbx, %rax
 jmp conclusion
 \end{lstlisting}
 \end{minipage}
-
-The \code{patch-instructions} then removes the three trivial moves
-from \key{rbx} to \key{rbx} to obtain the following result.
-
-\begin{minipage}{0.45\textwidth}
+$\Rightarrow\qquad$
+\begin{minipage}{0.25\textwidth}
 \begin{lstlisting}
 movq $1, %rbx
 movq $42, %rdx
@@ -5308,129 +5435,129 @@ Figure~\ref{fig:R2-passes} lists all the passes needed for the
 compilation of $R_2$.
 
 
-\section{Challenge: Optimize and Remove Jumps}
+\section{Challenge: Remove Jumps}
 \label{sec:opt-jumps}
 
-Recall that in the example output of \code{explicate-control} in
-Figure~\ref{fig:explicate-control-s1-38}, \code{block57} through
-\code{block60} are trivial blocks, they do nothing but jump to another
-block. The first goal of this challenge assignment is to remove those
-blocks. Figure~\ref{fig:optimize-jumps} repeats the result of
-\code{explicate-control} on the left and shows the result of bypassing
-the trivial blocks on the right. Let us focus on \code{block61}.  The
-\code{then} branch jumps to \code{block57}, which in turn jumps to
-\code{block55}. The optimized code on the right of
-Figure~\ref{fig:optimize-jumps} bypasses \code{block57}, with the
-\code{then} branch jumping directly to \code{block55}. The story is
-similar for the \code{else} branch, as well as for the two branches in
-\code{block62}. After the jumps in \code{block61} and \code{block62}
-have been optimized in this way, there are no longer any jumps to
-blocks \code{block57} through \code{block60}, so they can be removed.
+%% Recall that in the example output of \code{explicate-control} in
+%% Figure~\ref{fig:explicate-control-s1-38}, \code{block57} through
+%% \code{block60} are trivial blocks, they do nothing but jump to another
+%% block. The first goal of this challenge assignment is to remove those
+%% blocks. Figure~\ref{fig:optimize-jumps} repeats the result of
+%% \code{explicate-control} on the left and shows the result of bypassing
+%% the trivial blocks on the right. Let us focus on \code{block61}.  The
+%% \code{then} branch jumps to \code{block57}, which in turn jumps to
+%% \code{block55}. The optimized code on the right of
+%% Figure~\ref{fig:optimize-jumps} bypasses \code{block57}, with the
+%% \code{then} branch jumping directly to \code{block55}. The story is
+%% similar for the \code{else} branch, as well as for the two branches in
+%% \code{block62}. After the jumps in \code{block61} and \code{block62}
+%% have been optimized in this way, there are no longer any jumps to
+%% blocks \code{block57} through \code{block60}, so they can be removed.
 
-\begin{figure}[tbp]
-\begin{tabular}{lll}
-\begin{minipage}{0.4\textwidth}
-\begin{lstlisting}
-block62:
-    tmp54 = (read);
-    if (eq? tmp54 2) then
-       goto block59;
-    else
-       goto block60;
-block61:
-    tmp53 = (read);
-    if (eq? tmp53 0) then
-       goto block57;
-    else
-       goto block58;
-block60:
-    goto block56;
-block59:
-    goto block55;
-block58:
-    goto block56;
-block57:
-    goto block55;
-block56:
-    return (+ 700 77);
-block55:
-    return (+ 10 32);
-start:
-    tmp52 = (read);
-    if (eq? tmp52 1) then
-       goto block61;
-    else
-       goto block62;
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.55\textwidth}
-\begin{lstlisting}
-block62:
-    tmp54 = (read);
-    if (eq? tmp54 2) then
-       goto block55;
-    else
-       goto block56;
-block61:
-    tmp53 = (read);
-    if (eq? tmp53 0) then
-       goto block55;
-    else
-       goto block56;
-block56:
-    return (+ 700 77);
-block55:
-    return (+ 10 32);
-start:
-    tmp52 = (read);
-    if (eq? tmp52 1) then
-       goto block61;
-    else
-       goto block62;
-\end{lstlisting}
-\end{minipage}
-\end{tabular}
-\caption{Optimize jumps by removing trivial blocks.}
-\label{fig:optimize-jumps}
-\end{figure}
+%% \begin{figure}[tbp]
+%% \begin{tabular}{lll}
+%% \begin{minipage}{0.4\textwidth}
+%% \begin{lstlisting}
+%% block62:
+%%     tmp54 = (read);
+%%     if (eq? tmp54 2) then
+%%        goto block59;
+%%     else
+%%        goto block60;
+%% block61:
+%%     tmp53 = (read);
+%%     if (eq? tmp53 0) then
+%%        goto block57;
+%%     else
+%%        goto block58;
+%% block60:
+%%     goto block56;
+%% block59:
+%%     goto block55;
+%% block58:
+%%     goto block56;
+%% block57:
+%%     goto block55;
+%% block56:
+%%     return (+ 700 77);
+%% block55:
+%%     return (+ 10 32);
+%% start:
+%%     tmp52 = (read);
+%%     if (eq? tmp52 1) then
+%%        goto block61;
+%%     else
+%%        goto block62;
+%% \end{lstlisting}
+%% \end{minipage}
+%% &
+%% $\Rightarrow$
+%% &
+%% \begin{minipage}{0.55\textwidth}
+%% \begin{lstlisting}
+%% block62:
+%%     tmp54 = (read);
+%%     if (eq? tmp54 2) then
+%%        goto block55;
+%%     else
+%%        goto block56;
+%% block61:
+%%     tmp53 = (read);
+%%     if (eq? tmp53 0) then
+%%        goto block55;
+%%     else
+%%        goto block56;
+%% block56:
+%%     return (+ 700 77);
+%% block55:
+%%     return (+ 10 32);
+%% start:
+%%     tmp52 = (read);
+%%     if (eq? tmp52 1) then
+%%        goto block61;
+%%     else
+%%        goto block62;
+%% \end{lstlisting}
+%% \end{minipage}
+%% \end{tabular}
+%% \caption{Optimize jumps by removing trivial blocks.}
+%% \label{fig:optimize-jumps}
+%% \end{figure}
 
-The name of this pass is \code{optimize-jumps}.  We recommend
-implementing this pass in two phases. The first phrase builds a hash
-table that maps labels to possibly improved labels. The second phase
-changes the target of each \code{goto} to use the improved label.  If
-the label is for a trivial block, then the hash table should map the
-label to the first non-trivial block that can be reached from this
-label by jumping through trivial blocks.  If the label is for a
-non-trivial block, then the hash table should map the label to itself;
-we do not want to change jumps to non-trivial blocks.
+%% The name of this pass is \code{optimize-jumps}.  We recommend
+%% implementing this pass in two phases. The first phrase builds a hash
+%% table that maps labels to possibly improved labels. The second phase
+%% changes the target of each \code{goto} to use the improved label.  If
+%% the label is for a trivial block, then the hash table should map the
+%% label to the first non-trivial block that can be reached from this
+%% label by jumping through trivial blocks.  If the label is for a
+%% non-trivial block, then the hash table should map the label to itself;
+%% we do not want to change jumps to non-trivial blocks.
 
-The first phase can be accomplished by constructing an empty hash
-table, call it \code{short-cut}, and then iterating over the control
-flow graph. Each time you encouter a block that is just a \code{goto},
-then update the hash table, mapping the block's source to the target
-of the \code{goto}. Also, the hash table may already have mapped some
-labels to the block's source, to you must iterate through the hash
-table and update all of those so that they instead map to the target
-of the \code{goto}.
+%% The first phase can be accomplished by constructing an empty hash
+%% table, call it \code{short-cut}, and then iterating over the control
+%% flow graph. Each time you encouter a block that is just a \code{goto},
+%% then update the hash table, mapping the block's source to the target
+%% of the \code{goto}. Also, the hash table may already have mapped some
+%% labels to the block's source, to you must iterate through the hash
+%% table and update all of those so that they instead map to the target
+%% of the \code{goto}.
 
-For the second phase, we recommend iterating through the $\Tail$ of
-each block in the program, updating the target of every \code{goto}
-according to the mapping in \code{short-cut}.
+%% For the second phase, we recommend iterating through the $\Tail$ of
+%% each block in the program, updating the target of every \code{goto}
+%% according to the mapping in \code{short-cut}.
 
-\begin{exercise}\normalfont
-  Implement the \code{optimize-jumps} pass as a transformation from
-  $C_1$ to $C_1$, coming after the \code{explicate-control} pass.
-  Check that \code{optimize-jumps} removes trivial blocks in a few
-  example programs. Then check that your compiler still passes all of
-  your tests.
-\end{exercise}
+%% \begin{exercise}\normalfont
+%%   Implement the \code{optimize-jumps} pass as a transformation from
+%%   $C_1$ to $C_1$, coming after the \code{explicate-control} pass.
+%%   Check that \code{optimize-jumps} removes trivial blocks in a few
+%%   example programs. Then check that your compiler still passes all of
+%%   your tests.
+%% \end{exercise}
 
-There is another opportunity for optimizing jumps that is apparent in
-the example of Figure~\ref{fig:if-example-x86}. The \code{start} block
-end with a jump to \code{block7953} and there are no other jumps to
+There is an opportunity for optimizing jumps that is apparent in the
+example of Figure~\ref{fig:if-example-x86}. The \code{start} block end
+with a jump to \code{block7953} and there are no other jumps to
 \code{block7953} in the rest of the program. In this situation we can
 avoid the runtime overhead of this jump by merging \code{block7953}
 into the preceeding block, in this case the \code{start} block.
