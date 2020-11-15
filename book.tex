@@ -5310,7 +5310,8 @@ and test your compiler using your previously created programs on the
 The second argument of the \key{cmpq} instruction must not be an
 immediate value (such as an integer). So if you are comparing two
 immediates, we recommend inserting a \key{movq} instruction to put the
-second argument in \key{rax}.
+second argument in \key{rax}. Also, recall that instructions may have
+at most one memory reference.
 %
 The second argument of the \key{movzbq} must be a register.
 %
@@ -7870,7 +7871,13 @@ and conclusion and store them in the $\itm{info}$ field of the
 function definition.)
 
 
-\section{Uncover Live}
+\section{Register Allocation}
+\label{sec:register-allocation-r4}
+
+
+\subsection{Liveness Analysis}
+\label{sec:liveness-analysis-r4}
+\index{liveness analysis}
 
 %% The rest of the passes need only minor modifications to handle the new
 %% kinds of AST nodes: \code{fun-ref}, \code{indirect-callq}, and
@@ -7887,7 +7894,8 @@ Regarding the set of read locations $R$ the arity field of
 argument-passing registers should be considered as read by those
 instructions.
 
-\section{Build Interference Graph}
+\subsection{Build Interference Graph}
+\label{sec:build-interference-r4}
 
 With the addition of function definitions, we compute an interference
 graph for each function (not just one for the whole program).
@@ -7906,7 +7914,7 @@ addition of edges between call-live variables and the caller-saved
 registers).
 
 
-\section{Allocate Registers}
+\subsection{Allocate Registers}
 
 The primary change to the \code{allocate-registers} pass is adding an
 auxiliary function for handling definitions (the \Def{} non-terminal
@@ -8608,6 +8616,145 @@ Create 5 new programs that use \key{lambda} functions and make use of
 lexical scoping. Test your compiler on these new programs and all of
 your previously created test programs.
 \end{exercise}
+
+\clearpage
+
+\section{Challenge: Optimize Closures}
+\label{sec:optimize-closures}
+
+In this chapter we compiled lexically-scoped functions into a
+relatively efficient representation: flat closures. However, even this
+representation comes with some overhead. For example, consider the
+following program with a function \code{tail-sum} that does not have
+any free variables and where all the uses of \code{tail-sum} are in
+applications where we know that only \code{tail-sum} is being applied
+(and not any other functions).
+\begin{center}
+\begin{minipage}{0.95\textwidth}
+\begin{lstlisting}
+(define (tail-sum [n : Integer] [r : Integer]) : Integer
+  (if (eq? n 0)
+      r
+      (tail-sum (- n 1) (+ n r))))
+
+(+ (tail-sum 5 0) 27)
+\end{lstlisting}
+\end{minipage}
+\end{center}
+As described in this chapter, we uniformly apply closure conversion to
+all functions, obtaining the following output for this program.
+\begin{center}
+\begin{minipage}{0.95\textwidth}
+\begin{lstlisting}
+(define (tail_sum1 [fvs5 : _] [n2 : Integer] [r3 : Integer]) : Integer
+   (if (eq? n2 0)
+      r3
+      (let ([clos4 (closure (list (fun-ref tail_sum1)))])
+         ((vector-ref clos4 0) clos4 (+ n2 -1) (+ n2 r3)))))
+
+(define (main) : Integer
+   (+ (let ([clos6 (closure (list (fun-ref tail_sum1)))])
+         ((vector-ref clos6 0) clos6 5 0)) 27))
+\end{lstlisting}
+\end{minipage}
+\end{center}
+
+In the previous Chapter, there would be no allocation in the program
+and the calls to \code{tail\_sum} would be direct calls. In contrast,
+the above program allocates memory for each \code{closure} and the
+calls to \code{tail\_sum} are indirect. These two differences incur
+considerable overhead in a program such as this one, where the
+allocations and indirect calls occur inside a tight loop.
+
+One might think that this problem is trivial to solve: can't we just
+recognize calls of the form \code{((fun-ref $f$) $e_1 \ldots e_n$)}
+and compile it to a direct call \code{((fun-ref $f$) $e'_1 \ldots e'_n$)}
+instead of treating it like a call to a closure?  We would
+also drop the \code{fvs5} parameter of \code{tail\_sum}.
+%
+However, this problem is not so trivial because a global function may
+``escape'' and become involved in applications that also involve
+closures. Consider the following example in which the application
+\code{(f 41)} needs to be compiled into a closure application and the
+\code{add1} function might get bound to \code{f}.
+\begin{lstlisting}
+(define (add1 [x : Integer]) : Integer
+  (+ x 1))
+
+(let ([y (read)])
+  (let ([f (if (eq? (read) 0)
+               add1
+               (lambda: ([x : Integer]) : Integer (- x y)))])
+    (f 41)))
+\end{lstlisting}
+If a global function name is used in any way other than as the
+operator in a direct call, then we say that the function
+\emph{escapes}. If a global function does not escape, then we do not
+need to perform closure conversion to the function.
+
+\begin{exercise}\normalfont
+  Implement an auxilliary function for detecting which global
+  functions escape. Using that function, implement an improved version
+  of closure conversion that does not apply closure conversion to
+  global functions that do not escape, but instead compiles them as
+  regular functions. Create several new test cases that check whether
+  you properly detect whether global functions escape or not.
+\end{exercise}
+
+So far we have reduced the overhead of calling global functions, but
+it would also be nice to reduce the overhead of calling a
+\code{lambda} when we can determine at compile time which
+\code{lambda} will be called. We refer to such calls as \emph{known
+  calls}.  Consider the following example in which a \code{lambda} is
+bound to \code{f} and then applied.
+\begin{lstlisting}
+(let ([y (read)])
+  (let ([f (lambda: ([x : Integer]) : Integer
+             (+ x y))])
+    (f 21)))
+\end{lstlisting}
+Closure conversion compiles \code{(f 21)} into an indirect call:
+\begin{lstlisting}
+(define (lambda5 [fvs6 : (Vector _ Integer)] [x3 : Integer]) : Integer
+   (let ([y2 (vector-ref fvs6 1)])
+      (+ x3 y2)))
+
+(define (main) : Integer
+   (let ([y2 (read)])
+      (let ([f4 (Closure 1 (list (fun-ref lambda5) y2))])
+         ((vector-ref f4 0) f4 21))))
+\end{lstlisting}
+but we can instead compile the application \code{(f 21)} into a direct call
+to \code{lambda5}:
+\begin{lstlisting}
+(define (main) : Integer
+   (let ([y2 (read)])
+      (let ([f4 (Closure 1 (list (fun-ref lambda5) y2))])
+         ((fun-ref lambda5) f4 21))))
+\end{lstlisting}
+
+The problem of determining which lambda will be called from a
+particular application is quite challenging in general and the topic
+of considerable research~\citep{Shivers:1988aa,Gilray:2016aa}. For
+this challenge assignment we recommend that you simply maintain an
+environment mapping \code{let}-bound variables to function names that
+is exended whenever you encounter a closure on the right-hand side of
+a \code{let}. The \code{let}-bound variable should be mapped to the
+name of the global function for the closure. Then, when you encounter
+an application in which the operator is a variable, you can compile
+the application to a direct call if that variable is mapped to a
+function name in the environment.  This pass should come after closure
+conversion.
+
+\begin{exercise}\normalfont
+Implement a compiler pass, named \code{optimize-known-calls}, that
+compiles known calls into direct calls. Verify that your compiler is
+successful in this regard on several example programs.
+\end{exercise}
+
+This challenge assignment only scratches the surface of optimizing of
+closures. A good next step for the interested reader is to look at the
+work of \citet{Keep:2012ab}.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
