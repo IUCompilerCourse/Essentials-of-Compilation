@@ -8323,7 +8323,7 @@ syntax for function application.
 \]
 \end{minipage}
 }
-\caption{Concrete syntax of $R_5$, extending $R_4$ (Figure~\ref{fig:r4-syntax}) 
+\caption{Concrete syntax of $R_5$, extending $R_4$ (Figure~\ref{fig:r4-concrete-syntax}) 
   with \key{lambda}.}
 \label{fig:r5-concrete-syntax}
 \end{figure}
@@ -8757,6 +8757,374 @@ successful in this regard on several example programs.
 These exercises only scratches the surface of optimizing of
 closures. A good next step for the interested reader is to look at the
 work of \citet{Keep:2012ab}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Loops and Assignment}
+\label{ch:loop}
+
+In this Chapter we study two features that are the hallmarks of
+imperative programming languages: loops and assignments to local
+variables. The following example demonstrates these new features by
+computing the sum of the first five positive integers.
+% similar to loop_test_1.rkt
+\begin{lstlisting}
+(let ([sum 0])
+  (let ([i 5])
+    (begin
+      (while (> i 0)
+        (begin
+          (set! sum (+ sum i))
+          (set! i (- i 1))))
+      sum)))
+\end{lstlisting}
+The \code{while} loop consists of a condition and a body.  The body is
+executed repeatedly so long as the condition evaluates to \code{\#t}.
+The result of a \code{while} loop is \code{void}.
+%
+The \code{set!} consists of a variable and a right-hand-side expression.
+The value of the variable is changed to the value of the right-hand-side.
+The result of a \code{set!} is also \code{void}.
+%
+The primary purpose of the \code{while} loop and \code{set!} features
+is to cause side effects and not to directly produce as value, so it
+is convenient to also include in $R_8$ a language feature for
+sequencing side effects: the \code{begin} expression.  It consists of
+one or more expressions that are evaluated left-to-right.  The result
+of the last expression is also the result of the \code{begin}.  The
+rest of the expressions are only evaluated for their side effects.
+
+The concrete syntax of $R_8$ is defined in
+Figure~\ref{fig:r8-concrete-syntax} and its abstract syntax is defined
+in Figure~\ref{fig:r8-syntax}.
+
+\begin{figure}[tp]
+\centering
+\fbox{
+  \begin{minipage}{0.96\textwidth}
+    \small
+\[
+\begin{array}{lcl}
+  \Exp &::=& \gray{ \Int \mid \CREAD{} \mid \CNEG{\Exp}
+     \mid \CADD{\Exp}{\Exp} \mid \CSUB{\Exp}{\Exp} }  \\
+    &\mid&  \gray{ \Var \mid \CLET{\Var}{\Exp}{\Exp} }\\
+    &\mid& \gray{\key{\#t} \mid \key{\#f} 
+     \mid (\key{and}\;\Exp\;\Exp) 
+     \mid (\key{or}\;\Exp\;\Exp) 
+     \mid (\key{not}\;\Exp) } \\
+    &\mid& \gray{ (\key{eq?}\;\Exp\;\Exp) \mid \CIF{\Exp}{\Exp}{\Exp} } \\
+    &\mid& \gray{ (\key{vector}\;\Exp\ldots) \mid
+          (\key{vector-ref}\;\Exp\;\Int)} \\
+    &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})
+    \mid (\Exp \; \Exp\ldots) } \\
+    &\mid& \gray{ \LP \key{procedure-arity}~\Exp\RP 
+    \mid \CLAMBDA{\LP\LS\Var \key{:} \Type\RS\ldots\RP}{\Type}{\Exp} } \\
+  &\mid& \CSETBANG{\Var}{\Exp}
+  \mid \CBEGIN{\Exp\ldots}{\Exp}
+  \mid \CWHILE{\Exp}{\Exp} \\
+  \Def &::=& \gray{ \CDEF{\Var}{\LS\Var \key{:} \Type\RS\ldots}{\Type}{\Exp} } \\
+  R_8 &::=& \gray{\Def\ldots \; \Exp}
+\end{array}
+\]
+\end{minipage}
+}
+\caption{Concrete syntax of $R_8$, extending $R_5$ (Figure~\ref{fig:r5-concrete-syntax}) 
+  with \key{lambda}.}
+\label{fig:r8-concrete-syntax}
+\end{figure}
+
+\begin{figure}[tp]
+\centering
+\fbox{
+  \begin{minipage}{0.96\textwidth}
+    \small
+\[
+\begin{array}{lcl}
+  \Exp &::=& \gray{ \INT{\Int} \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp} } \\
+       &\mid& \gray{ \PRIM{\itm{op}}{\Exp\ldots} }\\
+     &\mid& \gray{ \BOOL{\itm{bool}}
+      \mid \IF{\Exp}{\Exp}{\Exp} } \\
+     &\mid& \gray{ \VOID{} \mid \LP\key{HasType}~\Exp~\Type \RP 
+     \mid \APPLY{\Exp}{\Exp\ldots} }\\
+  &\mid& \gray{ \LAMBDA{\LP\LS\Var\code{:}\Type\RS\ldots\RP}{\Type}{\Exp} }\\
+  &\mid& \SETBANG{\Var}{\Exp} \mid \BEGIN{\Exp\ldots}{\Exp}
+   \mid \WHILE{\Exp}{\Exp} \\
+ \Def &::=& \gray{ \FUNDEF{\Var}{\LP\LS\Var \code{:} \Type\RS\ldots\RP}{\Type}{\code{'()}}{\Exp} }\\
+  R_5 &::=& \gray{ \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp} }
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The abstract syntax of $R_8$, extending $R_5$ (Figure~\ref{fig:r5-syntax}).}
+\label{fig:r8-syntax}
+\end{figure}
+
+
+At first glance, the translation of these language features to x86
+seems to be trivial because the $C_3$ intermediate language already
+supports assignment, \code{goto}, conditional branching, and
+sequencing. However, there are two complications that arise, which we
+discuss in the next two sections. After that we introduce one new
+compiler pass and the changes necessary to the existing passes.
+
+\section{Assignment and Lexically Scoped Functions}
+\label{sec:assignment-scoping}
+
+The addition of assignment raises a problem with our approach to
+implementing lexically-scoped functions. Consider the following
+example in which function \code{f} has a free variable \code{x} that
+is changed after \code{f} is created but before the call to \code{f}.
+% similar to loop_test_5.rkt
+\begin{lstlisting}
+(let ([x 0])
+  (let ([y 0])
+    (let ([f (lambda: ([z : Integer]) : Integer (+ x z))])
+      (begin
+        (set! x 10)
+        (set! y 12)
+        (+ 20 (f y))))))
+\end{lstlisting}
+The correct output for this example is \code{42} because the call to
+\code{f} is required to use the current value of \code{x} (which is
+\code{10}). Unfortunately, the closure conversion pass
+(Section~\ref{sec:closure-conversion}) generates code for the
+\code{lambda} that copies the old value of \code{x} into a
+closure. Thus, if we naively add support for assignment to our current
+compiler, the output of this program would be \code{32}.
+
+A first attempt at solving this problem would be to save a pointer to
+\code{x} in the closure and change the occurences of \code{x} inside
+the lambda to dereference the pointer. Of course, this would require
+assigning \code{x} to the stack and not to a register. However, the
+problem goes a bit deeper. Consider the following example in which we
+create a counter abstraction by creating a pair of functions that
+share the free variable \code{x}.
+% similar to loop_test_10.rkt
+\begin{lstlisting}
+(define (f [x : Integer]) : (Vector ( -> Integer) ( -> Void))
+  (vector
+   (lambda: () : Integer x)
+   (lambda: () : Void (set! x (+ 1 x)))))
+
+(let ([counter (f 0)])
+  (let ([get (vector-ref counter 0)])
+    (let ([inc (vector-ref counter 1)])
+      (begin
+        (inc)
+        (get)))))
+\end{lstlisting}
+In this example, the lifetime of \code{x} extends beyond the lifetime
+of the call to \code{f}. Thus, if we were to store \code{x} on the
+stack frame for the call to \code{f}, it would be gone by the time we
+call \code{inc} and \code{get}, leaving us with dangling pointers for
+\code{x}. This example demonstrates that when a variable occurs free
+inside a \code{lambda}, its lifetime becomes indefinite. Thus, the
+value of the variable needs to live on the heap.  The verb ``box'' is
+often used for allocating a single value on the heap, producing a
+pointer, and ``unbox'' for dereferencing the pointer.
+
+We recommend solving these problems by ``boxing'' the local variables
+that are in the intersection of 1) variables that appear on the
+left-hand-side of a \code{set!} and 2) variables that occur free
+inside a \code{lambda}. We shall introduce a new pass named
+\code{convert-assignments} in Section~\ref{sec:convert-assignments} to
+perform this translation. But before diving into the compiler passes,
+we one more problem to discuss.
+
+\section{Cyclic Control Flow and Dataflow Analysis}
+\label{sec:dataflow-analysis}
+
+Up until now the control-flow graphs generated in
+\code{explicate-control} were guaranteed to be acyclic. However, each
+\code{while} loop will introduce a cycle in the control-flow graph.
+But does this matter? 
+%
+Indeed it does.  Recall that for register allocation, the compiler
+performs liveness analysis to determine which variables can share the
+same register.  In Section~\ref{sec:liveness-analysis-r2} we analyze
+the control-flow graph in reverse topological order, but topological
+order is only well-defined for acyclic graphs.
+
+Let us return to the example of computing the sum of the first five
+positive integers. Here is the program after instruction selection but
+before register allocation.
+\begin{center}
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+(define (main) : Integer
+   mainstart:
+      movq $0, sum1
+      movq $5, i2
+      jmp block5
+   block5:
+      movq i2, tmp3
+      cmpq tmp3, $0
+      jl block7
+      jmp block8
+\end{lstlisting}
+\end{minipage}
+\begin{minipage}{0.45\textwidth}
+  \begin{lstlisting}
+
+    
+block7:
+      addq i2, sum1
+      movq $1, tmp4
+      negq tmp4
+      addq tmp4, i2
+      jmp block5
+   block8:
+      movq $27, %rax
+      addq sum1, %rax
+      jmp mainconclusion
+)
+\end{lstlisting}
+  \end{minipage}
+\end{center}
+Recall that liveness analysis works backwards, starting at the end
+of each function. For this example we could start with \code{block8}
+because we know what is live at the beginning of the conclusion,
+just \code{rax} and \code{rsp}. So the live-before set
+for \code{block8} is $\{\ttm{rsp},\ttm{sum1}\}$.
+%
+Next we might try to analyze \code{block5} or \code{block7}, but
+\code{block5} jumps to \code{block7} and vice versa, so it seems that
+we are stuck.
+
+The way out of this impass came from the realization that one can
+compute an under-approximation of the live-before set for each block
+by starting out with an empty live-after set. Furthmore, the
+under-approximations can be improved by updating the live-after set
+for each block using the under-approximated live-before sets from the
+other blocks. In fact, by iterating this process, the
+under-approximations eventually become the correct solutions!
+%
+This approach is applicable to many static analysis problems and goes
+by the name \emph{dataflow analysis}\index{dataflow analysis}.  It was
+invented by \citet{Kildall:1973vn} in his Ph.D. thesis at the
+University of Washington.
+
+Let us apply this approach to the above example. We use the empty set
+for the initial live-before set for each block. Let $M_0$ be the
+following mapping from label names to sets of locations.
+\begin{center}
+\begin{lstlisting}
+mainstart: { }
+block5: { }
+block7: { }
+block8: { }
+\end{lstlisting}
+\end{center}
+Using the above live-before approximations, we determine the
+live-after for each block and then apply liveness analysis to it.
+This produces the following approximate live-before sets for each
+block.
+\begin{center}
+  \begin{lstlisting}
+mainstart: {}
+block5: { i2 }
+block7: { i2, sum1 }
+block8: { rsp, sum1 }
+\end{lstlisting}
+\end{center}
+
+For the second round, the live-after for \code{mainstart} is the
+current live-before for \code{block5}, which is \code{\{ i2 \}}.  So
+the approximate live-before for \code{mainstart} remains the empty
+set. The live-after for \code{block5} is the union of the
+live-before's for \code{block7} and \code{block8}, which is \code{\{
+  i2 , rsp, sum1 \}}. So the approximate live-before for \code{block5}
+is \code{\{ i2 , rsp, sum1 \}}.  The live-after for \code{block7} is
+the live-before for \code{block5} (from the previous iteration), which
+is \code{\{ i2 \}}. So the approximate live-before of \code{block7}
+remains \code{\{ i2, sum1 \}}.
+\begin{center}
+  \begin{lstlisting}
+mainstart: {}
+block5: { i2, rsp, sum1 }
+block7: { i2, sum1 }
+block8: { rsp, sum1 }
+\end{lstlisting}
+\end{center}
+In the preceeding iteration, only \code{block5} changed, so we can
+limit our attention to \code{mainstart} and \code{block7}, the two
+blocks that jump to \code{block5}.  As a result, the live-before sets
+for \code{mainstart} and \code{block7} are updated to include
+\code{rsp}.
+\begin{center}
+  \begin{lstlisting}
+mainstart: { rsp }
+block5: { i2, rsp, sum1 }
+block7: { i2, rsp, sum1 }
+block8: { rsp, sum1 }
+\end{lstlisting}
+\end{center}
+Because \code{block7} changed, we analyze \code{block5} once more, but
+its live-before set remains \code{\{ i2, rsp, sum1 \}}.  At this point
+our approximations have converged on the actual solution.
+
+This iteration process is guaranteed to converge to a solution by the
+Kleene Fixed-Point Theorem, a general theorem about functions on
+lattices~\citet{Kleene:1952aa}. Roughly speaking, a lattice is some
+collection $L$ whose elements are partially ordered by a relation
+$\sqsubseteq$ and $L$ contains a least element $\bot$ (bottom). For
+liveness analysis, a mapping $M$ of block labels to sets of locations
+is a single element in the lattice. We can order these mappings
+pointwise, using set inclusion to compare sets of live locations.  So
+given any two mappings $M_i$ and $M_j$, $M_i \sqsubseteq M_j$ when
+$M_i(\ell) \subseteq M_j(\ell)$ for every block label $\ell$ in the
+program. Let $M_\bot$ be the mapping that sends every label to the
+emptyset, i.e., $M_{\bot}(\ell) = \emptyset$.  Thus, $M_{\bot}$ is the
+bottom element of this lattice.
+
+We can think of one iteration of liveness analysis as being a function
+$f$ on this lattice. It takes a mapping as input and computes a new
+mapping.
+\[
+   f(M_i) = M_{i+1}
+\]
+Next let us think for a moment about what a final solution $M_s$
+should look like. If we perform liveness analysis using the solution
+$M_s$ as input, we should get $M_s$ again as the output. That is, the
+solution should be a \emph{fixed point} of the function $f$.\index{fixed point}
+\[
+   f(M_s) = M_s
+\]
+Furthermore, the solution should only include locations that are
+forced to be there by performing liveness analysis on the program, so
+the solution should be the \emph{least} fixed point.\index{least fixed point}
+
+The Kleene Fixed-Point Theorem states that if a function $f$ is
+monotone (larger inputs produce larger outputs), then the least fixed
+point of $f$ is the largest element of what is called the ascending
+Kleene chain:\index{Kleene Fixed-Point Theorem}
+\[
+\bot \sqsubseteq f(\bot) \sqsubseteq f(f(\bot)) \sqsubseteq \cdots
+  \sqsubseteq f^n(\bot) \sqsubseteq \cdots
+\]
+Some lattices have an infinite number of elements and functions on
+them that keep going up forever. Fortunately for liveness analysis,
+this is not the case because there are only a finite number of
+variables in the program. Thus, the ascending chains always ``top
+out'' at some fixed point after some number of iterations.
+\[
+\bot \sqsubseteq f(\bot) \sqsubseteq f(f(\bot)) \sqsubseteq \cdots
+\sqsubseteq f^k(\bot) = f^{k+1}(\bot) = f^{k+2}(\bot)
+\]
+
+
+
+
+
+\section{Convert Assignments}
+\label{sec:convert-assignments}
+
+
+
+
+
+
+
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
