@@ -81,8 +81,8 @@
 \lstset{%
 language=Lisp,
 basicstyle=\ttfamily\small,
-morekeywords={seq,assign,program,block,define,lambda,match,goto,if,else,then,struct,Integer,Boolean,Vector,Void},
-deletekeywords={read},
+morekeywords={seq,assign,program,block,define,lambda,match,goto,if,else,then,struct,Integer,Boolean,Vector,Void,while},
+deletekeywords={read,mapping},
 escapechar=|,
 columns=flexible,
 moredelim=[is][\color{red}]{~}{~},
@@ -5030,7 +5030,7 @@ Let $B_1$ be the result of \code{explicate-tail} on the ``then''
 branch and $G_0$ and let $B_2$ be the result of \code{explicate-tail}
 on the ``else'' branch and $G_0$.  Let $B_3$ be the result of applying
 \code{explicate-pred} to the condition of the \key{if}, $B_1$, and
-$B_2$.  Then the \key{if} as a whole translates to $B_3$.
+$B_2$.  Then the \key{if} as a whole translates to promise $B_3$.
 \[
     (\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els}) \quad\Rightarrow\quad B_3
 \]
@@ -5053,8 +5053,8 @@ assignment positions.  Let $B_2$ be the result of applying
 $G_1$.  Let $B_3$ be the result of applying \code{explicate-assign} to
 the ``else'' branch, variable $x$, and $G_1$. Finally, let $B_4$ be
 the result of applying \code{explicate-pred} to the predicate
-$\itm{cnd}$ and the blocks $B_2$ and $B_3$. The \key{if} as a whole
-translates to the block $B_4$.
+$\itm{cnd}$ and the promises $B_2$ and $B_3$. The \key{if} as a whole
+translates to the promise $B_4$.
 \[
 (\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els}) \quad\Rightarrow\quad B_4
 \]
@@ -6363,6 +6363,8 @@ should all be treated as complex operands. A new case for
 handled carefully to prevent the \code{Prim} node from being separated
 from its enclosing \code{HasType}.
 
+TODO: add the grammar for the output language
+
 
 \section{Explicate Control and the $C_2$ language}
 \label{sec:explicate-control-r3}
@@ -7510,6 +7512,7 @@ address in a register.  Thus, it is a good idea to create a new pass
 that changes function references from just a symbol $f$ to
 $\FUNREF{f}$. This pass is named \code{reveal-functions} and the
 output language, $F_1$, is defined in Figure~\ref{fig:f1-syntax}.
+The concrete syntax for a function reference is $\CFUNREF{f}$.
 
 \begin{figure}[tp]
 \centering
@@ -7602,7 +7605,7 @@ $\Rightarrow$
 \end{tabular}
 
 
-\section{Remove Complex Operators and Operands}
+\section{Remove Complex Operands}
 \label{sec:rco-r4}
 
 The primary decisions to make for this pass is whether to classify
@@ -7617,6 +7620,9 @@ even though \code{FunRef} seems rather simple, it needs to be
 classified as a complex expression so that we generate an assignment
 statement with a left-hand side that can serve as the target of the
 \code{leaq}.
+
+TODO: add the output grammar
+
 
 \section{Explicate Control and the $C_3$ language}
 \label{sec:explicate-control-r4}
@@ -8432,7 +8438,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(vector |\itm{name}| |\itm{fvs}| ...)
+(vector (fun-ref |\itm{name}|) |\itm{fvs}| ...)
 \end{lstlisting}
 \end{minipage}
 \end{tabular}  \\
@@ -8792,7 +8798,7 @@ sequencing side effects: the \code{begin} expression.  It consists of
 one or more expressions that are evaluated left-to-right.  The result
 of the last expression is also the result of the \code{begin}.  The
 rest of the expressions are only evaluated for their side effects.
-
+%
 The concrete syntax of $R_8$ is defined in
 Figure~\ref{fig:r8-concrete-syntax} and its abstract syntax is defined
 in Figure~\ref{fig:r8-syntax}.
@@ -8861,10 +8867,11 @@ in Figure~\ref{fig:r8-syntax}.
 
 At first glance, the translation of these language features to x86
 seems to be trivial because the $C_3$ intermediate language already
-supports assignment, \code{goto}, conditional branching, and
-sequencing. However, there are two complications that arise, which we
-discuss in the next two sections. After that we introduce one new
-compiler pass and the changes necessary to the existing passes.
+supports all of the ingredients that we need: assignment, \code{goto},
+conditional branching, and sequencing. However, there are two
+complications that arise, which we discuss in the next two
+sections. After that we introduce one new compiler pass and the
+changes necessary to the existing passes.
 
 \section{Assignment and Lexically Scoped Functions}
 \label{sec:assignment-scoping}
@@ -8873,15 +8880,16 @@ The addition of assignment raises a problem with our approach to
 implementing lexically-scoped functions. Consider the following
 example in which function \code{f} has a free variable \code{x} that
 is changed after \code{f} is created but before the call to \code{f}.
-% similar to loop_test_5.rkt
+% loop_test_11.rkt
 \begin{lstlisting}
 (let ([x 0])
   (let ([y 0])
-    (let ([f (lambda: ([z : Integer]) : Integer (+ x z))])
-      (begin
-        (set! x 10)
-        (set! y 12)
-        (+ 20 (f y))))))
+    (let ([z 20])
+      (let ([f (lambda: ([a : Integer]) : Integer (+ a (+ x z)))])
+        (begin
+          (set! x 10)
+          (set! y 12)
+          (f y))))))
 \end{lstlisting}
 The correct output for this example is \code{42} because the call to
 \code{f} is required to use the current value of \code{x} (which is
@@ -8933,10 +8941,10 @@ we one more problem to discuss.
 \section{Cyclic Control Flow and Dataflow Analysis}
 \label{sec:dataflow-analysis}
 
-Up until now the control-flow graphs generated in
+Up until this point the control-flow graphs generated in
 \code{explicate-control} were guaranteed to be acyclic. However, each
-\code{while} loop will introduce a cycle in the control-flow graph.
-But does this matter? 
+\code{while} loop introduces a cycle in the control-flow graph.
+But does that matter?
 %
 Indeed it does.  Recall that for register allocation, the compiler
 performs liveness analysis to determine which variables can share the
@@ -8990,136 +8998,410 @@ Next we might try to analyze \code{block5} or \code{block7}, but
 \code{block5} jumps to \code{block7} and vice versa, so it seems that
 we are stuck.
 
-The way out of this impass came from the realization that one can
-compute an under-approximation of the live-before set for each block
-by starting out with an empty live-after set. Furthmore, the
-under-approximations can be improved by updating the live-after set
-for each block using the under-approximated live-before sets from the
-other blocks. In fact, by iterating this process, the
-under-approximations eventually become the correct solutions!
+The way out of this impass comes from the realization that one can
+perfom liveness analysis starting with an empty live-after set to
+compute an under-approximation of the live-before set.  By
+\emph{under-approximation}, we mean that the set only contains
+variables that are really live, but it may be missing some.  Next, the
+under-approximations for each block can be improved by 1) updating the
+live-after set for each block using the approximate live-before sets
+from the other blocks and 2) perform liveness analysis again on each
+block.  In fact, by iterating this process, the under-approximations
+eventually become the correct solutions!
 %
-This approach is applicable to many static analysis problems and goes
-by the name \emph{dataflow analysis}\index{dataflow analysis}.  It was
-invented by \citet{Kildall:1973vn} in his Ph.D. thesis at the
-University of Washington.
+This approach of iteratively analyzing a control-flow graph is
+applicable to many static analysis problems and goes by the name
+\emph{dataflow analysis}\index{dataflow analysis}.  It was invented by
+\citet{Kildall:1973vn} in his Ph.D. thesis at the University of
+Washington.
 
 Let us apply this approach to the above example. We use the empty set
-for the initial live-before set for each block. Let $M_0$ be the
-following mapping from label names to sets of locations.
+for the initial live-before set for each block. Let $m_0$ be the
+following mapping from label names to sets of locations (variables and
+registers).
 \begin{center}
 \begin{lstlisting}
-mainstart: { }
-block5: { }
-block7: { }
-block8: { }
+mainstart: {}
+block5: {}
+block7: {}
+block8: {}
 \end{lstlisting}
 \end{center}
 Using the above live-before approximations, we determine the
-live-after for each block and then apply liveness analysis to it.
-This produces the following approximate live-before sets for each
-block.
+live-after for each block and then apply liveness analysis to each
+block.  This produces our next approximation $m_1$ of the live-before
+sets.
 \begin{center}
   \begin{lstlisting}
 mainstart: {}
-block5: { i2 }
-block7: { i2, sum1 }
-block8: { rsp, sum1 }
+block5: {i2}
+block7: {i2, sum1}
+block8: {rsp, sum1}
 \end{lstlisting}
 \end{center}
 
 For the second round, the live-after for \code{mainstart} is the
-current live-before for \code{block5}, which is \code{\{ i2 \}}.  So
-the approximate live-before for \code{mainstart} remains the empty
-set. The live-after for \code{block5} is the union of the
-live-before's for \code{block7} and \code{block8}, which is \code{\{
-  i2 , rsp, sum1 \}}. So the approximate live-before for \code{block5}
-is \code{\{ i2 , rsp, sum1 \}}.  The live-after for \code{block7} is
-the live-before for \code{block5} (from the previous iteration), which
-is \code{\{ i2 \}}. So the approximate live-before of \code{block7}
-remains \code{\{ i2, sum1 \}}.
+current live-before for \code{block5}, which is \code{\{i2\}}.  So
+the liveness analysis for \code{mainstart} computes the empty set. The
+live-after for \code{block5} is the union of the live-before's for
+\code{block7} and \code{block8}, which is \code{\{i2 , rsp, sum1\}}.
+So the liveness analysis for \code{block5} computes \code{\{i2 , rsp,
+  sum1\}}.  The live-after for \code{block7} is the live-before for
+\code{block5} (from the previous iteration), which is \code{\{i2\}}.
+So the liveness analysis for \code{block7} remains \code{\{i2, sum1\}}.
+Together these yield the following approximation $m_2$ of the
+live-before sets.
 \begin{center}
   \begin{lstlisting}
 mainstart: {}
-block5: { i2, rsp, sum1 }
-block7: { i2, sum1 }
-block8: { rsp, sum1 }
+block5: {i2, rsp, sum1}
+block7: {i2, sum1}
+block8: {rsp, sum1}
 \end{lstlisting}
 \end{center}
 In the preceeding iteration, only \code{block5} changed, so we can
 limit our attention to \code{mainstart} and \code{block7}, the two
 blocks that jump to \code{block5}.  As a result, the live-before sets
 for \code{mainstart} and \code{block7} are updated to include
-\code{rsp}.
+\code{rsp}, yielding the following approximation $m_3$.
 \begin{center}
   \begin{lstlisting}
-mainstart: { rsp }
-block5: { i2, rsp, sum1 }
-block7: { i2, rsp, sum1 }
-block8: { rsp, sum1 }
+mainstart: {rsp}
+block5: {i2, rsp, sum1}
+block7: {i2, rsp, sum1}
+block8: {rsp, sum1}
 \end{lstlisting}
 \end{center}
 Because \code{block7} changed, we analyze \code{block5} once more, but
 its live-before set remains \code{\{ i2, rsp, sum1 \}}.  At this point
-our approximations have converged on the actual solution.
+our approximations have converged, so $m_3$ is the solution.
 
 This iteration process is guaranteed to converge to a solution by the
 Kleene Fixed-Point Theorem, a general theorem about functions on
-lattices~\citet{Kleene:1952aa}. Roughly speaking, a lattice is some
-collection $L$ whose elements are partially ordered by a relation
-$\sqsubseteq$ and $L$ contains a least element $\bot$ (bottom). For
-liveness analysis, a mapping $M$ of block labels to sets of locations
-is a single element in the lattice. We can order these mappings
-pointwise, using set inclusion to compare sets of live locations.  So
-given any two mappings $M_i$ and $M_j$, $M_i \sqsubseteq M_j$ when
-$M_i(\ell) \subseteq M_j(\ell)$ for every block label $\ell$ in the
-program. Let $M_\bot$ be the mapping that sends every label to the
-emptyset, i.e., $M_{\bot}(\ell) = \emptyset$.  Thus, $M_{\bot}$ is the
-bottom element of this lattice.
+lattices~\citep{Kleene:1952aa}. Roughly speaking, a \emph{lattice} is
+any collection that comes with a partial ordering $\sqsubseteq$ on its
+elements, a least element $\bot$ (pronounced bottom), and a join
+operator $\sqcup$.\index{lattice}\index{bottom}\index{partial
+  ordering}\index{join}\footnote{Technically speaking, we will be
+  working with join semi-lattices.} When two elements are ordered $m_i
+\sqsubseteq m_j$, it means that $m_j$ contains at least as much
+information as $m_i$, so we can think of $m_j$ as a better-or-equal
+approximation than $m_i$.  The bottom element $\bot$ represents the
+complete lack of information, i.e., the worst approximation.  The join
+operator takes two lattice elements and combines their information,
+i.e., it produces the least upper bound of the two.\index{least upper
+  bound}
+
+A dataflow analysis typicaly involves two lattices: one lattice to
+represent abstract states and another lattice that aggregates the
+abstract states of all the blocks in the control-flow graph.  For
+liveness analysis, an abstract state is a set of locations.  We form
+the lattice $L$ by taking its elements to be sets of locations, the
+ordering to be set inclusion ($\subseteq$), the bottom to be the empty
+set, and the join operator to be set union.
+%
+We form a second lattice $M$ by taking its elements to be mappings
+from the block labels to sets of locations (elements of $L$).  We
+order the mappings pointwise, using the ordering of $L$. So given any
+two mappings $m_i$ and $m_j$, $m_i \sqsubseteq_M m_j$ when $m_i(\ell)
+\subseteq m_j(\ell)$ for every block label $\ell$ in the program.  The
+bottom element of $M$ is the mapping $\bot_M$ that sends every label
+to the emptyset, i.e., $\bot_M(\ell) = \emptyset$.
 
 We can think of one iteration of liveness analysis as being a function
-$f$ on this lattice. It takes a mapping as input and computes a new
+$f$ on the lattice $M$. It takes a mapping as input and computes a new
 mapping.
 \[
-   f(M_i) = M_{i+1}
+   f(m_i) = m_{i+1}
 \]
-Next let us think for a moment about what a final solution $M_s$
+Next let us think for a moment about what a final solution $m_s$
 should look like. If we perform liveness analysis using the solution
-$M_s$ as input, we should get $M_s$ again as the output. That is, the
+$m_s$ as input, we should get $m_s$ again as the output. That is, the
 solution should be a \emph{fixed point} of the function $f$.\index{fixed point}
 \[
-   f(M_s) = M_s
+   f(m_s) = m_s
 \]
 Furthermore, the solution should only include locations that are
 forced to be there by performing liveness analysis on the program, so
 the solution should be the \emph{least} fixed point.\index{least fixed point}
 
 The Kleene Fixed-Point Theorem states that if a function $f$ is
-monotone (larger inputs produce larger outputs), then the least fixed
-point of $f$ is the largest element of what is called the ascending
-Kleene chain:\index{Kleene Fixed-Point Theorem}
+monotone (better inputs produce better outputs), then the least fixed
+point of $f$ is the greatest element of the \emph{ascending Kleene
+  chain} obtained by starting at $\bot$ and iterating $f$ as
+follows.\index{Kleene Fixed-Point Theorem}
 \[
 \bot \sqsubseteq f(\bot) \sqsubseteq f(f(\bot)) \sqsubseteq \cdots
   \sqsubseteq f^n(\bot) \sqsubseteq \cdots
 \]
-Some lattices have an infinite number of elements and functions on
-them that keep going up forever. Fortunately for liveness analysis,
-this is not the case because there are only a finite number of
-variables in the program. Thus, the ascending chains always ``top
-out'' at some fixed point after some number of iterations.
+When a lattice contains only finitely-long ascending chains, then
+every Kleene chain tops out at some fixed point after a number of
+iterations of $f$.
 \[
 \bot \sqsubseteq f(\bot) \sqsubseteq f(f(\bot)) \sqsubseteq \cdots
-\sqsubseteq f^k(\bot) = f^{k+1}(\bot) = f^{k+2}(\bot)
+\sqsubseteq f^k(\bot) = f^{k+1}(\bot) = m_s
 \]
 
+The liveness analysis is indeed a monotone function and the lattice
+$M$ only has finitely-long ascending chains because there are only a
+finite number of variables and blocks in the program. Thus we are
+guaranteed that iteratively applying liveness analysis to all blocks
+in the program will eventually produce the least fixed point solution.
 
+Next let us consider dataflow analysis in general and discuss the
+generic work list algorithm (Figure~\ref{fig:generic-dataflow}).
+%
+The algorithm has four parameters: the control-flow graph \code{G}, a
+function \code{transfer} that applies the analysis to one block, the
+\code{bottom} and \code{join} operator for the lattice of abstract
+staties.  The algorithm begins by creating the bottom mapping,
+represented by hashtable.  It then pushes all of the nodes in the
+control-flow graph onto the work list (a queue). The algorithm repeats
+the \code{while} loop as long as there are items in the work list. In
+each iteration, a node is popped from the work list and processed. The
+\code{input} for the node is computed by taking the join of the
+abstract states of all the predecessor nodes. The \code{transfer}
+function is then applied to obtain the \code{output} abstract
+state. If the output differs from the previous state for this block,
+the mapping for this block is updated and its successor nodes are
+pushed onto the work list.
 
+\begin{figure}[tb]
+\begin{lstlisting}
+(define (analyze-dataflow G transfer bottom join)
+  (define mapping (make-hash))
+  (for ([v (in-vertices G)])
+    (dict-set! mapping v bottom))
+  (define worklist (make-queue))
+  (for ([v (in-vertices G)])
+    (enqueue! worklist v))
+  (define trans-G (transpose G))
+  (while (not (queue-empty? worklist))
+    (define node (dequeue! worklist)) 
+    (define input (for/fold ([state bottom])
+                            ([pred (in-neighbors trans-G node)])
+                    (join state (dict-ref mapping pred))))
+    (define output (transfer node input))
+    (cond [(not (equal? output (dict-ref mapping node)))
+           (dict-set! mapping node output)
+           (for ([v (in-neighbors G node)])
+             (enqueue! worklist v))]))
+  mapping)
+\end{lstlisting}
+\caption{Generic work list algorithm for dataflow analysis}
+  \label{fig:generic-dataflow}
+\end{figure}
 
+Having discussed the two complications that arise from adding support
+for assignment and loops, we turn to discussing the one new compiler
+pass and the significant changes to existing passes.
 
 \section{Convert Assignments}
 \label{sec:convert-assignments}
 
+Recall that in Section~\ref{sec:assignment-scoping} we learned that
+the combination of assignments and lexically-scoped functions requires
+that we box those variables that are both assigned-to and that appear
+free inside a \code{lambda}. The purpose of the
+\code{convert-assignments} pass is to carry out that transformation.
+We recommend placing this pass after \code{uniquify} but before
+\code{reveal-functions}.
+
+Consider again the first example from
+Section~\ref{sec:assignment-scoping}:
+\begin{lstlisting}
+(let ([x 0])
+  (let ([y 0])
+    (let ([z 20])
+      (let ([f (lambda: ([a : Integer]) : Integer (+ a (+ x z)))])
+        (begin
+          (set! x 10)
+          (set! y 12)
+          (f y))))))
+\end{lstlisting}
+The variables \code{x} and \code{y} are assigned-to.  The variables
+\code{x} and \code{z} occur free inside the \code{lambda}. Thus,
+variable \code{x} needs to be boxed but not \code{y} and \code{z}.
+The boxing of \code{x} consists of three transformations: initialize
+\code{x} with a vector, replace reads from \code{x} with
+\code{vector-ref}'s, and replace each \code{set!} on \code{x} with a
+\code{vector-set!}. The output of \code{convert-assignments} for this
+example is as follows.
+\begin{lstlisting}
+(define (main) : Integer
+  (let ([x0 (vector 0)])
+    (let ([y1 0])
+      (let ([z2 20])
+        (let ([f4 (lambda: ([a3 : Integer]) : Integer
+                      (+ a3 (+ (vector-ref x0 0) z2)))])
+          (begin 
+            (vector-set! x0 0 10)
+            (set! y1 12)
+            (f4 y1)))))))
+\end{lstlisting}
+
+\paragraph{Assigned \& Free}
+
+We recommend defining an auxilliary function named
+\code{assigned\&free} that takes an expression and simultaneously
+computes 1) a set of assigned variables $A$, 2) a set $F$ of variables
+that occur free within lambda's, and 3) a new version of the
+expression that records which bound variables occured in the
+intersection of $A$ and $F$. You can use the struct
+\code{AssignedFree} to do this. Consider the case for
+$\LET{x}{\itm{rhs}}{\itm{body}}$.  Suppose the the recursive call on
+$\itm{rhs}$ produces $\itm{rhs}'$, $A_r$, and $F_r$ and the recursive
+call on the $\itm{body}$ produces $\itm{body}'$, $A_b$, and $F_b$. If
+$x$ is in $A_b\cap F_b$, then transforms the \code{Let} as follows.
+\begin{lstlisting}
+  (Let |$x$| |$rhs$| |$body$|)
+  |$\Rightarrow$|
+  (Let (AssignedFree |$x$|) |$rhs'$| |$body'$|)
+\end{lstlisting}
+If $x$ is not in $A_b\cap F_b$ then omit the use of \code{AssignedFree}.
+The set of assigned variables for this \code{Let} is
+$A_r \cup (A_b - \{x\})$
+and the set of variables free in lambda's is
+$F_r \cup (F_b - \{x\})$.
+
+The case for $\SETBANG{x}{\itm{rhs}}$ is straightforward but
+important. Recursively process \itm{rhs} to obtain \itm{rhs'}, $A_r$,
+and $F_r$. The result is $\SETBANG{x}{\itm{rhs'}}$, $\{x\} \cup A_r$,
+and $F_r$.
+
+The case for $\LAMBDA{\itm{params}}{T}{\itm{body}}$ is a bit more
+involved.  Let \itm{body'}, $A_b$, and $F_b$ be the result of
+recursively processing \itm{body}. Wrap each of parameter that occurs
+in $A_b \cap F_b$ with \code{AssignedFree} to produce \itm{params'}.
+Let $P$ be the set of parameter names in \itm{params}.  The result is
+$\LAMBDA{\itm{params'}}{T}{\itm{body'}}$, $A_b - P$, and $(F_b \cup
+\mathrm{FV}(\itm{body})) - P$, where $\mathrm{FV}$ computes the free
+variables of an expression (see Chapter~\ref{ch:lambdas}).
+
+\paragraph{Convert Assignments}
+
+Next we discuss the \code{convert-assignment} pass with its auxiliary
+functions for expressions and definitions. The function for
+expressions, \code{cnvt-assign-exp}, should take an expression and a
+set of assigned-and-free variables (obtained from the result of
+\code{assigned\&free}. In the case for $\VAR{x}$, if $x$ is
+assigned-and-free, then unbox it by translating $\VAR{x}$ to a
+\code{vector-ref}.
+\begin{lstlisting}
+  (Var |$x$|)
+  |$\Rightarrow$|
+  (Prim 'vector-ref (list (Var |$x$|) (Int 0)))
+\end{lstlisting}
+%
+In the case for $\LET{\LP\code{AssignedFree}\,
+  x\RP}{\itm{rhs}}{\itm{body}}$, recursively process \itm{rhs} to
+obtain \itm{rhs'}.  Next, recursively process \itm{body} to obtain
+\itm{body'} but with $x$ added to the set of assigned-and-free
+variables.  Translate the let-expression as follows to bind $x$ to a
+boxed value.
+\begin{lstlisting}
+  (Let (AssignedFree |$x$|) |$rhs$| |$body$|)
+  |$\Rightarrow$|
+  (Let |$x$| (Prim 'vector (list |$rhs'$|)) |$body'$|)
+\end{lstlisting}
+%
+In the case for $\SETBANG{x}{\itm{rhs}}$, recursively process
+\itm{rhs} to obtain \itm{rhs'}.  If $x$ is in the assigned-and-free
+variables, translate the \code{set!} into a \code{vector-set!}
+as follows.
+\begin{lstlisting}
+  (SetBang |$x$| |$\itm{rhs}$|)
+  |$\Rightarrow$|
+  (Prim 'vector-set! (list (Var |$x$|) (Int 0) |$\itm{rhs'}$|))
+\end{lstlisting}
+%
+The case for \code{Lambda} is non-trivial, but it is similar to the
+case for function definitions, which we discuss next.
+
+The auxiliary function for definitions, \code{cnvt-assign-def},
+applies assignment conversion to function definitions.
+We translate a function definition as follows.
+\begin{lstlisting}
+  (Def |$f$| |$\itm{params}$| |$T$| |$\itm{info}$| |$\itm{body_1}$|)
+  |$\Rightarrow$|
+  (Def |$f$| |$\itm{params'}$| |$T$| |$\itm{info}$| |$\itm{body_4}$|)
+\end{lstlisting}
+So it remains to explain \itm{params'} and $\itm{body}_4$.
+Let \itm{body_2}, $A_b$, and $F_b$ be the result of
+\code{assigned\&free} on $\itm{body_1}$.
+Let $P$ be the parameter names in \itm{params}.
+We then apply \code{cnvt-assign-exp} to $\itm{body_2}$ to
+obtain \itm{body_3}, passing $A_b \cap F_b \cap P$
+as the set of assigned-and-free variables.
+Finally, we obtain \itm{body_4} by wrapping \itm{body_3}
+in a sequence of let-expressions that box the parameters
+that are in $A_b \cap F_b$.
+%
+Regarding \itm{params'}, change the names of the parameters that are
+in $A_b \cap F_b$ to maintain uniqueness (and so the let-bound
+variables can retain the original names). Recall the second example in
+Section~\ref{sec:assignment-scoping} involving a counter
+abstraction. The following is the output of assignment version for
+function \code{f}.
+\begin{lstlisting}
+(define (f0 [x1 : Integer]) : (Vector ( -> Integer) ( -> Void))
+  (vector
+   (lambda: () : Integer x1)
+   (lambda: () : Void (set! x1 (+ 1 x1)))))
+|$\Rightarrow$|
+(define (f0 [param_x1 : Integer]) : (Vector (-> Integer) (-> Void))
+  (let ([x1 (vector param_x1)])
+    (vector (lambda: () : Integer (vector-ref x1 0))
+             (lambda: () : Void
+                (vector-set! x1 0 (+ 1 (vector-ref x1 0)))))))
+\end{lstlisting}
 
 
+\section{Remove Complex Operands}
+\label{sec:rco-loop}
+
+
+TODO: define the output grammar
+
+
+\begin{lstlisting}
+(let ([x0 10])
+  (let ([y1 0])
+    (+ (+ (begin (set! y1 (read)) x0)
+          (begin (set! x0 (read)) y1))
+       x0)))
+|$\Rightarrow$|
+(define (main) : Integer
+  (let ([x0 10])
+    (let ([y1 0])
+      (let ([tmp2 (begin 
+                    (set! y1 (read))
+                    x0)])
+        (let ([tmp3 (begin 
+                      (set! x0 (read))
+                      y1)])
+          (let ([tmp4 (+ tmp2 tmp3)])
+            (+ tmp4 x0)))))))
+\end{lstlisting}
+
+
+
+
+
+\section{Explicate Control}
+\label{sec:explicate-loop}
+
+
+\section{Register Allocation}
+\label{sec:register-allocation-loop}
+
+
+%\section{Remove Jumps}
+%\label{sec:remove-jumps-loop}
+
+
+\section{Select Instructions}
+\label{sec:select-instructions-loop}
 
 
 
