@@ -8829,21 +8829,15 @@ computing the sum of the first five positive integers.
           (set! i (- i 1))))
       sum)))
 \end{lstlisting}
-The \code{while} loop consists of a condition and a body.  The body is
-executed repeatedly so long as the condition evaluates to \code{\#t}.
-The result of a \code{while} loop is \code{void}.
+The \code{while} loop consists of a condition and a body.  
 %
 The \code{set!} consists of a variable and a right-hand-side expression.
-The value of the variable is changed to the value of the right-hand-side.
-The result of a \code{set!} is also \code{void}.
 %
 The primary purpose of both the \code{while} loop and \code{set!}  is
 to cause side effects, so it is convenient to also include in $R_8$ a
 language feature for sequencing side effects: the \code{begin}
-expression.  It consists of one or more subexpressions that are
-evaluated left-to-right.  The result of the last subexpression is the
-result of the \code{begin}.  The rest of the subexpressions are only
-evaluated for their side effects.
+expression. It consists of one or more subexpressions that are
+evaluated left-to-right.
 %
 The concrete syntax of $R_8$ is defined in
 Figure~\ref{fig:r8-concrete-syntax} and its abstract syntax is defined
@@ -8911,11 +8905,31 @@ in Figure~\ref{fig:r8-syntax}.
 \end{figure}
 
 The definitional interpreter for $R_8$ is shown in
-Figure~\ref{fig:interp-R8}. 
+Figure~\ref{fig:interp-R8}. We add three new cases for \code{SetBang},
+\code{WhileLoop}, and \code{Begin} and we make changes to \code{Var},
+\code{Let}, and \code{Apply} regarding variables. To support
+assignment to variables and to make their lifetimes indefinite (see
+the second example in Section~\ref{sec:assignment-scoping}), we box
+the value that is bound to each variable (in \code{Let}) and function
+parameter (in \code{Apply}). The case for \code{Var} unboxes the
+value.
+%
+Now to discuss the new cases. For \code{SetBang}, we lookup the
+variable in the environment, obtain a boxed value, which we mutate
+using \code{set-box!} to the result of evaluating the right-hand side.
+The result value of a \code{SetBang} is \code{void}.
+%
+For the \code{WhileLoop}, we repeatedly 1) evaluate the condition, and
+if the result is true, 2) evaluate the body.
+The result value of a \code{while} loop is also \code{void}.
+%
+Finally, the $\BEGIN{es}{\itm{body}}$ expression evaluates the
+subexpressions \itm{es} for their effects and then evaluates
+and returns the result from \itm{body}.
 
 
 \begin{figure}[tbp]
-\begin{lstlisting}
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define (interp-exp env)
   (lambda (e)
     (define recur (interp-exp env))
@@ -8930,8 +8944,8 @@ Figure~\ref{fig:interp-R8}.
        (match fun-val
          [`(function (,xs ...) ,body ,lam-env)
           (define new-env (append (for/list ([x xs] [arg arg-vals])
-                                    (cons x (box arg)))
-                                  lam-env))
+                                       (cons x (box arg)))
+                                    lam-env))
           ((interp-exp new-env) body)])]
       [(SetBang x rhs)
        (set-box! (lookup x env) (recur rhs))]
@@ -8950,6 +8964,47 @@ Figure~\ref{fig:interp-R8}.
 \caption{Interpreter for $R_8$.}
 \label{fig:interp-R8}
 \end{figure}
+
+The type checker for $R_8$ is define in
+Figure~\ref{fig:type-check-R8}.  For \code{SetBang}, the type of the
+variable and the right-hand-side must agree. The result type is
+\code{Void}. For the \code{WhileLoop}, the condition must be a
+\code{Boolean}. The result type is also \code{Void}.  For
+\code{Begin}, the result type is the type of its last subexpression.
+
+\begin{figure}[tbp]
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+(define (type-check-R8 env)
+  (lambda (e)
+    (match e
+      [(SetBang x rhs)
+       (define-values (rhs^ rhsT) (recur rhs))
+       (define varT (dict-ref env x))
+       (unless (type-equal? rhsT varT)
+         (error 'type-check-exp
+                "variable and RHS of set! have different type, ~a != ~a"
+                varT rhsT))
+       (values (SetBang x rhs^) 'Void)]
+      [(WhileLoop cnd body)
+       (define-values (cnd^ Tc) (recur cnd))
+       (unless (type-equal? Tc 'Boolean)
+         (error 'type-check-exp
+                "expected Boolean in condition of if, not ~a" Tc))
+       (define-values (body^ Tbody) ((type-check-exp env) body))
+       (values (WhileLoop cnd^ body^) 'Void)]
+      [(Begin es body)
+       (define-values (es^ ts)
+         (for/lists (l1 l2) ([e es]) (recur e)))
+       (define-values (body^ Tbody) (recur body))
+       (values (Begin es^ body^) Tbody)]
+      ...
+      )))
+\end{lstlisting}
+\caption{Type checking \key{SetBang}, \key{WhileLoop},
+    and \code{Begin} in $R_8$.}
+\label{fig:type-check-R8}
+\end{figure}
+
 
   
 At first glance, the translation of these language features to x86
