@@ -7181,7 +7181,7 @@ update the \code{lambda} values to use the top-level environment.
        (define fun-val (recur fun))
        (define arg-vals (for/list ([e args]) (recur e)))
        (match fun-val
-	 [`(lambda (,xs ...) ,body ,fun-env)
+	 [`(function (,xs ...) ,body ,fun-env)
 	  (define new-env (append (map cons xs arg-vals) fun-env))
 	  ((interp-exp new-env) body)])]
       ...
@@ -7190,7 +7190,7 @@ update the \code{lambda} values to use the top-level environment.
 (define (interp-def d)
   (match d
     [(Def f (list `[,xs : ,ps] ...) rt _ body)
-     (mcons f `(lambda ,xs ,body ()))]
+     (mcons f `(function ,xs ,body ()))]
     ))
 
 (define (interp-R4 p)
@@ -7199,8 +7199,8 @@ update the \code{lambda} values to use the top-level environment.
      (let ([top-level (for/list ([d ds]) (interp-def d))])
        (for/list ([b top-level])
          (set-mcdr! b (match (mcdr b)
-                        [`(lambda ,xs ,body ())
-                         `(lambda ,xs ,body ,top-level)])))
+                        [`(function ,xs ,body ())
+                         `(function ,xs ,body ,top-level)])))
        ((interp-exp top-level) body))]
     ))
 \end{lstlisting}
@@ -8837,13 +8837,13 @@ The \code{set!} consists of a variable and a right-hand-side expression.
 The value of the variable is changed to the value of the right-hand-side.
 The result of a \code{set!} is also \code{void}.
 %
-The primary purpose of the \code{while} loop and \code{set!} features
-is to cause side effects and not to directly produce as value, so it
-is convenient to also include in $R_8$ a language feature for
-sequencing side effects: the \code{begin} expression.  It consists of
-one or more expressions that are evaluated left-to-right.  The result
-of the last expression is also the result of the \code{begin}.  The
-rest of the expressions are only evaluated for their side effects.
+The primary purpose of both the \code{while} loop and \code{set!}  is
+to cause side effects, so it is convenient to also include in $R_8$ a
+language feature for sequencing side effects: the \code{begin}
+expression.  It consists of one or more subexpressions that are
+evaluated left-to-right.  The result of the last subexpression is the
+result of the \code{begin}.  The rest of the subexpressions are only
+evaluated for their side effects.
 %
 The concrete syntax of $R_8$ is defined in
 Figure~\ref{fig:r8-concrete-syntax} and its abstract syntax is defined
@@ -8910,12 +8910,50 @@ in Figure~\ref{fig:r8-syntax}.
 \label{fig:r8-syntax}
 \end{figure}
 
+The definitional interpreter for $R_8$ is shown in
+Figure~\ref{fig:interp-R8}. 
 
-% TODO: type checker and interpreter for $R_8$.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+(define (interp-exp env)
+  (lambda (e)
+    (define recur (interp-exp env))
+    (match e
+      [(Var x) (unbox (lookup x env))]
+      [(Let x e body)
+       (define new-env (cons (cons x (box (recur e))) env))
+       ((interp-exp new-env) body)]
+      [(Apply fun args)
+       (define fun-val (recur fun))
+       (define arg-vals (map recur args))
+       (match fun-val
+         [`(function (,xs ...) ,body ,lam-env)
+          (define new-env (append (for/list ([x xs] [arg arg-vals])
+                                    (cons x (box arg)))
+                                  lam-env))
+          ((interp-exp new-env) body)])]
+      [(SetBang x rhs)
+       (set-box! (lookup x env) (recur rhs))]
+      [(WhileLoop cnd body)
+       (define (loop)
+         (cond [(recur cnd)  (recur body) (loop)]
+               [else         (void)]))
+       (loop)]
+      [(Begin es body)
+       (for ([e es]) (recur e))
+       (recur body)]
+      ...
+      [else (error 'interp-exp "unrecognized expression ~a" e)]
+      )))
+\end{lstlisting}
+\caption{Interpreter for $R_8$.}
+\label{fig:interp-R8}
+\end{figure}
 
   
 At first glance, the translation of these language features to x86
-seems to be trivial because the $C_3$ intermediate language already
+seems straightforward because the $C_3$ intermediate language already
 supports all of the ingredients that we need: assignment, \code{goto},
 conditional branching, and sequencing. However, there are two
 complications that arise, which we discuss in the next two
@@ -9176,7 +9214,7 @@ the solution should be the \emph{least} fixed point.\index{least fixed point}
 
 The Kleene Fixed-Point Theorem states that if a function $f$ is
 monotone (better inputs produce better outputs), then the least fixed
-point of $f$ is the greatest element of the \emph{ascending Kleene
+point of $f$ is the least upper bound of the \emph{ascending Kleene
   chain} obtained by starting at $\bot$ and iterating $f$ as
 follows.\index{Kleene Fixed-Point Theorem}
 \[
@@ -9185,7 +9223,8 @@ follows.\index{Kleene Fixed-Point Theorem}
 \]
 When a lattice contains only finitely-long ascending chains, then
 every Kleene chain tops out at some fixed point after a number of
-iterations of $f$.
+iterations of $f$. So that fixed point is also a least upper
+bound of the chain.
 \[
 \bot \sqsubseteq f(\bot) \sqsubseteq f(f(\bot)) \sqsubseteq \cdots
 \sqsubseteq f^k(\bot) = f^{k+1}(\bot) = m_s
@@ -9789,7 +9828,7 @@ Figure~\ref{fig:interp-R7}.
        (define new-args (map recur es))
        (let ([f-val (value-of-any (recur f))])
          (match f-val 
-           [`(lambda (,xs ...) ,body ,lam-env)
+           [`(function (,xs ...) ,body ,lam-env)
             (define new-env (append (map cons xs new-args) lam-env))
             ((interp-R7-exp new-env) body)]
            [else (error "interp-R7-exp, expected function, not" f-val)]))]
