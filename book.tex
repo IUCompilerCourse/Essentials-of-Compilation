@@ -8515,20 +8515,38 @@ create a top-level function definition for each \key{Lambda}, as
 shown below.\\
 \begin{minipage}{0.8\textwidth}
 \begin{lstlisting}
-(Def |\itm{name}| ([clos : (Vector _ |\itm{fvts}| ...)] |\itm{ps}| ...) |\itm{rt}|
+(Def |\itm{name}| ([clos : (Vector _ |\itm{fvts}| ...)] |\itm{ps'}| ...) |\itm{rt'}|
    (Let |$\itm{fvs}_1$| (Prim 'vector-ref (list (Var clos) (Int 1)))
      ...
      (Let |$\itm{fvs}_n$| (Prim 'vector-ref (list (Var clos) (Int |$n$|)))
        |\itm{body'}|)...))
 \end{lstlisting}
 \end{minipage}\\
-The \code{clos} parameter refers to the closure. The $\itm{ps}$
-parameters are the normal parameters of the \key{Lambda}. The types
+The \code{clos} parameter refers to the closure.  Translate the type
+annotations in \itm{ps} and the return type \itm{rt}, as discussed in
+the next paragraph, to obtain \itm{ps'} and \itm{rt'}.  The types
 $\itm{fvts}$ are the types of the free variables in the lambda and the
-underscore is a dummy type because it is rather difficult to give a
-type to the function in the closure's type.  The sequence of \key{Let}
-forms bind the free variables to their values obtained from the
-closure.
+underscore \code{\_} is a dummy type that we use because it is rather
+difficult to give a type to the function in the closure's
+type.\footnote{To give an accurate type to a closure, we would need to
+  add existential types to the type checker~\citep{Minamide:1996ys}.}
+The dummy type is considered to be equal to any other type during type
+checking.  The sequence of \key{Let} forms bind the free variables to
+their values obtained from the closure.
+
+Closure conversion turns functions into vectors, so the type
+annotations in the program must also be translated.  We recommend
+defining a auxiliary recursive function for this purpose.  Function
+types should be translated as follows.
+\begin{lstlisting}
+(|$T_1, \ldots, T_n$| -> |$T_r$|)
+|$\Rightarrow$|  
+(Vector ((Vector _) |$T'_1, \ldots, T'_n$| -> |$T'_r$|))
+\end{lstlisting}
+The above type says that the first thing in the vector is a function
+pointer. It omits the types of the free variables because 1) those
+types are not available in this context and 2) we do not need them in
+the code that is generated for function application.
 
 We transform function application into code that retrieves the
 function pointer from the closure and then calls the function, passing
