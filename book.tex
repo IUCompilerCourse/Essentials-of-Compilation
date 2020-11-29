@@ -8455,6 +8455,36 @@ require the body's type to match the declared return type.
 \end{figure}
 
 
+\section{Reveal Functions and the $F_2$ language}
+\label{sec:reveal-functions-r5}
+
+
+To support the \code{procedure-arity} operator we need to communicate
+the arity of a function to the point of closure creation.  We can
+accomplish this by replacing the $\FUNREF{\Var}$ struct with one that
+has a second field for the arity: $\FUNREFARITY{\Var}{\Int}$.  The
+output of this pass is the language $F_2$, whose syntax is defined in
+Figure~\ref{fig:f2-syntax}.
+
+\begin{figure}[tp]
+\centering
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{lcl}
+\Exp &::=& \ldots \mid \FUNREFARITY{\Var}{\Int}\\
+ \Def &::=& \gray{ \FUNDEF{\Var}{([\Var \code{:} \Type]\ldots)}{\Type}{\code{'()}}{\Exp} }\\
+  F_2 &::=& \gray{\PROGRAMDEFS{\code{'()}}{\LP \Def\ldots \RP}}
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The abstract syntax $F_2$, an extension of $R_5$
+  (Figure~\ref{fig:r5-syntax}).}
+\label{fig:f2-syntax}
+\end{figure}
+
+
 \section{Closure Conversion}
 \label{sec:closure-conversion}
 \index{closure conversion}
@@ -8465,79 +8495,60 @@ that comes after \code{reveal-functions} and before
 \code{limit-functions}. 
 
 As usual, we implement the pass as a recursive function over the
-AST. All of the action is in the clauses for \key{lambda} and
-\key{Apply}. We transform a \key{lambda} expression into an expression
-that creates a closure, that is, creates a vector whose first element
-is a function pointer and the rest of the elements are the free
-variables of the \key{lambda}.  The \itm{name} is a unique symbol
-generated to identify the function.
-
-\begin{tabular}{lll}
-\begin{minipage}{0.4\textwidth}
+AST. All of the action is in the clauses for \key{Lambda} and
+\key{Apply}. We transform a \key{Lambda} expression into an expression
+that creates a closure, that is, a vector whose first element is a
+function pointer and the rest of the elements are the free variables
+of the \key{Lambda}. We use the struct \code{Closure} here instead of
+using \code{vector} so that we can distinguish closures from vectors
+in Section~\ref{sec:optimize-closures} and to record the arity.  In
+the generated code below, the \itm{name} is a unique symbol generated
+to identify the function and the \itm{arity} is the number of
+parameters (the length of \itm{ps}).
 \begin{lstlisting}
-(lambda: (|\itm{ps}| ...) : |\itm{rt}| |\itm{body}|)
+(Lambda |\itm{ps}| |\itm{rt}| |\itm{body}|)
+|$\Rightarrow$|
+(Closure |\itm{arity}| (FunRef |\itm{name}|) |\itm{fvs}|)
 \end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.4\textwidth}
-\begin{lstlisting}
-(vector (fun-ref |\itm{name}|) |\itm{fvs}| ...)
-\end{lstlisting}
-\end{minipage}
-\end{tabular}  \\
-%
-In addition to transforming each \key{lambda} into a \key{vector}, we
-must create a top-level function definition for each \key{lambda}, as
+In addition to transforming each \key{Lambda} into a \key{Closure}, we
+create a top-level function definition for each \key{Lambda}, as
 shown below.\\
 \begin{minipage}{0.8\textwidth}
-  \begin{lstlisting}
-   (define (|\itm{name}| [clos : (Vector _ |\itm{fvts}| ...)] |\itm{ps}| ...)
-      (let ([|$\itm{fvs}_1$| (vector-ref clos 1)])
-        ...
-        (let ([|$\itm{fvs}_n$| (vector-ref clos |$n$|)])
-          |\itm{body'}|)...))
+\begin{lstlisting}
+(Def |\itm{name}| ([clos : (Vector _ |\itm{fvts}| ...)] |\itm{ps}| ...) |\itm{rt}|
+   (Let |$\itm{fvs}_1$| (Prim 'vector-ref (list (Var clos) (Int 1)))
+     ...
+     (Let |$\itm{fvs}_n$| (Prim 'vector-ref (list (Var clos) (Int |$n$|)))
+       |\itm{body'}|)...))
 \end{lstlisting}
 \end{minipage}\\
 The \code{clos} parameter refers to the closure. The $\itm{ps}$
-parameters are the normal parameters of the \key{lambda}. The types
+parameters are the normal parameters of the \key{Lambda}. The types
 $\itm{fvts}$ are the types of the free variables in the lambda and the
 underscore is a dummy type because it is rather difficult to give a
-type to the function in the closure's type, and it does not matter.
-The sequence of \key{let} forms bind the free variables to their
-values obtained from the closure.
+type to the function in the closure's type.  The sequence of \key{Let}
+forms bind the free variables to their values obtained from the
+closure.
 
 We transform function application into code that retrieves the
 function pointer from the closure and then calls the function, passing
 in the closure as the first argument. We bind $e'$ to a temporary
 variable to avoid code duplication.
-
-\begin{tabular}{lll}
-\begin{minipage}{0.3\textwidth}
 \begin{lstlisting}
-(app |$e$| |\itm{es}| ...)
+(Apply |$e$| |\itm{es}| ...)
+|$\Rightarrow$|
+(Let |\itm{tmp}| |$e'$|
+  (Apply (Prim 'vector-ref (list (Var |\itm{tmp}|) (Int 0))) |\itm{tmp}| |\itm{es'}|))
 \end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.5\textwidth}
-\begin{lstlisting}
-(let ([|\itm{tmp}| |$e'$|])
-  (app (vector-ref |\itm{tmp}| 0) |\itm{tmp}| |\itm{es'}|))
-\end{lstlisting}
-\end{minipage}
-\end{tabular}  \\
 
-There is also the question of what to do with top-level function
-definitions. To maintain a uniform translation of function
+There is also the question of what to do with references top-level
+function definitions. To maintain a uniform translation of function
 application, we turn function references into closures.
 
 \begin{tabular}{lll}
 \begin{minipage}{0.3\textwidth}
 \begin{lstlisting}
-(fun-ref |$f$|)
+(FunRefArity |$f$| |$n$|)
 \end{lstlisting}
 \end{minipage}
 &
@@ -8545,7 +8556,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.5\textwidth}
 \begin{lstlisting}
-(vector (fun-ref |$f$|))
+(Closure |$n$| (FunRef |$f$|) '())
 \end{lstlisting}
 \end{minipage}
 \end{tabular}  \\
@@ -8557,47 +8568,42 @@ an extra closure parameter.
 \label{sec:example-lambda}
 
 Figure~\ref{fig:lexical-functions-example} shows the result of
-\code{reveal-functions} and then \code{convert-to-closures} for the
-example program demonstrating lexical scoping that we discussed at the
+\code{reveal-functions} and \code{convert-to-closures} for the example
+program demonstrating lexical scoping that we discussed at the
 beginning of this chapter.
 
 
-\begin{figure}[h]
+\begin{figure}[tbp]
   \begin{minipage}{0.8\textwidth}
-% tests/s4_6.rkt
+% tests/lambda_test_6.rkt
 \begin{lstlisting}[basicstyle=\ttfamily\small]
-(define (f74 [x75 : Integer]) : (Integer -> Integer)
-   (let ([y76 4])
-      (lambda: ( [z77 : Integer]) : Integer
-         (+ x75 (+ y76 z77)))))
+(define (f6 [x7 : Integer]) : (Integer -> Integer)
+   (let ([y8 4])
+      (lambda: ([z9 : Integer]) : Integer
+         (+ x7 (+ y8 z9)))))
 
 (define (main) : Integer
-   (let ([g78 ((fun-ref f74) 5)])
-      (let ([h79 ((fun-ref f74) 3)])
-         (+ (g78 11) (h79 15)))))
+   (let ([g0 ((fun-ref-arity f6 1) 5)])
+      (let ([h1 ((fun-ref-arity f6 1) 3)])
+         (+ (g0 11) (h1 15)))))
 \end{lstlisting}
-$\Downarrow$
+$\Rightarrow$
 \begin{lstlisting}[basicstyle=\ttfamily\small]
-(define (f74 [fvs82 : _] [x75 : Integer])
-        : (Vector ((Vector _) Integer -> Integer))
-   (let ([y76 4])
-      (vector (fun-ref lambda80) x75 y76)))
+(define (f6 [fvs4 : _] [x7 : Integer]) : (Vector ((Vector _) Integer -> Integer))
+   (let ([y8 4])
+      (closure 1 (list (fun-ref lambda2) x7 y8))))
 
-(define (lambda80 [fvs81 : (Vector _ Integer Integer)] [z77 : Integer])
-        : Integer
-  (let ([x75 (vector-ref fvs81 1)])
-      (let ([y76 (vector-ref fvs81 2)])
-         (+ x75 (+ y76 z77)))))
+(define (lambda2 [fvs3 : (Vector _ Integer Integer)] [z9 : Integer]) : Integer
+   (let ([x7 (vector-ref fvs3 1)])
+      (let ([y8 (vector-ref fvs3 2)])
+         (+ x7 (+ y8 z9)))))
 
 (define (main) : Integer
-   (let ([g78 (let ([app83 (vector (fun-ref f74))])
-                    ((vector-ref app83 0) app83 5))])
-      (let ([h79 (let ([app84 (vector (fun-ref f74))])
-                       ((vector-ref app84 0) app84 3))])
-         (+ (let ([app85 g78])
-               ((vector-ref app85 0) app85 11))
-             (let ([app86 h79])
-                ((vector-ref app86 0) app86 15))))))
+   (let ([g0 (let ([clos5 (closure 1 (list (fun-ref f6)))])
+                    ((vector-ref clos5 0) clos5 5))])
+      (let ([h1 (let ([clos6 (closure 1 (list (fun-ref f6)))])
+                       ((vector-ref clos6 0) clos6 3))])
+         (+ ((vector-ref g0 0) g0 11) ((vector-ref h1 0) h1 15)))))
 \end{lstlisting}
 \end{minipage}
 
