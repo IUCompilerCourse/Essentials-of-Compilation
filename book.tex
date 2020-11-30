@@ -81,7 +81,7 @@
 \lstset{%
 language=Lisp,
 basicstyle=\ttfamily\small,
-morekeywords={seq,assign,program,block,define,lambda,match,goto,if,else,then,struct,Integer,Boolean,Vector,Void,while},
+morekeywords={seq,assign,program,block,define,lambda,match,goto,if,else,then,struct,Integer,Boolean,Vector,Void,while,begin},
 deletekeywords={read,mapping},
 escapechar=|,
 columns=flexible,
@@ -8864,7 +8864,7 @@ work of \citet{Keep:2012ab}.
 \chapter{Loops and Assignment}
 \label{ch:loop}
 
-In this Chapter we study two features that are the hallmarks of
+In this chapter we study two features that are the hallmarks of
 imperative programming languages: loops and assignments to local
 variables. The following example demonstrates these new features by
 computing the sum of the first five positive integers.
@@ -8956,24 +8956,24 @@ in Figure~\ref{fig:r8-syntax}.
 
 The definitional interpreter for $R_8$ is shown in
 Figure~\ref{fig:interp-R8}. We add three new cases for \code{SetBang},
-\code{WhileLoop}, and \code{Begin} and we make changes to \code{Var},
-\code{Let}, and \code{Apply} regarding variables. To support
-assignment to variables and to make their lifetimes indefinite (see
-the second example in Section~\ref{sec:assignment-scoping}), we box
-the value that is bound to each variable (in \code{Let}) and function
-parameter (in \code{Apply}). The case for \code{Var} unboxes the
-value.
+\code{WhileLoop}, and \code{Begin} and we make changes to the cases
+for \code{Var}, \code{Let}, and \code{Apply} regarding variables. To
+support assignment to variables and to make their lifetimes indefinite
+(see the second example in Section~\ref{sec:assignment-scoping}), we
+box the value that is bound to each variable (in \code{Let}) and
+function parameter (in \code{Apply}). The case for \code{Var} unboxes
+the value.
 %
 Now to discuss the new cases. For \code{SetBang}, we lookup the
-variable in the environment, obtain a boxed value, which we mutate
-using \code{set-box!} to the result of evaluating the right-hand side.
-The result value of a \code{SetBang} is \code{void}.
+variable in the environment to obtain a boxed value and then we change
+it using \code{set-box!} to the result of evaluating the right-hand
+side.  The result value of a \code{SetBang} is \code{void}.
 %
 For the \code{WhileLoop}, we repeatedly 1) evaluate the condition, and
 if the result is true, 2) evaluate the body.
 The result value of a \code{while} loop is also \code{void}.
 %
-Finally, the $\BEGIN{es}{\itm{body}}$ expression evaluates the
+Finally, the $\BEGIN{\itm{es}}{\itm{body}}$ expression evaluates the
 subexpressions \itm{es} for their effects and then evaluates
 and returns the result from \itm{body}.
 
@@ -9061,7 +9061,7 @@ At first glance, the translation of these language features to x86
 seems straightforward because the $C_3$ intermediate language already
 supports all of the ingredients that we need: assignment, \code{goto},
 conditional branching, and sequencing. However, there are two
-complications that arise, which we discuss in the next two
+complications that arise which we discuss in the next two
 sections. After that we introduce one new compiler pass and the
 changes necessary to the existing passes.
 
@@ -9554,11 +9554,9 @@ function \code{f}.
 \label{sec:rco-loop}
 
 The three new language forms, \code{while}, \code{set!}, and
-\code{begin} need to be categorized as atomic or complex expressions,
-as do their subexpressions. They are all complex and their
-subexpressions are all allowed to be complex.
-Figure~\ref{fig:r4-anf-syntax} defines the output language
-$R_4^{\dagger}$ of this pass.
+\code{begin} are all complex expressions and their subexpressions are
+allowed to be complex.  Figure~\ref{fig:r4-anf-syntax} defines the
+output language $R_4^{\dagger}$ of this pass.
 
 \begin{figure}[tp]
 \centering
@@ -9589,7 +9587,7 @@ expression.  This approach applies, unchanged, to handle the new
 language forms.  For example, in the following code there are two
 \code{begin} expressions appearing as arguments to \code{+}.  The
 output of \code{rco-exp} is shown below, in which the \code{begin}
-expression have been bound to temporary variables. Recall that
+expressions have been bound to temporary variables. Recall that
 \code{let} expressions in $R_8^{\dagger}$ are allowed to have
 arbitrary expressions in their right-hand-side expression, so it is
 fine to place \code{begin} there.
@@ -9638,7 +9636,7 @@ only difference is that \code{Call}, \code{vector-set!}, and
      &\mid& \CALL{\Atm}{\LP\Atm\ldots\RP} \mid \READ{}\\
      &\mid& \LP\key{Prim}~\key{'vector-set!}\,\LP\key{list}\,\Atm\,\INT{\Int}\,\Atm\RP\RP \\
 \Def &::=& \DEF{\itm{label}}{\LP\LS\Var\key{:}\Type\RS\ldots\RP}{\Type}{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP}\\
-C_3 & ::= & \PROGRAMDEFS{\itm{info}}{\LP\Def\ldots\RP} 
+C_7 & ::= & \PROGRAMDEFS{\itm{info}}{\LP\Def\ldots\RP} 
 \end{array}
 \]
 \end{minipage}
@@ -9655,10 +9653,10 @@ the expression is obviously pure, that is, never causes side effects,
 then the expression can be removed, so the result is just the
 continuation block.
 %
-The $\WHILE{\itm{cnd}}{\itm{body}}$ loop is the most interesting case.
-First, you will need a fresh label $\itm{loop}$ for the top of the
-loop.  Recursively process the \itm{body} (in effect position) with
-the a \code{goto} to $\itm{loop}$ as the continuation, producing
+The $\WHILE{\itm{cnd}}{\itm{body}}$ expression is the most interesting
+case.  First, you will need a fresh label $\itm{loop}$ for the top of
+the loop.  Recursively process the \itm{body} (in effect position)
+with the a \code{goto} to $\itm{loop}$ as the continuation, producing
 \itm{body'}. Next, process the \itm{cnd} (in predicate position) with
 \itm{body'} as the then-branch and the continuation block as the
 else-branch. The result should be added to the control-flow graph with
