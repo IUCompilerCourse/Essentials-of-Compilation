@@ -10377,7 +10377,7 @@ C_4 & ::= & \gray{ \PROGRAMDEFS{\itm{info}}{\LP\Def\ldots\RP} }
 \section{Instruction Selection}
 \label{sec:select-r6}
 
-\paragraph{Make-Any}
+\paragraph{Make-any}
 
 We recommend compiling the \key{make-any} primitive as follows if the
 tag is for \key{Integer} or \key{Boolean}.  The \key{salq} instruction
@@ -10388,9 +10388,9 @@ combine the tag and the value to form the tagged value.  \\
 \begin{lstlisting}
 (Assign |\itm{lhs}| (Prim 'make-any (list |$e$| (Int |$\itm{tag}$|))))
 |$\Rightarrow$|
-(movq |$e'$| |\itm{lhs}'|)
-(salq (int 3) |\itm{lhs}'|)
-(orq (int |$\itm{tag}$|) |\itm{lhs}'|)
+movq |$e'$|, |\itm{lhs'}|
+salq $3, |\itm{lhs'}|
+orq $|$\itm{tag}$|, |\itm{lhs'}|
 \end{lstlisting}
 The instruction selection for vectors and procedures is different
 because their is no need to shift them to the left. The rightmost 3
@@ -10399,83 +10399,50 @@ value and the tag using \key{orq}.  \\
 \begin{lstlisting}
 (Assign |\itm{lhs}| (Prim 'make-any (list |$e$| (Int |$\itm{tag}$|))))
 |$\Rightarrow$|
-(movq |$e'$| |\itm{lhs}'|)
-(orq (int |$\itm{tagof}(T)$|) |\itm{lhs}'|)
+movq |$e'$|, |\itm{lhs'}|
+orq $|$\itm{tag}$|, |\itm{lhs'}|
 \end{lstlisting}
 
-\paragraph{Tag of Any}
+\paragraph{Tag-of-any}
 
 Recall that the \code{tag-of-any} operation extracts the type tag from
 a value of type \code{Any}. The type tag is the bottom three bits, so
 we obtain the tag by taking the bitwise-and of the value with $111$
 ($7$ in decimal).
+\begin{lstlisting}
+(Assign |\itm{lhs}| (Prim 'tag-of-any (list |$e$|)))
+|$\Rightarrow$|
+movq |$e'$|, |\itm{lhs}'|
+andq $7, |\itm{lhs}'|
+\end{lstlisting}
 
-\begin{tabular}{lll}
-\begin{minipage}{0.4\textwidth}
-\begin{lstlisting}
-(assign |\itm{lhs}| (tag-of-any |$e$|))
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.5\textwidth}
-\begin{lstlisting}
-(movq |$e'$| |\itm{lhs}'|)
-(andq (int 7) |\itm{lhs}'|)
-\end{lstlisting}
-\end{minipage}
-\end{tabular}  
+\paragraph{ValueOf}
 
-\paragraph{Value of Any}
-
-Like \key{inject}, the instructions for \key{value-of-any} are
-different depending on whether the type $T$ is a pointer (vector or
-procedure) or not (Integer or Boolean). The following shows the
-instruction selection for Integer and Boolean.  We produce an untagged
-value by shifting it to the right by 3 bits.
-%
-\\
-\begin{tabular}{lll}
-\begin{minipage}{0.4\textwidth}
+Like \key{make-any}, the instructions for \key{ValueOf} are different
+depending on whether the type $T$ is a pointer (vector or procedure)
+or not (Integer or Boolean). The following shows the instruction
+selection for Integer and Boolean.  We produce an untagged value by
+shifting it to the right by 3 bits.
 \begin{lstlisting}
-(assign |\itm{lhs}| (project |$e$| |$T$|))
+(Assign |\itm{lhs}| (ValueOf |$e$| |$T$|))
+|$\Rightarrow$|
+movq |$e'$|, |\itm{lhs'}|
+sarq $3, |\itm{lhs'}|
 \end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.5\textwidth}
-\begin{lstlisting}
-(movq |$e'$| |\itm{lhs}'|)
-(sarq (int 3) |\itm{lhs}'|)
-\end{lstlisting}
-\end{minipage}
-\end{tabular}  \\
 %
 In the case for vectors and procedures, there is no need to
 shift. Instead we just need to zero-out the rightmost 3 bits. We
 accomplish this by creating the bit pattern $\ldots 0111$ ($7$ in
-decimal) and apply \code{bitwise-not} to obtain $\ldots 1000$ which we
-\code{movq} into the destination $\itm{lhs}$.  We then generate
-\code{andq} with the tagged value to get the desired result. \\
-%
-\begin{tabular}{lll}
-\begin{minipage}{0.4\textwidth}
+decimal) and apply \code{bitwise-not} to obtain $\ldots 11111000$ (-8
+in decimal) which we \code{movq} into the destination $\itm{lhs}$.  We
+then apply \code{andq} with the tagged value to get the desired
+result. \\
 \begin{lstlisting}
-(assign |\itm{lhs}| (project |$e$| |$T$|))
+(Assign |\itm{lhs}| (ValueOf |$e$| |$T$|))
+|$\Rightarrow$|
+movq $|$-8$|, |\itm{lhs'}|
+andq |$e'$|, |\itm{lhs'}|
 \end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.5\textwidth}
-\begin{lstlisting}
-(movq (int |$\ldots 1000$|) |\itm{lhs}'|)
-(andq |$e'$| |\itm{lhs}'|)
-\end{lstlisting}
-\end{minipage}
-\end{tabular}  
 
 %% \paragraph{Type Predicates} We leave it to the reader to
 %% devise a sequence of instructions to implement the type predicates
@@ -10492,8 +10459,8 @@ of type \code{Any} in the same way that it treats variables of type
 \begin{itemize}
 \item If a variable of type \code{Any} is live during a function call,
   then it must be spilled. One way to accomplish this is to augment
-  the pass \code{build-interference} to mark all variables that are
-  live after a \code{callq} as interfering with all the registers.
+  \code{build-interference} to mark all variables that are live after
+  a \code{callq} as interfering with all the registers.
 
 \item If a variable of type \code{Any} is spilled, it must be spilled
   to the root stack instead of the normal procedure call stack.
