@@ -6462,7 +6462,7 @@ defined in Figure~\ref{fig:c2-syntax}.  The new forms of $C_2$ include
 the \key{allocate}, \key{vector-ref}, and \key{vector-set!}, and
 \key{global-value} expressions and the \code{collect} statement.  The
 \code{explicate-control} pass can treat these new forms much like the
-other forms.
+other expression forms that we've already encoutered.
 
 
 \section{Select Instructions and the x86$_2$ Language}
@@ -8374,7 +8374,7 @@ syntax for function application.
 \]
 \end{minipage}
 }
-\caption{Concrete syntax of $R_5$, extending $R_4$ (Figure~\ref{fig:r4-concrete-syntax}) 
+\caption{The concrete syntax of $R_5$, extending $R_4$ (Figure~\ref{fig:r4-concrete-syntax}) 
   with \key{lambda}.}
 \label{fig:r5-concrete-syntax}
 \end{figure}
@@ -8594,7 +8594,7 @@ beginning of this chapter.
 \begin{figure}[tbp]
   \begin{minipage}{0.8\textwidth}
 % tests/lambda_test_6.rkt
-\begin{lstlisting}[basicstyle=\ttfamily\small]
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define (f6 [x7 : Integer]) : (Integer -> Integer)
    (let ([y8 4])
       (lambda: ([z9 : Integer]) : Integer
@@ -8606,7 +8606,7 @@ beginning of this chapter.
          (+ (g0 11) (h1 15)))))
 \end{lstlisting}
 $\Rightarrow$
-\begin{lstlisting}[basicstyle=\ttfamily\small]
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define (f6 [fvs4 : _] [x7 : Integer]) : (Vector ((Vector _) Integer -> Integer))
    (let ([y8 4])
       (closure 1 (list (fun-ref lambda2) x7 y8))))
@@ -8648,11 +8648,47 @@ The only difference is replacing the use of
 \ALLOCCLOS{\itm{len}}{\itm{type}}{\itm{arity}}.
 
 
+\section{Explicate Control and $C_4$}
+\label{sec:explicate-r5}
+
+The output language of \code{explicate-control} is $C_4$ whose
+abstract syntax is defined in Figure~\ref{fig:c4-syntax}.  The only
+difference with respect to $C_3$ is the addition of the
+\code{AllocateClosure} form to the grammar for $\Exp$.  The handling
+of \code{AllocateClosure} in the \code{explicate-control} pass is
+similar to the handling of other expressions such as primitive
+operators.
+
+\begin{figure}[tp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\small
+\[
+\begin{array}{lcl}
+\Exp &::= & \ldots
+   \mid \ALLOCCLOS{\Int}{\Type}{\Int} \\
+\Stmt &::=& \gray{ \ASSIGN{\VAR{\Var}}{\Exp} 
+       \mid \LP\key{Collect} \,\itm{int}\RP } \\
+\Tail &::= & \gray{ \RETURN{\Exp} \mid \SEQ{\Stmt}{\Tail} 
+       \mid \GOTO{\itm{label}} } \\
+    &\mid& \gray{ \IFSTMT{\BINOP{\itm{cmp}}{\Atm}{\Atm}}{\GOTO{\itm{label}}}{\GOTO{\itm{label}}}  }\\
+    &\mid& \gray{ \TAILCALL{\Atm}{\Atm\ldots} } \\
+\Def &::=& \gray{ \DEF{\itm{label}}{\LP[\Var\key{:}\Type]\ldots\RP}{\Type}{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP} }\\
+C_4 & ::= & \gray{ \PROGRAMDEFS{\itm{info}}{\LP\Def\ldots\RP} }
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The abstract syntax of $C_4$, extending $C_3$ (Figure~\ref{fig:c3-syntax}).}
+\label{fig:c4-syntax}
+\end{figure}
+
+
 \section{Select Instructions}
 \label{sec:select-instructions-R5}
 
-Compile the \ALLOCCLOS{\itm{len}}{\itm{type}}{\itm{arity}} form
-similar to the \ALLOC{\itm{len}}{\itm{type}} form
+Compile \ALLOCCLOS{\itm{len}}{\itm{type}}{\itm{arity}} in almost the
+same way as the \ALLOC{\itm{len}}{\itm{type}} form
 (Section~\ref{sec:select-instructions-gc}). The only difference is
 that you should place the \itm{arity} in the tag that is stored at
 position $0$ of the vector. Recall that in
@@ -8923,7 +8959,7 @@ in Figure~\ref{fig:r8-syntax}.
 \]
 \end{minipage}
 }
-\caption{Concrete syntax of $R_8$, extending $R_5$ (Figure~\ref{fig:r5-concrete-syntax}) 
+\caption{The concrete syntax of $R_8$, extending $R_5$ (Figure~\ref{fig:r5-concrete-syntax}) 
   with \key{lambda}.}
 \label{fig:r8-concrete-syntax}
 \end{figure}
@@ -9607,7 +9643,7 @@ fine to place \code{begin} there.
           (+ tmp4 x0))))))
 \end{lstlisting}
 
-\section{Explicate Control}
+\section{Explicate Control and $C_7$}
 \label{sec:explicate-loop}
 
 Recall that in the \code{explicate-control} pass we define one helper
@@ -9788,12 +9824,12 @@ for the compilation of $R_8$.
 \label{ch:type-dynamic}
 \index{dynamic typing}
 
-In this chapter we discuss the compilation $R_7$, a dynamically typed
-language and a subset of the Racket language. Recall that in the
-previous chapters we have compiled subsets of the \emph{Typed} Racket
-language. In dynamically typed languages, each evaluation of an
-expression may produce a value of a different type. Consider the
-following example with a conditional expression that may return a
+In this chapter we discuss the compilation of $R_7$, a dynamically
+typed language and a subset of the Racket language. In contrast, the
+previous chapters have studies the compilation of Typed Racket. In
+dynamically typed languages, a given expression may produce a value of
+a different type each time it is executed. Consider the following
+example with a conditional \code{if} expression that may return a
 Boolean or an integer depending on the input to the program.
 \begin{lstlisting}
    (not (if (eq? (read) 1) #f 0))
@@ -10023,7 +10059,6 @@ extend our compiler to handle the new features of $R_6$
     &\mid& \gray{\LP\Type\ldots \; \key{->}\; \Type\RP} \mid \key{Any} \\
   \FType &::=& \key{Integer} \mid \key{Boolean} \mid \key{Void} \mid \LP\key{Vectorof}\;\key{Any}\RP \mid \LP\key{Vector}\; \key{Any}\ldots\RP \\
     &\mid& \LP\key{Any}\ldots \; \key{->}\; \key{Any}\RP\\
-  \itm{cmp} &::= & \key{eq?} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
   \Exp &::=& \ldots 
    \mid \CINJECT{\Exp}{\FType}\RP \mid \CPROJECT{\Exp}{\FType} \\
   & \mid & \LP\key{boolean?}\;\Exp\RP \mid \LP\key{integer?}\;\Exp\RP\\
@@ -10034,7 +10069,7 @@ extend our compiler to handle the new features of $R_6$
 \]
 \end{minipage}
 }
-\caption{Concrete syntax of $R_6$, extending $R_5$ (Figure~\ref{fig:r5-syntax})
+\caption{The concrete syntax of $R_6$, extending $R_5$ (Figure~\ref{fig:r5-syntax})
   with \key{Any}.}
 \label{fig:r6-concrete-syntax}
 \end{figure}
@@ -10048,14 +10083,8 @@ extend our compiler to handle the new features of $R_6$
 \begin{array}{lcl}
   \itm{op} &::= & \code{boolean?} \mid \code{integer?} \mid \code{vector?}
     \mid \code{procedure?} \mid \code{void?} \\
-  \Exp &::=& \gray{ \INT{\Int} \VAR{\Var} \mid \LET{\Var}{\Exp}{\Exp} } \\
-       &\mid& \gray{ \PRIM{\itm{op}}{\Exp\ldots} }\\
-     &\mid& \gray{ \BOOL{\itm{bool}}
-      \mid \IF{\Exp}{\Exp}{\Exp} } \\
-     &\mid& \gray{ \VOID{} \mid \LP\key{HasType}~\Exp~\Type \RP 
-     \mid \APPLY{\Exp}{\Exp\ldots} }\\
-  &\mid& \gray{ \LAMBDA{\LP[\Var\code{:}\Type]\ldots\RP}{\Type}{\Exp} }\\
-   &\mid& \INJECT{\Exp}{\FType} \mid \PROJECT{\Exp}{\FType} \\
+  \Exp &::=& \ldots
+   \mid \INJECT{\Exp}{\FType} \mid \PROJECT{\Exp}{\FType} \\
  \Def &::=& \gray{ \FUNDEF{\Var}{\LP[\Var \code{:} \Type]\ldots\RP}{\Type}{\code{'()}}{\Exp} }\\
   R_5 &::=& \gray{ \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp} }
 \end{array}
@@ -10144,9 +10173,46 @@ The interpreter for $R_6$ is in Figure~\ref{fig:interp-R6}.
 \end{figure}
 
 \begin{figure}[btp]
- \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]U
-UNDER CONSTRUCTION (vectors)
-   
+ \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+      [(Prim 'vector-ref (list e ei))
+       (define-values (e^ t) (recur e))
+       (define-values (i it) (recur ei))
+       (unless (type-equal? it 'Integer)
+         (error 'type-check-exp "vector-ref: index not Integer: ~a" it))
+       (match (list t i)
+         [(list `(Vector ,ts ...) (Int i^))
+          (unless (and (exact-nonnegative-integer? i^)
+                       (i^ . < . (length ts)))
+            (error 'type-check-exp "invalid index ~a in ~a" i^ e))
+          (let ([t (list-ref ts i^)])
+            (values (Prim 'vector-ref (list e^ (Int i^))) t))]
+         [(list `(Vectorof ,t) i)
+          (values (Prim 'vector-ref (list e^ i))  t)]
+         [else (error "expected a vector in vector-ref, not" t)])]
+      [(Prim 'vector-set! (list e-vec e-i e-arg))
+       (define-values (e-vec^ t-vec) (recur e-vec))
+       (define-values (i it) (recur e-i))
+       (define-values (e-arg^ t-arg) (recur e-arg))
+       (unless (type-equal? it 'Integer)
+         (error 'type-check-exp "vector-set!: index not Integer: ~a" it))
+       (match (list t-vec i)
+         [(list `(Vector ,ts ...) (Int i^))
+          (unless (and (exact-nonnegative-integer? i^)
+                       (i^ . < . (length ts)))
+            (error 'type-check-exp "invalid index ~a in ~a" i^ e))
+          (unless (type-equal? (list-ref ts i^) t-arg)
+            (error 'type-check-exp "type mismatch in vector-set! ~a ~a" 
+                   (list-ref ts i^) t-arg))
+          (values (Prim 'vector-set! (list e-vec^ (Int i^) e-arg^))  'Void)]
+         [(list `(Vectorof ,t) i)
+          (unless (type-equal? t t-arg)
+            (error 'type-check-exp "type mismatch in vector-set! ~a ~a" 
+                   t t-arg))
+          (values (Prim 'vector-set! (list e-vec^ i e-arg^))  'Void)]
+         [else
+          (error 'type-check-exp "expected a vector in vector-set!, not ~a"
+                 t-vec)])]
+      ...
       [else 
        (error 'type-check-exp "R6/unmatched ~a" e)]
       )))
@@ -10214,20 +10280,23 @@ UNDER CONSTRUCTION (vectors)
 \section{Shrinking $R_6$}
 \label{sec:shrink-r6}
 
-In the \code{shrink} pass we recommend compiling \code{Project} into
-an explicit \code{If} expression that uses two new forms,
-\code{ValueOf} and \code{Exit}, and a new primitive operation,
-\code{tag-of-any}.  The \code{tag-of-any} operation retrieves the type
-tag from a tagged value of type \code{Any}.  The \code{ValueOf} form
-retrieves the underlying value from a tagged value.  The
-\code{ValueOf} form includes the type for the underlying value which
-is used by the type checker.  Finally, the \code{Exit} form ends the
-execution of the program.
-%
+% TODO: define R'_6
+
+In the \code{shrink} pass we recommend compiling \code{project} into
+an \code{if} expression that checks whether the value's tag matches
+the target type; if it does, the value is converted to a value of the
+target type by removing the tag; if it does not, the program exits.
+To perform these actions we need a new primitive operation,
+\code{tag-of-any}, and two new forms, \code{ValueOf} and \code{Exit}.
+The \code{tag-of-any} operation retrieves the type tag from a tagged
+value of type \code{Any}.  The \code{ValueOf} form retrieves the
+underlying value from a tagged value.  The \code{ValueOf} form
+includes the type for the underlying value which is used by the type
+checker.  Finally, the \code{Exit} form ends the execution of the
+program.
+
 If the target type of the projection is \code{Boolean} or
 \code{Integer}, then \code{Project} can be translated as follows.
-%(We have omitted the \code{has-type} AST nodes to make this
-%output more readable.)
 \begin{center}
 \begin{minipage}{1.0\textwidth}
 \begin{lstlisting}
@@ -10243,12 +10312,12 @@ If the target type of the projection is \code{Boolean} or
 \end{center}
 If the target type of the projection is a vector or function type,
 then there is a bit more work to do. For vectors, check that the
-length of the vector (use the \code{vector-length} primitive) matches
-the length of the vector type. For functions, check that its arity
-(\code{procedure-arity}) matches the number of parameters in the
-function type.
+length of the vector type matches the length of the vector (using the
+\code{vector-length} primitive). For functions, check that the number
+of parameters in the function type matches the function's arity (using
+\code{procedure-arity}).
 
-Regarding \code{Inject}, we recommend compiling it to a slightly
+Regarding \code{inject}, we recommend compiling it to a slightly
 lower-level primitive operation named \code{make-any}. This operation
 takes a tag instead of a type. \\
 \begin{center}
@@ -10264,12 +10333,48 @@ takes a tag instead of a type. \\
 We recommend translating the type predicates (\code{boolean?}, etc.)
 into uses of \code{tag-of-any} and \code{eq?}.
 
-\section{Closure Conversion for $R_6$}
-\label{sec:closure-conversion-R6}
+\section{Remove Complex Operands}
+\label{sec:rco-r6}
+
+The \code{ValueOf} and \code{Exit} forms are both complex expressions.
+The subexpression of \code{ValueOf} must be atomic.
+
+\section{Explicate Control and $C_5$}
+\label{sec:explicate-r6}
+
+The output of \code{explicate-control} is the $C_5$ language whose
+syntax is defined in Figure~\ref{fig:c5-syntax}. The \code{ValueOf}
+form that we added to $R_6$ remains an expression and the \code{Exit}
+expression becomes a statement.
+
+\begin{figure}[tp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\small
+\[
+\begin{array}{lcl}
+\Exp &::= & \ldots
+   \mid \VALUEOF{\Exp}{\FType} \\
+\Stmt &::=& \gray{ \ASSIGN{\VAR{\Var}}{\Exp} 
+  \mid \LP\key{Collect} \,\itm{int}\RP }
+  \mid \LP\key{Exit}\RP \\
+\Tail &::= & \gray{ \RETURN{\Exp} \mid \SEQ{\Stmt}{\Tail} 
+       \mid \GOTO{\itm{label}} } \\
+    &\mid& \gray{ \IFSTMT{\BINOP{\itm{cmp}}{\Atm}{\Atm}}{\GOTO{\itm{label}}}{\GOTO{\itm{label}}}  }\\
+    &\mid& \gray{ \TAILCALL{\Atm}{\Atm\ldots} } \\
+\Def &::=& \gray{ \DEF{\itm{label}}{\LP[\Var\key{:}\Type]\ldots\RP}{\Type}{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP} }\\
+C_4 & ::= & \gray{ \PROGRAMDEFS{\itm{info}}{\LP\Def\ldots\RP} }
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The abstract syntax of $C_5$, extending $C_4$ (Figure~\ref{fig:c4-syntax}).}
+\label{fig:c5-syntax}
+\end{figure}
 
 
 
-\section{Instruction Selection for $R_6$}
+\section{Instruction Selection}
 \label{sec:select-r6}
 
 \paragraph{Inject}
