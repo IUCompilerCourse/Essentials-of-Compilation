@@ -8544,7 +8544,10 @@ types should be translated as follows.
 (Vector ((Vector _) |$T'_1, \ldots, T'_n$| -> |$T'_r$|))
 \end{lstlisting}
 The above type says that the first thing in the vector is a function
-pointer. It omits the types of the free variables because 1) those
+pointer. The first parameter of the function pointer is a vector (a
+closure) and the rest of the parameters are the ones from the original
+function, with types $T'_1, \ldots, T'_n$.  The \code{Vector} type for
+the closure omits the types of the free variables because 1) those
 types are not available in this context and 2) we do not need them in
 the code that is generated for function application.
 
@@ -10374,7 +10377,7 @@ C_4 & ::= & \gray{ \PROGRAMDEFS{\itm{info}}{\LP\Def\ldots\RP} }
 
 
 
-\section{Instruction Selection}
+\section{Select Instructions}
 \label{sec:select-r6}
 
 \paragraph{Make-any}
@@ -10412,8 +10415,8 @@ we obtain the tag by taking the bitwise-and of the value with $111$
 \begin{lstlisting}
 (Assign |\itm{lhs}| (Prim 'tag-of-any (list |$e$|)))
 |$\Rightarrow$|
-movq |$e'$|, |\itm{lhs}'|
-andq $7, |\itm{lhs}'|
+movq |$e'$|, |\itm{lhs'}|
+andq $7, |\itm{lhs'}|
 \end{lstlisting}
 
 \paragraph{ValueOf}
@@ -10479,16 +10482,16 @@ previously created test programs.
 
 Figure~\ref{fig:compile-r7-r6} shows the compilation of many of the
 $R_7$ forms into $R_6$. An important invariant of this pass is that
-given a subexpression $e$ of $R_7$, the pass will produce an
-expression $e'$ of $R_6$ that has type \key{Any}. For example, the
+given a subexpression $e$ in the $R_7$ program, the pass will produce
+an expression $e'$ in $R_6$ that has type \key{Any}. For example, the
 first row in Figure~\ref{fig:compile-r7-r6} shows the compilation of
 the Boolean \code{\#t}, which must be injected to produce an
 expression of type \key{Any}.
 %
 The second row of Figure~\ref{fig:compile-r7-r6}, the compilation of
-addition, is representative of compilation for many operations: the
-arguments have type \key{Any} and must be projected to \key{Integer}
-before the addition can be performed.
+addition, is representative of compilation for many primitive
+operations: the arguments have type \key{Any} and must be projected to
+\key{Integer} before the addition can be performed.
 
 The compilation of \key{lambda} (third row of
 Figure~\ref{fig:compile-r7-r6}) shows what happens when we need to
@@ -10499,13 +10502,13 @@ has to account for some differences in behavior between $R_7$ and
 $R_6$. The $R_7$ language is more permissive than $R_6$ regarding what
 kind of values can be used in various places. For example, the
 condition of an \key{if} does not have to be a Boolean. For \key{eq?},
-the arguments need not be of the same type (but in that case, the
-result will be \code{\#f}).
+the arguments need not be of the same type (in that case the
+result is \code{\#f}).
 
 \begin{figure}[btp]
 \centering
 \begin{tabular}{|lll|} \hline
-\begin{minipage}{0.25\textwidth}
+\begin{minipage}{0.27\textwidth}
 \begin{lstlisting}
 #t
 \end{lstlisting}
@@ -10519,7 +10522,7 @@ $\Rightarrow$
 \end{lstlisting}
 \end{minipage}
 \\[2ex]\hline
-\begin{minipage}{0.25\textwidth}
+\begin{minipage}{0.27\textwidth}
 \begin{lstlisting}
 (+ |$e_1$| |$e_2$|)
 \end{lstlisting}
@@ -10536,9 +10539,9 @@ $\Rightarrow$
 \end{lstlisting}
 \end{minipage}
 \\[2ex]\hline
-\begin{minipage}{0.25\textwidth}
+\begin{minipage}{0.27\textwidth}
 \begin{lstlisting}
-(lambda (|$x_1 \ldots$|) |$e$|)
+(lambda (|$x_1 \ldots x_n$|) |$e$|)
 \end{lstlisting}
 \end{minipage}
 &
@@ -10546,14 +10549,15 @@ $\Rightarrow$
 &
 \begin{minipage}{0.6\textwidth}
 \begin{lstlisting}
-(inject (lambda: ([|$x_1$|:Any]|$\ldots$|):Any |$e'$|)
-        (Any|$\ldots$|Any -> Any))
+(inject
+   (lambda: ([|$x_1$|:Any]|$\ldots$|[|$x_n$|:Any]):Any |$e'$|)
+   (Any|$\ldots$|Any -> Any))
 \end{lstlisting}
 \end{minipage}
 \\[2ex]\hline
-\begin{minipage}{0.25\textwidth}
+\begin{minipage}{0.27\textwidth}
 \begin{lstlisting}
-(app |$e_0$| |$e_1 \ldots e_n$|)
+(|$e_0$| |$e_1 \ldots e_n$|)
 \end{lstlisting}
 \end{minipage}
 &
@@ -10561,12 +10565,11 @@ $\Rightarrow$
 &
 \begin{minipage}{0.6\textwidth}
 \begin{lstlisting}
-(app (project |$e'_0$| (Any|$\ldots$|Any -> Any))
-   |$e'_1 \ldots e'_n$|)
+((project |$e'_0$| (Any|$\ldots$|Any -> Any)) |$e'_1 \ldots e'_n$|)
 \end{lstlisting}
 \end{minipage}
 \\[2ex]\hline
-\begin{minipage}{0.25\textwidth}
+\begin{minipage}{0.27\textwidth}
 \begin{lstlisting}
 (vector-ref |$e_1$| |$e_2$|)
 \end{lstlisting}
@@ -10582,7 +10585,7 @@ $\Rightarrow$
 \end{lstlisting}
 \end{minipage}
 \\[2ex]\hline
-\begin{minipage}{0.25\textwidth}
+\begin{minipage}{0.27\textwidth}
 \begin{lstlisting}
 (if |$e_1$| |$e_2$| |$e_3$|)
 \end{lstlisting}
@@ -10592,13 +10595,11 @@ $\Rightarrow$
 &
 \begin{minipage}{0.6\textwidth}
 \begin{lstlisting}
-(if (eq? |$e'_1$| (inject #f Boolean))
-   |$e'_3$|
-   |$e'_2$|)
+(if (eq? |$e'_1$| (inject #f Boolean)) |$e'_3$| |$e'_2$|)
 \end{lstlisting}
 \end{minipage}
 \\[2ex]\hline
-\begin{minipage}{0.25\textwidth}
+\begin{minipage}{0.27\textwidth}
 \begin{lstlisting}
 (eq? |$e_1$| |$e_2$|)
 \end{lstlisting}
@@ -10621,7 +10622,7 @@ $\Rightarrow$
 
 \begin{exercise}\normalfont
 Expand your compiler to handle $R_7$ as outlined in this chapter.
-Create tests for $R_7$ by adapting all of your previous test programs
+Create tests for $R_7$ by adapting ten of your previous test programs
 by removing type annotations. Add 5 more tests programs that
 specifically rely on the language being dynamically typed. That is,
 they should not be legal programs in a statically typed language, but
