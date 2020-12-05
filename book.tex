@@ -7356,37 +7356,49 @@ update the \code{lambda} values to use the top-level environment.
 
 \begin{figure}[tp]
 \begin{lstlisting}
-(define (interp-exp env)
-  (lambda (e)
-    (define recur (interp-exp env))
-    (match e
-      ...
-      [(Apply fun args)
-       (define fun-val (recur fun))
-       (define arg-vals (for/list ([e args]) (recur e)))
-       (match fun-val
-	 [`(function (,xs ...) ,body ,fun-env)
-	  (define new-env (append (map cons xs arg-vals) fun-env))
-	  ((interp-exp new-env) body)])]
-      ...
-      )))
+(define interp-R4-class
+  (class interp-R3-class
+    (super-new)
 
-(define (interp-def d)
-  (match d
-    [(Def f (list `[,xs : ,ps] ...) rt _ body)
-     (mcons f `(function ,xs ,body ()))]
+    (define/override (interp-exp env)
+      (lambda (e)
+        (define recur (interp-exp env))
+        (match e
+          [(Var x) (unbox (dict-ref env x))]
+          [(Let x e body)
+           (define new-env (dict-set env x (box (recur e))))
+           ((interp-exp new-env) body)]
+          [(Apply fun args)
+           (define fun-val (recur fun))
+           (define arg-vals (for/list ([e args]) (recur e)))
+           (match fun-val
+             [`(function (,xs ...) ,body ,fun-env)
+              (define params-args (for/list ([x xs] [arg arg-vals])
+                                    (cons x (box arg))))
+              (define new-env (append params-args fun-env))
+              ((interp-exp new-env) body)]
+             [else (error "interp-exp, expected function, not ~a" fun-val)])]
+          [else ((super interp-exp env) e)]
+          )))
+
+    (define/public (interp-def d)
+      (match d
+        [(Def f (list `[,xs : ,ps] ...) rt _ body)
+         (cons f (box `(function ,xs ,body ())))]))
+
+    (define/override (interp-program p)
+      (match p
+        [(ProgramDefsExp info ds body)
+         (let ([top-level (for/list ([d ds]) (interp-def d))])
+           (for/list ([f (in-dict-values top-level)])
+             (set-box! f (match (unbox f)
+                           [`(function ,xs ,body ())
+                            `(function ,xs ,body ,top-level)])))
+           ((interp-exp top-level) body))]))
     ))
 
 (define (interp-R4 p)
-  (match p
-    [(ProgramDefsExp info ds body)
-     (let ([top-level (for/list ([d ds]) (interp-def d))])
-       (for/list ([b top-level])
-         (set-mcdr! b (match (mcdr b)
-                        [`(function ,xs ,body ())
-                         `(function ,xs ,body ,top-level)])))
-       ((interp-exp top-level) body))]
-    ))
+  (send (new interp-R4-class) interp-program p))
 \end{lstlisting}
 \caption{Interpreter for the $R_4$ language.}
 \label{fig:interp-R4}
@@ -7399,52 +7411,59 @@ The type checker for $R_4$ is is in Figure~\ref{fig:type-check-R4}.
 
 \begin{figure}[tp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define (fun-def-name d)
-  (match d [(Def f (list `[,xs : ,ps] ...) rt info body)  f]))
+(define type-check-R4-class
+  (class type-check-R3-class
+    (super-new)
+    (inherit check-type-equal?)
 
-(define (fun-def-type d)
-  (match d
-    [(Def f (list `[,xs : ,ps] ...) rt info body)  `(,@ps -> ,rt)]))
+    (define/public (type-check-apply env e es)
+      (define-values (e^ ty) ((type-check-exp env) e))
+      (define-values (e* ty*) (for/lists (e* ty*) ([e (in-list es)])
+                                ((type-check-exp env) e)))
+      (match ty
+        [`(,ty^* ... -> ,rt)
+         (for ([arg-ty ty*] [param-ty ty^*])
+           (check-type-equal? arg-ty param-ty (Apply e es)))
+         (values e^ e* rt)]))
 
-(define (type-check-exp env)
-  (lambda (e)
-    (match e
-      ...
-      [(Apply e es)
-       (define-values (e^ ty) ((type-check-exp env) e))
-       (define-values (e* ty*) (for/lists (e* ty*) ([e (in-list es)])
-                                     ((type-check-exp env) e)))
-       (match ty
-         [`(,ty^* ... -> ,rt)
-          (for ([arg-ty ty*] [prm-ty ty^*])
-            (unless (equal? arg-ty prm-ty)
-              (error "argument ~a not equal to parameter ~a" arg-ty prm-ty)))
-          (values (HasType (Apply e^ e*) rt) rt)]
-         [else (error "expected a function, not" ty)])])))
+    (define/override (type-check-exp env)
+      (lambda (e)
+        (match e
+          [(FunRef f)
+           (values (FunRef f)  (dict-ref env f))]
+          [(Apply e es)
+           (define-values (e^ es^ rt) (type-check-apply env e es))
+           (values (Apply e^ es^) rt)]
+          [(Call e es)
+           (define-values (e^ es^ rt) (type-check-apply env e es))
+           (values (Call e^ es^) rt)]
+          [else ((super type-check-exp env) e)])))
 
-(define (type-check-def env)
-  (lambda (e)
-    (match e
-      [(Def f (and p:t* (list `[,xs : ,ps] ...)) rt info body)
-       (define new-env (append (map cons xs ps) env))
-       (define-values (body^ ty^) ((type-check-exp new-env) body))
-       (unless (equal? ty^ rt)
-         (error "body type ~a not equal to return type ~a" ty^ rt))
-       (Def f p:t* rt info body^)])))	 
+    (define/public (type-check-def env)
+      (lambda (e)
+        (match e
+          [(Def f (and p:t* (list `[,xs : ,ps] ...)) rt info body)
+           (define new-env (append (map cons xs ps) env))
+           (define-values (body^ ty^) ((type-check-exp new-env) body))
+           (check-type-equal? ty^ rt body)
+           (Def f p:t* rt info body^)])))	 
 
-(define (type-check env)
-  (lambda (e)
-    (match e
-      [(ProgramDefsExp info ds body)
-       (define new-env (for/list ([d ds]) 
-                          (cons (fun-def-name d) (fun-def-type d))))
-       (define ds^ (for/list ([d ds])
-                      ((type-check-def new-env) d)))
-       (define-values (body^ ty) ((type-check-exp new-env) body))
-       (unless (equal? ty 'Integer)
-         (error "result of the program must be an integer, not " ty))
-       (ProgramDefsExp info ds^ body^)]
-      [else (error 'type-check "R4/type-check unmatched ~a" e)])))
+    (define/public (fun-def-type d)
+      (match d
+        [(Def f (list `[,xs : ,ps] ...) rt info body)  `(,@ps -> ,rt)]))
+
+    (define/override (type-check-program e)
+      (match e
+        [(ProgramDefsExp info ds body)
+         (define new-env (for/list ([d ds])
+                           (cons (Def-name d) (fun-def-type d))))
+         (define ds^ (for/list ([d ds]) ((type-check-def new-env) d)))
+         (define-values (body^ ty) ((type-check-exp new-env) body))
+         (check-type-equal? ty 'Integer body)
+         (ProgramDefsExp info ds^ body^)]))))
+
+(define (type-check-R4 p)
+  (send (new type-check-R4-class) type-check-program p))
 \end{lstlisting}
 \caption{Type checker for the $R_4$ language.}
 \label{fig:type-check-R4}
