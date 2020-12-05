@@ -81,8 +81,8 @@
 \lstset{%
 language=Lisp,
 basicstyle=\ttfamily\small,
-morekeywords={seq,assign,program,block,define,lambda,match,goto,if,else,then,struct,Integer,Boolean,Vector,Void,while,begin},
-deletekeywords={read,mapping},
+morekeywords={seq,assign,program,block,define,lambda,match,goto,if,else,then,struct,Integer,Boolean,Vector,Void,while,begin,define,public,override,class},
+deletekeywords={read,mapping,vector},
 escapechar=|,
 columns=flexible,
 moredelim=[is][\color{red}]{~}{~},
@@ -1185,6 +1185,129 @@ $52$ then $10$, the following produces $42$ (not $-42$).
 (let ([x (read)]) (let ([y (read)]) (+ x (- y))))
 \end{lstlisting}
 
+\subsection{Extensible Interpreters via Method Overriding}
+
+To prepare for discussing the interpreter for $R_1$, we need to
+explain why we choose to implement the interpreter using
+object-oriented programming, that is, as a collection of methods
+inside of a class. Throughout this book we define many interpreters,
+one for each of the languages that we study. Because each language
+builds on the prior one, there is a lot of commonality between their
+interpreters. We want to write down those common parts just once
+instead of many times. A naive approach would be to have, for example,
+the interpreter for $R_2$ handle all of the new features in that
+language and then have a default case that dispatches to the
+interpreter for $R_1$. The follow code sketches this idea.
+\begin{center}
+  \begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+(define (interp-R1 e)
+  (match e
+    [(Prim '- (list e))
+     (define v (interp-R1 e))
+     (fx- 0 v)]
+    ...
+    ))
+\end{lstlisting}
+\end{minipage}
+\begin{minipage}{0.45\textwidth}
+  \begin{lstlisting}
+(define (interp-R2 e)
+  (match e
+    [(If cnd thn els)
+     (define b (interp-R2 cnd))
+     (match b
+       [#t (interp-R2 thn)]
+       [#f (interp-R2 els)])]
+    ...
+    [else (interp-R1 e)]  
+    ))    
+\end{lstlisting}
+\end{minipage}
+\end{center}
+The problem with this approach is that it does not handle situations
+in which an $R_2$ feature, like \code{If}, is nested inside an $R_1$
+feature, like the \code{-} operator, as in the following program.
+\begin{lstlisting}
+(Prim '- (list (If (Bool #t) (Int 42) (Int 0))))
+\end{lstlisting}
+If we invoke \code{interp-R2} on this program, it dispatches to
+\code{interp-R1} to handle the \code{-} operator, but then it
+recurisvely calls \code{interp-R1} again on the argument of \code{-},
+which is an \code{If}.  But there is no case for \code{If} in
+\code{interp-R1}, so we get an error!
+
+To make our intepreters extensible we need something called \emph{open
+  recursion}\index{open recursion}. That is, a recursive call should
+always invoke the ``top'' interpreter, even if the recursive call is
+made from interpreters that are lower down.  Object-oriented languages
+provide open recursion in the form of method overriding\index{method
+  overriding}. The follow code sketches this idea for interpreting
+$R_1$ and $R_2$ using the
+\href{https://docs.racket-lang.org/guide/classes.html}{\code{class}}
+\index{class} feature of Racket.  We define one class for each
+language and place a method for interpreting expressions inside each
+class. The class for $R_2$ inherits from the class for $R_1$ and the
+method \code{interp-exp} for $R_2$ overrides the \code{interp-exp} for
+$R_1$. Note that the default case in \code{interp-exp} for $R_2$ uses
+\code{super} to invoke \code{interp-exp}, and because $R_2$ inherits
+from $R_1$, that dispatches to the \code{interp-exp} for $R_1$.
+\begin{center}
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+(define interp-R1-class
+  (class object%
+    (define/public (interp-exp e)
+      (match e
+        [(Prim '- (list e))
+         (define v (interp-exp e))
+         (fx- 0 v)]
+        ...
+        ))
+    ...
+  ))
+\end{lstlisting}
+\end{minipage}
+\begin{minipage}{0.45\textwidth}
+  \begin{lstlisting}
+(define interp-R2-class
+  (class interp-R1-class
+    (define/override (interp-exp e)
+      (match e
+        [(If cnd thn els)
+         (define b (interp-exp cnd))
+         (match b
+           [#t (interp-exp thn)]
+           [#f (interp-exp els)])]
+        ...
+        [else (super interp-exp e)]  
+        ))
+    ...
+  ))
+\end{lstlisting}
+\end{minipage}
+\end{center}
+Getting back to the troublesome example, repeated here:
+\begin{lstlisting}
+(define e0 (Prim '- (list (If (Bool #t) (Int 42) (Int 0)))))
+\end{lstlisting}
+We can invoke the \code{interp-exp} method for $R_2$ on this
+expression by creating an object of the $R_2$ class and sending it the
+\code{interp-exp} method with the argument \code{e0}.
+\begin{lstlisting}
+(send (new interp-R2-class) interp-exp e0)
+\end{lstlisting}
+This will again hit the default case and dispatch to the
+\code{interp-exp} method for $R_1$, which will handle the \code{-}
+operator. But then for the recursive method call, it will dispatch
+back to \code{interp-exp} for $R_2$, where the \code{If} will be
+correctly handled. Thus, method overriding gives us the open recursion
+that we need to implement our interpreters in an extensible way.
+
+\newpage
+
+\subsection{Definitional Interpreter for $R_1$}
+
 \begin{wrapfigure}[24]{r}[1.0in]{0.6\textwidth}
   \small
   \begin{tcolorbox}[title=Association Lists as Dictionaries]
@@ -1219,12 +1342,14 @@ $52$ then $10$, the following produces $42$ (not $-42$).
 \end{tcolorbox}
 \end{wrapfigure}
 
-Figure~\ref{fig:interp-R1} shows the definitional interpreter for the
-$R_1$ language. It extends the interpreter for $R_0$ with two new
-\key{match} clauses for variables and for \key{let}.  For \key{let},
-we need a way to communicate the value of a variable to all the uses
-of a variable. To accomplish this, we maintain a mapping from
-variables to values. Throughout the compiler we often need to map
+Now that we have explained why we use classes and methods to implement
+interpreters, we turn to the discussion of the actual interpreter for
+$R_1$.  Figure~\ref{fig:interp-R1} shows the definitional interpreter
+for the $R_1$ language. It is similar to the interpreter for $R_0$ but
+it adds two new \key{match} clauses for variables and for \key{let}.
+For \key{let}, we need a way to communicate the value of a variable to
+all the uses of a variable. To accomplish this, we maintain a mapping
+from variables to values. Throughout the compiler we often need to map
 variables to information about them. We refer to these mappings as
 \emph{environments}\index{environment}
 \footnote{Another common term for environment in the compiler
@@ -1242,31 +1367,39 @@ environment with the result value bound to the variable, using
 
 \begin{figure}[tp]
 \begin{lstlisting}
-(define (interp-exp env)
-  (lambda (e)
-    (match e
-      [(Int n) n]
-      [(Prim 'read '())
-       (define r (read))
-       (cond [(fixnum? r) r]
-             [else (error 'interp-R1 "expected an integer" r)])]
-      [(Prim '- (list e))
-       (define v ((interp-exp env) e))
-       (fx- 0 v)]
-      [(Prim '+ (list e1 e2))
-       (define v1 ((interp-exp env) e1))
-       (define v2 ((interp-exp env) e2))
-       (fx+ v1 v2)]
-      [(Var x) (dict-ref env x)]
-      [(Let x e body)
-       (define new-env (dict-set env x ((interp-exp env) e)))
-       ((interp-exp new-env) body)]
-      )))
+(define interp-R1-class
+  (class object%
+    (super-new)
+    
+    (define/public (interp-exp env)
+      (lambda (e)
+        (match e
+          [(Int n) n]
+          [(Prim 'read '())
+           (define r (read))
+           (cond [(fixnum? r) r]
+                 [else (error 'interp-exp "expected an integer" r)])]
+          [(Prim '- (list e))
+           (define v ((interp-exp env) e))
+           (fx- 0 v)]
+          [(Prim '+ (list e1 e2))
+           (define v1 ((interp-exp env) e1))
+           (define v2 ((interp-exp env) e2))
+           (fx+ v1 v2)]
+          [(Var x) (dict-ref env x)]
+          [(Let x e body)
+           (define new-env (dict-set env x ((interp-exp env) e)))
+           ((interp-exp new-env) body)]
+          )))
+
+    (define/public (interp-program p)
+      (match p
+        [(Program '() e) ((interp-exp '()) e)]
+        ))
+    ))
 
 (define (interp-R1 p)
-  (match p
-    [(Program '() e) ((interp-exp '()) e)]
-    ))
+  (send (new interp-R1-class) interp-program p))
 \end{lstlisting}
 \caption{Interpreter for the $R_1$ language.}
 \label{fig:interp-R1}
@@ -4204,8 +4337,8 @@ Section~\ref{sec:type-check-r2}.
 \label{fig:r2-syntax}
 \end{figure}
 
-Figure~\ref{fig:interp-R2} defines the interpreter for $R_2$, omitting
-the parts that are the same as the interpreter for $R_1$
+Figure~\ref{fig:interp-R2} defines the interpreter for $R_2$,
+inheriting from the interpreter for $R_1$
 (Figure~\ref{fig:interp-R1}). The literals \code{\#t} and \code{\#f}
 evaluate to the corresponding Boolean values. The conditional
 expression $(\key{if}\, \itm{cnd}\,\itm{thn}\,\itm{els})$ evaluates
@@ -4219,62 +4352,83 @@ $e_1$ evaluates to \code{\#f}.
 
 With the increase in the number of primitive operations, the
 interpreter code for them could become repetitive without some
-care. In Figure~\ref{fig:interp-R2} we factor out the different parts
-of the code for primitive operations into the \code{interp-op}
-function and the similar parts of the code into the match clause for
-\code{Prim} shown in Figure~\ref{fig:interp-R2}. We do not use
-\code{interp-op} for the \code{and} operation because of the
-short-circuiting behavior in the order of evaluation of its arguments.
-
+care. We factor out the different parts of the code for primitive
+operations into the \code{interp-op} method shown in in
+Figure~\ref{fig:interp-op-R2}. The match clause for \code{Prim} makes
+the recursive calls to interpret the arguments and then passes the
+resulting values to \code{interp-op}. We do not use \code{interp-op}
+for the \code{and} operation because of its short-circuiting behavior.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(define (interp-op op)
-  (match op
-    ...
-    ['not (lambda (v) (match v [#t #f] [#f #t]))]
-    ['eq? (lambda (v1 v2)
-            (cond [(or (and (fixnum? v1) (fixnum? v2))
-                       (and (boolean? v1) (boolean? v2)))
-                   (eq? v1 v2)]))]
-    ['< (lambda (v1 v2)
-          (cond [(and (fixnum? v1) (fixnum? v2)) (< v1 v2)]))]
-    ['<= (lambda (v1 v2)
-           (cond [(and (fixnum? v1) (fixnum? v2)) (<= v1 v2)]))]
-    ['> (lambda (v1 v2)
-          (cond [(and (fixnum? v1) (fixnum? v2)) (> v1 v2)]))]
-    ['>= (lambda (v1 v2)
-           (cond [(and (fixnum? v1) (fixnum? v2)) (>= v1 v2)]))]
-    [else (error 'interp-op "unknown operator")]))
+(define interp-R2-class
+  (class interp-R1-class
+    (super-new)
 
-(define (interp-exp env)
-  (lambda (e)
-    (define recur (interp-exp env))
-    (match e
-      ...
-      [(Bool b) b]
-      [(If cnd thn els)
-       (define b (recur cnd))
-       (match b
-         [#t (recur thn)]
-         [#f (recur els)])]
-      [(Prim 'and (list e1 e2))
-       (define v1 (recur e1))
-       (match v1
-         [#t (match (recur e2) [#t #t] [#f #f])]
-         [#f #f])]
-      [(Prim op args)
-       (apply (interp-op op) (for/list ([e args]) (recur e)))]
-      )))
+    (define/public (interp-op op) ...)
+
+    (define/override (interp-exp env)
+      (lambda (e)
+        (define recur (interp-exp env))
+        (match e
+          [(Bool b) b]
+          [(If cnd thn els)
+           (define b (recur cnd))
+           (match b
+             [#t (recur thn)]
+             [#f (recur els)])]
+          [(Prim 'and (list e1 e2))
+           (define v1 (recur e1))
+           (match v1
+             [#t (match (recur e2) [#t #t] [#f #f])]
+             [#f #f])]
+          [(Prim op args)
+           (apply (interp-op op) (for/list ([e args]) (recur e)))]
+          [else ((super interp-exp env) e)]
+          )))
+    ))
 
 (define (interp-R2 p)
-  (match p
-    [(Program info e)
-     ((interp-exp '()) e)]
+  (send (new interp-R2-class) interp-program p))
+\end{lstlisting}
+\caption{Interpreter for the $R_2$ language. (See
+  Figure~\ref{fig:interp-op-R2} for \code{interp-op}.)}
+\label{fig:interp-R2}
+\end{figure}
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+(define/public (interp-op op)
+  (match op
+    ['+ fx+]
+    ['- fx-]
+    ['read read-fixnum]
+    ['not (lambda (v) (match v [#t #f] [#f #t]))]
+    ['or (lambda (v1 v2)
+           (cond [(and (boolean? v1) (boolean? v2))
+                  (or v1 v2)]))]
+    ['eq? (lambda (v1 v2)
+            (cond [(or (and (fixnum? v1) (fixnum? v2))
+                       (and (boolean? v1) (boolean? v2))
+                       (and (vector? v1) (vector? v2)))
+                   (eq? v1 v2)]))]
+    ['< (lambda (v1 v2)
+          (cond [(and (fixnum? v1) (fixnum? v2))
+                 (< v1 v2)]))]
+    ['<= (lambda (v1 v2)
+           (cond [(and (fixnum? v1) (fixnum? v2))
+                  (<= v1 v2)]))]
+    ['> (lambda (v1 v2)
+          (cond [(and (fixnum? v1) (fixnum? v2))
+                 (> v1 v2)]))]
+    ['>= (lambda (v1 v2)
+           (cond [(and (fixnum? v1) (fixnum? v2))
+                  (>= v1 v2)]))]
+    [else (error 'interp-op "unknown operator")]
     ))
 \end{lstlisting}
-\caption{Interpreter for the $R_2$ language.}
-\label{fig:interp-R2}
+\caption{Interpreter for the primitive operators in the $R_2$ language.}
+\label{fig:interp-op-R2}
 \end{figure}
 
 
@@ -4307,118 +4461,141 @@ checker enforces the rule that the argument of \code{not} must be a
    (not (+ 10 (- (+ 12 20))))
 \end{lstlisting}
 
-The type checker for $R_2$ is a structurally recursive function over
-the AST. Figure~\ref{fig:type-check-R2} defines the
-\code{type-check-exp} function. The code for the type checker is in
-the file \code{type-check-R2.rkt} of the support code.
+We implement type checking using classes and method overriding for the
+same reason that we use them to implement the interpreters. We
+separate the type checker for the $R_1$ fragment into its own class,
+shown in Figure~\ref{fig:type-check-R1}. The type checker for $R_2$ is
+shown in Figure~\ref{fig:type-check-R2}; inherits from the one for
+$R_1$. The code for these type checkers are in the files
+\code{type-check-R1.rkt} and \code{type-check-R2.rkt} of the support
+code.
 %
-Given an input expression \code{e}, the type checker either returns a
-type (\key{Integer} or \key{Boolean}) or it signals an error.  The
-type of an integer literal is \code{Integer} and the type of a Boolean
-literal is \code{Boolean}.  To handle variables, the type checker uses
-the environment \code{env} to map variables to types. Consider the
-clause for \key{let}.  We type check the initializing expression to
-obtain its type \key{T} and then associate type \code{T} with the
-variable \code{x} in the environment used to type check the body of
-the \key{let}. Thus, when the type checker encounters a use of
-variable \code{x}, it can find its type in the environment.
+Each type checker is a structurally recursive function over the AST.
+Given an input expression \code{e}, the type checker either signals an
+error or returns an expression and its type (\key{Integer} or
+\key{Boolean}). There are situations in which we want to change or
+update the expression.
+%
+The type of an integer literal is \code{Integer} and
+the type of a Boolean literal is \code{Boolean}.  To handle variables,
+the type checker uses the environment \code{env} to map variables to
+types. Consider the clause for \key{let}.  We type check the
+initializing expression to obtain its type \key{T} and then associate
+type \code{T} with the variable \code{x} in the environment used to
+type check the body of the \key{let}. Thus, when the type checker
+encounters a use of variable \code{x}, it can find its type in the
+environment.
 
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define (type-check-exp env)
-  (lambda (e)
-    (match e
-      [(Var x)
-       (let ([t (dict-ref env x)])
-         (values (Var x) t))]
-      [(Int n) (values (Int n) 'Integer)]
-      [(Bool b) (values (Bool b) 'Boolean)]
-      [(Let x e body)
-       (define-values (e^ Te) ((type-check-exp env) e))
-       (define-values (b Tb) ((type-check-exp (dict-set env x Te)) body))
-       (values (Let x e^ b) Tb)]
-      [(If cnd thn els)
-       (define-values (c Tc) ((type-check-exp env) cnd))
-       (define-values (t Tt) ((type-check-exp env) thn))
-       (define-values (e Te) ((type-check-exp env) els))
-       (unless (type-equal? Tc 'Boolean)
-         (error 'type-check-exp "condition should be Boolean, not ~a" Tc))
-       (unless (type-equal? Tt Te)
-         (error 'type-check-exp "types of branches not equal, ~a != ~a" Tt Te))
-       (values (If c t e) Te)]
-      [(Prim 'eq? (list e1 e2))
-       (define-values (e1^ T1) ((type-check-exp env) e1))
-       (define-values (e2^ T2) ((type-check-exp env) e2))
-       (unless (type-equal? T1 T2)
-         (error 'type-check-exp "argument types of eq?: ~a != ~a" T1 T2))
-       (values (Prim 'eq? (list e1^ e2^)) 'Boolean)]
-      [(Prim op es)
-        (define-values (new-es ts)
-          (for/lists (exprs types) ([e es]) ((type-check-exp env) e)))
-        (define t-ret (type-check-op op ts))
-        (values (Prim op new-es) t-ret)]
-      [else
-       (error 'type-check-exp "couldn't match" e)])))
+(define type-check-R1-class
+  (class object%
+    (super-new)
 
-(define (type-check-R2 e)
-  (match e
-    [(Program info body)
-     (define-values (body^ Tb) ((type-check-exp '()) body))
-     (unless (type-equal? Tb 'Integer)
-       (error 'type-check-R2 "result type must be Integer, not ~a" Tb))
-     (Program info body^)]
-    [else (error 'type-check-R2 "couldn't match ~a" e)]))
+    (define/public (operator-types)
+      '((+ . ((Integer Integer) . Integer))
+        (- . ((Integer) . Integer))
+        (read . (() . Integer))))
+
+    (define/public (type-equal? t1 t2) (equal? t1 t2))
+
+    (define/public (check-type-equal? t1 t2 e)
+      (unless (type-equal? t1 t2)
+        (error 'type-check "~a != ~a\nin ~v" t1 t2 e)))
+
+    (define/public (type-check-op op arg-types e)
+      (match (dict-ref (operator-types) op)
+        [`(,param-types . ,return-type)
+         (for ([at arg-types] [pt param-types])
+           (check-type-equal? at pt e))
+         return-type]
+        [else (error 'type-check-op "unrecognized ~a" op)]))
+
+    (define/public (type-check-exp env)
+      (lambda (e)
+        (debug 'type-check-exp "R1" e)
+        (match e
+          [(Var x)  (values (Var x) (dict-ref env x))]
+          [(Int n)  (values (Int n) 'Integer)]
+          [(Let x e body)
+           (define-values (e^ Te) ((type-check-exp env) e))
+           (define-values (b Tb) ((type-check-exp (dict-set env x Te)) body))
+           (values (Let x e^ b) Tb)]
+          [(Prim op es)
+           (define-values (new-es ts)
+             (for/lists (exprs types) ([e es]) ((type-check-exp env) e)))
+           (values (Prim op new-es) (type-check-op op ts e))]
+          [else (error 'type-check-exp "couldn't match" e)])))
+
+    (define/public (type-check-program e)
+      (match e
+        [(Program info body)
+         (define-values (body^ Tb) ((type-check-exp '()) body))
+         (check-type-equal? Tb 'Integer body)
+         (Program info body^)]
+        [else (error 'type-check-R1 "couldn't match ~a" e)]))
+    ))
+
+(define (type-check-R1 p)
+  (send (new type-check-R1-class) type-check-program p))
+\end{lstlisting}
+\caption{Type checker for the $R_1$ fragment of $R_2$.}
+\label{fig:type-check-R1}
+\end{figure}
+
+\begin{figure}[tbp]
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+(define type-check-R2-class
+  (class type-check-R1-class
+    (super-new)
+    (inherit check-type-equal?)
+    
+    (define/override (operator-types)
+      (append '((- . ((Integer Integer) . Integer))
+                (and . ((Boolean Boolean) . Boolean))
+                (or . ((Boolean Boolean) . Boolean))
+                (< . ((Integer Integer) . Boolean))
+                (<= . ((Integer Integer) . Boolean))
+                (> . ((Integer Integer) . Boolean))
+                (>= . ((Integer Integer) . Boolean))
+                (not . ((Boolean) . Boolean))
+                )
+              (super operator-types)))
+
+    (define/override (type-check-exp env)
+      (lambda (e)
+        (match e
+          [(Bool b) (values (Bool b) 'Boolean)]
+          [(If cnd thn els)
+           (define-values (cnd^ Tc) ((type-check-exp env) cnd))
+           (define-values (thn^ Tt) ((type-check-exp env) thn))
+           (define-values (els^ Te) ((type-check-exp env) els))
+           (check-type-equal? Tc 'Boolean e)
+           (check-type-equal? Tt Te e)
+           (values (If cnd^ thn^ els^) Te)]
+          [(Prim 'eq? (list e1 e2))
+           (define-values (e1^ T1) ((type-check-exp env) e1))
+           (define-values (e2^ T2) ((type-check-exp env) e2))
+           (check-type-equal? T1 T2 e)
+           (values (Prim 'eq? (list e1^ e2^)) 'Boolean)]
+          [else ((super type-check-exp env) e)])))
+    ))
+
+(define (type-check-R2 p)
+  (send (new type-check-R2-class) type-check-program p))
 \end{lstlisting}
 \caption{Type checker for the $R_2$ language.}
 \label{fig:type-check-R2}
 \end{figure}
 
-
-Figure~\ref{fig:type-check-aux-R2} defines three auxiliary functions
-that are used in the type checker. The \code{operator-types} function
-defines a dictionary that maps the operator names to their parameter
-and return types. The \code{type-equal?} function determines whether
-two types are equal, which for now simply dispatches to \code{equal?}
-(deep equality). The \code{type-check-op} function looks up the
-operator in the \code{operator-types} dictionary and then checks
-whether the argument types are equal to the parameter types.  The
-result is the return type of the operator.
-
-\begin{figure}[tbp]
-\begin{lstlisting}
-(define (operator-types)
-  '((+ . ((Integer Integer) . Integer))
-    (- . ((Integer Integer) . Integer))
-    (and . ((Boolean Boolean) . Boolean))
-    (or . ((Boolean Boolean) . Boolean))
-    (< . ((Integer Integer) . Boolean))
-    (<= . ((Integer Integer) . Boolean))
-    (> . ((Integer Integer) . Boolean))
-    (>= . ((Integer Integer) . Boolean))
-    (- . ((Integer) . Integer))
-    (not . ((Boolean) . Boolean))
-    (read . (() . Integer))
-    ))
-
-(define (type-equal? t1 t2)
-  (equal? t1 t2))
-
-(define (type-check-op op arg-types)
-  (match (dict-ref (operator-types) op)
-    [`(,param-types . ,return-type)
-     (for ([at arg-types] [pt param-types]) 
-       (unless (type-equal? at pt)
-         (error 'type-check-op
-                "argument and parameter mismatch, ~a != ~a" at pt)))
-     return-type]
-    [else
-     (error 'type-check-op "unrecognized operator ~a" op)]))
-\end{lstlisting}
-\caption{Auxiliary functions for type checking.}
-\label{fig:type-check-aux-R2}
-\end{figure}
-
-
+Three auxiliary methods are used in the type checker. The method
+\code{operator-types} defines a dictionary that maps the operator
+names to their parameter and return types. The \code{type-equal?}
+method determines whether two types are equal, which for now simply
+dispatches to \code{equal?}  (deep equality). The \code{type-check-op}
+method looks up the operator in the \code{operator-types} dictionary
+and then checks whether the argument types are equal to the parameter
+types.  The result is the return type of the operator.
 
 \begin{exercise}\normalfont
 Create 10 new example programs in $R_2$. Half of the example programs
@@ -5811,41 +5988,51 @@ would run out of memory.\footnote{The $R_3$ language does not have
 must therefore perform automatic garbage collection.
 
 Figure~\ref{fig:interp-R3} shows the definitional interpreter for the
-$R_3$ language. We define the \code{vector}, \code{vector-ref}, and
-\code{vector-set!} operations for $R_3$ in terms of the corresponding
-operations in Racket. One subtle point is that the \code{vector-set!}
-operation returns the \code{\#<void>} value. The \code{\#<void>} value
-can be passed around just like other values inside an $R_3$ program
-and a \code{\#<void>} value can be compared for equality with another
-\code{\#<void>} value. However, there are no other operations specific
-to the the \code{\#<void>} value in $R_3$. In contrast, Racket defines
-the \code{void?} predicate that returns \code{\#t} when applied to
-\code{\#<void>} and \code{\#f} otherwise.
+$R_3$ language. We define the \code{vector}, \code{vector-length},
+\code{vector-ref}, and \code{vector-set!} operations for $R_3$ in
+terms of the corresponding operations in Racket. One subtle point is
+that the \code{vector-set!}  operation returns the \code{\#<void>}
+value. The \code{\#<void>} value can be passed around just like other
+values inside an $R_3$ program and a \code{\#<void>} value can be
+compared for equality with another \code{\#<void>} value. However,
+there are no other operations specific to the the \code{\#<void>}
+value in $R_3$. In contrast, Racket defines the \code{void?} predicate
+that returns \code{\#t} when applied to \code{\#<void>} and \code{\#f}
+otherwise.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(define primitives (set ... 'vector 'vector-ref 'vector-set!))
+(define interp-R3-class
+  (class interp-R2-class
+    (super-new)
 
-(define (interp-op op)
-  (match op
-     ...
-     ['vector vector]
-     ['vector-ref vector-ref]
-     ['vector-set! vector-set!]
-     [else (error 'interp-op "unknown operator")]))
+    (define/override (interp-op op)
+      (match op
+        ['eq? (lambda (v1 v2)
+                (cond [(or (and (fixnum? v1) (fixnum? v2))
+                           (and (boolean? v1) (boolean? v2))
+                           (and (vector? v1) (vector? v2))
+                           (and (void? v1) (void? v2)))
+                       (eq? v1 v2)]))]
+        ['vector vector]
+        ['vector-length vector-length]
+        ['vector-ref vector-ref]
+        ['vector-set! vector-set!]
+        [else (super interp-op op)]
+        ))
 
-(define (interp-exp env)
-  (lambda (e)
-    (define recur (interp-exp env))
-    (match e
-       ...
-       )))
+    (define/override (interp-exp env)
+      (lambda (e)
+        (define recur (interp-exp env))
+        (match e
+          [(HasType e t)  (recur e)]
+          [(Void)  (void)]
+          [else ((super interp-exp env) e)]
+          )))
+    ))
 
 (define (interp-R3 p)
- (match p
-   [(Program '() e)
-    ((interp-exp '()) e)]
-   ))
+  (send (new interp-R3-class) interp-program p))
 \end{lstlisting}
 \caption{Interpreter for the $R_3$ language.}
 \label{fig:interp-R3}
@@ -5868,66 +6055,63 @@ start and end parentheses.  \index{unquote-slicing}
 
 \begin{figure}[tp]
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-(define (type-check-exp env)
-  (lambda (e)
-    (define recur (type-check-exp env))
-    (match e
-      ...
-      [(Void) (values (Void) 'Void)]
-      [(Prim 'vector es)
-       (define-values (e* t*) (for/lists (e* t*) ([e es]) (recur e)))
-       (let ([t `(Vector ,@t*)])
-         (values (HasType (Prim 'vector e*) t) t))]
-      [(Prim 'vector-ref (list e (Int i)))
-       (define-values (e^ t) (recur e))
-       (match t
-         [`(Vector ,ts ...)
-          (unless (and (exact-nonnegative-integer? i) (< i (length ts)))
-            (error 'type-check-exp "invalid index ~a" i))
-          (let ([t (list-ref ts i)])
-            (values (Prim 'vector-ref (list e^ (Int i)))  t))]
-         [else (error 'type-check-exp
-                      "expected a vector in vector-ref, not ~a" t)])]
-      [(Prim 'vector-set! (list e (Int i) arg) )
-       (define-values (e-vec t-vec) (recur e))
-       (define-values (e-arg^ t-arg) (recur arg))
-       (match t-vec
-         [`(Vector ,ts ...)
-          (unless (and (exact-nonnegative-integer? i) (i . < . (length ts)))
-            (error 'type-check-exp "invalid index ~a" i))
-          (unless (type-equal? (list-ref ts i) t-arg)
-            (error 'type-check-exp "type mismatch in vector-set! ~a ~a" 
-                   (list-ref ts i) t-arg))
-          (values (Prim 'vector-set! (list e-vec (Int i) e-arg^))  'Void)]
-         [else (error 'type-check-exp
-                      "expected a vector in vector-set!, not ~a" t-vec)])]
-      [(Prim 'vector-length (list e))
-       (define-values (e^ t) (recur e))
-       (match t
-         [`(Vector ,ts ...)
-          (values (Prim 'vector-length (list e^))  'Integer)]
-         [else (error 'type-check-exp
-                      "expected a vector in vector-length, not ~a" t)])]
-      [(Prim 'eq? (list arg1 arg2))
-       (define-values (e1 t1) (recur arg1))
-       (define-values (e2 t2) (recur arg2))
-       (match* (t1 t2)
-         [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))  (void)]
-         [(other wise)
-          (unless (type-equal? t1 t2)
-            (error 'type-check-exp
-                   "type error: different argument types of eq?: ~a != ~a" t1 t2))])
-       (values (Prim 'eq? (list e1 e2)) 'Boolean)]
-      [(HasType (Prim 'vector es) t)
-       ((type-check-exp env) (Prim 'vector es))]
-      [(HasType e t)
-       (define-values (e^ t^) (recur e))
-       (unless (type-equal? t t^)
-         (error 'type-check-exp "type mismatch in HasType" t t^))
-       (values (HasType e^ t) t)]
-      ...
-      [else (error 'type-check-exp "R3/unmatched ~a" e)]
-      )))
+(define type-check-R3-class
+  (class type-check-R2-class
+    (super-new)
+    (inherit check-type-equal?)
+
+    (define/override (type-check-exp env)
+      (lambda (e)
+        (define recur (type-check-exp env))
+        (match e
+          [(Void) (values (Void) 'Void)]
+          [(Prim 'vector es)
+           (define-values (e* t*) (for/lists (e* t*) ([e es]) (recur e)))
+           (define t `(Vector ,@t*))
+           (values (HasType (Prim 'vector e*) t)  t)]
+          [(Prim 'vector-ref (list e1 (Int i)))
+           (define-values (e1^ t) (recur e1))
+           (match t
+             [`(Vector ,ts ...)
+              (unless (and (0 . <= . i) (i . < . (length ts)))
+                (error 'type-check "index ~a out of bounds\nin ~v" i e))
+              (values (Prim 'vector-ref (list e1^ (Int i)))  (list-ref ts i))]
+             [else (error 'type-check "expect Vector, not ~a\nin ~v" t e)])]
+          [(Prim 'vector-set! (list e1 (Int i) arg) )
+           (define-values (e-vec t-vec) (recur e1))
+           (define-values (e-arg^ t-arg) (recur arg))
+           (match t-vec
+             [`(Vector ,ts ...)
+              (unless (and (0 . <= . i) (i . < . (length ts)))
+                (error 'type-check "index ~a out of bounds\nin ~v" i e))
+              (check-type-equal? (list-ref ts i) t-arg e)
+              (values (Prim 'vector-set! (list e-vec (Int i) e-arg^))  'Void)]
+             [else (error 'type-check "expect Vector, not ~a\nin ~v" t-vec e)])]
+          [(Prim 'vector-length (list e))
+           (define-values (e^ t) (recur e))
+           (match t
+             [`(Vector ,ts ...)
+              (values (Prim 'vector-length (list e^))  'Integer)]
+             [else (error 'type-check "expect Vector, not ~a\nin ~v" t e)])]
+          [(Prim 'eq? (list arg1 arg2))
+           (define-values (e1 t1) (recur arg1))
+           (define-values (e2 t2) (recur arg2))
+           (match* (t1 t2)
+             [(`(Vector ,ts1 ...)  `(Vector ,ts2 ...))  (void)]
+             [(other wise)  (check-type-equal? t1 t2 e)])
+           (values (Prim 'eq? (list e1 e2)) 'Boolean)]
+          [(HasType (Prim 'vector es) t)
+           ((type-check-exp env) (Prim 'vector es))]
+          [(HasType e1 t)
+           (define-values (e1^ t^) (recur e1))
+           (check-type-equal? t t^ e)
+           (values (HasType e1^ t) t)]
+          [else ((super type-check-exp env) e)]
+          )))
+    ))
+
+(define (type-check-R3 p)
+  (send (new type-check-R3-class) type-check-program p))
 \end{lstlisting}
 \caption{Type checker for the $R_3$ language.}
 \label{fig:type-check-R3}
@@ -10335,6 +10519,34 @@ takes a tag instead of a type. \\
 
 We recommend translating the type predicates (\code{boolean?}, etc.)
 into uses of \code{tag-of-any} and \code{eq?}.
+
+\section{Check Bounds}
+\label{sec:check-bounds-r6}
+
+UNDER CONSTRUCTION
+
+When the type of the vector argument is \code{Vectorof}, insert bounds
+checking.
+
+\begin{lstlisting}
+(vector-ref e1 e2)
+|$\Rightarrow$|
+(let ([v e1'])
+  (let ([i e2'])
+    (if (< i (vector-length v))
+        (vector-ref v i)
+        (exit))))
+\end{lstlisting}
+
+\begin{lstlisting}
+(vector-set! e1 e2 e3)
+|$\Rightarrow$|
+(let ([v e1'])
+  (let ([i e2'])
+    (if (< i (vector-length v))
+        (vector-set! v i e3')
+        (exit))))
+\end{lstlisting}
 
 \section{Remove Complex Operands}
 \label{sec:rco-r6}
