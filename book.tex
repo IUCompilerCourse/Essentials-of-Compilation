@@ -1371,26 +1371,25 @@ environment with the result value bound to the variable, using
   (class object%
     (super-new)
     
-    (define/public (interp-exp env)
-      (lambda (e)
-        (match e
-          [(Int n) n]
-          [(Prim 'read '())
-           (define r (read))
-           (cond [(fixnum? r) r]
-                 [else (error 'interp-exp "expected an integer" r)])]
-          [(Prim '- (list e))
-           (define v ((interp-exp env) e))
-           (fx- 0 v)]
-          [(Prim '+ (list e1 e2))
-           (define v1 ((interp-exp env) e1))
-           (define v2 ((interp-exp env) e2))
-           (fx+ v1 v2)]
-          [(Var x) (dict-ref env x)]
-          [(Let x e body)
-           (define new-env (dict-set env x ((interp-exp env) e)))
-           ((interp-exp new-env) body)]
-          )))
+    (define/public ((interp-exp env) e)
+      (match e
+        [(Int n) n]
+        [(Prim 'read '())
+         (define r (read))
+         (cond [(fixnum? r) r]
+               [else (error 'interp-exp "expected an integer" r)])]
+        [(Prim '- (list e))
+         (define v ((interp-exp env) e))
+         (fx- 0 v)]
+        [(Prim '+ (list e1 e2))
+         (define v1 ((interp-exp env) e1))
+         (define v2 ((interp-exp env) e2))
+         (fx+ v1 v2)]
+        [(Var x) (dict-ref env x)]
+        [(Let x e body)
+         (define new-env (dict-set env x ((interp-exp env) e)))
+         ((interp-exp new-env) body)]
+        ))
 
     (define/public (interp-program p)
       (match p
@@ -4367,25 +4366,24 @@ for the \code{and} operation because of its short-circuiting behavior.
 
     (define/public (interp-op op) ...)
 
-    (define/override (interp-exp env)
-      (lambda (e)
-        (define recur (interp-exp env))
-        (match e
-          [(Bool b) b]
-          [(If cnd thn els)
-           (define b (recur cnd))
-           (match b
-             [#t (recur thn)]
-             [#f (recur els)])]
-          [(Prim 'and (list e1 e2))
-           (define v1 (recur e1))
-           (match v1
-             [#t (match (recur e2) [#t #t] [#f #f])]
-             [#f #f])]
-          [(Prim op args)
-           (apply (interp-op op) (for/list ([e args]) (recur e)))]
-          [else ((super interp-exp env) e)]
-          )))
+    (define/override ((interp-exp env) e)
+      (define recur (interp-exp env))
+      (match e
+        [(Bool b) b]
+        [(If cnd thn els)
+         (define b (recur cnd))
+         (match b
+           [#t (recur thn)]
+           [#f (recur els)])]
+        [(Prim 'and (list e1 e2))
+         (define v1 (recur e1))
+         (match v1
+           [#t (match (recur e2) [#t #t] [#f #f])]
+           [#f #f])]
+        [(Prim op args)
+         (apply (interp-op op) (for/list ([e args]) (recur e)))]
+        [else ((super interp-exp env) e)]
+        ))
     ))
 
 (define (interp-R2 p)
@@ -6021,14 +6019,13 @@ otherwise.
         [else (super interp-op op)]
         ))
 
-    (define/override (interp-exp env)
-      (lambda (e)
-        (define recur (interp-exp env))
-        (match e
-          [(HasType e t)  (recur e)]
-          [(Void)  (void)]
-          [else ((super interp-exp env) e)]
-          )))
+    (define/override ((interp-exp env) e)
+      (define recur (interp-exp env))
+      (match e
+        [(HasType e t)  (recur e)]
+        [(Void)  (void)]
+        [else ((super interp-exp env) e)]
+        ))
     ))
 
 (define (interp-R3 p)
@@ -7360,26 +7357,25 @@ update the \code{lambda} values to use the top-level environment.
   (class interp-R3-class
     (super-new)
 
-    (define/override (interp-exp env)
-      (lambda (e)
-        (define recur (interp-exp env))
-        (match e
-          [(Var x) (unbox (dict-ref env x))]
-          [(Let x e body)
-           (define new-env (dict-set env x (box (recur e))))
-           ((interp-exp new-env) body)]
-          [(Apply fun args)
-           (define fun-val (recur fun))
-           (define arg-vals (for/list ([e args]) (recur e)))
-           (match fun-val
-             [`(function (,xs ...) ,body ,fun-env)
-              (define params-args (for/list ([x xs] [arg arg-vals])
-                                    (cons x (box arg))))
-              (define new-env (append params-args fun-env))
-              ((interp-exp new-env) body)]
-             [else (error "interp-exp, expected function, not ~a" fun-val)])]
-          [else ((super interp-exp env) e)]
-          )))
+    (define/override ((interp-exp env) e)
+      (define recur (interp-exp env))
+      (match e
+        [(Var x) (unbox (dict-ref env x))]
+        [(Let x e body)
+         (define new-env (dict-set env x (box (recur e))))
+         ((interp-exp new-env) body)]
+        [(Apply fun args)
+         (define fun-val (recur fun))
+         (define arg-vals (for/list ([e args]) (recur e)))
+         (match fun-val
+           [`(function (,xs ...) ,body ,fun-env)
+            (define params-args (for/list ([x xs] [arg arg-vals])
+                                  (cons x (box arg))))
+            (define new-env (append params-args fun-env))
+            ((interp-exp new-env) body)]
+           [else (error 'interp-exp "expected function, not ~a" fun-val)])]
+        [else ((super interp-exp env) e)]
+        ))
 
     (define/public (interp-def d)
       (match d
@@ -8620,7 +8616,29 @@ values.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-UPDATE ME
+(define interp-R5-class
+  (class interp-R4-class
+    (super-new)
+
+    (define/override (interp-op op)
+      (match op
+        ['procedure-arity
+         (lambda (v)
+           (match v
+             [`(function (,xs ...) ,body ,lam-env)  (length xs)]
+             [else (error 'interp-op "expected a function, not ~a" v)]))]
+        [else (super interp-op op)]))
+
+    (define/override ((interp-exp env) e)
+      (define recur (interp-exp env))
+      (match e
+        [(Lambda (list `[,xs : ,Ts] ...) rT body)
+         `(function ,xs ,body ,env)]
+        [else ((super interp-exp env) e)]))
+    ))
+
+(define (interp-R5 p)
+  (send (new interp-R5-class) interp-program p))
 \end{lstlisting}
 \caption{Interpreter for $R_5$.}
 \label{fig:interp-R5}
@@ -9222,36 +9240,28 @@ and returns the result from \itm{body}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define (interp-exp env)
-  (lambda (e)
-    (define recur (interp-exp env))
-    (match e
-      [(Var x) (unbox (lookup x env))]
-      [(Let x e body)
-       (define new-env (cons (cons x (box (recur e))) env))
-       ((interp-exp new-env) body)]
-      [(Apply fun args)
-       (define fun-val (recur fun))
-       (define arg-vals (map recur args))
-       (match fun-val
-         [`(function (,xs ...) ,body ,lam-env)
-          (define new-env (append (for/list ([x xs] [arg arg-vals])
-                                       (cons x (box arg)))
-                                    lam-env))
-          ((interp-exp new-env) body)])]
-      [(SetBang x rhs)
-       (set-box! (lookup x env) (recur rhs))]
-      [(WhileLoop cnd body)
-       (define (loop)
-         (cond [(recur cnd)  (recur body) (loop)]
-               [else         (void)]))
-       (loop)]
-      [(Begin es body)
-       (for ([e es]) (recur e))
-       (recur body)]
-      ...
-      [else (error 'interp-exp "unrecognized expression ~a" e)]
-      )))
+(define interp-R8-class
+  (class interp-R6-class
+    (super-new)
+
+    (define/override ((interp-exp env) e)
+      (define recur (interp-exp env))
+      (match e
+        [(SetBang x rhs)
+         (set-box! (lookup x env) (recur rhs))]
+        [(WhileLoop cnd body)
+         (define (loop)
+           (cond [(recur cnd)  (recur body) (loop)]
+                 [else         (void)]))
+         (loop)]
+        [(Begin es body)
+         (for ([e es]) (recur e))
+         (recur body)]
+        [else ((super interp-exp env) e)]))
+    ))
+
+(define (interp-R8 p)
+  (send (new interp-R8-class) interp-program p))
 \end{lstlisting}
 \caption{Interpreter for $R_8$.}
 \label{fig:interp-R8}
@@ -9266,31 +9276,35 @@ variable and the right-hand-side must agree. The result type is
 
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define (type-check-R8 env)
-  (lambda (e)
-    (match e
-      [(SetBang x rhs)
-       (define-values (rhs^ rhsT) (recur rhs))
-       (define varT (dict-ref env x))
-       (unless (type-equal? rhsT varT)
-         (error 'type-check-exp
-                "variable and RHS of set! have different type, ~a != ~a"
-                varT rhsT))
-       (values (SetBang x rhs^) 'Void)]
-      [(WhileLoop cnd body)
-       (define-values (cnd^ Tc) (recur cnd))
-       (unless (type-equal? Tc 'Boolean)
-         (error 'type-check-exp
-                "expected Boolean in condition of if, not ~a" Tc))
-       (define-values (body^ Tbody) ((type-check-exp env) body))
-       (values (WhileLoop cnd^ body^) 'Void)]
-      [(Begin es body)
-       (define-values (es^ ts)
-         (for/lists (l1 l2) ([e es]) (recur e)))
-       (define-values (body^ Tbody) (recur body))
-       (values (Begin es^ body^) Tbody)]
-      ...
-      )))
+(define type-check-R8-class
+  (class type-check-R6-class
+    (super-new)
+    (inherit check-type-equal?)
+
+    (define/override (type-check-exp env)
+      (lambda (e)
+        (define recur (type-check-exp env))
+        (match e
+          [(SetBang x rhs)
+           (define-values (rhs^ rhsT) (recur rhs))
+           (define varT (dict-ref env x))
+           (check-type-equal? rhsT varT e)
+           (values (SetBang x rhs^) 'Void)]
+          [(WhileLoop cnd body)
+           (define-values (cnd^ Tc) (recur cnd))
+           (check-type-equal? Tc 'Boolean e)
+           (define-values (body^ Tbody) ((type-check-exp env) body))
+           (values (WhileLoop cnd^ body^) 'Void)]
+          [(Begin es body)
+           (define-values (es^ ts)
+             (for/lists (l1 l2) ([e es]) (recur e)))
+           (define-values (body^ Tbody) (recur body))
+           (values (Begin es^ body^) Tbody)]
+          [else ((super type-check-exp env) e)])))
+    ))
+
+(define (type-check-R8 p)
+  (send (new type-check-R8-class) type-check-program p))
 \end{lstlisting}
 \caption{Type checking \key{SetBang}, \key{WhileLoop},
     and \code{Begin} in $R_8$.}
@@ -10321,58 +10335,52 @@ The type predicates such as $\LP\key{boolean?}\,e\RP$ expect the
 expression $e$ to produce a tagged value; they return \key{\#t} if the
 tag corresponds to the predicate and they return \key{\#f} otherwise.
 
-The type checker for $R_6$ is shown in Figures~\ref{fig:type-check-R6-part-1}
-and \ref{fig:type-check-R6-part-2}.
-The interpreter for $R_6$ is in Figure~\ref{fig:interp-R6}.
+The type checker for $R_6$ is shown in
+Figures~\ref{fig:type-check-R6-part-1} and
+\ref{fig:type-check-R6-part-2} and uses the auxiliary functions in
+Figure~\ref{fig:type-check-R6-aux}.
+%
+The interpreter for $R_6$ is in Figure~\ref{fig:interp-R6} and the
+auxiliary function \code{apply-project} is in Figure~\ref{fig:apply-project}.
+
 
 \begin{figure}[btp]
  \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define (operator-types)
-  '(...
-    (integer? . ((Any) . Boolean))
-    (vector? . ((Any) . Boolean))
-    (procedure? . ((Any) . Boolean))
-    (void? . ((Any) . Boolean))
-    ))
-    
-(define (type-check-exp env)
-  (lambda (e)
-    (define recur (type-check-exp env))
-    (match e
-      ...  
-      [(Inject e ty)
-       (unless (flat-ty? ty)
-         (error 'type-check-exp
-                "may only inject a value of flat type, not ~a" ty))
-       (define-values (new-e e-ty) (recur e))
-       (cond
-        [(type-equal? e-ty ty)
-         (values (Inject new-e ty) 'Any)]
-        [else
-         (error 'type-check-exp
-                "injected expression does not have expected type" 
-                e e-ty ty)])]
-      [(Project e ty)
-       (unless (flat-ty? ty)
-         (error 'type-check-exp
-                "may only project to a flat type, not ~a" ty))
-       (define-values (new-e e-ty) (recur e))
-       (cond
-         [(type-equal? e-ty 'Any)
-          (values (Project new-e ty) ty)]
-        [else
-         (error 'type-check-exp
-                "project expression does not have type Any" e)])]
-      [(Prim pred (list e))
-       #:when (set-member? type-predicates pred)
-       (define-values (new-e e-ty) (recur e))
-       (cond
-         [(type-equal? e-ty 'Any)
-          (values (Prim pred (list new-e)) 'Boolean)]
-         [else
-          (error 'type-check-exp
-                 "type predicate expected argument of type Any, not ~a" e-ty)])]
-      ...
+(define type-check-R6-class
+  (class type-check-R5-class
+    (super-new)
+    (inherit check-type-equal?)
+
+    (define/override (type-check-exp env)
+      (lambda (e)
+        (define recur (type-check-exp env))
+        (match e
+          [(If cnd thn els)
+           (define-values (cnd^ Tc) (recur cnd))
+           (define-values (thn^ Tt) (recur thn))
+           (define-values (els^ Te) (recur els))
+           (check-type-equal? Tc 'Boolean cnd)
+           (check-type-equal? Tt Te e)
+           (values (If cnd^ thn^ els^) (combine-types Tt Te))]
+          [(Prim 'vector-length (list e))
+           (define-values (e^ t) (recur e))
+           (match t
+             [(or `(Vector ,_ ...) `(Vectorof ,_))
+              (values (Prim 'vector-length (list e^))  'Integer)]
+             [else (error 'type-check "expected a vector, not ~a\nin ~v" t e)])]
+          [(Prim 'vector-ref (list e1 ei))
+           (define-values (e^ t) (recur e1))
+           (define-values (i it) (recur ei))
+           (check-type-equal? it 'Integer e)
+           (match (list t i)
+             [(list `(Vector ,ts ...) (Int i^))
+              (unless (and (0 . <= . i^) (i^ . < . (length ts)))
+                (error 'type-check-exp "invalid index ~a in ~a" i^ e))
+              (let ([t (list-ref ts i^)])
+                (values (Prim 'vector-ref (list e^ (Int i^))) t))]
+             [(list `(Vectorof ,t) i)
+              (values (Prim 'vector-ref (list e^ i))  t)]
+             [else (error "expected a vector in vector-ref, not" t)])]
 \end{lstlisting}
 \caption{Type checker for the $R_6$ language, part 1.}
 \label{fig:type-check-R6-part-1}
@@ -10380,110 +10388,224 @@ The interpreter for $R_6$ is in Figure~\ref{fig:interp-R6}.
 
 \begin{figure}[btp]
  \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-      [(Prim 'vector-ref (list e ei))
-       (define-values (e^ t) (recur e))
-       (define-values (i it) (recur ei))
-       (unless (type-equal? it 'Integer)
-         (error 'type-check-exp "vector-ref: index not Integer: ~a" it))
-       (match (list t i)
-         [(list `(Vector ,ts ...) (Int i^))
-          (unless (and (exact-nonnegative-integer? i^)
-                       (i^ . < . (length ts)))
-            (error 'type-check-exp "invalid index ~a in ~a" i^ e))
-          (let ([t (list-ref ts i^)])
-            (values (Prim 'vector-ref (list e^ (Int i^))) t))]
-         [(list `(Vectorof ,t) i)
-          (values (Prim 'vector-ref (list e^ i))  t)]
-         [else (error "expected a vector in vector-ref, not" t)])]
-      [(Prim 'vector-set! (list e-vec e-i e-arg))
-       (define-values (e-vec^ t-vec) (recur e-vec))
-       (define-values (i it) (recur e-i))
-       (define-values (e-arg^ t-arg) (recur e-arg))
-       (unless (type-equal? it 'Integer)
-         (error 'type-check-exp "vector-set!: index not Integer: ~a" it))
-       (match (list t-vec i)
-         [(list `(Vector ,ts ...) (Int i^))
-          (unless (and (exact-nonnegative-integer? i^)
-                       (i^ . < . (length ts)))
-            (error 'type-check-exp "invalid index ~a in ~a" i^ e))
-          (unless (type-equal? (list-ref ts i^) t-arg)
-            (error 'type-check-exp "type mismatch in vector-set! ~a ~a" 
-                   (list-ref ts i^) t-arg))
-          (values (Prim 'vector-set! (list e-vec^ (Int i^) e-arg^))  'Void)]
-         [(list `(Vectorof ,t) i)
-          (unless (type-equal? t t-arg)
-            (error 'type-check-exp "type mismatch in vector-set! ~a ~a" 
-                   t t-arg))
-          (values (Prim 'vector-set! (list e-vec^ i e-arg^))  'Void)]
-         [else
-          (error 'type-check-exp "expected a vector in vector-set!, not ~a"
-                 t-vec)])]
-      ...
-      [else 
-       (error 'type-check-exp "R6/unmatched ~a" e)]
-      )))
+          [(Prim 'vector-set! (list e-vec e-i e-arg))
+           (define-values (e-vec^ t-vec) (recur e-vec))
+           (define-values (i it) (recur e-i))
+           (define-values (e-arg^ t-arg) (recur e-arg))
+           (check-type-equal? it 'Integer e)
+           (match (list t-vec i)
+             [(list `(Vector ,ts ...) (Int i^))
+              (unless (and (0 . <= . i^) (i^ . < . (length ts)))
+                (error 'type-check-exp "invalid index ~a in ~a" i^ e))
+              (check-type-equal? (list-ref ts i^) t-arg e)
+              (values (Prim 'vector-set! (list e-vec^ (Int i^) e-arg^)) 'Void)]
+             [(list `(Vectorof ,t) i)
+              (check-type-equal? t t-arg e)
+              (values (Prim 'vector-set! (list e-vec^ i e-arg^)) 'Void)]
+             [else
+              (error 'type-check-exp "expected a vector, not ~a" t-vec)])]
+          [(Inject e1 ty)
+           (unless (flat-ty? ty)
+             (error 'type-check "may only inject from flat type, not ~a" ty))
+           (define-values (new-e1 e-ty) (recur e1))
+           (check-type-equal? e-ty ty e)
+           (values (Inject new-e1 ty) 'Any)]
+          [(ValueOf e ty)
+           (define-values (new-e e-ty) (recur e))
+           (values (ValueOf new-e ty) ty)]
+          [(Project e1 ty)
+           (unless (flat-ty? ty)
+             (error 'type-check "may only project to flat type, not ~a" ty))
+           (define-values (new-e1 e-ty) (recur e1))
+           (check-type-equal? e-ty 'Any e)
+           (values (Project new-e1 ty) ty)]
+          [(Prim pred (list e1))
+           #:when (set-member? (type-predicates) pred)
+           (define-values (new-e1 e-ty) (recur e1))
+           (check-type-equal? e-ty 'Any e)
+           (values (Prim pred (list new-e1)) 'Boolean)]
+          [(Exit)
+           (values (Exit) '_)]
+          [(Prim 'eq? (list arg1 arg2))
+           (define-values (e1 t1) (recur arg1))
+           (define-values (e2 t2) (recur arg2))
+           (match* (t1 t2)
+             ;; allow comparison of vectors of different element types
+             [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))   (void)]
+             [(`(Vectorof ,t1) `(Vectorof ,t2))         (void)]
+             [(other wise) (check-type-equal? t1 t2 e)])
+           (values (Prim 'eq? (list e1 e2)) 'Boolean)]
+          [else ((super type-check-exp env) e)])))
+
+    ))
 \end{lstlisting}
 \caption{Type checker for the $R_6$ language, part 2.}
 \label{fig:type-check-R6-part-2}
 \end{figure}
 
 
+\begin{figure}[tbp]
+\begin{lstlisting}
+    (define/override (operator-types)
+      (append
+       '((integer? . ((Any) . Boolean))
+         (vector? . ((Any) . Boolean))
+         (procedure? . ((Any) . Boolean))
+         (void? . ((Any) . Boolean))
+         (tag-of-any . ((Any) . Integer))
+         (make-any . ((_ Integer) . Any))
+         )
+       (super operator-types)))
+
+    (define/public (type-predicates)
+      (set 'boolean? 'integer? 'vector? 'procedure? 'void?))
+
+    (define/public (combine-types t1 t2)
+      (match (list t1 t2)
+        [(list '_ t2) t2]
+        [(list t1 '_) t1]
+        [(list `(Vector ,ts1 ...)
+               `(Vector ,ts2 ...))
+         `(Vector ,@(for/list ([t1 ts1] [t2 ts2])
+                      (combine-types t1 t2)))]
+        [(list `(,ts1 ... -> ,rt1)
+               `(,ts2 ... -> ,rt2))
+         `(,@(for/list ([t1 ts1] [t2 ts2])
+               (combine-types t1 t2))
+           -> ,(combine-types rt1 rt2))]
+        [else t1]))
+
+    (define/public (flat-ty? ty)
+      (match ty
+        [(or `Integer `Boolean '_ `Void) #t]
+        [`(Vector ,ts ...) (for/and ([t ts]) (eq? t 'Any))]
+        [`(Vectorof Any) #t]
+        [`(,ts ... -> ,rt)
+         (and (eq? rt 'Any) (for/and ([t ts]) (eq? t 'Any)))]
+        [else #f]))
+\end{lstlisting}
+\caption{Auxiliary methods for type checking $R_6$.}
+\label{fig:type-check-R6-aux}
+\end{figure}
+
 % to do: add rules for vector-ref, etc. for Vectorof
 %Also, \key{eq?} is extended to operate on values of type \key{Any}.
 
 \begin{figure}[btp]
 \begin{lstlisting}
-(define (interp-op op)
-  (match op
-    ...
-    ['boolean? (lambda (v)
-		 (match v
-		   [`(tagged ,v1 ,tg)
-                    (equal? tg (any-tag 'Boolean))]
-		   [else #f]))]
-    ['integer? (lambda (v)
-		 (match v
-		   [`(tagged ,v1 ,tg)
-                    (equal? tg (any-tag 'Integer))]
-		   [else #f]))]
-    ['vector? (lambda (v)
-		(match v
-		  [`(tagged ,v1 ,tg)
-                   (equal? tg (any-tag `(Vector Any)))]
-		  [else #f]))]
-    ['procedure? (lambda (v)
-		   (match v
-		     [`(tagged ,v1 ,tg)
-                      (equal? tg (any-tag `(Any -> Any)))]
-		     [else #f]))]
-    ...
+(define interp-R6-class
+  (class interp-R5-class
+    (super-new)
+
+    (define/override (interp-op op)
+      (match op
+        ['boolean? (match-lambda
+                     [`(tagged ,v1 ,tg) (equal? tg (any-tag 'Boolean))]
+                     [else #f])]
+        ['integer? (match-lambda
+                     [`(tagged ,v1 ,tg) (equal? tg (any-tag 'Integer))]
+                     [else #f])]
+        ['vector? (match-lambda
+                    [`(tagged ,v1 ,tg) (equal? tg (any-tag `(Vector Any)))]
+                    [else #f])]
+        ['procedure? (match-lambda
+                       [`(tagged ,v1 ,tg) (equal? tg (any-tag `(Any -> Any)))]
+                       [else #f])]
+        ['eq? (match-lambda*
+                [`((tagged ,v1^ ,tg1) (tagged ,v2^ ,tg2))
+                 (and (eq? v1^ v2^) (equal? tg1 tg2))]
+                [ls (apply (super interp-op op) ls)])]
+        ['make-any (lambda (v tg) `(tagged ,v ,tg))]
+        ['tag-of-any
+         (match-lambda
+           [`(tagged ,v^ ,tg)  tg]
+           [v  (error 'interp-op "expected tagged value, not ~a" v)])]
+        [else (super interp-op op)]))
+
+    (define/override ((interp-exp env) e)
+      (define recur (interp-exp env))
+      (match e
+        [(Inject e ty) `(tagged ,(recur e) ,(any-tag ty))]
+        [(Project e ty2)  (apply-project (recur e) ty2)]
+        [(ValueOf e ty)
+         (match (recur e)
+           [`(tagged ,v^ ,tg)  v^]
+           [v (error 'interp-op "expected tagged value, not ~a" v)])]
+        [(Exit) (error 'interp-exp "exiting")]
+        [else ((super interp-exp env) e)]))
     ))
 
-(define (interp-exp env)
-  (lambda (e)
-    (define recur (interp-exp env))
-    (let ([ret
-           (match e
-             ...
-             [(Inject e ty)
-              (apply-inject ((interp-exp env) e) (any-tag ty))]
-             [(Project e ty2)
-              (define v (recur e))
-              (apply-project v ty2)]
-             [(Exit)
-              (error 'interp-exp "exiting")]
-             [else (error 'interp-exp "unrecognized expression ~a" e)]
-             )])
-      (verbose "R6/interp-exp ==>" ret)
-      ret)))
+(define (interp-R6 p)
+  (send (new interp-R6-class) interp-program p))
 \end{lstlisting}
 \caption{Interpreter for $R_6$.}
 \label{fig:interp-R6}
 \end{figure}
 
+\begin{figure}[tbp]
+\begin{lstlisting}
+(define (apply-project v ty2)
+  (define tag2 (any-tag ty2))
+  (match v
+    [`(tagged ,v1 ,tag1)
+     (cond [(eq? tag1 tag2)
+            (match ty2
+              [`(Vector ,ts ...)
+               (cond [(eq? (vector-length v1) (length ts)) v1]
+                     [else
+                      (error 'apply-project
+                             "length ~a does not match vector type length ~a"
+                             (vector-length v1) (length ts))])]
+              [`(,ts ... -> ,rt)
+               (match v1
+                 [`(function ,xs ,body ,env)
+                  (cond [(eq? (length xs) (length ts)) v1]
+                        [else
+                         (error 'apply-project
+                                "arity ~a does not match type arity ~a"
+                                (length xs) (length ts))])]
+                 [else (error 'apply-project "expected a function, not ~a" v1)])]
+              [else v1])]
+           [else (error 'apply-project "tag mismatch ~a != ~a" tag1 tag2)])]
+    [else (error 'apply-project "expected tagged value, not ~a" v)]))
+\end{lstlisting}
+  \caption{Auxiliary function to apply a projection.}
+  \label{fig:apply-project}
+\end{figure}
 %\clearpage
 
-\section{Shrinking $R_6$}
+
+
+
+\section{Check Bounds}
+\label{sec:check-bounds-r6}
+
+When the type of the vector argument is \code{Vectorof}, the static
+type checking does not guarantee that the index in a \code{vector-ref}
+or \code{vector-set!} operation is within bounds. Thus, we need to
+insert bounds checking as follows.
+
+\begin{lstlisting}
+(vector-ref e1 e2)
+|$\Rightarrow$|
+(let ([v e1'])
+  (let ([i e2'])
+    (if (and (<= 0 i) (< i (vector-length v)))
+        (vector-ref v i)
+        (exit))))
+\end{lstlisting}
+
+\begin{lstlisting}
+(vector-set! e1 e2 e3)
+|$\Rightarrow$|
+(let ([v e1'])
+  (let ([i e2'])
+    (if (and (<= 0 i) (< i (vector-length v)))
+        (vector-set! v i e3')
+        (exit))))
+\end{lstlisting}
+
+\section{Shrink $R_6$}
 \label{sec:shrink-r6}
 
 % TODO: define R'_6
@@ -10539,34 +10661,6 @@ takes a tag instead of a type. \\
 We recommend translating the type predicates (\code{boolean?}, etc.)
 into uses of \code{tag-of-any} and \code{eq?}.
 
-\section{Check Bounds}
-\label{sec:check-bounds-r6}
-
-UNDER CONSTRUCTION
-
-When the type of the vector argument is \code{Vectorof}, insert bounds
-checking.
-
-\begin{lstlisting}
-(vector-ref e1 e2)
-|$\Rightarrow$|
-(let ([v e1'])
-  (let ([i e2'])
-    (if (< i (vector-length v))
-        (vector-ref v i)
-        (exit))))
-\end{lstlisting}
-
-\begin{lstlisting}
-(vector-set! e1 e2 e3)
-|$\Rightarrow$|
-(let ([v e1'])
-  (let ([i e2'])
-    (if (< i (vector-length v))
-        (vector-set! v i e3')
-        (exit))))
-\end{lstlisting}
-
 \section{Remove Complex Operands}
 \label{sec:rco-r6}
 
@@ -10581,6 +10675,7 @@ syntax is defined in Figure~\ref{fig:c5-syntax}. The \code{ValueOf}
 form that we added to $R_6$ remains an expression and the \code{Exit}
 expression becomes a statement.
 
+
 \begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
@@ -10590,12 +10685,12 @@ expression becomes a statement.
 \Exp &::= & \ldots
    \mid \VALUEOF{\Exp}{\FType} \\
 \Stmt &::=& \gray{ \ASSIGN{\VAR{\Var}}{\Exp} 
-  \mid \LP\key{Collect} \,\itm{int}\RP }
-  \mid \LP\key{Exit}\RP \\
+  \mid \LP\key{Collect} \,\itm{int}\RP }\\
 \Tail &::= & \gray{ \RETURN{\Exp} \mid \SEQ{\Stmt}{\Tail} 
        \mid \GOTO{\itm{label}} } \\
     &\mid& \gray{ \IFSTMT{\BINOP{\itm{cmp}}{\Atm}{\Atm}}{\GOTO{\itm{label}}}{\GOTO{\itm{label}}}  }\\
-    &\mid& \gray{ \TAILCALL{\Atm}{\Atm\ldots} } \\
+&\mid& \gray{ \TAILCALL{\Atm}{\Atm\ldots} } 
+  \mid \LP\key{Exit}\RP \\
 \Def &::=& \gray{ \DEF{\itm{label}}{\LP[\Var\key{:}\Type]\ldots\RP}{\Type}{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP} }\\
 C_4 & ::= & \gray{ \PROGRAMDEFS{\itm{info}}{\LP\Def\ldots\RP} }
 \end{array}
