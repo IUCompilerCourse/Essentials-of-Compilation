@@ -10603,6 +10603,11 @@ perform bounds checking at runtime.
         (exit))))
 \end{lstlisting}
 
+Note that in the compiler for $R_7$, this pass comes after
+\code{shrink} so you should not literally use \code{and} and \code{<=}
+in the generated code for bounds checking, but instead expand those
+forms in the same way as \code{shrink}.
+
 Because this pass depends on type information, we recommend
 implementing it as an extension to the type checker for $R_6$, as
 sketched in the following code.  When the vector argument is of type
@@ -10632,16 +10637,16 @@ should perform the above transformations.
 \end{center}
 
 
-\section{Shrink $R_6$}
-\label{sec:shrink-r6}
+\section{Reveal Casts}
+\label{sec:reveal-casts-r6}
 
 % TODO: define R'_6
 
-In the \code{shrink} pass we recommend compiling \code{project} into
-an \code{if} expression that checks whether the value's tag matches
-the target type; if it does, the value is converted to a value of the
-target type by removing the tag; if it does not, the program exits.
-To perform these actions we need a new primitive operation,
+In the \code{reveal-casts} pass we recommend compiling \code{project}
+into an \code{if} expression that checks whether the value's tag
+matches the target type; if it does, the value is converted to a value
+of the target type by removing the tag; if it does not, the program
+exits.  To perform these actions we need a new primitive operation,
 \code{tag-of-any}, and two new forms, \code{ValueOf} and \code{Exit}.
 The \code{tag-of-any} operation retrieves the type tag from a tagged
 value of type \code{Any}.  The \code{ValueOf} form retrieves the
@@ -11056,10 +11061,10 @@ completion without error.
 \path[->,bend left=15] (R4-4) edge [right] node
      {\ttfamily\footnotesize\color{red} cast-insert} (R4-5);
 \path[->,bend left=15] (R4-5) edge [left] node
-     {\ttfamily\footnotesize\color{red} shrink} (R4-6);
+     {\ttfamily\footnotesize\color{red} reveal-casts} (R4-6);
      
 \path[->,bend left=15] (R4-6) edge [below] node
-     {\ttfamily\footnotesize\color{red} convert-to-clos.} (F1-2);
+     {\ttfamily\footnotesize convert-to-clos.} (F1-2);
 \path[->,bend right=15] (F1-2) edge [above] node
      {\ttfamily\footnotesize limit-fun.} (F1-3);
 \path[->,bend right=15] (F1-3) edge [above] node
@@ -11067,7 +11072,7 @@ completion without error.
 \path[->,bend right=15] (F1-4) edge [above] node
      {\ttfamily\footnotesize remove-complex.} (F1-5);
 \path[->,bend right=15] (F1-5) edge [right] node
-     {\ttfamily\footnotesize\color{red} explicate-control} (C3-2);
+     {\ttfamily\footnotesize explicate-control} (C3-2);
 \path[->,bend left=15] (C3-2) edge [left] node
      {\ttfamily\footnotesize\color{red} select-instr.} (x86-2);
 \path[->,bend right=15] (x86-2) edge [left] node
