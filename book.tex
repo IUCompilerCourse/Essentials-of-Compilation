@@ -10345,7 +10345,7 @@ auxiliary function \code{apply-project} is in Figure~\ref{fig:apply-project}.
 
 
 \begin{figure}[btp]
- \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+ \begin{lstlisting}[basicstyle=\ttfamily\small]
 (define type-check-R6-class
   (class type-check-R5-class
     (super-new)
@@ -10355,13 +10355,6 @@ auxiliary function \code{apply-project} is in Figure~\ref{fig:apply-project}.
       (lambda (e)
         (define recur (type-check-exp env))
         (match e
-          [(If cnd thn els)
-           (define-values (cnd^ Tc) (recur cnd))
-           (define-values (thn^ Tt) (recur thn))
-           (define-values (els^ Te) (recur els))
-           (check-type-equal? Tc 'Boolean cnd)
-           (check-type-equal? Tt Te e)
-           (values (If cnd^ thn^ els^) (combine-types Tt Te))]
           [(Prim 'vector-length (list e))
            (define-values (e^ t) (recur e))
            (match t
@@ -10381,13 +10374,6 @@ auxiliary function \code{apply-project} is in Figure~\ref{fig:apply-project}.
              [(list `(Vectorof ,t) i)
               (values (Prim 'vector-ref (list e^ i))  t)]
              [else (error "expected a vector in vector-ref, not" t)])]
-\end{lstlisting}
-\caption{Type checker for the $R_6$ language, part 1.}
-\label{fig:type-check-R6-part-1}
-\end{figure}
-
-\begin{figure}[btp]
- \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
           [(Prim 'vector-set! (list e-vec e-i e-arg))
            (define-values (e-vec^ t-vec) (recur e-vec))
            (define-values (i it) (recur e-i))
@@ -10404,40 +10390,53 @@ auxiliary function \code{apply-project} is in Figure~\ref{fig:apply-project}.
               (values (Prim 'vector-set! (list e-vec^ i e-arg^)) 'Void)]
              [else
               (error 'type-check-exp "expected a vector, not ~a" t-vec)])]
-          [(Inject e1 ty)
-           (unless (flat-ty? ty)
-             (error 'type-check "may only inject from flat type, not ~a" ty))
-           (define-values (new-e1 e-ty) (recur e1))
-           (check-type-equal? e-ty ty e)
-           (values (Inject new-e1 ty) 'Any)]
-          [(ValueOf e ty)
-           (define-values (new-e e-ty) (recur e))
-           (values (ValueOf new-e ty) ty)]
-          [(Project e1 ty)
-           (unless (flat-ty? ty)
-             (error 'type-check "may only project to flat type, not ~a" ty))
-           (define-values (new-e1 e-ty) (recur e1))
-           (check-type-equal? e-ty 'Any e)
-           (values (Project new-e1 ty) ty)]
-          [(Prim pred (list e1))
-           #:when (set-member? (type-predicates) pred)
-           (define-values (new-e1 e-ty) (recur e1))
-           (check-type-equal? e-ty 'Any e)
-           (values (Prim pred (list new-e1)) 'Boolean)]
-          [(Exit)
-           (values (Exit) '_)]
-          [(Prim 'eq? (list arg1 arg2))
-           (define-values (e1 t1) (recur arg1))
-           (define-values (e2 t2) (recur arg2))
-           (match* (t1 t2)
-             ;; allow comparison of vectors of different element types
-             [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))   (void)]
-             [(`(Vectorof ,t1) `(Vectorof ,t2))         (void)]
-             [(other wise) (check-type-equal? t1 t2 e)])
-           (values (Prim 'eq? (list e1 e2)) 'Boolean)]
-          [else ((super type-check-exp env) e)])))
+\end{lstlisting}
+\caption{Type checker for the $R_6$ language, part 1.}
+\label{fig:type-check-R6-part-1}
+\end{figure}
 
-    ))
+\begin{figure}[btp]
+ \begin{lstlisting}[basicstyle=\ttfamily\small]
+      [(Inject e1 ty)
+       (unless (flat-ty? ty)
+         (error 'type-check "may only inject from flat type, not ~a" ty))
+       (define-values (new-e1 e-ty) (recur e1))
+       (check-type-equal? e-ty ty e)
+       (values (Inject new-e1 ty) 'Any)]
+      [(ValueOf e ty)
+       (define-values (new-e e-ty) (recur e))
+       (values (ValueOf new-e ty) ty)]
+      [(Project e1 ty)
+       (unless (flat-ty? ty)
+         (error 'type-check "may only project to flat type, not ~a" ty))
+       (define-values (new-e1 e-ty) (recur e1))
+       (check-type-equal? e-ty 'Any e)
+       (values (Project new-e1 ty) ty)]
+      [(Prim pred (list e1))
+       #:when (set-member? (type-predicates) pred)
+       (define-values (new-e1 e-ty) (recur e1))
+       (check-type-equal? e-ty 'Any e)
+       (values (Prim pred (list new-e1)) 'Boolean)]
+      [(If cnd thn els)
+       (define-values (cnd^ Tc) (recur cnd))
+       (define-values (thn^ Tt) (recur thn))
+       (define-values (els^ Te) (recur els))
+       (check-type-equal? Tc 'Boolean cnd)
+       (check-type-equal? Tt Te e)
+       (values (If cnd^ thn^ els^) (combine-types Tt Te))]
+      [(Exit) (values (Exit) '_)]
+      [(Prim 'eq? (list arg1 arg2))
+       (define-values (e1 t1) (recur arg1))
+       (define-values (e2 t2) (recur arg2))
+       (match* (t1 t2)
+         ;; allow comparison of vectors of different element types
+         [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))   (void)]
+         [(`(Vectorof ,t1) `(Vectorof ,t2))         (void)]
+         [(other wise) (check-type-equal? t1 t2 e)])
+       (values (Prim 'eq? (list e1 e2)) 'Boolean)]
+      [else ((super type-check-exp env) e)])))
+
+))
 \end{lstlisting}
 \caption{Type checker for the $R_6$ language, part 2.}
 \label{fig:type-check-R6-part-2}
@@ -10572,38 +10571,66 @@ auxiliary function \code{apply-project} is in Figure~\ref{fig:apply-project}.
   \caption{Auxiliary function to apply a projection.}
   \label{fig:apply-project}
 \end{figure}
-%\clearpage
 
-
-
+\clearpage
 
 \section{Check Bounds}
 \label{sec:check-bounds-r6}
 
-When the type of the vector argument is \code{Vectorof}, the static
-type checking does not guarantee that the index in a \code{vector-ref}
-or \code{vector-set!} operation is within bounds. Thus, we need to
-insert bounds checking as follows.
+Regarding the \code{vector-ref} or \code{vector-set!} operations, when
+the type of the vector argument is \code{Vectorof}, the type checker
+for $R_6$ (Figure~\ref{fig:type-check-R6-part-1}) does not guarantee
+that the index is within bounds. Thus, we need to insert code to
+perform bounds checking at runtime.
 
 \begin{lstlisting}
-(vector-ref e1 e2)
+(vector-ref |$e_1$| |$e_2$|)
 |$\Rightarrow$|
-(let ([v e1'])
-  (let ([i e2'])
+(let ([v |$e'_1$|])
+  (let ([i |$e'_2$|])
     (if (and (<= 0 i) (< i (vector-length v)))
         (vector-ref v i)
         (exit))))
 \end{lstlisting}
 
 \begin{lstlisting}
-(vector-set! e1 e2 e3)
+(vector-set! |$e_1$| |$e_2$| |$e_3$|)
 |$\Rightarrow$|
-(let ([v e1'])
-  (let ([i e2'])
+(let ([v |$e'_1$|])
+  (let ([i |$e'_2$|])
     (if (and (<= 0 i) (< i (vector-length v)))
-        (vector-set! v i e3')
+        (vector-set! v i |$e'_3$|)
         (exit))))
 \end{lstlisting}
+
+Because this pass depends on type information, we recommend
+implementing it as an extension to the type checker for $R_6$, as
+sketched in the following code.  When the vector argument is of type
+\code{Vector}, your code should mimic what is done in the type checker
+for $R_6$.  If the vector argument is type \code{Vectorof}, your code
+should perform the above transformations.
+\begin{center}
+  \begin{minipage}{0.96\textwidth}
+\begin{lstlisting}
+(define check-bounds-R6-class
+  (class type-check-R6-class
+    (super-new)
+    (inherit check-type-equal?)
+    
+    (define/override (type-check-exp env)
+      (lambda (e)
+        (match e
+          [(Prim 'vector-ref (list e1 ei)) ... ]
+          [(Prim 'vector-set! (list e-vec e-i e-arg)) ...]
+          [else ((super type-check-exp env) e)])))
+    ))
+
+(define (check-bounds-R6 p)
+  (send (new check-bounds-R6-class) type-check-program p))
+\end{lstlisting}
+  \end{minipage}
+\end{center}
+
 
 \section{Shrink $R_6$}
 \label{sec:shrink-r6}
@@ -10705,6 +10732,33 @@ C_4 & ::= & \gray{ \PROGRAMDEFS{\itm{info}}{\LP\Def\ldots\RP} }
 
 \section{Select Instructions}
 \label{sec:select-r6}
+
+% TODO: talk about vector-ref and vector-set! -Jeremy
+
+%% Recall instruction selection for `vector-ref`:
+
+%%     (Assign lhs (Prim 'vector-ref (list evec (Int n))))
+%%     ===>
+%%     movq evec', %r11
+%%     movq offset(%r11), lhs'
+
+%%     where offset is 8(n+1)
+
+%% If the index is not of the form `(Int i)`, but an arbitrary
+%% expression, then instead of computing the offset `8(n+1)` at compile
+%% time, you can generate the following instructions. Note the use of the
+%% new instruction `imulq`.
+
+%%     (Assign lhs (Prim 'vector-ref (list evec en)))
+%%     ===>
+%%     movq en', %r11
+%%     addq $1, %r11
+%%     imulq $8, %r11
+%%     addq evec', %r11
+%%     movq 0(%r11) lhs'
+
+%% The same idea applies to `vector-set!`.
+
 
 \paragraph{Make-any}
 
