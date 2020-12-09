@@ -10733,32 +10733,45 @@ C_4 & ::= & \gray{ \PROGRAMDEFS{\itm{info}}{\LP\Def\ldots\RP} }
 \section{Select Instructions}
 \label{sec:select-r6}
 
-% TODO: talk about vector-ref and vector-set! -Jeremy
+\paragraph{Vector-ref}
 
-%% Recall instruction selection for `vector-ref`:
+Recall that instruction selection for \code{vector-ref} in
+Section~\ref{sec:select-instructions-gc} depends on knowing the index $n$
+at compile time:
+\begin{lstlisting}
+(Assign |$\itm{lhs}$| (Prim 'vector-ref (list |$\itm{vec}$| (Int |$n$|))))
+|$\Longrightarrow$|
+movq |$\itm{vec}'$|, %r11
+movq |$\itm{offset}$|(%r11), |$\itm{lhs'}$|
+\end{lstlisting}
+where $\itm{offset} = 8(n+1)$.
+%
+In $R_6$ the index may be an arbitrary expression so instead of
+computing the offset at compile time, instructions need to be
+generated to compute the offset at runtime as follows. Note the use of
+the new instruction \code{imulq}.
+\begin{center}
+\begin{minipage}{0.96\textwidth}
+\begin{lstlisting}
+(Assign |$\itm{lhs}$| (Prim 'vector-ref (list |$\itm{vec}$| |$e$|)))
+|$\Longrightarrow$|
+movq |$e'$|, %r11
+addq $1, %r11
+imulq $8, %r11
+addq |$\itm{vec'}$|, %r11
+movq 0(%r11) |$\itm{lhs'}$|
+\end{lstlisting}
+\end{minipage}
+\end{center}
 
-%%     (Assign lhs (Prim 'vector-ref (list evec (Int n))))
-%%     ===>
-%%     movq evec', %r11
-%%     movq offset(%r11), lhs'
+\paragraph{Vector-set!}
 
-%%     where offset is 8(n+1)
+The same issue discussed above for \code{vector-ref} also applies to
+\code{vector-set!}.  The index may be an arbitrary expression so one
+must generate instructions to compute the offset at runtime.
 
-%% If the index is not of the form `(Int i)`, but an arbitrary
-%% expression, then instead of computing the offset `8(n+1)` at compile
-%% time, you can generate the following instructions. Note the use of the
-%% new instruction `imulq`.
-
-%%     (Assign lhs (Prim 'vector-ref (list evec en)))
-%%     ===>
-%%     movq en', %r11
-%%     addq $1, %r11
-%%     imulq $8, %r11
-%%     addq evec', %r11
-%%     movq 0(%r11) lhs'
 
 %% The same idea applies to `vector-set!`.
-
 
 \paragraph{Make-any}
 
