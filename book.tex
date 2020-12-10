@@ -10487,8 +10487,6 @@ auxiliary function \code{apply-project} is in Figure~\ref{fig:apply-project}.
 \label{fig:type-check-R6-aux}
 \end{figure}
 
-% to do: add rules for vector-ref, etc. for Vectorof
-%Also, \key{eq?} is extended to operate on values of type \key{Any}.
 
 \begin{figure}[btp]
 \begin{lstlisting}
@@ -10593,20 +10591,10 @@ perform bounds checking at runtime.
         (exit))))
 \end{lstlisting}
 
-\begin{lstlisting}
-(vector-set! |$e_1$| |$e_2$| |$e_3$|)
-|$\Rightarrow$|
-(let ([v |$e'_1$|])
-  (let ([i |$e'_2$|])
-    (if (and (<= 0 i) (< i (vector-length v)))
-        (vector-set! v i |$e'_3$|)
-        (exit))))
-\end{lstlisting}
-
-Note that in the compiler for $R_7$, this pass comes after
-\code{shrink} so you should not literally use \code{and} and \code{<=}
-in the generated code for bounds checking, but instead expand those
-forms in the same way as \code{shrink}.
+In the compiler for $R_7$, this pass should come after \code{shrink},
+so you should not literally use \code{and} and \code{<=} in the
+generated code for bounds checking, but instead expand those forms in
+the same way as \code{shrink}.
 
 Because this pass depends on type information, we recommend
 implementing it as an extension to the type checker for $R_6$, as
@@ -10679,7 +10667,7 @@ of parameters in the function type matches the function's arity (using
 
 Regarding \code{inject}, we recommend compiling it to a slightly
 lower-level primitive operation named \code{make-any}. This operation
-takes a tag instead of a type. \\
+takes a tag instead of a type.
 \begin{center}
 \begin{minipage}{1.0\textwidth}
 \begin{lstlisting}
@@ -10690,8 +10678,9 @@ takes a tag instead of a type. \\
 \end{minipage}
 \end{center}
 
-We recommend translating the type predicates (\code{boolean?}, etc.)
-into uses of \code{tag-of-any} and \code{eq?}.
+The type predicates (\code{boolean?}, etc.) can be translated into
+uses of \code{tag-of-any} and \code{eq?} in a similar way as in the
+translation of \code{Project}.
 
 \section{Remove Complex Operands}
 \label{sec:rco-r6}
@@ -10705,7 +10694,7 @@ The subexpression of \code{ValueOf} must be atomic.
 The output of \code{explicate-control} is the $C_5$ language whose
 syntax is defined in Figure~\ref{fig:c5-syntax}. The \code{ValueOf}
 form that we added to $R_6$ remains an expression and the \code{Exit}
-expression becomes a statement.
+expression becomes a $\Tail$.
 
 
 \begin{figure}[tp]
@@ -10771,9 +10760,9 @@ movq 0(%r11) |$\itm{lhs'}$|
 
 \paragraph{Vector-set!}
 
-The same issue discussed above for \code{vector-ref} also applies to
-\code{vector-set!}.  The index may be an arbitrary expression so one
-must generate instructions to compute the offset at runtime.
+The above issue also applies to \code{vector-set!}.  The index may be
+an arbitrary expression so one must generate instructions to compute
+the offset at runtime.
 
 
 %% The same idea applies to `vector-set!`.
@@ -10795,8 +10784,8 @@ orq $|$\itm{tag}$|, |\itm{lhs'}|
 \end{lstlisting}
 The instruction selection for vectors and procedures is different
 because their is no need to shift them to the left. The rightmost 3
-bits are already zeros as described above. So we just combine the
-value and the tag using \key{orq}.  \\
+bits are already zeros as described at the beginning of this
+chapter. So we just combine the value and the tag using \key{orq}.  \\
 \begin{lstlisting}
 (Assign |\itm{lhs}| (Prim 'make-any (list |$e$| (Int |$\itm{tag}$|))))
 |$\Rightarrow$|
@@ -10853,10 +10842,11 @@ andq |$e'$|, |\itm{lhs'}|
 \label{sec:register-allocation-r6}
 \index{register allocation}
 
-As mentioned above, a variable of type \code{Any} might refer to a
-vector. Thus, the register allocator for $R_6$ needs to treat variable
-of type \code{Any} in the same way that it treats variables of type
-\code{Vector} for purposes of garbage collection. In particular,
+At the beginning of this chapter we discussed how a variable of type
+\code{Any} might refer to a vector. Thus, the register allocator for
+$R_6$ needs to treat variable of type \code{Any} in the same way that
+it treats variables of type \code{Vector} for purposes of garbage
+collection. In particular,
 \begin{itemize}
 \item If a variable of type \code{Any} is live during a function call,
   then it must be spilled. One way to accomplish this is to augment
@@ -10878,6 +10868,7 @@ previously created test programs.
 \section{Compiling $R_7$ to $R_6$}
 \label{sec:compile-r7}
 
+The \code{cast-insert} pass compiles from $R_7$ to $R_6$.
 Figure~\ref{fig:compile-r7-r6} shows the compilation of many of the
 $R_7$ forms into $R_6$. An important invariant of this pass is that
 given a subexpression $e$ in the $R_7$ program, the pass will produce
