@@ -5868,20 +5868,20 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
 \[
 \begin{array}{lcl}
   \Type &::=& \gray{\key{Integer} \mid \key{Boolean}}
-  \mid (\key{Vector}\;\Type\ldots) \mid \key{Void}\\
+  \mid \LP\key{Vector}\;\Type\ldots\RP \mid \key{Void}\\
   \Exp &::=& \gray{  \Int \mid \CREAD{} \mid \CNEG{\Exp} \mid \CADD{\Exp}{\Exp} \mid \CSUB{\Exp}{\Exp} }  \\
   &\mid&  \gray{  \Var \mid \CLET{\Var}{\Exp}{\Exp}  }\\
   &\mid& \gray{ \key{\#t} \mid \key{\#f} 
-   \mid (\key{and}\;\Exp\;\Exp) 
-   \mid (\key{or}\;\Exp\;\Exp)
-   \mid (\key{not}\;\Exp) } \\
-  &\mid& \gray{  (\itm{cmp}\;\Exp\;\Exp) 
+   \mid \LP\key{and}\;\Exp\;\Exp\RP 
+   \mid \LP\key{or}\;\Exp\;\Exp\RP
+   \mid \LP\key{not}\;\Exp\RP } \\
+  &\mid& \gray{  \LP\itm{cmp}\;\Exp\;\Exp\RP 
    \mid \CIF{\Exp}{\Exp}{\Exp}  } \\
-  &\mid& (\key{vector}\;\Exp\ldots) 
-   \mid (\key{vector-ref}\;\Exp\;\Int) \\
-  &\mid& (\key{vector-set!}\;\Exp\;\Int\;\Exp) 
-   \mid (\key{vector-length}\;\Exp) \\
-  &\mid& (\key{void}) \mid (\key{has-type}~\Exp~\Type)\\
+  &\mid& \LP\key{vector}\;\Exp\ldots\RP 
+   \mid \LP\key{vector-ref}\;\Exp\;\Int\RP \\
+  &\mid& \LP\key{vector-set!}\;\Exp\;\Int\;\Exp\RP 
+   \mid \LP\key{vector-length}\;\Exp\RP \\
+  &\mid& \LP\key{void}\RP \mid \LP\key{has-type}~\Exp~\Type\RP\\
   R_3 &::=& \Exp
 \end{array}
 \]
@@ -10251,10 +10251,8 @@ the tag can differentiation between vectors ($010$) and the other
 kinds of values.
 
 We implement our untyped language $R_7$ by compiling it to $R_6$
-(Section~\ref{sec:compile-r7}), but first we describe the how to
-extend our compiler to handle the new features of $R_6$
-(Sections~\ref{sec:shrink-r6}, \ref{sec:select-r6}, and
-\ref{sec:register-allocation-r6}).
+(Section~\ref{sec:compile-r7}), but first we describe the $R_6$
+language.
 
 \section{The $R_6$ Language: Typed Racket $+$ \key{Any}}
 \label{sec:r6-lang}
@@ -10270,10 +10268,11 @@ extend our compiler to handle the new features of $R_6$
     &\mid& \gray{\LP\Type\ldots \; \key{->}\; \Type\RP} \mid \key{Any} \\
   \FType &::=& \key{Integer} \mid \key{Boolean} \mid \key{Void} \mid \LP\key{Vectorof}\;\key{Any}\RP \mid \LP\key{Vector}\; \key{Any}\ldots\RP \\
     &\mid& \LP\key{Any}\ldots \; \key{->}\; \key{Any}\RP\\
-  \Exp &::=& \ldots 
-   \mid \CINJECT{\Exp}{\FType}\RP \mid \CPROJECT{\Exp}{\FType} \\
-  & \mid & \LP\key{boolean?}\;\Exp\RP \mid \LP\key{integer?}\;\Exp\RP\\
-  & \mid & \LP\key{vector?}\;\Exp\RP \mid \LP\key{procedure?}\;\Exp\RP \mid \LP\key{void?}\;\Exp\RP \\
+  \Exp &::=& \ldots \mid \LP\key{vector-ref}\;\Exp\;\Exp\RP 
+     \mid \LP\key{vector-set!}\;\Exp\;\Exp\;\Exp\RP\\
+  &\mid& \CINJECT{\Exp}{\FType}\RP \mid \CPROJECT{\Exp}{\FType} \\
+  &\mid& \LP\key{boolean?}\;\Exp\RP \mid \LP\key{integer?}\;\Exp\RP\\
+  &\mid& \LP\key{vector?}\;\Exp\RP \mid \LP\key{procedure?}\;\Exp\RP \mid \LP\key{void?}\;\Exp\RP \\
   \Def &::=& \gray{ \CDEF{\Var}{\LS\Var \key{:} \Type\RS\ldots}{\Type}{\Exp} } \\
   R_6 &::=& \gray{\Def\ldots \; \Exp}
 \end{array}
@@ -10294,10 +10293,12 @@ extend our compiler to handle the new features of $R_6$
 \begin{array}{lcl}
   \itm{op} &::= & \code{boolean?} \mid \code{integer?} \mid \code{vector?}
     \mid \code{procedure?} \mid \code{void?} \\
-  \Exp &::=& \ldots
-   \mid \INJECT{\Exp}{\FType} \mid \PROJECT{\Exp}{\FType} \\
+    \Exp &::=& \ldots
+     \mid \VECREF{\Exp}{\Exp}\\
+   &\mid& \VECSET{\Exp}{\Exp}{\Exp} \\
+   &\mid& \INJECT{\Exp}{\FType} \mid \PROJECT{\Exp}{\FType} \\
  \Def &::=& \gray{ \FUNDEF{\Var}{\LP[\Var \code{:} \Type]\ldots\RP}{\Type}{\code{'()}}{\Exp} }\\
-  R_5 &::=& \gray{ \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp} }
+  R_6 &::=& \gray{ \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp} }
 \end{array}
 \]
 \end{minipage}
@@ -10563,14 +10564,163 @@ auxiliary function \code{apply-project} is in Figure~\ref{fig:apply-project}.
 
 \clearpage
 
+\section{Cast Insertion: Compiling $R_7$ to $R_6$}
+\label{sec:compile-r7}
+
+The \code{cast-insert} pass compiles from $R_7$ to $R_6$.
+Figure~\ref{fig:compile-r7-r6} shows the compilation of many of the
+$R_7$ forms into $R_6$. An important invariant of this pass is that
+given a subexpression $e$ in the $R_7$ program, the pass will produce
+an expression $e'$ in $R_6$ that has type \key{Any}. For example, the
+first row in Figure~\ref{fig:compile-r7-r6} shows the compilation of
+the Boolean \code{\#t}, which must be injected to produce an
+expression of type \key{Any}.
+%
+The second row of Figure~\ref{fig:compile-r7-r6}, the compilation of
+addition, is representative of compilation for many primitive
+operations: the arguments have type \key{Any} and must be projected to
+\key{Integer} before the addition can be performed.
+
+The compilation of \key{lambda} (third row of
+Figure~\ref{fig:compile-r7-r6}) shows what happens when we need to
+produce type annotations: we simply use \key{Any}.
+%
+The compilation of \code{if} and \code{eq?}  demonstrate how this pass
+has to account for some differences in behavior between $R_7$ and
+$R_6$. The $R_7$ language is more permissive than $R_6$ regarding what
+kind of values can be used in various places. For example, the
+condition of an \key{if} does not have to be a Boolean. For \key{eq?},
+the arguments need not be of the same type (in that case the
+result is \code{\#f}).
+
+\begin{figure}[btp]
+\centering
+\begin{tabular}{|lll|} \hline
+\begin{minipage}{0.27\textwidth}
+\begin{lstlisting}
+#t
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.6\textwidth}
+\begin{lstlisting}
+(inject #t Boolean)
+\end{lstlisting}
+\end{minipage}
+\\[2ex]\hline
+\begin{minipage}{0.27\textwidth}
+\begin{lstlisting}
+(+ |$e_1$| |$e_2$|)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.6\textwidth}
+\begin{lstlisting}
+(inject
+   (+ (project |$e'_1$| Integer)
+      (project |$e'_2$| Integer))
+   Integer)
+\end{lstlisting}
+\end{minipage}
+\\[2ex]\hline
+\begin{minipage}{0.27\textwidth}
+\begin{lstlisting}
+(lambda (|$x_1 \ldots x_n$|) |$e$|)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.6\textwidth}
+\begin{lstlisting}
+(inject
+   (lambda: ([|$x_1$|:Any]|$\ldots$|[|$x_n$|:Any]):Any |$e'$|)
+   (Any|$\ldots$|Any -> Any))
+\end{lstlisting}
+\end{minipage}
+\\[2ex]\hline
+\begin{minipage}{0.27\textwidth}
+\begin{lstlisting}
+(|$e_0$| |$e_1 \ldots e_n$|)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.6\textwidth}
+\begin{lstlisting}
+((project |$e'_0$| (Any|$\ldots$|Any -> Any)) |$e'_1 \ldots e'_n$|)
+\end{lstlisting}
+\end{minipage}
+\\[2ex]\hline
+\begin{minipage}{0.27\textwidth}
+\begin{lstlisting}
+(vector-ref |$e_1$| |$e_2$|)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.6\textwidth}
+\begin{lstlisting}
+(let ([tmp1 (project |$e'_1$| (Vectorof Any))])
+  (let ([tmp2 (project |$e'_2$| Integer)])
+     (vector-ref tmp1 tmp2)))
+\end{lstlisting}
+\end{minipage}
+\\[2ex]\hline
+\begin{minipage}{0.27\textwidth}
+\begin{lstlisting}
+(if |$e_1$| |$e_2$| |$e_3$|)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.6\textwidth}
+\begin{lstlisting}
+(if (eq? |$e'_1$| (inject #f Boolean)) |$e'_3$| |$e'_2$|)
+\end{lstlisting}
+\end{minipage}
+\\[2ex]\hline
+\begin{minipage}{0.27\textwidth}
+\begin{lstlisting}
+(eq? |$e_1$| |$e_2$|)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.6\textwidth}
+\begin{lstlisting}
+(inject (eq? |$e'_1$| |$e'_2$|) Boolean)
+\end{lstlisting}
+\end{minipage}
+\\[2ex]\hline
+\end{tabular} 
+
+\caption{Cast Insertion}
+\label{fig:compile-r7-r6}
+\end{figure}
+
 \section{Check Bounds}
 \label{sec:check-bounds-r6}
 
-Regarding the \code{vector-ref} or \code{vector-set!} operations, when
-the type of the vector argument is \code{Vectorof}, the type checker
-for $R_6$ (Figure~\ref{fig:type-check-R6-part-1}) does not guarantee
-that the index is within bounds. Thus, we need to insert code to
-perform bounds checking at runtime.
+We have translated our $R_7$ programs to $R_6$, so now we proceed to
+compile $R_6$ to x86. The first pass is a new one named
+\code{check-bounds}. Note that the grammar for \code{vector-ref} or
+\code{vector-set!} operations has changed to allow arbitrary
+expressions for the index. If the type of the vector is of the form
+\code{(Vector ...)}, then type checker for $R_6$
+(Figure~\ref{fig:type-check-R6-part-1}) requires that the index be a
+literal integer and checks that it is in bounds. However, if the type
+of the vector is \code{(Vectorof T)}, then the type checker for $R_6$
+does not guarantee that the index is within bounds. Thus, we need to
+insert code to perform bounds checking at runtime.
 
 \begin{lstlisting}
 (vector-ref |$e_1$| |$e_2$|)
@@ -10856,148 +11006,6 @@ etc.). Test your compiler on these new programs and all of your
 previously created test programs.
 \end{exercise}
 
-\section{Compiling $R_7$ to $R_6$}
-\label{sec:compile-r7}
-
-The \code{cast-insert} pass compiles from $R_7$ to $R_6$.
-Figure~\ref{fig:compile-r7-r6} shows the compilation of many of the
-$R_7$ forms into $R_6$. An important invariant of this pass is that
-given a subexpression $e$ in the $R_7$ program, the pass will produce
-an expression $e'$ in $R_6$ that has type \key{Any}. For example, the
-first row in Figure~\ref{fig:compile-r7-r6} shows the compilation of
-the Boolean \code{\#t}, which must be injected to produce an
-expression of type \key{Any}.
-%
-The second row of Figure~\ref{fig:compile-r7-r6}, the compilation of
-addition, is representative of compilation for many primitive
-operations: the arguments have type \key{Any} and must be projected to
-\key{Integer} before the addition can be performed.
-
-The compilation of \key{lambda} (third row of
-Figure~\ref{fig:compile-r7-r6}) shows what happens when we need to
-produce type annotations: we simply use \key{Any}.
-%
-The compilation of \code{if} and \code{eq?}  demonstrate how this pass
-has to account for some differences in behavior between $R_7$ and
-$R_6$. The $R_7$ language is more permissive than $R_6$ regarding what
-kind of values can be used in various places. For example, the
-condition of an \key{if} does not have to be a Boolean. For \key{eq?},
-the arguments need not be of the same type (in that case the
-result is \code{\#f}).
-
-\begin{figure}[btp]
-\centering
-\begin{tabular}{|lll|} \hline
-\begin{minipage}{0.27\textwidth}
-\begin{lstlisting}
-#t
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.6\textwidth}
-\begin{lstlisting}
-(inject #t Boolean)
-\end{lstlisting}
-\end{minipage}
-\\[2ex]\hline
-\begin{minipage}{0.27\textwidth}
-\begin{lstlisting}
-(+ |$e_1$| |$e_2$|)
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.6\textwidth}
-\begin{lstlisting}
-(inject
-   (+ (project |$e'_1$| Integer)
-      (project |$e'_2$| Integer))
-   Integer)
-\end{lstlisting}
-\end{minipage}
-\\[2ex]\hline
-\begin{minipage}{0.27\textwidth}
-\begin{lstlisting}
-(lambda (|$x_1 \ldots x_n$|) |$e$|)
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.6\textwidth}
-\begin{lstlisting}
-(inject
-   (lambda: ([|$x_1$|:Any]|$\ldots$|[|$x_n$|:Any]):Any |$e'$|)
-   (Any|$\ldots$|Any -> Any))
-\end{lstlisting}
-\end{minipage}
-\\[2ex]\hline
-\begin{minipage}{0.27\textwidth}
-\begin{lstlisting}
-(|$e_0$| |$e_1 \ldots e_n$|)
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.6\textwidth}
-\begin{lstlisting}
-((project |$e'_0$| (Any|$\ldots$|Any -> Any)) |$e'_1 \ldots e'_n$|)
-\end{lstlisting}
-\end{minipage}
-\\[2ex]\hline
-\begin{minipage}{0.27\textwidth}
-\begin{lstlisting}
-(vector-ref |$e_1$| |$e_2$|)
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.6\textwidth}
-\begin{lstlisting}
-(let ([tmp1 (project |$e'_1$| (Vectorof Any))])
-  (let ([tmp2 (project |$e'_2$| Integer)])
-     (vector-ref tmp1 tmp2)))
-\end{lstlisting}
-\end{minipage}
-\\[2ex]\hline
-\begin{minipage}{0.27\textwidth}
-\begin{lstlisting}
-(if |$e_1$| |$e_2$| |$e_3$|)
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.6\textwidth}
-\begin{lstlisting}
-(if (eq? |$e'_1$| (inject #f Boolean)) |$e'_3$| |$e'_2$|)
-\end{lstlisting}
-\end{minipage}
-\\[2ex]\hline
-\begin{minipage}{0.27\textwidth}
-\begin{lstlisting}
-(eq? |$e_1$| |$e_2$|)
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.6\textwidth}
-\begin{lstlisting}
-(inject (eq? |$e'_1$| |$e'_2$|) Boolean)
-\end{lstlisting}
-\end{minipage}
-\\[2ex]\hline
-\end{tabular} 
-
-\caption{Compiling $R_7$ to $R_6$.}
-\label{fig:compile-r7-r6}
-\end{figure}
 
 
 \begin{exercise}\normalfont
