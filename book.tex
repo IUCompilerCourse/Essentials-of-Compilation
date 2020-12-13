@@ -10835,7 +10835,9 @@ The subexpression of \code{ValueOf} must be atomic.
 The output of \code{explicate-control} is the $C_5$ language whose
 syntax is defined in Figure~\ref{fig:c5-syntax}. The \code{ValueOf}
 form that we added to $R_6$ remains an expression and the \code{Exit}
-expression becomes a $\Tail$.
+expression becomes a $\Tail$. Also, note that the index argument of
+\code{vector-ref} and \code{vector-set!} is an $\Atm$ instead
+of an integer, as in $C_2$ (Figure~\ref{fig:c2-syntax}).
 
 
 \begin{figure}[tp]
@@ -10845,6 +10847,8 @@ expression becomes a $\Tail$.
 \[
 \begin{array}{lcl}
 \Exp &::= & \ldots
+   \mid \BINOP{\key{'vector-ref}}{\Atm}{\Atm}  \\
+   &\mid& (\key{Prim}~\key{'vector-set!}\,(\key{list}\,\Atm\,\Atm\,\Atm))
    \mid \VALUEOF{\Exp}{\FType} \\
 \Stmt &::=& \gray{ \ASSIGN{\VAR{\Var}}{\Exp} 
   \mid \LP\key{Collect} \,\itm{int}\RP }\\
@@ -10874,26 +10878,26 @@ Recall that instruction selection for \code{vector-ref} in
 Section~\ref{sec:select-instructions-gc} depends on knowing the index $n$
 at compile time:
 \begin{lstlisting}
-(Assign |$\itm{lhs}$| (Prim 'vector-ref (list |$\itm{vec}$| (Int |$n$|))))
+(Assign |$\itm{lhs}$| (Prim 'vector-ref (list |$a_1$| (Int |$n$|))))
 |$\Longrightarrow$|
-movq |$\itm{vec}'$|, %r11
+movq |$a_1'$|, %r11
 movq |$\itm{offset}$|(%r11), |$\itm{lhs'}$|
 \end{lstlisting}
 where $\itm{offset} = 8(n+1)$.
 %
-In $R_6$ the index may be an arbitrary expression so instead of
+In $R_6$ the index may be an arbitrary atom so instead of
 computing the offset at compile time, instructions need to be
 generated to compute the offset at runtime as follows. Note the use of
 the new instruction \code{imulq}.
 \begin{center}
 \begin{minipage}{0.96\textwidth}
 \begin{lstlisting}
-(Assign |$\itm{lhs}$| (Prim 'vector-ref (list |$\itm{vec}$| |$e$|)))
+(Assign |$\itm{lhs}$| (Prim 'vector-ref (list |$a_1$| |$a_2$|)))
 |$\Longrightarrow$|
-movq |$e'$|, %r11
+movq |$a_2'$|, %r11
 addq $1, %r11
 imulq $8, %r11
-addq |$\itm{vec'}$|, %r11
+addq |$a_1'$|, %r11
 movq 0(%r11) |$\itm{lhs'}$|
 \end{lstlisting}
 \end{minipage}
