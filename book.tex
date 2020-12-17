@@ -81,7 +81,7 @@
 \lstset{%
 language=Lisp,
 basicstyle=\ttfamily\small,
-morekeywords={seq,assign,program,block,define,lambda,match,goto,if,else,then,struct,Integer,Boolean,Vector,Void,while,begin,define,public,override,class},
+morekeywords={seq,assign,program,block,define,lambda,match,goto,if,else,then,struct,Integer,Boolean,Vector,Void,Any,while,begin,define,public,override,class},
 deletekeywords={read,mapping,vector},
 escapechar=|,
 columns=flexible,
@@ -1894,9 +1894,9 @@ each of the compiler passes in Figure~\ref{fig:R1-passes}.
 The output of \key{explicate-control} is similar to the $C$
 language~\citep{Kernighan:1988nx} in that it has separate syntactic
 categories for expressions and statements, so we name it $C_0$.  The
-concrete syntax for $C_0$ is defined in
-Figure~\ref{fig:c0-concrete-syntax} and the abstract syntax for $C_0$
-is defined in Figure~\ref{fig:c0-syntax}.
+abstract syntax for $C_0$ is defined in Figure~\ref{fig:c0-syntax}.
+(The concrete syntax for $C_0$ is in the Appendix,
+Figure~\ref{fig:c0-concrete-syntax}.)
 %
 The $C_0$ language supports the same operators as $R_1$ but the
 arguments of operators are restricted to atomic expressions (variables
@@ -1925,24 +1925,6 @@ The $\itm{info}$ field of the \key{Program} form, after the
 variables used in the program. At the start of the program, these
 variables are uninitialized; they become initialized on their first
 assignment.
-
-\begin{figure}[tbp]
-\fbox{
-\begin{minipage}{0.96\textwidth}
-\[
-\begin{array}{lcl}
-\Atm &::=& \Int \mid \Var \\
-\Exp &::=& \Atm \mid \key{(read)} \mid \key{(-}~\Atm\key{)} \mid \key{(+}~\Atm~\Atm\key{)}\\
-\Stmt &::=& \Var~\key{=}~\Exp\key{;} \\
-\Tail &::= & \key{return}~\Exp\key{;} \mid \Stmt~\Tail \\
-C_0 & ::= & (\itm{label}\key{:}~ \Tail)\ldots
-\end{array}
-\]
-\end{minipage}
-}
-\caption{The concrete syntax of the $C_0$ intermediate language.}
-\label{fig:c0-concrete-syntax}
-\end{figure}
 
 \begin{figure}[tbp]
 \fbox{
@@ -4779,42 +4761,19 @@ instruction to set the EFLAGS register.
 As with $R_1$, we compile $R_2$ to a C-like intermediate language, but
 we need to grow that intermediate language to handle the new features
 in $R_2$: Booleans and conditional expressions.
-Figure~\ref{fig:c1-concrete-syntax} defines the concrete syntax of
-$C_1$ and Figure~\ref{fig:c1-syntax} defines the abstract syntax.  In
-particular, we add logical and comparison operators to the $\Exp$
-non-terminal and the literals \key{\#t} and \key{\#f} to the $\Arg$
-non-terminal.  Regarding control flow, $C_1$ differs considerably from
-$R_2$.  Instead of \key{if} expressions, $C_1$ has \key{goto} and
-conditional \key{goto} in the grammar for $\Tail$. This means that a
-sequence of statements may now end with a \code{goto} or a conditional
-\code{goto}. The conditional \code{goto} jumps to one of two labels
-depending on the outcome of the comparison. In
-Section~\ref{sec:explicate-control-r2} we discuss how to translate
-from $R_2$ to $C_1$, bridging this gap between \key{if} expressions
-and \key{goto}'s.
-
-\begin{figure}[tbp]
-\fbox{
-\begin{minipage}{0.96\textwidth}
-\small    
-\[
-\begin{array}{lcl}
-\Atm &::=& \gray{ \Int \mid \Var } \mid \itm{bool} \\
-\itm{cmp} &::= & \key{eq?} \mid \key{<}  \\
-\Exp &::=& \gray{ \Atm \mid \key{(read)} \mid \key{(-}~\Atm\key{)} \mid \key{(+}~\Atm~\Atm\key{)} } \\
-   &\mid& \LP \key{not}~\Atm \RP \mid \LP \itm{cmp}~\Atm~\Atm\RP \\
-\Stmt &::=& \gray{ \Var~\key{=}~\Exp\key{;} } \\
-\Tail &::= & \gray{ \key{return}~\Exp\key{;} \mid \Stmt~\Tail } 
-   \mid \key{goto}~\itm{label}\key{;}\\
-   &\mid& \key{if}~\LP \itm{cmp}~\Atm~\Atm \RP~ \key{goto}~\itm{label}\key{;} ~\key{else}~\key{goto}~\itm{label}\key{;} \\
-C_1 & ::= & \gray{ (\itm{label}\key{:}~ \Tail)\ldots }
-\end{array}
-\]
-\end{minipage}
-}
-\caption{The concrete syntax of the $C_1$ intermediate language.}
-\label{fig:c1-concrete-syntax}
-\end{figure}
+Figure~\ref{fig:c1-syntax} defines the abstract syntax of $C_1$. (The
+concrete syntax is in the Appendix,
+Figure~\ref{fig:c1-concrete-syntax}.)  The $C_1$ language adds logical
+and comparison operators to the $\Exp$ non-terminal and the literals
+\key{\#t} and \key{\#f} to the $\Arg$ non-terminal.  Regarding control
+flow, $C_1$ differs considerably from $R_2$.  Instead of \key{if}
+expressions, $C_1$ has \key{goto} and conditional \key{goto} in the
+grammar for $\Tail$. This means that a sequence of statements may now
+end with a \code{goto} or a conditional \code{goto}. The conditional
+\code{goto} jumps to one of two labels depending on the outcome of the
+comparison. In Section~\ref{sec:explicate-control-r2} we discuss how
+to translate from $R_2$ to $C_1$, bridging this gap between \key{if}
+expressions and \key{goto}'s.
 
 \begin{figure}[tp]
 \fbox{
@@ -6571,31 +6530,6 @@ R^{\dagger}_3  &::=& \gray{ \PROGRAM{\code{'()}}{\Exp} }
 \section{Explicate Control and the $C_2$ language}
 \label{sec:explicate-control-r3}
 
-\begin{figure}[tbp]
-\fbox{
-\begin{minipage}{0.96\textwidth}
-\small    
-\[
-\begin{array}{lcl}
-\Atm &::=& \gray{ \Int \mid \Var \mid \itm{bool} } \\
-\itm{cmp} &::= & \gray{ \key{eq?} \mid \key{<} } \\
-\Exp &::=& \gray{ \Atm \mid \key{(read)} \mid \key{(-}~\Atm\key{)} \mid \key{(+}~\Atm~\Atm\key{)} } \\
-  &\mid& \gray{ \LP \key{not}~\Atm \RP \mid \LP \itm{cmp}~\Atm~\Atm\RP } \\
-&\mid& \LP \key{allocate}~\Int~\Type \RP \\
-  &\mid& (\key{vector-ref}\;\Atm\;\Int) \mid (\key{vector-set!}\;\Atm\;\Int\;\Atm)\\
-  &\mid& \LP \key{global-value}~\Var \RP \mid \LP \key{void} \RP \\
-\Stmt &::=& \gray{ \Var~\key{=}~\Exp\key{;} } \mid \LP\key{collect}~\Int \RP\\
-\Tail &::= & \gray{ \key{return}~\Exp\key{;} \mid \Stmt~\Tail } 
-   \mid \gray{ \key{goto}~\itm{label}\key{;} }\\
-   &\mid& \gray{ \key{if}~\LP \itm{cmp}~\Atm~\Atm \RP~ \key{goto}~\itm{label}\key{;} ~\key{else}~\key{goto}~\itm{label}\key{;} } \\
-C_2 & ::= & \gray{ (\itm{label}\key{:}~ \Tail)\ldots }
-\end{array}
-\]
-\end{minipage}
-}
-\caption{The concrete syntax of the $C_2$ intermediate language.}
-\label{fig:c2-concrete-syntax}
-\end{figure}
 
 \begin{figure}[tp]
 \fbox{
@@ -6628,13 +6562,14 @@ C_2 & ::= & \gray{ \PROGRAM{\itm{info}}{\CFG{(\itm{label}\,\key{.}\,\Tail)\ldots
 \end{figure}
 
 The output of \code{explicate-control} is a program in the
-intermediate language $C_2$, whose concrete syntax is defined in
-Figure~\ref{fig:c2-concrete-syntax} and whose abstract syntax is
-defined in Figure~\ref{fig:c2-syntax}.  The new forms of $C_2$ include
-the \key{allocate}, \key{vector-ref}, and \key{vector-set!}, and
-\key{global-value} expressions and the \code{collect} statement.  The
-\code{explicate-control} pass can treat these new forms much like the
-other expression forms that we've already encoutered.
+intermediate language $C_2$, whose abstract syntax is defined in
+Figure~\ref{fig:c2-syntax}.  (The concrete syntax is defined in
+Figure~\ref{fig:c2-concrete-syntax} of the Appendix.)  The new forms
+of $C_2$ include the \key{allocate}, \key{vector-ref}, and
+\key{vector-set!}, and \key{global-value} expressions and the
+\code{collect} statement.  The \code{explicate-control} pass can treat
+these new forms much like the other expression forms that we've
+already encoutered.
 
 
 \section{Select Instructions and the x86$_2$ Language}
@@ -7751,6 +7686,7 @@ The concrete syntax for a function reference is $\CFUNREF{f}$.
   (Figure~\ref{fig:r4-syntax}).}
 \label{fig:f1-syntax}
 \end{figure}
+% TODO: rename $F_1$ to $R'_4$
 
 %% Distinguishing between calls in tail position and non-tail position
 %% requires the pass to have some notion of context. We recommend using
@@ -7861,50 +7797,21 @@ R^{\dagger}_4  &::=& \gray{ \PROGRAMDEFS{\code{'()}}{\Def} }
 \section{Explicate Control and the $C_3$ language}
 \label{sec:explicate-control-r4}
 
-Figures~\ref{fig:c3-concrete-syntax} and \ref{fig:c3-syntax} define
-the concrete and abstract syntax for $C_3$, the output of
-\key{explicate-control}. The auxiliary functions for assignment and
-tail contexts should be updated with cases for \code{Apply} and
-\code{FunRef} and the function for predicate context should be updated
-for \code{Apply} but not \code{FunRef}.  (A \code{FunRef} can't be a
-Boolean.)  In assignment and predicate contexts, \code{Apply} becomes
-\code{Call}, whereas in tail position \code{Apply} becomes
-\code{TailCall}.  We recommend defining a new auxiliary function for
-processing function definitions.  This code is similar to the case for
-\code{Program} in $R_3$.  The top-level \code{explicate-control}
-function that handles the \code{ProgramDefs} form of $R_4$ can then
-apply this new function to all the function definitions.
+Figure~\ref{fig:c3-syntax} defines the abstract syntax for $C_3$, the
+output of \key{explicate-control}. (The concrete syntax is given in
+Figure~\ref{fig:c3-concrete-syntax} of the Appendix.) The auxiliary
+functions for assignment and tail contexts should be updated with
+cases for \code{Apply} and \code{FunRef} and the function for
+predicate context should be updated for \code{Apply} but not
+\code{FunRef}.  (A \code{FunRef} can't be a Boolean.)  In assignment
+and predicate contexts, \code{Apply} becomes \code{Call}, whereas in
+tail position \code{Apply} becomes \code{TailCall}.  We recommend
+defining a new auxiliary function for processing function definitions.
+This code is similar to the case for \code{Program} in $R_3$.  The
+top-level \code{explicate-control} function that handles the
+\code{ProgramDefs} form of $R_4$ can then apply this new function to
+all the function definitions.
 
-\begin{figure}[tp]
-\fbox{
-\begin{minipage}{0.96\textwidth}
-\small
-\[
-\begin{array}{lcl}
-\Atm &::=& \gray{ \Int \mid \Var \mid \key{\#t} \mid \key{\#f} }
-  \\
-\itm{cmp} &::= & \gray{  \key{eq?} \mid \key{<} } \\
-\Exp &::= & \gray{ \Atm \mid \LP\key{read}\RP \mid \LP\key{-}\;\Atm\RP \mid \LP\key{+} \; \Atm\;\Atm\RP
-      \mid \LP\key{not}\;\Atm\RP \mid \LP\itm{cmp}\;\Atm\;\Atm\RP  } \\
-   &\mid& \gray{  \LP\key{allocate}\,\Int\,\Type\RP
-   \mid \LP\key{vector-ref}\, \Atm\, \Int\RP  } \\
-   &\mid& \gray{  \LP\key{vector-set!}\,\Atm\,\Int\,\Atm\RP \mid \LP\key{global-value} \,\itm{name}\RP \mid \LP\key{void}\RP } \\
-   &\mid& \LP\key{fun-ref}~\itm{label}\RP \mid \LP\key{call} \,\Atm\,\Atm\ldots\RP \\
-\Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Exp} 
-       \mid \LP\key{collect} \,\itm{int}\RP }\\
-\Tail &::= & \gray{\RETURN{\Exp} \mid \LP\key{seq}\;\Stmt\;\Tail\RP} \\
-      &\mid& \gray{\LP\key{goto}\,\itm{label}\RP
-       \mid \IF{\LP\itm{cmp}\, \Atm\,\Atm\RP}{\LP\key{goto}\,\itm{label}\RP}{\LP\key{goto}\,\itm{label}\RP}} \\
-      &\mid& \LP\key{tail-call}\,\Atm\,\Atm\ldots\RP \\
-  \Def &::=& \LP\key{define}\; \LP\itm{label} \; [\Var \key{:} \Type]\ldots\RP \key{:} \Type \; \LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP\RP \\
-C_3 & ::= & \Def\ldots
-\end{array}
-\]
-\end{minipage}
-}
-\caption{The $C_3$ language, extending $C_2$ (Figure~\ref{fig:c2-concrete-syntax}) with functions.}
-\label{fig:c3-concrete-syntax}
-\end{figure}
 
 \begin{figure}[tp]
 \fbox{
@@ -10036,12 +9943,13 @@ for the compilation of $R_8$.
 \index{dynamic typing}
 
 In this chapter we discuss the compilation of $R_7$, a dynamically
-typed language and a subset of the Racket language. In contrast, the
-previous chapters have studies the compilation of Typed Racket. In
-dynamically typed languages, a given expression may produce a value of
-a different type each time it is executed. Consider the following
-example with a conditional \code{if} expression that may return a
-Boolean or an integer depending on the input to the program.
+typed language and a subset of the Racket language. This is in
+contrast to the previous chapters, which have studied the compilation
+of Typed Racket. In dynamically typed languages such as $R_7$, a given
+expression may produce a value of a different type each time it is
+executed. Consider the following example with a conditional \code{if}
+expression that may return a Boolean or an integer depending on the
+input to the program.
 \begin{lstlisting}
    (not (if (eq? (read) 1) #f 0))
 \end{lstlisting}
@@ -11096,16 +11004,636 @@ for the compilation of $R_7$.
 \label{ch:gradual-typing}
 \index{gradual typing}
 
-This chapter will be based on the ideas of \citet{Siek:2006bh}.
+This chapter studies a language, $R_9$, in which the programmer can
+choose between static and dynamic type checking for different regions
+of a program, thereby mixing the statically typed $R_8$ language with
+the dynamically typed $R_7$. There are several approaches to mixing
+static and dynamic typing, including multi-language
+integration~\citep{Tobin-Hochstadt:2006fk,Matthews:2007zr} and hybrid
+type checking~\citep{Flanagan:2006mn,Gronski:2006uq}. In this chapter
+we focus on \emph{gradual typing}\index{gradual typing}, in which the
+programmer controls the amount of static versus dynamic checking by
+adding or removing type annotations on parameters and
+variables~\citep{Anderson:2002kd,Siek:2006bh}.
+
+% TODO: syntax
+
+Both the type checker and the interpreter for $R_9$ require some
+interesting changes to enable gradual typing, which we discuss in the
+next two section while revisiting the \code{map-vec} example from
+Chapter~\ref{ch:functions}.  In Figure~\ref{fig:gradual-map-vec} we
+present the example again but this time we leave off the type
+annotations from the \code{add1}.
+
+\begin{figure}[btp]
+\begin{lstlisting}
+(define (map-vec [f : (Integer -> Integer)]
+                   [v : (Vector Integer Integer)])
+                   : (Vector Integer Integer)
+  (vector (f (vector-ref v 0)) (f (vector-ref v 1))))
+(define (add1 x) (+ x 1))
+
+(vector-ref (map-vec add1 (vector 0 41)) 1)
+\end{lstlisting}
+\caption{A partially-typed version of the \code{map-vec} example.}
+\label{fig:gradual-map-vec}
+\end{figure}
+
+\section{Type Checking $R_9$}
+\label{sec:gradual-type-check}
+
+The type checker for $R_9$ uses the \code{Any} type for missing
+parameter and return types. For example, the \code{x} parameter of
+\code{add1} is given the type \code{Any} and the return type of
+\code{add1} is \code{Any}. Next consider the \code{+} operator inside
+\code{add1}. It expects both arguments to have type \code{Integer},
+but its first argument, \code{x}, has type \code{Any}.  In a gradual
+typed language, such differences are allowed so long as the types are
+\emph{consistent}, that is, they are equal except regarding the
+presence or absence of the \code{Any} type. Thus, the type \code{Any}
+is consistent with any other type, including \code{Integer}.
+Figure~\ref{fig:consistent} defines the \code{consistent?} predicate.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+(define (consistent? t1 t2)
+  (match* (t1 t2)
+    [('Integer 'Integer) #t]
+    [('Boolean 'Boolean) #t]
+    [('Void 'Void) #t]
+    [('Any t2) #t]
+    [(t1 'Any) #t]
+    [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))
+     (for/and ([t1 ts1] [t2 ts2]) (consistent? t1 t2))]
+    [(`(,ts1 ... -> ,rt1) `(,ts2 ... -> ,rt2))
+     (and (for/and ([t1 ts1] [t2 ts2]) (consistent? t1 t2))
+          (consistent? rt1 rt2))]
+    [(other wise) #f]))
+\end{lstlisting}
+\caption{The consistency predicate on types.}
+\label{fig:consistent}
+\end{figure}
+
+Returning to the \code{map-vec} example, the \code{add1}
+function has type \code{(Any -> Any)} but parameter
+\code{f} of \code{map-vec} has type \code{(Integer -> Integer)}.
+The type checker for $R_9$ allows this because the two types are consistent.
+In particular, \code{->} is equal to \code{->} and the domain and range types,
+\code{Any} and \code{Integer}, are consistent.
+
+Next consider a program with an error, such as applying the
+\code{map-vec} to a function that sometimes returns a Boolean, as
+shown in Figure~\ref{fig:map-vec-maybe-add1}.  The type checker for
+$R_9$ accepts this program because the type of \code{maybe-add1},
+\code{(Any -> Any)}, is consistent with \code{(Integer -> Integer)},
+the type of parameter \code{f} of \code{map-vec}.  However, running
+this program with input \code{1} triggers an error when the
+\code{maybe-add1} function returns \code{\#t}. $R_9$ performs checking
+at runtime to ensure the integrity of the static types, such as the
+\code{(Integer -> Integer)} annotation on parameter \code{f} of
+\code{map-vec}.  This runtime checking is carried out by a new
+\code{cast} form that is inserted by the type checker.  Thus, the
+output of the type checker is a program in the $R'_9$ language, which
+adds \code{cast} to $R_9$.
+
+% TODO: grammar for $R'_9$
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+(define (map-vec [f : (Integer -> Integer)]
+                   [v : (Vector Integer Integer)])
+                   : (Vector Integer Integer)
+  (vector (f (vector-ref v 0)) (f (vector-ref v 1))))
+(define (add1 x) (+ x 1))
+(define (true) #t)
+(define (maybe-add1 x) (if (eq? 0 (read)) (add1 x) (true)))
+
+(vector-ref (map-vec maybe-add1 (vector 0 41)) 0)
+\end{lstlisting}
+\caption{A variant of the \code{map-vec} example with an error.}
+\label{fig:map-vec-maybe-add1}
+\end{figure}
+
+Figure~\ref{fig:map-vec-cast} shows the output of the type checker for
+\code{map-vec} and \code{maybe-add1}.  The idea is that \code{cast} is
+inserted every time the type checker sees two types that are
+consistent but not equal. In the \code{add1} function, \code{x} is
+cast to \code{Integer} and the result of the \code{+} is cast to
+\code{Any}.  In the call to \code{map-vec}, the \code{add1} argument
+is cast from \code{(Any -> Any)} to \code{(Integer -> Integer)}.
+
+\begin{figure}[btp]
+\begin{lstlisting}
+(define (map-vec [f : (Integer -> Integer)]
+                   [v : (Vector Integer Integer)])
+                   : (Vector Integer Integer)
+  (vector (f (vector-ref v 0)) (f (vector-ref v 1))))
+(define (add1 [x : Any]) : Any
+  (cast (+ (cast x Any Integer) 1) Integer Any))
+(define (true) : Any (cast #t Boolean Any))
+(define (maybe-add1 [x : Any]) : Any
+  (if (eq? 0 (read)) (add1 x) (true)))
+
+(vector-ref (map-vec (cast maybe-add1 (Any -> Any)
+                                          (Integer -> Integer))
+                       (vector 0 41))
+              0)
+\end{lstlisting}
+\caption{Output from type checking \code{map-vec}
+  and \code{maybe-add1}.}
+\label{fig:map-vec-cast}
+\end{figure}
 
 
-\section{The $R_9$ gradually-typed language}
+The type checker for $R_9$ is defined in
+Figures~\ref{fig:type-check-R9-1}, \ref{fig:type-check-R9-2},
+\ref{fig:type-check-R9-3}, and \ref{fig:type-check-R9-4}.
 
-% syntax
 
-% interpreter
+\begin{figure}[tbp]
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+(define type-check-gradual-class
+  (class type-check-R8-class
+    (super-new)
+    (inherit check-type-equal? operator-types type-predicates)
+    
+    (define/public (check-consistent? t1 t2 e)
+      (unless (consistent? t1 t2)
+        (error 'type-check "~a is inconsistent with ~a\nin ~v" t1 t2 e)))
 
-% type checker
+    (define/override (type-check-op op arg-types args e)
+      (match (dict-ref (operator-types) op)
+        [`(,param-types . ,return-type)
+         (for ([at arg-types] [pt param-types]) 
+           (check-consistent? at pt e))
+         (values return-type
+                 (for/list ([e args] [s arg-types] [t param-types])
+                   (make-cast e s t)))]
+        [else (error 'type-check-op "unrecognized ~a" op)]))
+
+    (define explicit-prim-ops
+      (set-union (type-predicates)
+       (set 'procedure-arity 'eq?
+            'vector 'vector-length 'vector-ref 'vector-set!
+            'any-vector-length 'any-vector-ref 'any-vector-set!)))
+    
+    (define/override (type-check-exp env)
+      (lambda (e)
+	(define recur (type-check-exp env))
+	(match e
+          [(Prim 'eq? (list e1 e2))
+           (define-values (e1^ t1) (recur e1))
+           (define-values (e2^ t2) (recur e2))
+           (check-consistent? t1 t2 e)
+           (define T (meet t1 t2))
+           (values (Prim 'eq? (list (make-cast e1^ t1 T) (make-cast e2^ t2 T)))
+                   'Boolean)]
+	  [(Prim 'vector-length (list e1))
+           (define-values (e1^ t) (recur e1))
+	   (match t
+             ['Any (values (Prim 'any-vector-length (list e1^)) 'Integer)]
+             [`(Vector ,ts ...)
+              (values (Prim 'vector-length (list e1^)) 'Integer)])]
+\end{lstlisting}
+\caption{Type checker for the $R_9$ language, part 1.}
+\label{fig:type-check-R9-1}
+\end{figure}
+
+\begin{figure}[tbp]
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+	  [(Prim 'vector-ref (list e1 e2))
+           (define-values (e1^ t) (recur e1))
+           (define-values (e2^ it) (recur e2))
+           (check-consistent? it 'Integer e)
+	   (match (list t e2^)
+             [(list 'Any ei)
+              (define e2^^ (make-cast e2^ it 'Integer))
+              (values (Prim 'any-vector-ref (list e1^ e2^^)) 'Any)]
+	     [(list `(Vector ,ts ...) (Int i))
+              (unless (and (0 . <= . i) (i . < . (length ts)))
+                (error 'type-check "invalid index ~a in ~a" i e))
+              (values (Prim 'vector-ref (list e1^ (Int i))) (list-ref ts i))])]
+	  [(Prim 'vector-set! (list e1 e2 e3) )
+           (define-values (e1^ t-vec) (recur e1))
+           (define-values (e2^ it) (recur e2))
+           (define-values (e3^ t-arg) (recur e3))
+           (check-consistent? it 'Integer e)
+	   (match t-vec
+	     [`(Vector ,ts ...)
+              (match e2^
+                [(Int i)
+                 (unless (and (0 . <= . i) (i . < . (length ts)))
+                   (error 'type-check "invalid index ~a in ~a" i e))
+                 (check-consistent? (list-ref ts i) t-arg e)
+                 (define e3^^ (make-cast e3^ t-arg (list-ref ts i)))
+                 (values (Prim 'vector-set! (list e1^ (Int i) e3^^)) 'Void)])]
+             ['Any
+              (define e2^^ (make-cast e2^ it 'Integer))
+              (define e3^^ (make-cast e3^ t-arg 'Any))
+              (values (Prim 'any-vector-set! (list e1^ e2^^ e3^^)) 'Void)]
+	     [else
+              (error 'type-check "expected vector not ~a\nin ~v" t-vec e)])]
+	  [(Prim op es)
+           #:when (not (set-member? explicit-prim-ops op))
+           (define-values (new-es ts)
+             (for/lists (exprs types) ([e es])
+               (recur e)))
+           (define-values (t-ret new-es^) (type-check-op op ts new-es e))
+           (values (Prim op new-es^) t-ret)]
+          [(If cnd thn els)
+           (define-values (c Tc) (recur cnd))
+	   (define-values (t Tt) (recur thn))
+	   (define-values (e Te) (recur els))
+	   (check-consistent? Tc 'Boolean e)
+	   (check-consistent? Tt Te e)
+           (define Tb (join Tt Te))
+	   (values (If (make-cast c Tc 'Boolean) (make-cast t Tt Tb)
+                       (make-cast e Te Tb)) Tb)]
+\end{lstlisting}
+\caption{Type checker for the $R_9$ language, part 2.}
+\label{fig:type-check-R9-2}
+\end{figure}
+
+
+\begin{figure}[tbp]
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+          [(HasType e1 T)
+           (define-values (e1^ T1) (recur e1))
+           (check-consistent? T1 T)
+           (values (make-cast e1^ T1 T) T)]
+	  [(Apply e es)
+	   (define-values (e* ty*) (for/lists (e* ty*) ([e (in-list es)])
+                                     (recur e)))
+	   (define-values (e^ ty) (recur e))
+	   (match ty
+	     [`(,ty^* ... -> ,rt)
+              (for ([arg-ty ty*] [param-ty ty^*])
+                (check-consistent? arg-ty param-ty e))
+              (define new-args (for/list ([e e*] [s ty*] [t ty^*])
+                                 (make-cast e s t)))
+	      (values (Apply e^ new-args) rt)]
+             [`Any
+              (define new-fun
+                (make-cast e^ 'Any `(,@(for/list ([e es]) 'Any) -> Any)))
+              (define new-args (for/list ([e e*] [s ty*])
+                                 (make-cast e s 'Any)))
+              (values (Apply new-fun new-args) 'Any)]
+	     [else (error 'type-check
+                          "expected a function, not ~a\nin ~v" ty e)])]
+          [(Lambda params rT body)
+           (define-values (xs Ts) (for/lists (l1 l2) ([p params])
+                                    (match p
+                                      [`[,x : ,T] (values x T)]
+                                      [(? symbol? x) (values x 'Any)])))
+           (define-values (new-body bodyT) 
+             ((type-check-exp (append (map cons xs Ts) env)) body))
+           (check-consistent? rT bodyT e)
+           (values (Lambda (for/list ([x xs] [T Ts]) `[,x : ,T]) rT
+                           (make-cast new-body bodyT rT)) `(,@Ts -> ,rT))]
+          [(SetBang x rhs)
+           (define-values (rhs^ rhsT) (recur rhs))
+           (define varT (dict-ref env x))
+           (check-consistent? rhsT varT e)
+           (values (SetBang x (make-cast rhs^ rhsT varT)) 'Void)]
+          [(WhileLoop cnd body)
+           (define-values (cnd^ Tc) (recur cnd))
+           (check-consistent? Tc 'Boolean e)
+           (define-values (body^ Tbody) ((type-check-exp env) body))
+           (values (WhileLoop (make-cast cnd^ Tc 'Boolean) body^) 'Void)]
+          [else  ((super type-check-exp env) e)]
+          )))
+\end{lstlisting}
+\caption{Type checker for the $R_9$ language, part 3.}
+\label{fig:type-check-R9-3}
+\end{figure}
+
+
+
+\begin{figure}[tbp]
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+    (define/override (fun-def-type d)
+      (match d
+	[(Def f params rt info body)
+         (debug 'fun-def-type "parameters:" params)
+         (define ps
+           (for/list ([p params])
+             (match p
+               [`[,x : ,T] T]
+               [(? symbol?) 'Any]
+               [else (error 'fun-def-type "unmatched parameter ~a" p)])))
+	 `(,@ps -> ,rt)]
+	[else (error 'fun-def-type "ill-formed function definition in ~a" d)]))
+
+    (define/override (type-check-def env)
+      (lambda (e)
+	(match e
+	  [(Def f params rt info body)
+           (define-values (xs ps) (for/lists (l1 l2) ([p params])
+                                    (match p
+                                      [`[,x : ,T] (values x T)]
+                                      [(? symbol? x) (values x 'Any)])))
+	   (define new-env (append (map cons xs ps) env))
+	   (define-values (body^ ty^) ((type-check-exp new-env) body))
+	   (check-consistent? ty^ rt e)
+	   (Def f (for/list ([x xs] [T ps]) `[,x : ,T]) rt info
+             (make-cast body^ ty^ rt))]
+	  [else (error 'type-check "ill-formed function definition ~a" e)]
+	  )))
+    
+    (define/override (type-check-program e)
+      (match e
+        [(Program info body)
+         (define-values (body^ ty) ((type-check-exp '()) body))
+         (check-consistent? ty 'Integer e)
+         (ProgramDefsExp info '() (make-cast body^ ty 'Integer))]
+        [(ProgramDefsExp info ds body)
+         (define new-env (for/list ([d ds]) 
+                           (cons (Def-name d) (fun-def-type d))))
+         (define ds^ (for/list ([d ds])
+                       ((type-check-def new-env) d)))
+         (define-values (body^ ty) ((type-check-exp new-env) body))
+         (check-consistent? ty 'Integer e)
+         (ProgramDefsExp info ds^ (make-cast body^ ty 'Integer))]
+        [else (super type-check-program e)]))
+    
+    ))
+
+(define (type-check-gradual p)
+  (send (new type-check-gradual-class) type-check-program p))
+\end{lstlisting}
+\caption{Type checker for the $R_9$ language, part 4.}
+\label{fig:type-check-R9-4}
+\end{figure}
+
+  
+\begin{figure}[tbp]
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+(define (join t1 t2)
+  (match* (t1 t2)
+    [('Integer 'Integer) 'Integer]
+    [('Boolean 'Boolean) 'Boolean]
+    [('Void  'Void) 'Void]
+    [('Any t2) t2]
+    [(t1 'Any) t1]
+    [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))
+     `(Vector ,@(for/list ([t1 ts1] [t2 ts2]) (join t1 t2)))]
+    [(`(,ts1 ... -> ,rt1) `(,ts2 ... -> ,rt2))
+     `(,@(for/list ([t1 ts1] [t2 ts2]) (join t1 t2))
+       -> ,(join rt1 rt2))]
+    [(other wise) (error 'join "inconsistent types ~a and ~a" t1 t2)]))
+
+(define (meet t1 t2)
+  (match* (t1 t2)
+    [('Integer 'Integer) 'Integer]
+    [('Boolean  'Boolean) 'Boolean]
+    [('Void 'Void) 'Void]
+    [('Any t2) 'Any]
+    [(t1 'Any) 'Any]
+    [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))
+     `(Vector ,@(for/list ([t1 ts1] [t2 ts2]) (meet t1 t2)))]
+    [(`(,ts1 ... -> ,rt1) `(,ts2 ... -> ,rt2))
+     `(,@(for/list ([t1 ts1] [t2 ts2]) (meet t1 t2))
+       -> ,(meet rt1 rt2))]
+    [(other wise) (error 'meet "inconsistent types ~a and ~a" t1 t2)]))
+
+(define (make-cast e src tgt)
+  (cond [(equal? src tgt) e]
+        [else (Cast e src tgt)]))
+\end{lstlisting}
+\caption{Auxiliary functions for type checking $R_9$.}
+\label{fig:type-check-R9-aux}
+\end{figure}
+
+\clearpage
+
+\section{Interpreting $R'_9$}
+\label{sec:interp-casts}
+
+The runtime behavior of first-order casts is straightforward, that is,
+casts involving simple types such as \code{Integer} and
+\code{Boolean}.  For example, a cast from \code{Integer} to \code{Any}
+can be accomplished with the \code{inject} operator of $R_6$, which
+puts the integer into a tagged value
+(Figure~\ref{fig:interp-R6}). Similarly, a cast from \code{Any} to
+\code{Integer} is accomplished with the \code{project} operator, that
+is, by checking the value's tag and either retrieving the underlying
+integer or signaling an error if it the tag is not the one for
+integers (Figure~\ref{fig:apply-project}).
+%
+Things get more interesting for higher-order casts, that is, casts
+involving function or vector types.
+
+Consider the cast of the function \code{maybe-add1} from \code{(Any ->
+  Any)} to \code{(Integer -> Integer)}. When a function flows through
+this cast at runtime, we can't know in general whether the function
+will always return an integer.\footnote{Predicting the return value of
+  a function is equivalent to the halting problem, which is
+  undecidable.}  The $R'_9$ interpreter therefore delays the checking
+of the cast until the function is applied. This is accomplished by
+wrapping \code{maybe-add1} in a new function that casts its parameter
+from \code{Integer} to \code{Any}, applies \code{maybe-add1}, and then
+casts the return value from \code{Any} to \code{Integer}.
+
+Turning our attention to casts involving vector types, we consider the
+example in Figure~\ref{fig:map-vec-bang} that defines a
+partially-typed version of \code{map-vec} whose parameter \code{v} has
+type \code{(Vector Any Any)} and that updates \code{v} in place
+instead of returning a new vector. So we name this function
+\code{map-vec!}. We apply \code{map-vec!} to a vector of integers, so
+the type checker inserts a cast from \code{(Vector Integer Integer)}
+to \code{(Vector Any Any)}. A naive way for the $R'_9$ interpreter to
+cast between vector types would be a build a new vector whose elements
+are the result of casting each of the original elements to the
+appropriate target type. However, this approach is only valid for
+immutable vectors; and our vectors are mutable. In the example of
+Figure~\ref{fig:map-vec-bang}, if the cast created a new vector, then
+the updates inside of \code{map-vec!} would happen to the new vector
+and not the original one.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+(define (map-vec! [f : (Any -> Any)]
+                  [v : (Vector Any Any)]) : Void
+  (begin
+    (vector-set! v 0 (f (vector-ref v 0)))
+    (vector-set! v 1 (f (vector-ref v 1)))))
+
+(define (add1 x) (+ x 1))
+
+(let ([v (vector 0 41)])
+  (begin (map-vec! add1 v) (vector-ref v 1)))
+\end{lstlisting}
+\caption{An example involving casts on vectors.}
+\label{fig:map-vec-bang}
+\end{figure}
+
+Instead the interpreter needs to create a new kind of value, a
+\emph{vector proxy}, that interposes on every vector operation. On a
+read, the proxy reads from the underlying vector and then applies a
+cast to the resulting value.  On a write, the proxy casts the argument
+value and then performs the write to the underlying vector. For the
+first \code{(vector-ref v 0)} in \code{map-vec!}, the proxy casts
+\code{0} from \code{Integer} to \code{Any}.  For the first
+\code{vector-set!}, the proxy casts a tagged \code{1} from \code{Any}
+to \code{Integer}.
+
+The final category of cast that we need to consider are casts between
+the \code{Any} type and either a function or a
+vector. Figure~\ref{fig:map-vec-any} shows a variant of
+\code{map-vec!} in which parameter \code{v} does not have a type
+annotation, so it is given type \code{Any}. In the call to
+\code{map-vec!}, the vector has type \code{(Vector Integer Integer)}
+so the type checker inserts a cast from \code{(Vector Integer
+  Integer)} to \code{Any}. A first thought is to use \code{inject},
+but that doesn't work because \code{(Vector Integer Integer)} is not a
+flat type. Instead, we must first cast to \code{(Vector Any Any)}
+(which is flat) and then inject to \code{Any}. 
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+(define (map-vec! [f : (Any -> Any)] v) : Void
+  (begin
+    (vector-set! v 0 (f (vector-ref v 0)))
+    (vector-set! v 1 (f (vector-ref v 1)))))
+
+(define (add1 x) (+ x 1))
+
+(let ([v (vector 0 41)])
+  (begin (map-vec! add1 v) (vector-ref v 1)))
+\end{lstlisting}
+\caption{}
+\label{fig:map-vec-any}
+\end{figure}
+
+The $R'_9$ interpreter uses an auxiliary function named
+\code{apply-cast} to cast a value from a source type to a target type,
+shown in Figure~\ref{fig:apply-cast}. You'll find that it handles all
+of the kinds of casts that we've discussed in this section.
+
+\begin{figure}[tbp]
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+(define/public (apply-cast v s t)
+  (match* (s t)
+    [(t1 t2) #:when (equal? t1 t2) v]
+    [('Any t2) 
+     (match t2
+       [`(,ts ... -> ,rt)
+        (define any->any `(,@(for/list ([t ts]) 'Any) -> Any))
+        (define v^ (apply-project v any->any))
+        (apply-cast v^ any->any `(,@ts -> ,rt))]
+       [`(Vector ,ts ...)
+        (define vec-any `(Vector ,@(for/list ([t ts]) 'Any)))
+        (define v^ (apply-project v vec-any))
+        (apply-cast v^ vec-any `(Vector ,@ts))]
+       [else (apply-project v t2)])]
+    [(t1 'Any) 
+     (match t1
+       [`(,ts ... -> ,rt)
+        (define any->any `(,@(for/list ([t ts]) 'Any) -> Any))
+        (define v^ (apply-cast v `(,@ts -> ,rt) any->any))
+        (apply-inject v^ (any-tag any->any))]
+       [`(Vector ,ts ...)
+        (define vec-any `(Vector ,@(for/list ([t ts]) 'Any)))
+        (define v^ (apply-cast v `(Vector ,@ts) vec-any))
+        (apply-inject v^ (any-tag vec-any))]
+       [else (apply-inject v (any-tag t1))])]
+    [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))
+     (define x (gensym 'x))
+     (define cast-reads (for/list ([t1 ts1] [t2 ts2])
+                          `(function (,x) ,(Cast (Var x) t1 t2) ())))
+     (define cast-writes
+       (for/list ([t1 ts1] [t2 ts2])
+         `(function (,x) ,(Cast (Var x) t2 t1) ())))
+     `(vector-proxy ,(vector v (apply vector cast-reads)
+                             (apply vector cast-writes)))]
+    [(`(,ts1 ... -> ,rt1) `(,ts2 ... -> ,rt2))
+     (define xs (for/list ([t2 ts2]) (gensym 'x)))
+     `(function ,xs ,(Cast
+                      (Apply (Value v)
+                             (for/list ([x xs][t1 ts1][t2 ts2])
+                               (Cast (Var x) t2 t1)))
+                      rt1 rt2) ())]
+    ))
+\end{lstlisting}
+\caption{The \code{apply-cast} auxiliary method.}
+  \label{fig:apply-cast}
+\end{figure}
+
+The interpreter for $R'_9$ is defined in
+Figure~\ref{fig:interp-R9-prime}, with the case for \code{Cast}
+dispatching to \code{apply-cast}. To handle the addition of vector
+proxies, we update the vector primitives in \code{interp-op} using the
+auxiliary functions in Figure~\ref{fig:guarded-vector}.
+
+\begin{figure}[tbp]
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+(define interp-R9-prime-class
+  (class interp-R8-class
+    (super-new)
+    (inherit apply-fun apply-inject apply-project)
+
+    (define/override (interp-op op)
+      (match op
+        ['vector-length guarded-vector-length]
+        ['vector-ref guarded-vector-ref]
+        ['vector-set! guarded-vector-set!]
+        ['any-vector-ref (lambda (v i)
+                           (match v [`(tagged ,v^ ,tg)
+                                     (guarded-vector-ref v^ i)]))]
+        ['any-vector-set! (lambda (v i a)
+                            (match v [`(tagged ,v^ ,tg)
+                                      (guarded-vector-set! v^ i a)]))]
+        ['any-vector-length (lambda (v)
+                              (match v [`(tagged ,v^ ,tg)
+                                        (guarded-vector-length v^)]))]
+        [else (super interp-op op)]
+        ))
+
+    (define/override ((interp-exp env) e)
+      (define (recur e) ((interp-exp env) e))
+      (match e
+        [(Value v) v]
+        [(Cast e src tgt) (apply-cast (recur e) src tgt)]
+        [else ((super interp-exp env) e)]))
+    ))
+
+(define (interp-R9-prime p)
+  (send (new interp-R9-prime-class) interp-program p))
+\end{lstlisting}
+\caption{The interpreter for $R'_9$.}
+  \label{fig:interp-R9-prime}
+\end{figure}
+
+
+\begin{figure}[tbp]
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+    (define (guarded-vector-ref vec i)
+      (match vec
+        [`(vector-proxy ,proxy)
+         (define val (guarded-vector-ref (vector-ref proxy 0) i))
+         (define rd (vector-ref (vector-ref proxy 1) i))
+         (apply-fun rd (list val) 'guarded-vector-ref)]
+        [else (vector-ref vec i)]))
+        
+    (define (guarded-vector-set! vec i arg)
+      (match vec
+        [`(vector-proxy ,proxy)
+         (define wr (vector-ref (vector-ref proxy 2) i))
+         (define arg^ (apply-fun wr (list arg) 'guarded-vector-set!))
+         (guarded-vector-set! (vector-ref proxy 0) i arg^)]
+        [else (vector-set! vec i arg)]))
+        
+    (define (guarded-vector-length vec)
+      (match vec
+        [`(vector-proxy ,proxy)
+         (guarded-vector-length (vector-ref proxy 0))]
+        [else (vector-length vec)]))
+\end{lstlisting}
+\caption{The guarded-vector auxiliary functions.}
+  \label{fig:guarded-vector}
+\end{figure}
+
+
 
 \section{Lower Casts}
 \label{sec:lower-casts}
@@ -11325,6 +11853,113 @@ registers.
   \caption{Quick-reference for the x86 instructions used in this book.}
   \label{tab:x86-instr}
 \end{table}
+
+\cleardoublepage
+
+\section{Concrete Syntax for Intermediate Languages}
+
+The concrete syntax for $C_0$, $C_1$, $C_2$ and $C_3$ is
+defined in Figures~\ref{fig:c0-concrete-syntax},
+\ref{fig:c1-concrete-syntax}, \ref{fig:c2-concrete-syntax},
+and \ref{fig:c3-concrete-syntax}, respectively.
+
+\begin{figure}[tbp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{lcl}
+\Atm &::=& \Int \mid \Var \\
+\Exp &::=& \Atm \mid \key{(read)} \mid \key{(-}~\Atm\key{)} \mid \key{(+}~\Atm~\Atm\key{)}\\
+\Stmt &::=& \Var~\key{=}~\Exp\key{;} \\
+\Tail &::= & \key{return}~\Exp\key{;} \mid \Stmt~\Tail \\
+C_0 & ::= & (\itm{label}\key{:}~ \Tail)\ldots
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The concrete syntax of the $C_0$ intermediate language.}
+\label{fig:c0-concrete-syntax}
+\end{figure}
+
+\begin{figure}[tbp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\small    
+\[
+\begin{array}{lcl}
+\Atm &::=& \gray{ \Int \mid \Var } \mid \itm{bool} \\
+\itm{cmp} &::= & \key{eq?} \mid \key{<}  \\
+\Exp &::=& \gray{ \Atm \mid \key{(read)} \mid \key{(-}~\Atm\key{)} \mid \key{(+}~\Atm~\Atm\key{)} } \\
+   &\mid& \LP \key{not}~\Atm \RP \mid \LP \itm{cmp}~\Atm~\Atm\RP \\
+\Stmt &::=& \gray{ \Var~\key{=}~\Exp\key{;} } \\
+\Tail &::= & \gray{ \key{return}~\Exp\key{;} \mid \Stmt~\Tail } 
+   \mid \key{goto}~\itm{label}\key{;}\\
+   &\mid& \key{if}~\LP \itm{cmp}~\Atm~\Atm \RP~ \key{goto}~\itm{label}\key{;} ~\key{else}~\key{goto}~\itm{label}\key{;} \\
+C_1 & ::= & \gray{ (\itm{label}\key{:}~ \Tail)\ldots }
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The concrete syntax of the $C_1$ intermediate language.}
+\label{fig:c1-concrete-syntax}
+\end{figure}
+
+\begin{figure}[tbp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\small    
+\[
+\begin{array}{lcl}
+\Atm &::=& \gray{ \Int \mid \Var \mid \itm{bool} } \\
+\itm{cmp} &::= & \gray{ \key{eq?} \mid \key{<} } \\
+\Exp &::=& \gray{ \Atm \mid \key{(read)} \mid \key{(-}~\Atm\key{)} \mid \key{(+}~\Atm~\Atm\key{)} } \\
+  &\mid& \gray{ \LP \key{not}~\Atm \RP \mid \LP \itm{cmp}~\Atm~\Atm\RP } \\
+&\mid& \LP \key{allocate}~\Int~\Type \RP \\
+  &\mid& (\key{vector-ref}\;\Atm\;\Int) \mid (\key{vector-set!}\;\Atm\;\Int\;\Atm)\\
+  &\mid& \LP \key{global-value}~\Var \RP \mid \LP \key{void} \RP \\
+\Stmt &::=& \gray{ \Var~\key{=}~\Exp\key{;} } \mid \LP\key{collect}~\Int \RP\\
+\Tail &::= & \gray{ \key{return}~\Exp\key{;} \mid \Stmt~\Tail } 
+   \mid \gray{ \key{goto}~\itm{label}\key{;} }\\
+   &\mid& \gray{ \key{if}~\LP \itm{cmp}~\Atm~\Atm \RP~ \key{goto}~\itm{label}\key{;} ~\key{else}~\key{goto}~\itm{label}\key{;} } \\
+C_2 & ::= & \gray{ (\itm{label}\key{:}~ \Tail)\ldots }
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The concrete syntax of the $C_2$ intermediate language.}
+\label{fig:c2-concrete-syntax}
+\end{figure}
+
+\begin{figure}[tp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\small
+\[
+\begin{array}{lcl}
+\Atm &::=& \gray{ \Int \mid \Var \mid \key{\#t} \mid \key{\#f} }
+  \\
+\itm{cmp} &::= & \gray{  \key{eq?} \mid \key{<} } \\
+\Exp &::= & \gray{ \Atm \mid \LP\key{read}\RP \mid \LP\key{-}\;\Atm\RP \mid \LP\key{+} \; \Atm\;\Atm\RP
+      \mid \LP\key{not}\;\Atm\RP \mid \LP\itm{cmp}\;\Atm\;\Atm\RP  } \\
+   &\mid& \gray{  \LP\key{allocate}\,\Int\,\Type\RP
+   \mid \LP\key{vector-ref}\, \Atm\, \Int\RP  } \\
+   &\mid& \gray{  \LP\key{vector-set!}\,\Atm\,\Int\,\Atm\RP \mid \LP\key{global-value} \,\itm{name}\RP \mid \LP\key{void}\RP } \\
+   &\mid& \LP\key{fun-ref}~\itm{label}\RP \mid \LP\key{call} \,\Atm\,\Atm\ldots\RP \\
+\Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \mid \RETURN{\Exp} 
+       \mid \LP\key{collect} \,\itm{int}\RP }\\
+\Tail &::= & \gray{\RETURN{\Exp} \mid \LP\key{seq}\;\Stmt\;\Tail\RP} \\
+      &\mid& \gray{\LP\key{goto}\,\itm{label}\RP
+       \mid \IF{\LP\itm{cmp}\, \Atm\,\Atm\RP}{\LP\key{goto}\,\itm{label}\RP}{\LP\key{goto}\,\itm{label}\RP}} \\
+      &\mid& \LP\key{tail-call}\,\Atm\,\Atm\ldots\RP \\
+  \Def &::=& \LP\key{define}\; \LP\itm{label} \; [\Var \key{:} \Type]\ldots\RP \key{:} \Type \; \LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP\RP \\
+C_3 & ::= & \Def\ldots
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The $C_3$ language, extending $C_2$ (Figure~\ref{fig:c2-concrete-syntax}) with functions.}
+\label{fig:c3-concrete-syntax}
+\end{figure}
 
 \cleardoublepage
 
