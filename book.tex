@@ -929,14 +929,22 @@ It produces an error:
 fx+: result is not a fixnum
 \end{lstlisting}
 We establish the convention that if running the definitional
-interpreter on a program produces an error, then the meaning of that
-program is \emph{unspecified}. That means a compiler for the language
-is under no obligations regarding that program; it may or may not
-produce an executable, and if it does, that executable can do
-anything. This convention applies to the languages defined in this
-book, as a way to simplify the student's task of implementing them,
-but this convention is not applicable to all programming languages.
-\index{unspecified behavior}
+interpreter on a program produces an error other than
+\code{trapped-error}, then the meaning of that program is
+\emph{unspecified}\index{unspecified behavior}. That means a compiler
+for the language is under no obligations regarding that program; it
+may or may not produce an executable, and if it does, that executable
+can do anything.  On the other hand, if the error is a
+\code{trapped-error}, then the compiled program is also required to
+report that an error occurred. To signal an error, exit with a return
+code of \code{255}.  The interpreters in chapters
+\ref{ch:type-dynamic} and \ref{ch:gradual-typing} use
+\code{trapped-error}.
+
+%% This convention applies to the languages defined in this
+%% book, as a way to simplify the student's task of implementing them,
+%% but this convention is not applicable to all programming languages.
+%% 
 
 Moving on to the last feature of the $R_0$ language, the \key{read}
 operation prompts the user of the program for an integer.  Recall that
@@ -9024,9 +9032,9 @@ work of \citet{Keep:2012ab}.
 \index{dynamic typing}
 
 In this chapter we discuss the compilation of $R_7$, a dynamically
-typed language and a subset of the Racket language. This is in
-contrast to the previous chapters, which have studied the compilation
-of Typed Racket. In dynamically typed languages such as $R_7$, a given
+typed language that is a subset of Racket. This is in contrast to the
+previous chapters, which have studied the compilation of Typed
+Racket. In dynamically typed languages such as $R_7$, a given
 expression may produce a value of a different type each time it is
 executed. Consider the following example with a conditional \code{if}
 expression that may return a Boolean or an integer depending on the
@@ -9120,81 +9128,166 @@ defined in Figures~\ref{fig:r7-concrete-syntax} and
 %
 There is no type checker for $R_7$ because it is not a statically
 typed language (it's dynamically typed!).
-%
+
 The definitional interpreter for $R_7$ is presented in
-Figure~\ref{fig:interp-R7}.
+Figure~\ref{fig:interp-R7} and its auxiliary functions are defined in
+Figure~\ref{fig:interp-R7-aux}. Consider the match clause for
+\code{(Int n)}.  Instead of simply returning the integer \code{n} (as
+in the interpreter for $R_1$ in Figure~\ref{fig:interp-R1}), the
+interpreter for $R_7$ creates a \emph{tagged value}\index{tagged
+  value} that combines an underlying value with a tag that identifies
+what kind of value it is. We define the following struct
+to represented tagged values.
+\begin{lstlisting}
+(struct Tagged (value tag) #:transparent)
+\end{lstlisting}
+The tags are \code{Integer}, \code{Boolean}, \code{Void},
+\code{Vector}, and \code{Procedure}. Tags are closely related to types
+but don't always capture all the information that a type does. For
+example, a vector of type \code{(Vector Any Any)} is tagged with
+\code{Vector} and a procedure of type \code{(Any Any -> Any)}
+is tagged with \code{Procedure}.
+
+Next consider the match clause for \code{vector-ref}.  The
+\code{check-tag} auxiliary function (Figure~\ref{fig:interp-R7-aux})
+is used to ensure that the first argument is a vector and the second
+is an integer. If they are not, a \code{trapped-error} is raised.
+Recall from Section~\ref{sec:interp-R0} that when a definition
+interpreter raises a \code{trapped-error} error, the compiled code
+must also signal an error by exiting with return code \code{255}.  A
+\code{trapped-error} is also raised if the index is not less than
+length of the vector.
+
 
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define (interp-R7-exp env)
-  (lambda (ast)
-    (define recur (interp-R7-exp env))
-    (match ast
-      [(Var x) (lookup x env)]
-      [(Int n) `(tagged ,n Integer)]
-      [(Bool b) `(tagged ,b Boolean)]
-      [(Prim 'read '()) `(tagged ,(read-fixnum) Integer)]
-      [(Lambda xs rt body)
-       `(tagged (lambda ,xs ,body ,env) (,@(for/list ([x xs]) 'Any) -> Any))]
-      [(Prim 'vector es)
-       `(tagged ,(apply vector (for/list ([e es]) (recur e)))
-                (Vector ,@(for/list ([e es]) 'Any)))]
-      [(Prim 'vector-set! (list e1 n e2))
-       (define vec (value-of-any (recur e1)))
-       (define i (value-of-any (recur n)))
-       (vector-set! vec i (recur e2))
-       `(tagged ,(void) Void)]
-      [(Prim 'vector-ref (list e1 n))
-       (define vec (value-of-any (recur e1)))
-       (define i (value-of-any (recur n)))
-       (vector-ref vec i)]
-      [(Let x e body)
-       (define v (recur e))
-       ((interp-R7-exp (cons (cons x v) env)) body)]
-      [(Prim 'and (list e1 e2))
-       (recur (If e1 e2 (Bool #f)))]
-      [(Prim 'or (list e1 e2))
-       (define v1 (recur e1))
-       (match (value-of-any v1) [#f (recur e2)] [else v1])]
-      [(Prim 'eq? (list l r))
-       `(tagged ,(equal? (recur l) (recur r)) Boolean)]
-      [(If q t f)
-       (match (value-of-any (recur q)) [#f (recur f)] [else (recur t)])]
-      [(Prim op es)
-       (tag-value
-        (apply (interp-op op) (for/list ([e es]) (value-of-any (recur e)))))]
-      [(Apply f es)
-       (define new-args (map recur es))
-       (let ([f-val (value-of-any (recur f))])
-         (match f-val 
-           [`(function (,xs ...) ,body ,lam-env)
-            (define new-env (append (map cons xs new-args) lam-env))
-            ((interp-R7-exp new-env) body)]
-           [else (error "interp-R7-exp, expected function, not" f-val)]))]
-      )))
+(define ((interp-R7-exp env) ast)
+  (define recur (interp-R7-exp env))
+  (match ast
+    [(Var x) (lookup x env)]
+    [(Int n) (Tagged n 'Integer)]
+    [(Bool b) (Tagged b 'Boolean)]
+    [(Lambda xs rt body)
+     (Tagged `(function ,xs ,body ,env) 'Procedure)]
+    [(Prim 'vector es)
+     (Tagged (apply vector (for/list ([e es]) (recur e))) 'Vector)]
+    [(Prim 'vector-ref (list e1 e2))
+     (define vec (recur e1)) (define i (recur e2))
+     (check-tag vec 'Vector ast) (check-tag i 'Integer ast)
+     (unless (< (Tagged-value i) (vector-length (Tagged-value vec)))
+       (error 'trapped-error "index ~a too big\nin ~v" (Tagged-value i) ast))
+     (vector-ref (Tagged-value vec) (Tagged-value i))]
+    [(Prim 'vector-set! (list e1 e2 e3))
+     (define vec (recur e1)) (define i (recur e2)) (define arg (recur e3))
+     (check-tag vec 'Vector ast) (check-tag i 'Integer ast)
+     (unless (< (Tagged-value i) (vector-length (Tagged-value vec)))
+       (error 'trapped-error "index ~a too big\nin ~v" (Tagged-value i) ast))
+     (vector-set! (Tagged-value vec) (Tagged-value i) arg)
+     (Tagged (void) 'Void)]
+    [(Let x e body) ((interp-R7-exp (cons (cons x (recur e)) env)) body)]
+    [(Prim 'and (list e1 e2)) (recur (If e1 e2 (Bool #f)))]
+    [(Prim 'or (list e1 e2))
+     (define v1 (recur e1))
+     (match (Tagged-value v1) [#f (recur e2)] [else v1])]
+    [(Prim 'eq? (list l r)) (Tagged (equal? (recur l) (recur r)) 'Boolean)]
+    [(Prim op (list e1))
+     #:when (set-member? type-predicates op)
+     (tag-value ((interp-op op) (Tagged-value (recur e1))))]
+    [(Prim op es)
+     (define args (map recur es))
+     (define tags (for/list ([arg args]) (Tagged-tag arg)))
+     (unless (for/or ([expected-tags (op-tags op)])
+               (equal? expected-tags tags))
+       (error 'trapped-error "illegal argument tags ~a\nin ~v" tags ast))
+     (tag-value
+      (apply (interp-op op) (for/list ([a args]) (Tagged-value a))))]
+    [(If q t f)
+     (match (Tagged-value (recur q)) [#f (recur f)] [else (recur t)])]
+    [(Apply f es)
+     (define new-f (recur f)) (define args (map recur es))
+     (check-tag new-f 'Procedure ast) (define f-val (Tagged-value new-f))
+     (match f-val 
+       [`(function ,xs ,body ,lam-env)
+        (unless (eq? (length xs) (length args))
+         (error 'trapped-error "~a != ~a\nin ~v" (length args) (length xs) ast))
+        (define new-env (append (map cons xs args) lam-env))
+        ((interp-R7-exp new-env) body)]
+       [else (error "interp-R7-exp, expected function, not" f-val)])]))
 \end{lstlisting}
 \caption{Interpreter for the $R_7$ language.}
 \label{fig:interp-R7}
 \end{figure}
 
+\begin{figure}[tbp]
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+(define (interp-op op)
+  (match op
+    ['+ fx+]
+    ['- fx-]
+    ['read read-fixnum]
+    ['not (lambda (v) (match v [#t #f] [#f #t]))]
+    ['< (lambda (v1 v2)
+	  (cond [(and (fixnum? v1) (fixnum? v2)) (< v1 v2)]))]
+    ['<= (lambda (v1 v2)
+	   (cond [(and (fixnum? v1) (fixnum? v2)) (<= v1 v2)]))]
+    ['> (lambda (v1 v2)
+	  (cond [(and (fixnum? v1) (fixnum? v2)) (> v1 v2)]))]
+    ['>= (lambda (v1 v2)
+	   (cond [(and (fixnum? v1) (fixnum? v2)) (>= v1 v2)]))]
+    ['boolean? boolean?]
+    ['integer? fixnum?]
+    ['void? void?]
+    ['vector? vector?]
+    ['vector-length vector-length]
+    ['procedure? (match-lambda
+                   [`(functions ,xs ,body ,env) #t] [else #f])]
+    [else (error 'interp-op "unknown operator" op)]))
 
-Let us consider how we might compile $R_7$ to x86, thinking about the
-first example above. Our bit-level representation of the Boolean
-\code{\#f} is zero and similarly for the integer \code{0}.  However,
-\code{(not \#f)} should produce \code{\#t} whereas \code{(not 0)}
-should produce \code{\#f}. Furthermore, the behavior of \code{not}, in
-general, cannot be determined at compile time, but depends on the
-runtime type of its input, as in the example above that depends on the
-result of \code{(read)}.
+(define (op-tags op)
+  (match op
+    ['+ '((Integer Integer))]
+    ['- '((Integer Integer) (Integer))]
+    ['read '(())]
+    ['not '((Boolean))]
+    ['< '((Integer Integer))]
+    ['<= '((Integer Integer))]
+    ['> '((Integer Integer))]
+    ['>= '((Integer Integer))]
+    ['vector-length '((Vector))]))
 
-The way around this problem is to include information about a value's
-runtime type in the value itself, so that this information can be
-inspected by operators such as \code{not}.  In particular, we 
-steal the 3 right-most bits from our 64-bit values to encode the
-runtime type.  We use $001$ to identify integers, $100$ for
-Booleans, $010$ for vectors, $011$ for procedures, and $101$ for the
-void value. We refer to these 3 bits as the \emph{tag} and we
-define the following auxiliary function.
+(define type-predicates
+  (set 'boolean? 'integer? 'vector? 'procedure? 'void?))
+
+(define (tag-value v)
+  (cond [(boolean? v) (Tagged v 'Boolean)]
+        [(fixnum? v) (Tagged v 'Integer)]
+        [(procedure? v) (Tagged v 'Procedure)]
+        [(vector? v) (Tagged v 'Vector)]
+        [(void? v) (Tagged v 'Void)]
+        [else (error 'tag-value "unidentified value ~a" v)]))
+
+(define (check-tag val expected ast)
+  (define tag (Tagged-tag val))
+  (unless (eq? tag expected)
+    (error 'trapped-error "expected ~a, not ~a\nin ~v" expected tag ast)))
+\end{lstlisting}
+\caption{Auxiliary functions for the $R_7$ interpreter.}
+\label{fig:interp-R7-aux}
+\end{figure}
+
+\clearpage
+
+\section{Representation of Tagged Values}
+
+The interpreter for $R_7$ introduced a new kind of value, a tagged
+value. To compile $R_7$ to x86 we must decide how to represent tagged
+values at the bit level. Because almost every operation in $R_7$
+involves manipulating tagged values, the representation must be
+efficient. Recall that all of our values are 64 bits.  We shall steal
+the 3 right-most bits to encode the tag.  We use $001$ to identify
+integers, $100$ for Booleans, $010$ for vectors, $011$ for procedures,
+and $101$ for the void value. We define the following auxiliary
+function for mapping types to tag codes.
 \begin{align*}
 \itm{tagof}(\key{Integer}) &= 001 \\
 \itm{tagof}(\key{Boolean}) &= 100 \\
@@ -9202,77 +9295,23 @@ define the following auxiliary function.
 \itm{tagof}((\ldots \key{->} \ldots)) &= 011 \\
 \itm{tagof}(\key{Void}) &= 101
 \end{align*}
-This stealing of 3 bits comes at some
-price: our integers are reduced to ranging from $-2^{60}$ to
-$2^{60}$. The stealing does not adversely affect vectors and
-procedures because those values are addresses, and our addresses are
-8-byte aligned so the rightmost 3 bits are unused, they are always
-$000$. Thus, we do not lose information by overwriting the rightmost 3
-bits with the tag and we can simply zero-out the tag to recover the
-original address.
+This stealing of 3 bits comes at some price: our integers are reduced
+to ranging from $-2^{60}$ to $2^{60}$. The stealing does not adversely
+affect vectors and procedures because those values are addresses, and
+our addresses are 8-byte aligned so the rightmost 3 bits are unused,
+they are always $000$. Thus, we do not lose information by overwriting
+the rightmost 3 bits with the tag and we can simply zero-out the tag
+to recover the original address.
 
-In some sense, these tagged values are a new kind of value.  Indeed,
-we can extend our \emph{typed} language with tagged values by adding a
-new type to classify them, called \key{Any}, and with operations for
-creating and using tagged values, yielding the $R_6$ language that we
-define in Section~\ref{sec:r6-lang}. The $R_6$ language provides the
-fundamental support for polymorphism and runtime types that we need to
-support dynamic typing.
+To make tagged values into first-class entities, we can give them a
+type, called \code{Any}, and define operations such as \code{Inject}
+and \code{Project} for creating and using them, yielding the $R_6$
+intermediate language. We describe how to compile $R_7$ to $R_6$ in
+Section~\ref{sec:compile-r7} but first we describe the $R_6$ language
+in greater detail.
 
-There is an interesting interaction between tagged values and garbage
-collection.  A variable of type \code{Any} might refer to a vector and
-therefore it might be a root that needs to be inspected and copied
-during garbage collection. Thus, we need to treat variables of type
-\code{Any} in a similar way to variables of type \code{Vector} for
-purposes of register allocation, which we discuss in
-Section~\ref{sec:register-allocation-r6}. One concern is that, if a
-variable of type \code{Any} is spilled, it must be spilled to the root
-stack.  But this means that the garbage collector needs to be able to
-differentiate between (1) plain old pointers to tuples, (2) a tagged
-value that points to a tuple, and (3) a tagged value that is not a
-tuple. We enable this differentiation by choosing not to use the tag
-$000$ in $\itm{tagof}$. Instead, that bit pattern is reserved for
-identifying plain old pointers to tuples. That way, if one of the
-first three bits is set, then we have a tagged value and inspecting
-the tag can differentiation between vectors ($010$) and the other
-kinds of values.
-
-We implement our untyped language $R_7$ by compiling it to $R_6$
-(Section~\ref{sec:compile-r7}), but first we describe the $R_6$
-language.
-
-\section{The $R_6$ Language: Typed Racket $+$ \key{Any}}
+\section{The $R_6$ Language}
 \label{sec:r6-lang}
-
-\begin{figure}[tp]
-\centering
-\fbox{
-\begin{minipage}{0.97\textwidth}\small
-\[
-\begin{array}{lcl}
-  \Type &::=& \gray{\key{Integer} \mid \key{Boolean}
-     \mid \LP\key{Vector}\;\Type\ldots\RP \mid \key{Void}} \\
-    &\mid& \gray{\LP\Type\ldots \; \key{->}\; \Type\RP} \mid \key{Any} \\
-\FType &::=& \key{Integer} \mid \key{Boolean} \mid \key{Void} 
-      \mid \LP\key{Vector}\; \key{Any}\ldots\RP \\
-     &\mid& \LP\key{Any}\ldots \; \key{->}\; \key{Any}\RP\\
-\Exp &::=& \ldots \CINJECT{\Exp}{\FType}\RP \mid \CPROJECT{\Exp}{\FType}\\
-  &\mid& \LP\key{any-vector-length}\;\Exp\RP
-   \mid \LP\key{any-vector-ref}\;\Exp\;\Exp\RP \\
-  &\mid& \LP\key{any-vector-set!}\;\Exp\;\Exp\;\Exp\RP\\
-  &\mid& \LP\key{boolean?}\;\Exp\RP \mid \LP\key{integer?}\;\Exp\RP
-   \mid \LP\key{void?}\;\Exp\RP \\
-  &\mid& \LP\key{vector?}\;\Exp\RP \mid \LP\key{procedure?}\;\Exp\RP \\
-  \Def &::=& \gray{ \CDEF{\Var}{\LS\Var \key{:} \Type\RS\ldots}{\Type}{\Exp} } \\
-  R_6 &::=& \gray{\Def\ldots \; \Exp}
-\end{array}
-\]
-\end{minipage}
-}
-\caption{The concrete syntax of $R_6$, extending $R_5$ (Figure~\ref{fig:r5-syntax})
-  with \key{Any}.}
-\label{fig:r6-concrete-syntax}
-\end{figure}
 
 \begin{figure}[tp]
 \centering
@@ -9299,18 +9338,17 @@ language.
 \end{figure}
 
 
-The concrete and abstract syntax of $R_6$ is defined in
-Figures~\ref{fig:r6-concrete-syntax} and \ref{fig:r6-syntax}.  The
-$\LP\key{inject}\; e\; T\RP$ form converts the value produced by
-expression $e$ of type $T$ into a tagged value.  The
-$\LP\key{project}\;e\;T\RP$ form converts the tagged value produced by
-expression $e$ into a value of type $T$ or else halts the program if
-the type tag is not equivalent to $T$.
+The abstract syntax of $R_6$ is defined in Figure~\ref{fig:r6-syntax}.
+(The concrete syntax of $R_6$ is in the Appendix,
+Figure~\ref{fig:r6-concrete-syntax}.)  The $\INJECT{e}{T}$ form
+converts the value produced by expression $e$ of type $T$ into a
+tagged value.  The $\PROJECT{e}{T}$ form converts the tagged value
+produced by expression $e$ into a value of type $T$ or else halts the
+program if the type tag is not equivalent to $T$.
 %
-Note that in both \key{inject} and \key{project}, the type $T$ is
-restricted to the flat types $\FType$, which simplifies the
-implementation and corresponds with what is needed for compiling
-untyped Racket.
+Note that in both \code{Inject} and \code{Project}, the type $T$ is
+restricted to a flat type $\FType$, which simplifies the
+implementation and corresponds with what is needed for compiling $R_7$.
 
 The \code{any-vector} operators adapt the vector operations so that
 they can be applied to a value of type \code{Any}.  They also
@@ -9318,9 +9356,9 @@ generalize the vector operations in that the index is not restricted
 to be a literal integer in the grammar but is allowed to be any
 expression.
 
-The type predicates such as $\LP\key{boolean?}\,e\RP$ expect the
-expression $e$ to produce a tagged value; they return \key{\#t} if the
-tag corresponds to the predicate and they return \key{\#f} otherwise.
+The type predicates such as \key{boolean?} expect their argument to
+produce a tagged value; they return \key{\#t} if the tag corresponds
+to the predicate and they return \key{\#f} otherwise.
 
 The type checker for $R_6$ is shown in
 Figures~\ref{fig:type-check-R6-part-1} and
@@ -9484,6 +9522,12 @@ auxiliary function \code{apply-project} is in Figure~\ref{fig:apply-project}.
          (match-lambda
            [`(tagged ,v^ ,tg)  tg]
            [v  (error 'interp-op "expected tagged value, not ~a" v)])]
+        ['any-vector-ref (lambda (v i)
+                           (match v [`(tagged ,v^ ,tg) (vector-ref v^ i)]))]
+        ['any-vector-set! (lambda (v i a)
+                            (match v [`(tagged ,v^ ,tg) (vector-set! v^ i a)]))]
+        ['any-vector-length (lambda (v)
+                            (match v [`(tagged ,v^ ,tg) (vector-length v^)]))]
         [else (super interp-op op)]))
 
     (define/override ((interp-exp env) e)
@@ -9508,32 +9552,34 @@ auxiliary function \code{apply-project} is in Figure~\ref{fig:apply-project}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(define (apply-project v ty2)
+(define/public (apply-inject v tg) (Tagged v tg))
+
+(define/public (apply-project v ty2)
   (define tag2 (any-tag ty2))
   (match v
-    [`(tagged ,v1 ,tag1)
-     (cond [(eq? tag1 tag2)
-            (match ty2
-              [`(Vector ,ts ...)
-               (cond [(eq? (vector-length v1) (length ts)) v1]
-                     [else
-                      (error 'apply-project
-                             "length ~a does not match vector type length ~a"
-                             (vector-length v1) (length ts))])]
-              [`(,ts ... -> ,rt)
-               (match v1
-                 [`(function ,xs ,body ,env)
-                  (cond [(eq? (length xs) (length ts)) v1]
-                        [else
-                         (error 'apply-project
-                                "arity ~a does not match type arity ~a"
-                                (length xs) (length ts))])]
-                 [else (error 'apply-project "expected a function, not ~a" v1)])]
-              [else v1])]
-           [else (error 'apply-project "tag mismatch ~a != ~a" tag1 tag2)])]
+    [(Tagged v1 tag1)
+     (cond
+       [(eq? tag1 tag2)
+        (match ty2
+          [`(Vector ,ts ...)
+           (define l1 ((interp-op 'vector-length) v1))
+           (cond
+             [(eq? l1 (length ts)) v1]
+             [else (error 'apply-project "vector length mismatch, ~a != ~a"
+                          l1 (length ts))])]
+          [`(,ts ... -> ,rt)
+           (match v1
+             [`(function ,xs ,body ,env)
+              (cond [(eq? (length xs) (length ts)) v1]
+                    [else
+                     (error 'apply-project "arity mismatch ~a != ~a"
+                            (length xs) (length ts))])]
+             [else (error 'apply-project "expected function not ~a" v1)])]
+          [else v1])]
+       [else (error 'apply-project "tag mismatch ~a != ~a" tag1 tag2)])]
     [else (error 'apply-project "expected tagged value, not ~a" v)]))
 \end{lstlisting}
-  \caption{Auxiliary function to apply a projection.}
+  \caption{Auxiliary functions for injection and projection.}
   \label{fig:apply-project}
 \end{figure}
 
@@ -9784,9 +9830,9 @@ of an integer, as in $C_2$ (Figure~\ref{fig:c2-syntax}).
 \[
 \begin{array}{lcl}
 \Exp &::= & \ldots
-   \mid \BINOP{\key{'vector-ref}}{\Atm}{\Atm}  \\
-   &\mid& (\key{Prim}~\key{'vector-set!}\,(\key{list}\,\Atm\,\Atm\,\Atm))
-   \mid \VALUEOF{\Exp}{\FType} \\
+   \mid \BINOP{\key{'any-vector-ref}}{\Atm}{\Atm}  \\
+   &\mid& (\key{Prim}~\key{'any-vector-set!}\,(\key{list}\,\Atm\,\Atm\,\Atm))\\
+   &\mid& \VALUEOF{\Exp}{\FType} \\
 \Stmt &::=& \gray{ \ASSIGN{\VAR{\Var}}{\Exp} 
   \mid \LP\key{Collect} \,\itm{int}\RP }\\
 \Tail &::= & \gray{ \RETURN{\Exp} \mid \SEQ{\Stmt}{\Tail} 
@@ -9809,45 +9855,9 @@ C_4 & ::= & \gray{ \PROGRAMDEFS{\itm{info}}{\LP\Def\ldots\RP} }
 \section{Select Instructions}
 \label{sec:select-r6}
 
-\paragraph{Vector-ref}
-
-Recall that instruction selection for \code{vector-ref} in
-Section~\ref{sec:select-instructions-gc} depends on knowing the index $n$
-at compile time:
-\begin{lstlisting}
-(Assign |$\itm{lhs}$| (Prim 'vector-ref (list |$a_1$| (Int |$n$|))))
-|$\Longrightarrow$|
-movq |$a_1'$|, %r11
-movq |$\itm{offset}$|(%r11), |$\itm{lhs'}$|
-\end{lstlisting}
-where $\itm{offset} = 8(n+1)$.
-%
-In $R_6$ the index may be an arbitrary atom so instead of
-computing the offset at compile time, instructions need to be
-generated to compute the offset at runtime as follows. Note the use of
-the new instruction \code{imulq}.
-\begin{center}
-\begin{minipage}{0.96\textwidth}
-\begin{lstlisting}
-(Assign |$\itm{lhs}$| (Prim 'vector-ref (list |$a_1$| |$a_2$|)))
-|$\Longrightarrow$|
-movq |$a_2'$|, %r11
-addq $1, %r11
-imulq $8, %r11
-addq |$a_1'$|, %r11
-movq 0(%r11) |$\itm{lhs'}$|
-\end{lstlisting}
-\end{minipage}
-\end{center}
-
-\paragraph{Vector-set!}
-
-The above issue also applies to \code{vector-set!}.  The index may be
-an arbitrary expression so one must generate instructions to compute
-the offset at runtime.
-
-
-%% The same idea applies to `vector-set!`.
+In the \code{select-instructions} pass we translate the primitive
+operations on the \code{Any} type to x86 instructions that involve
+manipulating the 3 tag bits of the tagged value.
 
 \paragraph{Make-any}
 
@@ -9920,24 +9930,77 @@ andq |$e'$|, |\itm{lhs'}|
 %% devise a sequence of instructions to implement the type predicates
 %% \key{boolean?}, \key{integer?}, \key{vector?}, and \key{procedure?}.
 
+\paragraph{Any-vector-length}
+
+\begin{lstlisting}
+(Assign |$\itm{lhs}$| (Prim 'any-vector-length (list |$a_1$|)))
+|$\Longrightarrow$|
+movq |$\neg 111$|, %r11
+andq |$a_1'$|,  %r11
+movq 0(%r11), %r11
+andq $126, %r11
+sarq $1, %r11
+movq %r11, |$\itm{lhs'}$|
+\end{lstlisting}
+
+\paragraph{Any-vector-ref}
+
+The index may be an arbitrary atom so instead of computing the offset
+at compile time, instructions need to be generated to compute the
+offset at runtime as follows. Note the use of the new instruction
+\code{imulq}.
+\begin{center}
+\begin{minipage}{0.96\textwidth}
+\begin{lstlisting}
+(Assign |$\itm{lhs}$| (Prim 'any-vector-ref (list |$a_1$| |$a_2$|)))
+|$\Longrightarrow$|
+movq |$\neg 111$|, %r11
+andq |$a_1'$|, %r11
+movq |$a_2'$|, %rax
+addq $1, %rax
+imulq $8, %rax
+addq %rax, %r11
+movq 0(%r11) |$\itm{lhs'}$|
+\end{lstlisting}
+\end{minipage}
+\end{center}
+
+\paragraph{Any-vector-set!}
+
+The code generation for \code{any-vector-set!} is similar to the other
+\code{any-vector} operations.
+
 \section{Register Allocation for $R_6$}
 \label{sec:register-allocation-r6}
 \index{register allocation}
 
-At the beginning of this chapter we discussed how a variable of type
-\code{Any} might refer to a vector. Thus, the register allocator for
-$R_6$ needs to treat variable of type \code{Any} in the same way that
-it treats variables of type \code{Vector} for purposes of garbage
-collection. In particular,
+There is an interesting interaction between tagged values and garbage
+collection that has an impact on register allocation.  A variable of
+type \code{Any} might refer to a vector and therefore it might be a
+root that needs to be inspected and copied during garbage
+collection. Thus, we need to treat variables of type \code{Any} in a
+similar way to variables of type \code{Vector} for purposes of
+register allocation.  In particular,
 \begin{itemize}
 \item If a variable of type \code{Any} is live during a function call,
-  then it must be spilled. One way to accomplish this is to augment
-  \code{build-interference} to mark all variables that are live after
-  a \code{callq} as interfering with all the registers.
+  then it must be spilled. This can be accomplished by changing
+  \code{build-interference} to mark all variables of type \code{Any}
+  that are live after a \code{callq} as interfering with all the
+  registers.
 
 \item If a variable of type \code{Any} is spilled, it must be spilled
   to the root stack instead of the normal procedure call stack.
 \end{itemize}
+
+Another concern regarding the root stack is that the garbage collector
+needs to differentiate between (1) plain old pointers to tuples, (2) a
+tagged value that points to a tuple, and (3) a tagged value that is
+not a tuple. We enable this differentiation by choosing not to use the
+tag $000$ in the $\itm{tagof}$ function. Instead, that bit pattern is
+reserved for identifying plain old pointers to tuples. That way, if
+one of the first three bits is set, then we have a tagged value and
+inspecting the tag can differentiation between vectors ($010$) and the
+other kinds of values.
 
 \begin{exercise}\normalfont
 Expand your compiler to handle $R_6$ as discussed in the last few
@@ -9946,7 +10009,6 @@ new operations (\code{inject}, \code{project}, \code{boolean?},
 etc.). Test your compiler on these new programs and all of your
 previously created test programs.
 \end{exercise}
-
 
 
 \begin{exercise}\normalfont
@@ -11876,6 +11938,39 @@ registers.
 \cleardoublepage
 
 \section{Concrete Syntax for Intermediate Languages}
+
+The concrete syntax of $R_6$ is defined in
+Figure~\ref{fig:r6-concrete-syntax}.
+
+\begin{figure}[tp]
+\centering
+\fbox{
+\begin{minipage}{0.97\textwidth}\small
+\[
+\begin{array}{lcl}
+  \Type &::=& \gray{\key{Integer} \mid \key{Boolean}
+     \mid \LP\key{Vector}\;\Type\ldots\RP \mid \key{Void}} \\
+    &\mid& \gray{\LP\Type\ldots \; \key{->}\; \Type\RP} \mid \key{Any} \\
+\FType &::=& \key{Integer} \mid \key{Boolean} \mid \key{Void} 
+      \mid \LP\key{Vector}\; \key{Any}\ldots\RP \\
+     &\mid& \LP\key{Any}\ldots \; \key{->}\; \key{Any}\RP\\
+\Exp &::=& \ldots \CINJECT{\Exp}{\FType}\RP \mid \CPROJECT{\Exp}{\FType}\\
+  &\mid& \LP\key{any-vector-length}\;\Exp\RP
+   \mid \LP\key{any-vector-ref}\;\Exp\;\Exp\RP \\
+  &\mid& \LP\key{any-vector-set!}\;\Exp\;\Exp\;\Exp\RP\\
+  &\mid& \LP\key{boolean?}\;\Exp\RP \mid \LP\key{integer?}\;\Exp\RP
+   \mid \LP\key{void?}\;\Exp\RP \\
+  &\mid& \LP\key{vector?}\;\Exp\RP \mid \LP\key{procedure?}\;\Exp\RP \\
+  \Def &::=& \gray{ \CDEF{\Var}{\LS\Var \key{:} \Type\RS\ldots}{\Type}{\Exp} } \\
+  R_6 &::=& \gray{\Def\ldots \; \Exp}
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The concrete syntax of $R_6$, extending $R_5$ (Figure~\ref{fig:r5-syntax})
+  with \key{Any}.}
+\label{fig:r6-concrete-syntax}
+\end{figure}
 
 The concrete syntax for $C_0$, $C_1$, $C_2$ and $C_3$ is
 defined in Figures~\ref{fig:c0-concrete-syntax},
