@@ -9366,7 +9366,8 @@ Figures~\ref{fig:type-check-R6-part-1} and
 Figure~\ref{fig:type-check-R6-aux}.
 %
 The interpreter for $R_6$ is in Figure~\ref{fig:interp-R6} and the
-auxiliary function \code{apply-project} is in Figure~\ref{fig:apply-project}.
+auxiliary functions \code{apply-inject} and \code{apply-project} are
+in Figure~\ref{fig:apply-project}.
 
 
 \begin{figure}[btp]
@@ -9517,11 +9518,6 @@ auxiliary function \code{apply-project} is in Figure~\ref{fig:apply-project}.
                 [`((tagged ,v1^ ,tg1) (tagged ,v2^ ,tg2))
                  (and (eq? v1^ v2^) (equal? tg1 tg2))]
                 [ls (apply (super interp-op op) ls)])]
-        ['make-any (lambda (v tg) `(tagged ,v ,tg))]
-        ['tag-of-any
-         (match-lambda
-           [`(tagged ,v^ ,tg)  tg]
-           [v  (error 'interp-op "expected tagged value, not ~a" v)])]
         ['any-vector-ref (lambda (v i)
                            (match v [`(tagged ,v^ ,tg) (vector-ref v^ i)]))]
         ['any-vector-set! (lambda (v i a)
@@ -9535,11 +9531,6 @@ auxiliary function \code{apply-project} is in Figure~\ref{fig:apply-project}.
       (match e
         [(Inject e ty) `(tagged ,(recur e) ,(any-tag ty))]
         [(Project e ty2)  (apply-project (recur e) ty2)]
-        [(ValueOf e ty)
-         (match (recur e)
-           [`(tagged ,v^ ,tg)  v^]
-           [v (error 'interp-op "expected tagged value, not ~a" v)])]
-        [(Exit) (error 'interp-exp "exiting")]
         [else ((super interp-exp env) e)]))
     ))
 
@@ -11024,10 +11015,12 @@ we focus on \emph{gradual typing}\index{gradual typing}, in which the
 programmer controls the amount of static versus dynamic checking by
 adding or removing type annotations on parameters and
 variables~\citep{Anderson:2002kd,Siek:2006bh}.
-
+%
 The concrete syntax of $R_9$ is defined in
 Figure~\ref{fig:r9-concrete-syntax} and its abstract syntax is defined
-in Figure~\ref{fig:r9-syntax}.
+in Figure~\ref{fig:r9-syntax}. The main syntactic difference between
+$R_8$ and $R_9$ is the additional \itm{param} and \itm{ret}
+non-terminals that make type annotations optional.
 
 \begin{figure}[tp]
 \centering
@@ -11037,6 +11030,7 @@ in Figure~\ref{fig:r9-syntax}.
 \[
 \begin{array}{lcl}
   \itm{param} &::=& \Var \mid \LS\Var \key{:} \Type\RS \\
+  \itm{ret} &::=& \epsilon \mid \key{:} \Type \\
   \Exp &::=& \gray{ \Int \mid \CREAD{} \mid \CNEG{\Exp}
      \mid \CADD{\Exp}{\Exp} \mid \CSUB{\Exp}{\Exp} }  \\
     &\mid&  \gray{ \Var \mid \CLET{\Var}{\Exp}{\Exp} }\\
@@ -11050,11 +11044,11 @@ in Figure~\ref{fig:r9-syntax}.
     &\mid& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\mid (\key{void})
     \mid (\Exp \; \Exp\ldots) } \\
     &\mid& \gray{ \LP \key{procedure-arity}~\Exp\RP }
-    \mid \CLAMBDA{\LP\itm{param}\ldots\RP}{\Type}{\Exp} \\
+    \mid \CGLAMBDA{\LP\itm{param}\ldots\RP}{\itm{ret}}{\Exp} \\
   &\mid& \gray{ \CSETBANG{\Var}{\Exp}
   \mid \CBEGIN{\Exp\ldots}{\Exp}
   \mid \CWHILE{\Exp}{\Exp} } \\
-  \Def &::=& \CDEF{\Var}{\itm{param}\ldots}{\Type}{\Exp} \\
+  \Def &::=& \CGDEF{\Var}{\itm{param}\ldots}{\itm{ret}}{\Exp} \\
   R_9 &::=& \gray{\Def\ldots \; \Exp}
 \end{array}
 \]
@@ -11079,8 +11073,8 @@ in Figure~\ref{fig:r9-syntax}.
      &\mid& \gray{ \VOID{} \mid \LP\key{HasType}~\Exp~\Type \RP 
      \mid \APPLY{\Exp}{\Exp\ldots} }\\
   &\mid& \LAMBDA{\LP\itm{param}\ldots\RP}{\Type}{\Exp} \\
-  &\mid& \gray{ \SETBANG{\Var}{\Exp} \mid \BEGIN{\LP\Exp\ldots\RP}{\Exp} 
-   \mid \WHILE{\Exp}{\Exp} } \\
+  &\mid& \gray{ \SETBANG{\Var}{\Exp} \mid \BEGIN{\LP\Exp\ldots\RP}{\Exp} } \\
+  &\mid& \gray{ \WHILE{\Exp}{\Exp} } \\
  \Def &::=& \FUNDEF{\Var}{\LP\itm{param}\ldots\RP}{\Type}{\code{'()}}{\Exp} \\
   R_9 &::=& \gray{ \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp} }
 \end{array}
@@ -11088,7 +11082,7 @@ in Figure~\ref{fig:r9-syntax}.
 \end{minipage}
 }
 \caption{The abstract syntax of $R_9$, extending $R_8$ (Figure~\ref{fig:r8-syntax}).}
-\label{fig:r8-syntax}
+\label{fig:r9-syntax}
 \end{figure}
 
 
