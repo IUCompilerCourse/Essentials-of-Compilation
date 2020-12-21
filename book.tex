@@ -9039,6 +9039,7 @@ expression may produce a value of a different type each time it is
 executed. Consider the following example with a conditional \code{if}
 expression that may return a Boolean or an integer depending on the
 input to the program.
+% part of  dynamic_test_25.rkt
 \begin{lstlisting}
    (not (if (eq? (read) 1) #f 0))
 \end{lstlisting}
@@ -9616,7 +9617,7 @@ result is \code{\#f}).
 &
 $\Rightarrow$
 &
-\begin{minipage}{0.6\textwidth}
+\begin{minipage}{0.65\textwidth}
 \begin{lstlisting}
 (inject #t Boolean)
 \end{lstlisting}
@@ -9630,7 +9631,7 @@ $\Rightarrow$
 &
 $\Rightarrow$
 &
-\begin{minipage}{0.6\textwidth}
+\begin{minipage}{0.65\textwidth}
 \begin{lstlisting}
 (inject
    (+ (project |$e'_1$| Integer)
@@ -9647,7 +9648,7 @@ $\Rightarrow$
 &
 $\Rightarrow$
 &
-\begin{minipage}{0.6\textwidth}
+\begin{minipage}{0.65\textwidth}
 \begin{lstlisting}
 (inject
    (lambda: ([|$x_1$|:Any]|$\ldots$|[|$x_n$|:Any]):Any |$e'$|)
@@ -9663,7 +9664,7 @@ $\Rightarrow$
 &
 $\Rightarrow$
 &
-\begin{minipage}{0.6\textwidth}
+\begin{minipage}{0.65\textwidth}
 \begin{lstlisting}
 ((project |$e'_0$| (Any|$\ldots$|Any -> Any)) |$e'_1 \ldots e'_n$|)
 \end{lstlisting}
@@ -9677,7 +9678,7 @@ $\Rightarrow$
 &
 $\Rightarrow$
 &
-\begin{minipage}{0.6\textwidth}
+\begin{minipage}{0.65\textwidth}
 \begin{lstlisting}
 (any-vector-ref |$e_1'$| |$e_2'$|)
 \end{lstlisting}
@@ -9691,7 +9692,7 @@ $\Rightarrow$
 &
 $\Rightarrow$
 &
-\begin{minipage}{0.6\textwidth}
+\begin{minipage}{0.65\textwidth}
 \begin{lstlisting}
 (if (eq? |$e'_1$| (inject #f Boolean)) |$e'_3$| |$e'_2$|)
 \end{lstlisting}
@@ -9705,9 +9706,24 @@ $\Rightarrow$
 &
 $\Rightarrow$
 &
-\begin{minipage}{0.6\textwidth}
+\begin{minipage}{0.65\textwidth}
 \begin{lstlisting}
 (inject (eq? |$e'_1$| |$e'_2$|) Boolean)
+\end{lstlisting}
+\end{minipage}
+\\[2ex]\hline
+\begin{minipage}{0.27\textwidth}
+\begin{lstlisting}
+(not |$e_1$|)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.65\textwidth}
+\begin{lstlisting}
+(if (eq? |$e'_1$| (inject #f Boolean))
+    (inject #t Boolean) (inject #f Boolean))
 \end{lstlisting}
 \end{minipage}
 \\[2ex]\hline
@@ -10085,6 +10101,8 @@ for the compilation of $R_7$.
 \chapter{Loops and Assignment}
 \label{ch:loop}
 
+% todo: define R'_8
+
 In this chapter we study two features that are the hallmarks of
 imperative programming languages: loops and assignments to local
 variables. The following example demonstrates these new features by
@@ -10105,14 +10123,12 @@ The \code{while} loop consists of a condition and a body.
 The \code{set!} consists of a variable and a right-hand-side expression.
 %
 The primary purpose of both the \code{while} loop and \code{set!}  is
-to cause side effects, so it is convenient to also include in $R_8$ a
+to cause side effects, so it is convenient to also include in a
 language feature for sequencing side effects: the \code{begin}
 expression. It consists of one or more subexpressions that are
 evaluated left-to-right.
-%
-The concrete syntax of $R_8$ is defined in
-Figure~\ref{fig:r8-concrete-syntax} and its abstract syntax is defined
-in Figure~\ref{fig:r8-syntax}.
+
+\section{The $R_8$ Language}
 
 \begin{figure}[tp]
 \centering
@@ -10174,6 +10190,10 @@ in Figure~\ref{fig:r8-syntax}.
 \label{fig:r8-syntax}
 \end{figure}
 
+The concrete syntax of $R_8$ is defined in
+Figure~\ref{fig:r8-concrete-syntax} and its abstract syntax is defined
+in Figure~\ref{fig:r8-syntax}.
+%
 The definitional interpreter for $R_8$ is shown in
 Figure~\ref{fig:interp-R8}. We add three new cases for \code{SetBang},
 \code{WhileLoop}, and \code{Begin} and we make changes to the cases
@@ -11022,7 +11042,8 @@ in Figure~\ref{fig:r9-syntax}. The main syntactic difference between
 $R_8$ and $R_9$ is the additional \itm{param} and \itm{ret}
 non-terminals that make type annotations optional. The return types
 are not optional in the abstract syntax; the parser fills in
-\code{Any} when the return type is not specified.
+\code{Any} when the return type is not specified in the concrete
+syntax.
 
 \begin{figure}[tp]
 \centering
@@ -11097,6 +11118,7 @@ present the example again but this time we leave off the type
 annotations from the \code{add1} function.
 
 \begin{figure}[btp]
+% gradual_test_9.rkt
 \begin{lstlisting}
 (define (map-vec [f : (Integer -> Integer)]
                    [v : (Vector Integer Integer)])
@@ -11111,7 +11133,7 @@ annotations from the \code{add1} function.
 \label{fig:gradual-map-vec}
 \end{figure}
 
-\section{Type Checking $R_9$}
+\section{Type Checking $R_9$, Casts, and $R'_9$}
 \label{sec:gradual-type-check}
 
 The type checker for $R_9$ uses the \code{Any} type for missing
@@ -11128,7 +11150,7 @@ Figure~\ref{fig:consistent} defines the \code{consistent?} predicate.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(define (consistent? t1 t2)
+(define/public (consistent? t1 t2)
   (match* (t1 t2)
     [('Integer 'Integer) #t]
     [('Boolean 'Boolean) #t]
@@ -11142,7 +11164,8 @@ Figure~\ref{fig:consistent} defines the \code{consistent?} predicate.
           (consistent? rt1 rt2))]
     [(other wise) #f]))
 \end{lstlisting}
-\caption{The consistency predicate on types.}
+\caption{The consistency predicate on types, a method in
+    \code{type-check-gradual-class}.}
 \label{fig:consistent}
 \end{figure}
 
@@ -11169,11 +11192,28 @@ error when the \code{maybe-add1} function returns \code{\#t}. $R_9$
 performs checking at runtime to ensure the integrity of the static
 types, such as the \code{(Integer -> Integer)} annotation on parameter
 \code{f} of \code{map-vec}.  This runtime checking is carried out by a
-new \code{cast} form that is inserted by the type checker.  Thus, the
+new \code{Cast} form that is inserted by the type checker.  Thus, the
 output of the type checker is a program in the $R'_9$ language, which
-adds \code{cast} to $R_9$.
+adds \code{Cast} to $R_8$, as shown in
+Figure~\ref{fig:r9-prime-syntax}.
 
-% TODO: grammar for $R'_9$
+\begin{figure}[tp]
+\centering
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\small
+\[
+\begin{array}{lcl}
+  \Exp &::=& \ldots \mid \CAST{\Exp}{\Type}{\Type} \\
+  R'_9 &::=& \gray{ \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp} }
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The abstract syntax of $R'_9$, extending $R_8$ (Figure~\ref{fig:r8-syntax}).}
+\label{fig:r9-prime-syntax}
+\end{figure}
+
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -11192,7 +11232,7 @@ adds \code{cast} to $R_9$.
 \end{figure}
 
 Figure~\ref{fig:map-vec-cast} shows the output of the type checker for
-\code{map-vec} and \code{maybe-add1}.  The idea is that \code{cast} is
+\code{map-vec} and \code{maybe-add1}.  The idea is that \code{Cast} is
 inserted every time the type checker sees two types that are
 consistent but not equal. In the \code{add1} function, \code{x} is
 cast to \code{Integer} and the result of the \code{+} is cast to
@@ -11200,9 +11240,8 @@ cast to \code{Integer} and the result of the \code{+} is cast to
 is cast from \code{(Any -> Any)} to \code{(Integer -> Integer)}.
 
 \begin{figure}[btp]
-\begin{lstlisting}
-(define (map-vec [f : (Integer -> Integer)]
-                   [v : (Vector Integer Integer)])
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+(define (map-vec [f : (Integer -> Integer)] [v : (Vector Integer Integer)])
                    : (Vector Integer Integer)
   (vector (f (vector-ref v 0)) (f (vector-ref v 1))))
 (define (add1 [x : Any]) : Any
@@ -11211,12 +11250,10 @@ is cast from \code{(Any -> Any)} to \code{(Integer -> Integer)}.
 (define (maybe-add1 [x : Any]) : Any
   (if (eq? 0 (read)) (add1 x) (true)))
 
-(vector-ref (map-vec (cast maybe-add1 (Any -> Any)
-                                          (Integer -> Integer))
-                       (vector 0 41))
-              0)
+(vector-ref (map-vec (cast maybe-add1 (Any -> Any) (Integer -> Integer))
+                       (vector 0 41)) 0)
 \end{lstlisting}
-\caption{Output from type checking \code{map-vec}
+\caption{Output of type checking \code{map-vec}
   and \code{maybe-add1}.}
 \label{fig:map-vec-cast}
 \end{figure}
@@ -11224,16 +11261,201 @@ is cast from \code{(Any -> Any)} to \code{(Integer -> Integer)}.
 
 The type checker for $R_9$ is defined in
 Figures~\ref{fig:type-check-R9-1}, \ref{fig:type-check-R9-2},
-\ref{fig:type-check-R9-3}, and \ref{fig:type-check-R9-4}.
+and \ref{fig:type-check-R9-3}.
 
 
 \begin{figure}[tbp]
-\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
 (define type-check-gradual-class
   (class type-check-R8-class
     (super-new)
-    (inherit check-type-equal? operator-types type-predicates)
-    
+    (inherit operator-types type-predicates)
+
+    (define/override (type-check-exp env)
+      (lambda (e)
+	(define recur (type-check-exp env))
+	(match e
+	  [(Prim 'vector-length (list e1))
+           (define-values (e1^ t) (recur e1))
+	   (match t
+             [`(Vector ,ts ...)
+              (values (Prim 'vector-length (list e1^)) 'Integer)]
+             ['Any (values (Prim 'any-vector-length (list e1^)) 'Integer)])]
+	  [(Prim 'vector-ref (list e1 e2))
+           (define-values (e1^ t1) (recur e1))
+           (define-values (e2^ t2) (recur e2))
+           (check-consistent? t2 'Integer e)
+	   (match t1
+	     [`(Vector ,ts ...)
+              (match e2^
+                [(Int i)
+                 (unless (and (0 . <= . i) (i . < . (length ts)))
+                   (error 'type-check "invalid index ~a in ~a" i e))
+                 (values (Prim 'vector-ref (list e1^ (Int i))) (list-ref ts i))]
+                [else (define e1^^ (make-cast e1^ t1 'Any))
+                      (define e2^^ (make-cast e2^ t2 'Integer))
+                      (values (Prim 'any-vector-ref (list e1^^ e2^^)) 'Any)])]
+             ['Any
+              (define e2^^ (make-cast e2^ t2 'Integer))
+              (values (Prim 'any-vector-ref (list e1^ e2^^)) 'Any)]
+             [else (error 'type-check "expected vector not ~a\nin ~v" t1 e)])]
+	  [(Prim 'vector-set! (list e1 e2 e3) )
+           (define-values (e1^ t1) (recur e1))
+           (define-values (e2^ t2) (recur e2))
+           (define-values (e3^ t3) (recur e3))
+           (check-consistent? t2 'Integer e)
+	   (match t1
+	     [`(Vector ,ts ...)
+              (match e2^
+                [(Int i)
+                 (unless (and (0 . <= . i) (i . < . (length ts)))
+                   (error 'type-check "invalid index ~a in ~a" i e))
+                 (check-consistent? (list-ref ts i) t3 e)
+                 (define e3^^ (make-cast e3^ t3 (list-ref ts i)))
+                 (values (Prim 'vector-set! (list e1^ (Int i) e3^^)) 'Void)]
+                [else
+                 (define e1^^ (make-cast e1^ t1 'Any))
+                 (define e2^^ (make-cast e2^ t2 'Integer))
+                 (define e3^^ (make-cast e3^ t3 'Any))
+                 (values (Prim 'any-vector-set! (list e1^^ e2^^ e3^^)) 'Void)])]
+             ['Any
+              (define e2^^ (make-cast e2^ t2 'Integer))
+              (define e3^^ (make-cast e3^ t3 'Any))
+              (values (Prim 'any-vector-set! (list e1^ e2^^ e3^^)) 'Void)]
+	     [else (error 'type-check "expected vector not ~a\nin ~v" t1 e)])]
+\end{lstlisting}
+\caption{Type checker for the $R_9$ language, part 1.}
+\label{fig:type-check-R9-1}
+\end{figure}
+
+\begin{figure}[tbp]
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+          [(Prim 'eq? (list e1 e2))
+           (define-values (e1^ t1) (recur e1))
+           (define-values (e2^ t2) (recur e2))
+           (check-consistent? t1 t2 e)
+           (define T (meet t1 t2))
+           (values (Prim 'eq? (list (make-cast e1^ t1 T) (make-cast e2^ t2 T)))
+                   'Boolean)]
+          [(Prim 'not (list e1))
+           (recur (If (Prim 'eq? (list e1 (Inject (Bool #f) 'Boolean)))
+                      (Bool #t) (Bool #f)))]
+          [(Prim 'and (list e1 e2))
+           (recur (If e1 e2 (Bool #f)))]
+          [(Prim 'or (list e1 e2))
+           (define tmp (gensym 'tmp))
+           (recur (Let tmp e1 (If (Var tmp) (Var tmp) e2)))]
+	  [(Prim op es)
+           #:when (not (set-member? explicit-prim-ops op))
+           (define-values (new-es ts)
+             (for/lists (exprs types) ([e es])
+               (recur e)))
+           (define-values (t-ret new-es^) (type-check-op op ts new-es e))
+           (values (Prim op new-es^) t-ret)]
+          [(If e1 e2 e3)
+           (define-values (e1^ T1) (recur e1))
+	   (define-values (e2^ T2) (recur e2))
+	   (define-values (e3^ T3) (recur e3))
+	   (check-consistent? T2 T3 e)
+           (match T1
+             ['Boolean
+              (define Tif (join T2 T3))
+              (values (If e1^ (make-cast e2^ T2 Tif)
+                          (make-cast e3^ T3 Tif)) Tif)]
+             ['Any
+              (define Tif (meet T2 T3))
+              (values (If (Prim 'eq? (list e1^ (Inject (Bool #f) 'Boolean)))
+                          (make-cast e3^ T3 Tif) (make-cast e2^ T2 Tif))
+                      Tif)]
+             [else (error 'type-check "expected Boolean not ~a\nin ~v" T1 e)])]
+          [(HasType e1 T)
+           (define-values (e1^ T1) (recur e1))
+           (check-consistent? T1 T)
+           (values (make-cast e1^ T1 T) T)]          
+          [(SetBang x e1)
+           (define-values (e1^ T1) (recur e1))
+           (define varT (dict-ref env x))
+           (check-consistent? T1 varT e)
+           (values (SetBang x (make-cast e1^ T1 varT)) 'Void)]
+          [(WhileLoop e1 e2)
+           (define-values (e1^ T1) (recur e1))
+           (check-consistent? T1 'Boolean e)
+           (define-values (e2^ T2) ((type-check-exp env) e2))
+           (values (WhileLoop (make-cast e1^ T1 'Boolean) e2^) 'Void)]
+\end{lstlisting}
+\caption{Type checker for the $R_9$ language, part 2.}
+\label{fig:type-check-R9-2}
+\end{figure}
+
+
+\begin{figure}[tbp]
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+	  [(Apply e1 e2s)
+	   (define-values (e1^ T1) (recur e1))
+	   (define-values (e2s^ T2s) (for/lists (e* ty*) ([e2 e2s]) (recur e2)))
+	   (match T1
+	     [`(,T1ps ... -> ,T1rt)
+              (for ([T2 T2s] [Tp T1ps])
+                (check-consistent? T2 Tp e))
+              (define e2s^^ (for/list ([e2 e2s^] [src T2s] [tgt T1ps])
+                              (make-cast e2 src tgt)))
+	      (values (Apply e1^ e2s^^) T1rt)]
+             [`Any
+              (define e1^^ (make-cast e1^ 'Any
+                                      `(,@(for/list ([e e2s]) 'Any) -> Any)))
+              (define e2s^^ (for/list ([e2 e2s^] [src T2s])
+                              (make-cast e2 src 'Any)))
+              (values (Apply e1^^ e2s^^) 'Any)]
+	     [else (error 'type-check "expected function not ~a\nin ~v" T1 e)])]
+          [(Lambda params Tr e1)
+           (define-values (xs Ts) (for/lists (l1 l2) ([p params])
+                                    (match p
+                                      [`[,x : ,T] (values x T)]
+                                      [(? symbol? x) (values x 'Any)])))
+           (define-values (e1^ T1) 
+             ((type-check-exp (append (map cons xs Ts) env)) e1))
+           (check-consistent? Tr T1 e)
+           (values (Lambda (for/list ([x xs] [T Ts]) `[,x : ,T]) Tr
+                           (make-cast e1^ T1 Tr)) `(,@Ts -> ,Tr))]
+          [else  ((super type-check-exp env) e)]
+          )))
+\end{lstlisting}
+\caption{Type checker for the $R_9$ language, part 3.}
+\label{fig:type-check-R9-3}
+\end{figure}
+
+
+\begin{figure}[tbp]
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+    (define/public (join t1 t2)
+      (match* (t1 t2)
+        [('Integer 'Integer) 'Integer]
+        [('Boolean 'Boolean) 'Boolean]
+        [('Void  'Void) 'Void]
+        [('Any t2) t2]
+        [(t1 'Any) t1]
+        [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))
+         `(Vector ,@(for/list ([t1 ts1] [t2 ts2]) (join t1 t2)))]
+        [(`(,ts1 ... -> ,rt1) `(,ts2 ... -> ,rt2))
+         `(,@(for/list ([t1 ts1] [t2 ts2]) (join t1 t2))
+           -> ,(join rt1 rt2))]))
+
+    (define/public (meet t1 t2)
+      (match* (t1 t2)
+        [('Integer 'Integer) 'Integer]
+        [('Boolean  'Boolean) 'Boolean]
+        [('Void 'Void) 'Void]
+        [('Any t2) 'Any]
+        [(t1 'Any) 'Any]
+        [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))
+         `(Vector ,@(for/list ([t1 ts1] [t2 ts2]) (meet t1 t2)))]
+        [(`(,ts1 ... -> ,rt1) `(,ts2 ... -> ,rt2))
+         `(,@(for/list ([t1 ts1] [t2 ts2]) (meet t1 t2))
+           -> ,(meet rt1 rt2))]))
+
+    (define/public (make-cast e src tgt)
+      (cond [(equal? src tgt) e] [else (Cast e src tgt)]))
+
     (define/public (check-consistent? t1 t2 e)
       (unless (consistent? t1 t2)
         (error 'type-check "~a is inconsistent with ~a\nin ~v" t1 t2 e)))
@@ -11249,149 +11471,15 @@ Figures~\ref{fig:type-check-R9-1}, \ref{fig:type-check-R9-2},
         [else (error 'type-check-op "unrecognized ~a" op)]))
 
     (define explicit-prim-ops
-      (set-union (type-predicates)
+      (set-union
+       (type-predicates)
        (set 'procedure-arity 'eq?
             'vector 'vector-length 'vector-ref 'vector-set!
             'any-vector-length 'any-vector-ref 'any-vector-set!)))
-    
-    (define/override (type-check-exp env)
-      (lambda (e)
-	(define recur (type-check-exp env))
-	(match e
-          [(Prim 'eq? (list e1 e2))
-           (define-values (e1^ t1) (recur e1))
-           (define-values (e2^ t2) (recur e2))
-           (check-consistent? t1 t2 e)
-           (define T (meet t1 t2))
-           (values (Prim 'eq? (list (make-cast e1^ t1 T) (make-cast e2^ t2 T)))
-                   'Boolean)]
-	  [(Prim 'vector-length (list e1))
-           (define-values (e1^ t) (recur e1))
-	   (match t
-             ['Any (values (Prim 'any-vector-length (list e1^)) 'Integer)]
-             [`(Vector ,ts ...)
-              (values (Prim 'vector-length (list e1^)) 'Integer)])]
-\end{lstlisting}
-\caption{Type checker for the $R_9$ language, part 1.}
-\label{fig:type-check-R9-1}
-\end{figure}
 
-\begin{figure}[tbp]
-\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-	  [(Prim 'vector-ref (list e1 e2))
-           (define-values (e1^ t) (recur e1))
-           (define-values (e2^ it) (recur e2))
-           (check-consistent? it 'Integer e)
-	   (match (list t e2^)
-             [(list 'Any ei)
-              (define e2^^ (make-cast e2^ it 'Integer))
-              (values (Prim 'any-vector-ref (list e1^ e2^^)) 'Any)]
-	     [(list `(Vector ,ts ...) (Int i))
-              (unless (and (0 . <= . i) (i . < . (length ts)))
-                (error 'type-check "invalid index ~a in ~a" i e))
-              (values (Prim 'vector-ref (list e1^ (Int i))) (list-ref ts i))])]
-	  [(Prim 'vector-set! (list e1 e2 e3) )
-           (define-values (e1^ t-vec) (recur e1))
-           (define-values (e2^ it) (recur e2))
-           (define-values (e3^ t-arg) (recur e3))
-           (check-consistent? it 'Integer e)
-	   (match t-vec
-	     [`(Vector ,ts ...)
-              (match e2^
-                [(Int i)
-                 (unless (and (0 . <= . i) (i . < . (length ts)))
-                   (error 'type-check "invalid index ~a in ~a" i e))
-                 (check-consistent? (list-ref ts i) t-arg e)
-                 (define e3^^ (make-cast e3^ t-arg (list-ref ts i)))
-                 (values (Prim 'vector-set! (list e1^ (Int i) e3^^)) 'Void)])]
-             ['Any
-              (define e2^^ (make-cast e2^ it 'Integer))
-              (define e3^^ (make-cast e3^ t-arg 'Any))
-              (values (Prim 'any-vector-set! (list e1^ e2^^ e3^^)) 'Void)]
-	     [else
-              (error 'type-check "expected vector not ~a\nin ~v" t-vec e)])]
-	  [(Prim op es)
-           #:when (not (set-member? explicit-prim-ops op))
-           (define-values (new-es ts)
-             (for/lists (exprs types) ([e es])
-               (recur e)))
-           (define-values (t-ret new-es^) (type-check-op op ts new-es e))
-           (values (Prim op new-es^) t-ret)]
-          [(If cnd thn els)
-           (define-values (c Tc) (recur cnd))
-	   (define-values (t Tt) (recur thn))
-	   (define-values (e Te) (recur els))
-	   (check-consistent? Tc 'Boolean e)
-	   (check-consistent? Tt Te e)
-           (define Tb (join Tt Te))
-	   (values (If (make-cast c Tc 'Boolean) (make-cast t Tt Tb)
-                       (make-cast e Te Tb)) Tb)]
-\end{lstlisting}
-\caption{Type checker for the $R_9$ language, part 2.}
-\label{fig:type-check-R9-2}
-\end{figure}
-
-
-\begin{figure}[tbp]
-\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-          [(HasType e1 T)
-           (define-values (e1^ T1) (recur e1))
-           (check-consistent? T1 T)
-           (values (make-cast e1^ T1 T) T)]
-	  [(Apply e es)
-	   (define-values (e* ty*) (for/lists (e* ty*) ([e (in-list es)])
-                                     (recur e)))
-	   (define-values (e^ ty) (recur e))
-	   (match ty
-	     [`(,ty^* ... -> ,rt)
-              (for ([arg-ty ty*] [param-ty ty^*])
-                (check-consistent? arg-ty param-ty e))
-              (define new-args (for/list ([e e*] [s ty*] [t ty^*])
-                                 (make-cast e s t)))
-	      (values (Apply e^ new-args) rt)]
-             [`Any
-              (define new-fun
-                (make-cast e^ 'Any `(,@(for/list ([e es]) 'Any) -> Any)))
-              (define new-args (for/list ([e e*] [s ty*])
-                                 (make-cast e s 'Any)))
-              (values (Apply new-fun new-args) 'Any)]
-	     [else (error 'type-check
-                          "expected a function, not ~a\nin ~v" ty e)])]
-          [(Lambda params rT body)
-           (define-values (xs Ts) (for/lists (l1 l2) ([p params])
-                                    (match p
-                                      [`[,x : ,T] (values x T)]
-                                      [(? symbol? x) (values x 'Any)])))
-           (define-values (new-body bodyT) 
-             ((type-check-exp (append (map cons xs Ts) env)) body))
-           (check-consistent? rT bodyT e)
-           (values (Lambda (for/list ([x xs] [T Ts]) `[,x : ,T]) rT
-                           (make-cast new-body bodyT rT)) `(,@Ts -> ,rT))]
-          [(SetBang x rhs)
-           (define-values (rhs^ rhsT) (recur rhs))
-           (define varT (dict-ref env x))
-           (check-consistent? rhsT varT e)
-           (values (SetBang x (make-cast rhs^ rhsT varT)) 'Void)]
-          [(WhileLoop cnd body)
-           (define-values (cnd^ Tc) (recur cnd))
-           (check-consistent? Tc 'Boolean e)
-           (define-values (body^ Tbody) ((type-check-exp env) body))
-           (values (WhileLoop (make-cast cnd^ Tc 'Boolean) body^) 'Void)]
-          [else  ((super type-check-exp env) e)]
-          )))
-\end{lstlisting}
-\caption{Type checker for the $R_9$ language, part 3.}
-\label{fig:type-check-R9-3}
-\end{figure}
-
-
-
-\begin{figure}[tbp]
-\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
     (define/override (fun-def-type d)
       (match d
 	[(Def f params rt info body)
-         (debug 'fun-def-type "parameters:" params)
          (define ps
            (for/list ([p params])
              (match p
@@ -11400,82 +11488,6 @@ Figures~\ref{fig:type-check-R9-1}, \ref{fig:type-check-R9-2},
                [else (error 'fun-def-type "unmatched parameter ~a" p)])))
 	 `(,@ps -> ,rt)]
 	[else (error 'fun-def-type "ill-formed function definition in ~a" d)]))
-
-    (define/override (type-check-def env)
-      (lambda (e)
-	(match e
-	  [(Def f params rt info body)
-           (define-values (xs ps) (for/lists (l1 l2) ([p params])
-                                    (match p
-                                      [`[,x : ,T] (values x T)]
-                                      [(? symbol? x) (values x 'Any)])))
-	   (define new-env (append (map cons xs ps) env))
-	   (define-values (body^ ty^) ((type-check-exp new-env) body))
-	   (check-consistent? ty^ rt e)
-	   (Def f (for/list ([x xs] [T ps]) `[,x : ,T]) rt info
-             (make-cast body^ ty^ rt))]
-	  [else (error 'type-check "ill-formed function definition ~a" e)]
-	  )))
-    
-    (define/override (type-check-program e)
-      (match e
-        [(Program info body)
-         (define-values (body^ ty) ((type-check-exp '()) body))
-         (check-consistent? ty 'Integer e)
-         (ProgramDefsExp info '() (make-cast body^ ty 'Integer))]
-        [(ProgramDefsExp info ds body)
-         (define new-env (for/list ([d ds]) 
-                           (cons (Def-name d) (fun-def-type d))))
-         (define ds^ (for/list ([d ds])
-                       ((type-check-def new-env) d)))
-         (define-values (body^ ty) ((type-check-exp new-env) body))
-         (check-consistent? ty 'Integer e)
-         (ProgramDefsExp info ds^ (make-cast body^ ty 'Integer))]
-        [else (super type-check-program e)]))
-    
-    ))
-
-(define (type-check-gradual p)
-  (send (new type-check-gradual-class) type-check-program p))
-\end{lstlisting}
-\caption{Type checker for the $R_9$ language, part 4.}
-\label{fig:type-check-R9-4}
-\end{figure}
-
-  
-\begin{figure}[tbp]
-\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define (join t1 t2)
-  (match* (t1 t2)
-    [('Integer 'Integer) 'Integer]
-    [('Boolean 'Boolean) 'Boolean]
-    [('Void  'Void) 'Void]
-    [('Any t2) t2]
-    [(t1 'Any) t1]
-    [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))
-     `(Vector ,@(for/list ([t1 ts1] [t2 ts2]) (join t1 t2)))]
-    [(`(,ts1 ... -> ,rt1) `(,ts2 ... -> ,rt2))
-     `(,@(for/list ([t1 ts1] [t2 ts2]) (join t1 t2))
-       -> ,(join rt1 rt2))]
-    [(other wise) (error 'join "inconsistent types ~a and ~a" t1 t2)]))
-
-(define (meet t1 t2)
-  (match* (t1 t2)
-    [('Integer 'Integer) 'Integer]
-    [('Boolean  'Boolean) 'Boolean]
-    [('Void 'Void) 'Void]
-    [('Any t2) 'Any]
-    [(t1 'Any) 'Any]
-    [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))
-     `(Vector ,@(for/list ([t1 ts1] [t2 ts2]) (meet t1 t2)))]
-    [(`(,ts1 ... -> ,rt1) `(,ts2 ... -> ,rt2))
-     `(,@(for/list ([t1 ts1] [t2 ts2]) (meet t1 t2))
-       -> ,(meet rt1 rt2))]
-    [(other wise) (error 'meet "inconsistent types ~a and ~a" t1 t2)]))
-
-(define (make-cast e src tgt)
-  (cond [(equal? src tgt) e]
-        [else (Cast e src tgt)]))
 \end{lstlisting}
 \caption{Auxiliary functions for type checking $R_9$.}
 \label{fig:type-check-R9-aux}
@@ -11489,10 +11501,10 @@ Figures~\ref{fig:type-check-R9-1}, \ref{fig:type-check-R9-2},
 The runtime behavior of first-order casts is straightforward, that is,
 casts involving simple types such as \code{Integer} and
 \code{Boolean}.  For example, a cast from \code{Integer} to \code{Any}
-can be accomplished with the \code{inject} operator of $R_6$, which
+can be accomplished with the \code{Inject} operator of $R_6$, which
 puts the integer into a tagged value
 (Figure~\ref{fig:interp-R6}). Similarly, a cast from \code{Any} to
-\code{Integer} is accomplished with the \code{project} operator, that
+\code{Integer} is accomplished with the \code{Project} operator, that
 is, by checking the value's tag and either retrieving the underlying
 integer or signaling an error if it the tag is not the one for
 integers (Figure~\ref{fig:apply-project}).
@@ -11528,6 +11540,7 @@ the updates inside of \code{map-vec!} would happen to the new vector
 and not the original one.
 
 \begin{figure}[tbp]
+  % gradual_test_11.rkt
 \begin{lstlisting}
 (define (map-vec! [f : (Any -> Any)]
                   [v : (Vector Any Any)]) : Void
@@ -11545,7 +11558,7 @@ and not the original one.
 \end{figure}
 
 Instead the interpreter needs to create a new kind of value, a
-\emph{vector proxy}, that interposes on every vector operation. On a
+\emph{vector proxy}, that intercepts every vector operation. On a
 read, the proxy reads from the underlying vector and then applies a
 cast to the resulting value.  On a write, the proxy casts the argument
 value and then performs the write to the underlying vector. For the
@@ -11555,16 +11568,16 @@ first \code{(vector-ref v 0)} in \code{map-vec!}, the proxy casts
 to \code{Integer}.
 
 The final category of cast that we need to consider are casts between
-the \code{Any} type and either a function or a
-vector. Figure~\ref{fig:map-vec-any} shows a variant of
-\code{map-vec!} in which parameter \code{v} does not have a type
-annotation, so it is given type \code{Any}. In the call to
-\code{map-vec!}, the vector has type \code{(Vector Integer Integer)}
-so the type checker inserts a cast from \code{(Vector Integer
-  Integer)} to \code{Any}. A first thought is to use \code{inject},
-but that doesn't work because \code{(Vector Integer Integer)} is not a
-flat type. Instead, we must first cast to \code{(Vector Any Any)}
-(which is flat) and then inject to \code{Any}. 
+the \code{Any} type and either a function or a vector
+type. Figure~\ref{fig:map-vec-any} shows a variant of \code{map-vec!}
+in which parameter \code{v} does not have a type annotation, so it is
+given type \code{Any}. In the call to \code{map-vec!}, the vector has
+type \code{(Vector Integer Integer)} so the type checker inserts a
+cast from \code{(Vector Integer Integer)} to \code{Any}. A first
+thought is to use \code{Inject}, but that doesn't work because
+\code{(Vector Integer Integer)} is not a flat type. Instead, we must
+first cast to \code{(Vector Any Any)} (which is flat) and then inject
+to \code{Any}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -11578,7 +11591,7 @@ flat type. Instead, we must first cast to \code{(Vector Any Any)}
 (let ([v (vector 0 41)])
   (begin (map-vec! add1 v) (vector-ref v 1)))
 \end{lstlisting}
-\caption{}
+\caption{Casting a vector to \code{Any}.}
 \label{fig:map-vec-any}
 \end{figure}
 
@@ -11640,7 +11653,7 @@ The interpreter for $R'_9$ is defined in
 Figure~\ref{fig:interp-R9-prime}, with the case for \code{Cast}
 dispatching to \code{apply-cast}. To handle the addition of vector
 proxies, we update the vector primitives in \code{interp-op} using the
-auxiliary functions in Figure~\ref{fig:guarded-vector}.
+functions in Figure~\ref{fig:guarded-vector}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
@@ -11711,21 +11724,124 @@ auxiliary functions in Figure~\ref{fig:guarded-vector}.
 \end{figure}
 
 
-
 \section{Lower Casts}
 \label{sec:lower-casts}
 
+The next step in the journey towards x86 is the \code{lower-casts}
+pass that translates the casts in $R'_9$ to the lower-level
+\code{Inject} and \code{Project} operators and a new operator for
+creating vector proxies, extending the $R'_8$ language to create
+$R''_8$. We recommend creating an auxiliary function named
+\code{lower-cast} that takes an expression (in $R'_9$), a source type,
+and a target type, and translates it to expression in $R''_8$ that has
+the same behavior as casting the expression from the source to the
+target type in the interpreter.
+
+The \code{lower-cast} function can follow a code structure similar to
+the \code{apply-cast} function (Figure~\ref{fig:apply-cast}) used in
+the interpreter for $R'_9$ because it must handle the same cases as
+\code{apply-cast} and it needs to mimic the behavior of
+\code{apply-cast}. The most interesting cases are those concerning the
+casts between two vector types and between two function types.
+
+As mentioned in Section~\ref{sec:interp-casts}, a cast from one vector
+type to another vector type is accomplished by creating a proxy that
+intercepts the operations on the underlying vector. Here we make the
+creation of the proxy explicit with the \code{vector-proxy} primitive
+operation. It takes three arguments, the first is an expression for
+the vector, the second is a vector of functions for casting an element
+that is being read from the vector, and the third is a vector of
+functions for casting an element that is being written to the vector.
+You can create the functions using \code{Lambda}. Also, as we shall
+see in the next section, we need to differentiate these vectors from
+the user-created ones, so we recommend using a new primitive operator
+named \code{raw-vector} instead of \code{vector} to create these
+vectors of functions. Figure~\ref{fig:map-vec-bang-lower-cast} shows
+the output of \code{lower-casts} on the example in
+Figure~\ref{fig:map-vec-bang} that involved casting a vector of
+integers to a vector of \code{Any}.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+(define (map-vec! [f : (Any -> Any)] [v : (Vector Any Any)]) : Void
+   (begin 
+      (vector-set! v 0 (f (vector-ref v 0)))
+      (vector-set! v 1 (f (vector-ref v 1)))))
+  
+(define (add1 [x : Any]) : Any
+   (inject (+ (project x Integer) 1) Integer))
+
+(let ([v (vector 0 41)])
+   (begin 
+      (map-vec! add1 (vector-proxy v
+                        (raw-vector (lambda: ([x9 : Integer]) : Any
+                                       (inject x9 Integer))
+                                     (lambda: ([x9 : Integer]) : Any
+                                       (inject x9 Integer)))
+                        (raw-vector (lambda: ([x9 : Any]) : Integer
+                                       (project x9 Integer))
+                                    (lambda: ([x9 : Any]) : Integer
+                                       (project x9 Integer)))))
+      (vector-ref v 1)))
+\end{lstlisting}
+\caption{Output of \code{lower-casts} on the example in
+  Figure~\ref{fig:map-vec-bang}.}
+\label{fig:map-vec-bang-lower-cast}
+\end{figure}
+
+A cast from one function type to another function type is accomplished
+by generating a \code{Lambda} whose parameter and return types match
+the target function type. The body of the \code{Lambda} should cast
+the parameters from the target type to the source type (yes,
+backwards! functions are contravariant\index{contravariant} in the
+parameters), then call the underlying function, and finally cast the
+result from the source return type to the target return type.
+Figure~\ref{fig:map-vec-lower-cast} shows the output of the
+\code{lower-casts} pass on the \code{map-vec} example in
+Figure~\ref{fig:gradual-map-vec}. Note that the \code{add1} argument
+in the call to \code{map-vec} is wrapped in a \code{lambda}.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+(define (map-vec [f : (Integer -> Integer)]
+                   [v : (Vector Integer Integer)])
+                   : (Vector Integer Integer)
+  (vector (f (vector-ref v 0)) (f (vector-ref v 1))))
+
+(define (add1 [x : Any]) : Any
+  (inject (+ (project x Integer) 1) Integer))
+
+(vector-ref (map-vec (lambda: ([x9 : Integer]) : Integer
+                        (project (add1 (inject x9 Integer)) Integer))
+                      (vector 0 41)) 1)
+\end{lstlisting}
+\caption{Output of \code{lower-casts} on the example in
+  Figure~\ref{fig:gradual-map-vec}.}
+\label{fig:map-vec-lower-cast}
+\end{figure}
 
 
 \section{Expose Proxies}
 \label{sec:expose-proxies}
 
+UNDER CONSTRUCTION
+
 
 \section{Closure Conversion}
 
+UNDER CONSTRUCTION
+
 \section{Explicate Control}
 
+UNDER CONSTRUCTION
+
 \section{Select Instructions}
+
+UNDER CONSTRUCTION
+
+\section{Further Reading}
+
+UNDER CONSTRUCTION
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
