@@ -11824,7 +11824,58 @@ in the call to \code{map-vec} is wrapped in a \code{lambda}.
 \section{Expose Proxies}
 \label{sec:expose-proxies}
 
-UNDER CONSTRUCTION
+So far the job of differentiating between vectors and vector proxies
+has been the job of the interpreter. For example, the interpreter for
+$R'_9$ implements \code{vector-ref} using the
+\code{guarded-vector-ref} function in Figure~\ref{fig:guarded-vector}.
+In the \code{expose-proxies} pass we shift this responsibility to the
+generated code.
+
+We begin by designing the output language $R_{\mathrm{proxy}}$.  In
+$R_9$ we used the type \code{Vector} for both real vectors and vector
+proxies. In $R_{\mathrm{proxy}}$ we return the \code{Vector} type to
+its original meaning, as the type of real vectors, and we introduce a
+new type, \code{GVector}, whose values can be either real vectors or
+vector proxies. This new type comes with a suite of new primitive
+operations for creating and using values of type \code{GVector}. We
+don't need to introduce a new type to represent vector proxies.
+
+\begin{description}
+\item[\code{inject-vector} : (\key{Vector} $T_1 \ldots T_n$) $\to$
+  (\key{GVector} $T_1 \ldots T_n$)]\ \\
+%
+  This operation returns value of the \code{GVector} type from a
+  vector, which is a pointer to the same underlying vector.
+\item[\code{inject-proxy} : (\key{Vector}~(\key{GVector} $T_1\ldots
+  T_n$) $R$ $W$) $\to$ (\key{GVector} $T'_1
+  \ldots T'_n$)]
+%
+  where $R = (\ttm{Vector}~(T_1\to T'_1) \ldots (T_n\to T'_n))$ and
+  $W = (\ttm{Vector}~(T'_1\to T_1) \ldots (T'_n\to T_n))$.
+%
+  This operation creates a value of the \code{GVector} type from a
+  vector proxy. The proxy is represented by a vector containing three
+  things: 1) the underlying vector, 2) a vector of functions for
+  casting elements that are read from the vector, and 3) a vector of
+  functions for casting values to be written to the vector.
+\item[\code{proxy?} : (\key{GVector} $T_1 \ldots T_n$) $\to$
+  \code{Boolean}] returns true is the value is a vector proxy and
+  false if the value is a real vector.
+\item[\code{project-vector} : (\key{GVector} $T_1 \ldots T_n$) $\to$
+  (\key{Vector} $T_1 \ldots T_n$)] Assuming that the input value is a
+  vector (and not a proxy), this operation returns the vector.
+  
+\item[\code{proxy-vector-length} : (\key{GVector} $T_1 \ldots T_n$)
+  $\to$ \code{Boolean}]
+  
+\item[\code{proxy-vector-ref}]
+  
+\item[\code{proxy-vector-set!}]
+  
+\end{description}
+
+
+
 
 
 \section{Closure Conversion}
