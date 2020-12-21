@@ -9858,7 +9858,6 @@ C_4 & ::= & \gray{ \PROGRAMDEFS{\itm{info}}{\LP\Def\ldots\RP} }
 \end{figure}
 
 
-
 \section{Select Instructions}
 \label{sec:select-r6}
 
@@ -11821,14 +11820,14 @@ in the call to \code{map-vec} is wrapped in a \code{lambda}.
 \end{figure}
 
 
-\section{Expose Proxies}
-\label{sec:expose-proxies}
+\section{Differentiate Proxies}
+\label{sec:differentiate-proxies}
 
-So far the job of differentiating between vectors and vector proxies
-has been the job of the interpreter. For example, the interpreter for
-$R'_9$ implements \code{vector-ref} using the
-\code{guarded-vector-ref} function in Figure~\ref{fig:guarded-vector}.
-In the \code{expose-proxies} pass we shift this responsibility to the
+So far the job of differentiating vectors and vector proxies has been
+the job of the interpreter. For example, the interpreter for $R'_9$
+implements \code{vector-ref} using the \code{guarded-vector-ref}
+function in Figure~\ref{fig:guarded-vector}.  In the
+\code{differentiate-proxies} pass we shift this responsibility to the
 generated code.
 
 We begin by designing the output language $R_{\mathrm{proxy}}$.  In
@@ -11838,61 +11837,273 @@ its original meaning, as the type of real vectors, and we introduce a
 new type, \code{GVector}, whose values can be either real vectors or
 vector proxies. This new type comes with a suite of new primitive
 operations for creating and using values of type \code{GVector}. We
-don't need to introduce a new type to represent vector proxies.
+don't need to introduce a new type to represent vector proxies.  A
+proxy is represented by a vector containing three things: 1) the
+underlying vector, 2) a vector of functions for casting elements that
+are read from the vector, and 3) a vector of functions for casting
+values to be written to the vector. So we define the following
+abbreviation for the type of a vector proxy:
+\[
+\itm{Proxy} (T\ldots \Rightarrow T'\ldots)
+= (\ttm{Vector}~(\ttm{GVector}~ T\ldots) ~R~ W)
+  \to (\key{GVector}~ T' \ldots)
+\]
+where $R = (\ttm{Vector}~(T\to T') \ldots)$ and
+$W = (\ttm{Vector}~(T'\to T) \ldots)$.
+%
+Next we describe each of the new primitive operations.
 
 \begin{description}
-\item[\code{inject-vector} : (\key{Vector} $T_1 \ldots T_n$) $\to$
-  (\key{GVector} $T_1 \ldots T_n$)]\ \\
+\item[\code{inject-vector} : (\key{Vector} $T \ldots$) $\to$
+  (\key{GVector} $T \ldots$)]\ \\
 %
-  This operation returns value of the \code{GVector} type from a
-  vector, which is a pointer to the same underlying vector.
-\item[\code{inject-proxy} : (\key{Vector}~(\key{GVector} $T_1\ldots
-  T_n$) $R$ $W$) $\to$ (\key{GVector} $T'_1
-  \ldots T'_n$)]
+  This operation brands a vector as a value of the \code{GVector} type.
+\item[\code{inject-proxy} : $\itm{Proxy}(T\ldots \Rightarrow T'\ldots)$
+  $\to$ (\key{GVector} $T' \ldots$)]\ \\
 %
-  where $R = (\ttm{Vector}~(T_1\to T'_1) \ldots (T_n\to T'_n))$ and
-  $W = (\ttm{Vector}~(T'_1\to T_1) \ldots (T'_n\to T_n))$.
+  This operation brands a vector proxy as value of the \code{GVector} type.
+\item[\code{proxy?} : (\key{GVector} $T \ldots$) $\to$
+  \code{Boolean}] \ \\
 %
-  This operation creates a value of the \code{GVector} type from a
-  vector proxy. The proxy is represented by a vector containing three
-  things: 1) the underlying vector, 2) a vector of functions for
-  casting elements that are read from the vector, and 3) a vector of
-  functions for casting values to be written to the vector.
-\item[\code{proxy?} : (\key{GVector} $T_1 \ldots T_n$) $\to$
-  \code{Boolean}] returns true is the value is a vector proxy and
-  false if the value is a real vector.
-\item[\code{project-vector} : (\key{GVector} $T_1 \ldots T_n$) $\to$
-  (\key{Vector} $T_1 \ldots T_n$)] Assuming that the input value is a
-  vector (and not a proxy), this operation returns the vector.
+  returns true if the value is a vector proxy and false if it is a
+  real vector.
+\item[\code{project-vector} : (\key{GVector} $T \ldots$) $\to$
+  (\key{Vector} $T \ldots$)]\ \\
+%
+  Assuming that the input is a vector (and not a proxy), this
+  operation returns the vector.
   
-\item[\code{proxy-vector-length} : (\key{GVector} $T_1 \ldots T_n$)
-  $\to$ \code{Boolean}]
+\item[\code{proxy-vector-length} : (\key{GVector} $T \ldots$)
+  $\to$ \code{Boolean}]\ \\
+%
+  Given a vector proxy, this operation returns the length of the
+  underlying vector.
   
-\item[\code{proxy-vector-ref}]
+\item[\code{proxy-vector-ref} : (\key{GVector} $T \ldots$)
+  $\to$ ($i$ : \code{Integer}) $\to$ $T_i$]\ \\
+%
+  Given a vector proxy, this operation returns the $i$th element of
+  the underlying vector.
   
-\item[\code{proxy-vector-set!}]
-  
+\item[\code{proxy-vector-set!} : (\key{GVector} $T \ldots$) $\to$ ($i$
+  : \code{Integer}) $\to$ $T_i$ $\to$ \key{Void}]\ \\ Given a vector
+  proxy, this operation writes a value to the $i$th element of the
+  underlying vector.
 \end{description}
 
+Now to discuss the translation that differentiates vectors from
+proxies. First, every type annotation in the program must be
+translated (recursively) to replace \code{Vector} with \code{GVector}.
+Next, we must insert uses of \code{GVector} operations in the
+appropriate places. For example, we wrap every vector creation with an
+\code{inject-vector}.
+\begin{lstlisting}
+(vector |$e_1 \ldots e_n$|)
+|$\Rightarrow$|
+(inject-vector (vector |$e'_1 \ldots e'_n$|))
+\end{lstlisting}
+The \code{raw-vector} operator that we introduced in the previous
+section does not get injected.
+\begin{lstlisting}
+(raw-vector |$e_1 \ldots e_n$|)
+|$\Rightarrow$|
+(vector |$e'_1 \ldots e'_n$|)
+\end{lstlisting}
 
+The \code{vector-proxy} primitive translates as follows.
+\begin{lstlisting}
+(vector-proxy |$e_1~e_2~e_3$|)
+|$\Rightarrow$|
+(inject-proxy (vector |$e'_1~e'_2~e'_3$|))
+\end{lstlisting}
 
+We translate the vector operations into conditional expressions that
+check whether the value is a proxy and then dispatch to either the
+appropriate proxy vector operation or the regular vector operation.
+For example, the following is the translation for \code{vector-ref}.
+\begin{lstlisting}
+(vector-ref |$e_1$| |$i$|)
+|$\Rightarrow$|
+(let ([|$v~e_1$|])
+  (if (proxy? |$v$|)
+    (proxy-vector-ref |$v$| |$i$|)
+    (vector-ref (project-vector |$v$|) |$i$|)
+\end{lstlisting}
+Note in the case of a real vector, we must apply \code{project-vector}
+before the \code{vector-ref}.
+
+\section{Reveal Casts}
+\label{sec:reveal-casts-gradual}
+
+Recall that the \code{reveal-casts} pass
+(Section~\ref{sec:reveal-casts-r6}) is responsible for lowering
+\code{Inject} and \code{Project} into lower-level operations.  In
+particular, \code{Project} turns into a conditional expression that
+inspects the tag and retrieves the underlying value.  Here we need to
+augment the translation of \code{Project} to handle the situation when
+the target type is \code{GVector}.  Instead of using
+\code{vector-length} we need to use \code{proxy-vector-length}.
+\begin{lstlisting}
+(project |$e$| (GVector Any|$_1$| |$\ldots$| Any|$_n$|))
+|$\Rightarrow$|
+(let |$\itm{tmp}$| |$e'$|
+   (if (eq? (tag-of-any |$\itm{tmp}$| 2))
+      (let |$\itm{vec}$| (value-of |$\itm{tmp}$| (GVector Any |$\ldots$| Any))
+        (if (eq? (proxy-vector-length |$\itm{vec}$|) |$n$|) |$\itm{vec}$| (exit)))
+      (exit)))
+\end{lstlisting}
 
 
 \section{Closure Conversion}
+\label{sec:closure-conversion-gradual}
 
-UNDER CONSTRUCTION
+The closure conversion pass only requires one minor adjustment.  The
+auxiliary function that translates type annotations needs to be
+updated to handle the \code{GVector} type.
 
 \section{Explicate Control}
+\label{sec:explicate-control-gradual}
 
-UNDER CONSTRUCTION
+Update the \code{explicate-control} pass to handle the new primitive
+operations on the \code{GVector} type.
 
 \section{Select Instructions}
+\label{sec:select-instructions-gradual}
 
-UNDER CONSTRUCTION
+Recall that the \code{select-instructions} pass is responsible for
+lowering the primitive operations into x86 instructions.  So we need
+to translate the new \code{GVector} operations to x86.  To do so, the
+first question we need to answer is how will we differentiate the two
+kinds of values (vectors and proxies) that can inhabit \code{GVector}.
+We need just one bit to accomplish this, so we use the $57$th bit of
+the 64-bit tag at the front of every vector (see
+Figure~\ref{fig:tuple-rep}). So far, this bit has been set to $0$, so
+for \code{inject-vector} we leave it that way.
+\begin{lstlisting}
+(Assign |$\itm{lhs}$| (Prim 'inject-vector (list |$e_1$|)))
+|$\Rightarrow$|  
+movq |$e'_1$|, |$\itm{lhs'}$|
+\end{lstlisting}
+On the other hand, \code{inject-proxy} sets the $57$th bit to $1$.
+\begin{lstlisting}
+(Assign |$\itm{lhs}$| (Prim 'inject-proxy (list |$e_1$|)))
+|$\Rightarrow$|  
+movq |$e'_1$|, %r11
+movq %r11, |$\itm{lhs'}$|
+movq |$(1 << 57)$|, %rax
+orq 0(%r11), %rax
+movq %rax, 0(%r11)
+\end{lstlisting}
+
+The \code{proxy?} operation consumes the information so carefully
+stashed away by \code{inject-vector} and \code{inject-proxy}.  It
+isolates the $57$th bit to tell whether the value is a real vector or
+a proxy.
+\begin{lstlisting}
+(Assign |$\itm{lhs}$| (Prim 'proxy? (list e)))
+|$\Rightarrow$|
+movq |$e_1'$|, %r11
+movq 0(%r11), %rax
+sarq $57, %rax
+andq $1, %rax
+movq %rax, |$\itm{lhs'}$|
+\end{lstlisting}
+
+The \code{project-vector} operation is straightforward to translate,
+so we leave it up to the reader.
+
+Regarding the \code{proxy-vector} operations, the runtime provides
+procedures that implement them (they are recursive functions!)  so
+here we simply need to translate these vector operations into the
+appropriate function call. For example, here is the translation for
+\code{proxy-vector-ref}.
+\begin{lstlisting}
+(Assign |$\itm{lhs}$| (Prim 'proxy-vector-ref (list |$e_1$| |$e_2$|)))
+|$\Rightarrow$|
+movq |$e_1'$|, %rdi
+movq |$e_2'$|, %rsi
+callq proxy_vector_ref
+movq %rax, |$\itm{lhs'}$|
+\end{lstlisting}
+
+We have another batch of vector operations to deal with, those for the
+\code{Any} type. Recall that the type checker for $R_9$ generates an
+\code{any-vector-ref} when there is a \code{vector-ref} on something
+of type \code{Any}, and similarly for \code{any-vector-set!}  and
+\code{any-vector-length} (Figure~\ref{fig:type-check-R9-1}). In
+Section~\ref{sec:select-r6} we selected instructions for these
+operations based on the idea that the underlying value was a real
+vector. But in the current setting, the underlying value is of type
+\code{GVector}. So \code{any-vector-ref} can be translates to
+pseudo-x86 as follows. We begin by projecting the underlying value out
+of the tagged value and then call the \code{proxy\_vector\_ref}
+procedure in the runtime.
+\begin{lstlisting}
+(Assign |$\itm{lhs}$| (Prim 'any-vector-ref (list |$e_1$| |$e_2$|)))
+movq |$\neg 111$|, %rdi
+andq |$e_1'$|, %rdi
+movq |$e_2'$|, %rsi
+callq proxy_vector_ref
+movq %rax, |$\itm{lhs'}$|
+\end{lstlisting}
+The \code{any-vector-set!} and \code{any-vector-length} operators can
+be translated in a similar way.
+
+\begin{exercise}\normalfont
+  Implement a compiler for the gradually-typed $R_9$ language by
+  extending and adapting your compiler for $R_8$. Create 10 new
+  partially-typed test programs. In addition to testing with these
+  new programs, also test your compiler on all the tests for $R_8$
+  and tests for $R_7$. Sometimes you may get a type checking error
+  on the $R_7$ programs but you can adapt them by inserting
+  a cast to the \code{Any} type around each subexpression
+  causing a type error. While $R_7$ doesn't have explicit casts,
+  you can induce one by wrapping the subexpression \code{e}
+  with a call to an un-annotated identity function, like this:
+  \code{((lambda (x) x) e)}.
+\end{exercise}
 
 \section{Further Reading}
 
-UNDER CONSTRUCTION
+This chapter just scratches the surface of gradual typing.  The basic
+approach described here is missing two key ingredients that one would
+want in a implementation of gradual typing: blame
+tracking~\citep{Tobin-Hochstadt:2006fk,Wadler:2009qv} and
+space-efficient casts~\citep{Herman:2006uq,Herman:2010aa}.  The
+problem addressed by blame tracking is that when a cast on a
+higher-order value fails, it often does so at a point in the program
+that is far removed from the original cast. Blame tracking is a
+technique for propagating extra information through casts and proxies
+so that when a cast fails, the error message can point back to the
+original location of the cast in the source program.
+
+The problem addressed by space-efficient casts also relates to
+higher-order casts. It turns out that in partially typed programs, a
+function or vector can flow through very-many casts at runtime. With
+the approach described in this chapter, each cast adds another
+\code{lambda} wrapper or a vector proxy. Not only does this take up
+considerable space, but it also makes the function calls and vector
+operations slow.  For example, a partially-typed version of quicksort
+could, in the worst case, build a chain of proxies of length $O(n)$
+around the vector, changing the overall time complexity of the
+algorithm from $O(n^2)$ to $O(n^3)$! \citet{Herman:2006uq} suggested a
+solution to this problem by representing casts using the coercion
+calculus of \citet{Henglein:1994nz}, which prevents the creation of
+long chains of proxies by compressing them into a concise normal
+form. \citet{Siek:2015ab} give and algorithm for compressing coercions
+and \citet{Kuhlenschmidt:2019aa} show how to implement these ideas in
+the Grift compiler.
+\begin{center}
+  \url{https://github.com/Gradual-Typing/Grift}
+\end{center}
+
+There are also interesting interactions between gradual typing and
+other language features, such as parametetric polymorphism,
+information-flow types, and type inference, to name a few. We
+recommend the reader to the online gradual typing bibliography:
+\begin{center}
+  \url{http://samth.github.io/gradual-typing-bib/}
+\end{center}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
