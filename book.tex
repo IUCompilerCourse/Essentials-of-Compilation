@@ -9321,6 +9321,7 @@ in greater detail.
     \small
 \[
 \begin{array}{lcl}
+\Type &::= & \ldots \mid \key{Any} \\
 \itm{op} &::= & \ldots \mid \code{any-vector-length}
      \mid \code{any-vector-ref} \mid \code{any-vector-set!}\\
     &\mid& \code{boolean?} \mid \code{integer?} \mid \code{vector?}
@@ -12112,9 +12113,431 @@ recommend the reader to the online gradual typing bibliography:
 \index{parametric polymorphism}
 \index{generics}
 
-This chapter may be based on ideas from \citet{Cardelli:1984aa},
-\citet{Leroy:1992qb}, \citet{Shao:1997uj}, or \citet{Harper:1995um}.
+This chapter studies the compilation of parametric
+polymorphism\index{parametric polymorphism}
+(aka. generics\index{generics}) in the subset $R_{10}$ of Typed
+Racket. Parametric polymorphism enables improved code reuse by
+parameterizing functions and data structures with respect to the types
+that they operate on. For example, Figure~\ref{fig:map-vec-poly}
+revisits the \code{map-vec} example but this time gives it a more
+fitting type.  This \code{map-vec} function is parameterized with
+respect to the element type of the vector. The type of \code{map-vec}
+is the following polymorphic type as specified by the \code{All} and
+the type parameter \code{a}.
+\begin{lstlisting}
+  (All (a) ((a -> a) (Vector a a) -> (Vector a a)))
+\end{lstlisting}
+The idea is that \code{map-vec} can be used at \emph{all} choices of a
+type for parameter \code{a}. In Figure~\ref{fig:map-vec-poly} we apply
+\code{map-vec} to a vector of integers, a choice of \code{Integer} for
+\code{a}, but we could have just as well applied \code{map-vec} to a
+vector of Booleans (and a function on Booleans).
 
+\begin{figure}[tbp]
+\begin{lstlisting}
+(: map-vec (All (a) ((a -> a) (Vector a a) -> (Vector a a))))
+(define (map-vec f v)
+  (vector (f (vector-ref v 0)) (f (vector-ref v 1))))
+
+(define (add1 [x : Integer]) : Integer (+ x 1))
+
+(vector-ref (map-vec add1 (vector 0 41)) 1)
+\end{lstlisting}
+\caption{The \code{map-vec} example using parametric polymorphism.}
+\label{fig:map-vec-poly}
+\end{figure}
+
+Figure~\ref{fig:r10-concrete-syntax} defines the concrete syntax of
+$R_{10}$ and Figure~\ref{fig:r10-syntax} defines the abstract
+syntax. We add a second form for function definitions in which a type
+declaration comes before the \code{define}. In the abstract syntax,
+the return type in the \code{Def} is \code{Any}, but that should be
+ignored in favor of the return type in the type declaration.  (The
+\code{Any} comes from using the same parser as in
+Chapter~\ref{ch:type-dynamic}.)  The presence of a type declaration
+enables the use of an \code{All} type for a function, thereby making
+it polymorphic. The grammar for types is extended to include
+polymorphic types and type variables.
+
+\begin{figure}[tp]
+\centering
+\fbox{
+  \begin{minipage}{0.96\textwidth}
+\small
+\[
+\begin{array}{lcl}
+  \Type &::=& \ldots \mid \LP\key{All}~\LP\Var\ldots\RP~ \Type\RP \mid \Var \\
+  \Def &::=& \gray{ \CDEF{\Var}{\LS\Var \key{:} \Type\RS \ldots}{\Type}{\Exp} } \\
+   &\mid& \LP\key{:}~\Var~\Type\RP \\
+   &&       \LP\key{define}~ \LP\Var ~ \Var\ldots\RP ~ \Exp\RP  \\
+  R_{10} &::=& \gray{ \Def \ldots ~ \Exp }
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The concrete syntax of $R_{10}$, extending $R_8$
+    (Figure~\ref{fig:r8-concrete-syntax}).}
+\label{fig:r10-concrete-syntax}
+\end{figure}
+
+\begin{figure}[tp]
+\centering
+\fbox{
+  \begin{minipage}{0.96\textwidth}
+\small
+\[
+\begin{array}{lcl}
+  \Type &::=& \ldots \mid \LP\key{All}~\LP\Var\ldots\RP~ \Type\RP \mid \Var \\
+  \Def &::=& \gray{ \DEF{\Var}{\LP\LS\Var \key{:} \Type\RS \ldots\RP}{\Type}{\code{'()}}{\Exp} } \\
+   &\mid& \DECL{\Var}{\Type} \\
+   &&  \DEF{\Var}{\LP\Var \ldots\RP}{\key{'Any}}{\code{'()}}{\Exp}  \\
+  R_{10} &::=& \gray{ \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp} }
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The abstract syntax of $R_{10}$, extending $R_8$
+    (Figure~\ref{fig:r8-syntax}).}
+\label{fig:r10-syntax}
+\end{figure}
+
+By including polymorphic types in the $\Type$ non-terminal we choose
+to make them first-class which has interesting repercussions on the
+compiler. Many languages with polymorphism, such as
+C++~\citep{stroustrup88:_param_types} and Standard
+ML~\citep{Milner:1990fk}, only support second-class polymorphism, so
+it is useful to see an example of first-class polymorphism. In
+Figure~\ref{fig:apply-twice} we define a function \code{apply-twice}
+whose parameter is a polymorphic function. The occurrence of a
+polymorphic type underneath a function type is enabled by the normal
+recursive structure of the grammar for $\Type$ and the categorization
+of the \code{All} type as a $\Type$.  The body of \code{apply-twice}
+applies the polymorphic function to a Boolean and to an integer.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+(: apply-twice ((All (b) (b -> b)) -> Integer))
+(define (apply-twice f)
+  (if (f #t) (f 42) (f 777)))
+
+(: id (All (a) (a -> a)))
+(define (id x) x)
+
+(apply-twice id)
+\end{lstlisting}
+\caption{An example illustrating first-class polymorphism.}
+\label{fig:apply-twice}
+\end{figure}
+
+The type checker for $R_{10}$ in Figure~\ref{fig:type-check-R10} has
+three new responsibilities (compared to $R_8$). The type checking of
+function application is extended to handle the case where the operator
+expression is a polymorphic function. In that case the type arguments
+are deduced by matching the type of the parameters with the types of
+the arguments.
+%
+The \code{match-types} auxiliary function carries out this deduction
+by recursively descending through a parameter type \code{pt} and the
+corresponding argument type \code{at}, making sure that they are equal
+except when there is a type parameter on the left (in the parameter
+type). If it's the first time that the type parameter has been
+encountered, then the algorithm deduces an association of the type
+parameter to the corresponding type on the right (in the argument
+type). If it's not the first time that the type parameter has been
+encountered, the algorithm looks up its deduced type and makes sure
+that it is equal to the type on the right.
+%
+Once the type arguments are deduced, the operator expression is
+wrapped in an \code{Inst} AST node (for instantiate) that records the
+type of the operator, but more importantly, records the deduced type
+arguments. The return type of the application is the return type of
+the polymorphic function, but with the type parameters replaced by the
+deduced type arguments, using the \code{subst-type} function.
+
+The second responsibility of the type checker is extending the
+function \code{type-equal?} to handle the \code{All} type.  This is
+not quite a simple as equal on other types, such as function and
+vector types, because two polymorphic types can be syntactically
+different even though they are equivalent types. For example,
+\code{(All (a) (a -> a))} is equivalent to \code{(All (b) (b -> b))}.
+Two polymorphic types should be considered equal if they differ only
+in the choice of the names of the type parameters. The
+\code{type-equal?} function in Figure~\ref{fig:type-check-R10-aux}
+renames the type parameters of the first type to match the type
+parameters of the second type.
+
+The third responsibility of the type checker is making sure that only
+defined type variables appear in type annotations. The
+\code{check-well-formed} function defined in
+Figure~\ref{fig:well-formed-types} recursively inspects a type, making
+sure that each type variable has been defined.
+
+The output language of the type checker is $R'_{10}$, defined in
+Figure~\ref{fig:r10-prime-syntax}. The type checker combines the type
+declaration and polymorphic function into a single definition, using
+the \code{Poly} form, to make polymorphic functions more convenient to
+process in next pass of the compiler.
+
+\begin{figure}[tp]
+\centering
+\fbox{
+  \begin{minipage}{0.96\textwidth}
+\small
+\[
+\begin{array}{lcl}
+  \Type &::=& \ldots \mid \LP\key{All}~\LP\Var\ldots\RP~ \Type\RP \mid \Var \\
+  \Exp &::=& \ldots \mid \INST{\Exp}{\Type}{\LP\Type\ldots\RP} \\
+  \Def &::=& \gray{ \DEF{\Var}{\LP\LS\Var \key{:} \Type\RS \ldots\RP}{\Type}{\code{'()}}{\Exp} } \\
+   &\mid& \LP\key{Poly}~\LP\Var\ldots\RP~ \DEF{\Var}{\LP\LS\Var \key{:} \Type\RS \ldots\RP}{\Type}{\code{'()}}{\Exp}\RP  \\
+  R'_{10} &::=& \gray{ \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp} }
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The abstract syntax of $R'_{10}$, extending $R_8$
+    (Figure~\ref{fig:r8-syntax}).}
+\label{fig:r10-prime-syntax}
+\end{figure}
+
+
+\begin{figure}[tbp]
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+(define type-check-poly-class
+  (class type-check-R8-class
+    (super-new)
+    (inherit check-type-equal?)
+  
+    (define/override (type-check-apply env e1 es)
+      (define-values (e^ ty) ((type-check-exp env) e1))
+      (define-values (es^ ty*) (for/lists (es^ ty*) ([e (in-list es)])
+                                ((type-check-exp env) e)))
+      (match ty
+        [`(,ty^* ... -> ,rt)
+         (for ([arg-ty ty*] [param-ty ty^*])
+           (check-type-equal? arg-ty param-ty (Apply e1 es)))
+         (values e^ es^ rt)]
+        [`(All ,xs (,tys ... -> ,rt))
+         (define env^ (append (for/list ([x xs]) (cons x 'Type)) env))
+         (define env^^ (for/fold ([env^^ env^]) ([arg-ty ty*] [param-ty tys])
+                         (match-types env^^ param-ty arg-ty)))
+         (define targs
+           (for/list ([x xs])
+             (match (dict-ref env^^ x (lambda () #f))
+               [#f (error 'type-check "type variable ~a not deduced\nin ~v"
+                          x (Apply e1 es))]
+               [ty ty])))
+         (values (Inst e^ ty targs) es^ (subst-type env^^ rt))]
+        [else (error 'type-check "expected a function, not ~a" ty)]))
+    
+    (define/override ((type-check-exp env) e)
+      (match e
+        [(Lambda `([,xs : ,Ts] ...) rT body)
+         (for ([T Ts]) ((check-well-formed env) T))
+         ((check-well-formed env) rT)
+         ((super type-check-exp env) e)]
+        [(HasType e1 ty)
+         ((check-well-formed env) ty)
+         ((super type-check-exp env) e)]
+        [else ((super type-check-exp env) e)]))
+
+    (define/override ((type-check-def env) d)
+      (verbose 'type-check "poly/def" d)
+      (match d
+        [(Generic ts (Def f (and p:t* (list `[,xs : ,ps] ...)) rt info body))
+         (define ts-env (for/list ([t ts]) (cons t 'Type)))
+         (for ([p ps]) ((check-well-formed ts-env) p))
+         ((check-well-formed ts-env) rt)
+         (define new-env (append ts-env (map cons xs ps) env))
+         (define-values (body^ ty^) ((type-check-exp new-env) body))
+         (check-type-equal? ty^ rt body)
+         (Generic ts (Def f p:t* rt info body^))]
+        [else ((super type-check-def env) d)]))
+
+    (define/override (type-check-program p)
+      (match p
+        [(Program info body)
+         (type-check-program (ProgramDefsExp info '() body))]
+        [(ProgramDefsExp info ds body)
+         (define ds^ (combine-decls-defs ds))
+         (define new-env (for/list ([d ds^])
+                           (cons (def-name d) (fun-def-type d))))
+         (define ds^^ (for/list ([d ds^]) ((type-check-def new-env) d)))
+         (define-values (body^ ty) ((type-check-exp new-env) body))
+         (check-type-equal? ty 'Integer body)
+         (ProgramDefsExp info ds^^ body^)]))
+  ))
+\end{lstlisting}
+\caption{Type checker for the $R_{10}$ language.}
+\label{fig:type-check-R10}
+\end{figure}
+
+\begin{figure}[tbp]
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+(define/override (type-equal? t1 t2)
+  (match* (t1 t2)
+    [(`(All ,xs ,T1) `(All ,ys ,T2))
+     (define env (map cons xs ys))
+     (type-equal? (subst-type env T1) T2)]
+    [(other wise)
+     (super type-equal? t1 t2)]))
+
+(define/public (match-types env pt at)
+  (match* (pt at)
+    [('Integer 'Integer) env] [('Boolean 'Boolean) env]
+    [('Void 'Void) env] [('Any 'Any) env]
+    [(`(Vector ,pts ...) `(Vector ,ats ...))
+     (for/fold ([env^ env]) ([pt1 pts] [at1 ats])
+       (match-types env^ pt1 at1))]
+    [(`(,pts ... -> ,prt) `(,ats ... -> ,art))
+     (define env^ (match-types env prt art))
+     (for/fold ([env^^ env^]) ([pt1 pts] [at1 ats])
+       (match-types env^^ pt1 at1))]
+    [(`(All ,pxs ,pt1) `(All ,axs ,at1))
+     (define env^ (append (map cons pxs axs) env))
+     (match-types env^ pt1 at1)]
+    [((? symbol? x) at)
+     (match (dict-ref env x (lambda () #f))
+       [#f (error 'type-check "undefined type variable ~a" x)]
+       ['Type (cons (cons x at) env)]
+       [t^ (check-type-equal? at t^ 'matching) env])]
+    [(other wise) (error 'type-check "mismatch ~a != a" pt at)]))
+
+(define/public (subst-type env pt)
+  (match pt
+    ['Integer 'Integer] ['Boolean 'Boolean]
+    ['Void 'Void] ['Any 'Any]
+    [`(Vector ,ts ...)
+     `(Vector ,@(for/list ([t ts]) (subst-type env t)))]
+    [`(,ts ... -> ,rt)
+     `(,@(for/list ([t ts]) (subst-type env t)) -> ,(subst-type env rt))]
+    [`(All ,xs ,t)
+     `(All ,xs ,(subst-type (append (map cons xs xs) env) t))]
+    [(? symbol? x) (dict-ref env x)]
+    [else (error 'type-check "expected a type not ~a" pt)]))
+
+(define/public (combine-decls-defs ds)
+  (match ds
+    ['() '()]
+    [`(,(Decl name type) . (,(Def f params _ info body) . ,ds^))
+     (unless (equal? name f)
+       (error 'type-check "name mismatch, ~a != ~a" name f))
+     (match type
+       [`(All ,xs (,ps ... -> ,rt))
+        (define params^ (for/list ([x params] [T ps]) `[,x : ,T]))
+        (cons (Generic xs (Def name params^ rt info body))
+              (combine-decls-defs ds^))]
+       [`(,ps ... -> ,rt)
+        (define params^ (for/list ([x params] [T ps]) `[,x : ,T]))
+        (cons (Def name params^ rt info body) (combine-decls-defs ds^))]
+       [else (error 'type-check "expected a function type, not ~a" type) ])]
+    [`(,(Def f params rt info body) . ,ds^)
+     (cons (Def f params rt info body) (combine-decls-defs ds^))]))
+\end{lstlisting}
+\caption{Auxiliary functions for type checking $R_{10}$.}
+\label{fig:type-check-R10-aux}
+\end{figure}
+
+
+\begin{figure}[tbp]
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+(define/public ((check-well-formed env) ty)
+  (match ty
+    ['Integer (void)]
+    ['Boolean (void)]
+    ['Void (void)]
+    [(? symbol? a)
+     (match (dict-ref env a (lambda () #f))
+       ['Type (void)]
+       [else (error 'type-check "undefined type variable ~a" a)])]
+    [`(Vector ,ts ...)
+     (for ([t ts]) ((check-well-formed env) t))]
+    [`(,ts ... -> ,t)
+     (for ([t ts]) ((check-well-formed env) t))
+     ((check-well-formed env) t)]
+    [`(All ,xs ,t)
+     (define env^ (append (for/list ([x xs]) (cons x 'Type)) env))
+     ((check-well-formed env^) t)]
+    [else (error 'type-check "unrecognized type ~a" ty)]))
+\end{lstlisting}
+\caption{Well-formed types.}
+\label{fig:well-formed-types}
+\end{figure}
+
+% TODO: interpreter for R10
+
+\section{Compiling Polymorphism}
+\label{sec:compiling-poly}
+
+Broadly speaking, there are three approaches to compiling parametric
+polymorphism, which we describe below.
+
+\begin{description}
+\item[Monomorphization] generates a different version of a polymorphic
+  function for each set of type arguments that it is used with,
+  producing type-specialized code. This approach results in the most
+  efficient code but requires whole-program compilation (no separate
+  compilation) and increases code size. For our current purposes
+  monomorphization is a non-starter because, with first-class
+  polymorphism, it is sometimes not possible to determine which
+  generic functions are used with which type arguments during
+  compilation. (It can be done at runtime, with just-in-time
+  compilation.) This approach is used to compile C++
+  templates~\citep{stroustrup88:_param_types}.
+  
+\item[Uniform representation] generates one version of each
+  polymorphic function but requires all values have a common format,
+  such as values of the \code{Any} type in $R_6$. Non-polymorphic code
+  (i.e. monomorphic code) is compiled similarly to code in a
+  dynamically typed language (like $R_7$), in which primitive
+  operators require their arguments to be projected from \code{Any}
+  and their results are injected into \code{Any}. This approach is
+  compatible with separate compilation and with first-class
+  polymorphism.  However, it produces the least-efficient code because
+  it introduces overhead in the entire program, including
+  non-polymorphic code. Some compilers for the ML language use the
+  uniform representation~\citep{Cardelli:1984aa,Appel:1987aa}.
+
+\item[Mixed representation] also generates one version of each
+  polymorphic function, using \code{Any} to represent type variables.
+  However, non-polymorphic code is compiled as usual (as in $R_8$) and
+  conversions are applied at the points of instantiations. This
+  approach is also compatible with separate compilation and
+  first-class polymorphism, but maintains the efficiency of
+  non-polymorphic code. The cost is some overhead at the boundary
+  between monomorphic and polymorphic code.
+
+  UNDER CONSTRUCTION
+  \citet{Leroy:1992qb}
+  \citep{Morrison:1991aa}
+  Java
+\end{description}
+
+
+%% This chapter may be based on ideas from \citet{Cardelli:1984aa},
+%% \citet{Leroy:1992qb}, \citet{Shao:1997uj}, or \citet{Harper:1995um}.
+
+% compile-time specialization: Ada, C++
+%   pos: efficient wrt. time
+%   neg: code size, no separate compilation, no first-class polymorphism
+
+% run-time specialization: C#
+
+% box everywhere: early ML \citep{Cardelli:1984aa,Appel:1987aa}
+
+% mixed representations:
+%    Vliet:1985aa
+%    (Gallium Caml compiler) \citet{Leroy:1992qb}, 
+%    Napier88 \citep{Morrison:1991aa}
+%    Java
+
+% Morrison:1991aa An ad hoc approach to the implementation of polymorphism.
+% by Morrison, Dearle, Connor, and Brown, 1991.
+%    uses type tags
+
+% Cardelli:1984aa: 
+
+\section{Erase Types}
+\label{sec:erase-types}
 
 
 
