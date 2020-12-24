@@ -11835,9 +11835,9 @@ We begin by designing the output language $R^p_8$.  In
 $R_9$ we used the type \code{Vector} for both real vectors and vector
 proxies. In $R^p_8$ we return the \code{Vector} type to
 its original meaning, as the type of real vectors, and we introduce a
-new type, \code{GVector}, whose values can be either real vectors or
+new type, \code{PVector}, whose values can be either real vectors or
 vector proxies. This new type comes with a suite of new primitive
-operations for creating and using values of type \code{GVector}. We
+operations for creating and using values of type \code{PVector}. We
 don't need to introduce a new type to represent vector proxies.  A
 proxy is represented by a vector containing three things: 1) the
 underlying vector, 2) a vector of functions for casting elements that
@@ -11846,8 +11846,8 @@ values to be written to the vector. So we define the following
 abbreviation for the type of a vector proxy:
 \[
 \itm{Proxy} (T\ldots \Rightarrow T'\ldots)
-= (\ttm{Vector}~(\ttm{GVector}~ T\ldots) ~R~ W)
-  \to (\key{GVector}~ T' \ldots)
+= (\ttm{Vector}~(\ttm{PVector}~ T\ldots) ~R~ W)
+  \to (\key{PVector}~ T' \ldots)
 \]
 where $R = (\ttm{Vector}~(T\to T') \ldots)$ and
 $W = (\ttm{Vector}~(T'\to T) \ldots)$.
@@ -11856,37 +11856,37 @@ Next we describe each of the new primitive operations.
 
 \begin{description}
 \item[\code{inject-vector} : (\key{Vector} $T \ldots$) $\to$
-  (\key{GVector} $T \ldots$)]\ \\
+  (\key{PVector} $T \ldots$)]\ \\
 %
-  This operation brands a vector as a value of the \code{GVector} type.
+  This operation brands a vector as a value of the \code{PVector} type.
 \item[\code{inject-proxy} : $\itm{Proxy}(T\ldots \Rightarrow T'\ldots)$
-  $\to$ (\key{GVector} $T' \ldots$)]\ \\
+  $\to$ (\key{PVector} $T' \ldots$)]\ \\
 %
-  This operation brands a vector proxy as value of the \code{GVector} type.
-\item[\code{proxy?} : (\key{GVector} $T \ldots$) $\to$
+  This operation brands a vector proxy as value of the \code{PVector} type.
+\item[\code{proxy?} : (\key{PVector} $T \ldots$) $\to$
   \code{Boolean}] \ \\
 %
   returns true if the value is a vector proxy and false if it is a
   real vector.
-\item[\code{project-vector} : (\key{GVector} $T \ldots$) $\to$
+\item[\code{project-vector} : (\key{PVector} $T \ldots$) $\to$
   (\key{Vector} $T \ldots$)]\ \\
 %
   Assuming that the input is a vector (and not a proxy), this
   operation returns the vector.
   
-\item[\code{proxy-vector-length} : (\key{GVector} $T \ldots$)
+\item[\code{proxy-vector-length} : (\key{PVector} $T \ldots$)
   $\to$ \code{Boolean}]\ \\
 %
   Given a vector proxy, this operation returns the length of the
   underlying vector.
   
-\item[\code{proxy-vector-ref} : (\key{GVector} $T \ldots$)
+\item[\code{proxy-vector-ref} : (\key{PVector} $T \ldots$)
   $\to$ ($i$ : \code{Integer}) $\to$ $T_i$]\ \\
 %
   Given a vector proxy, this operation returns the $i$th element of
   the underlying vector.
   
-\item[\code{proxy-vector-set!} : (\key{GVector} $T \ldots$) $\to$ ($i$
+\item[\code{proxy-vector-set!} : (\key{PVector} $T \ldots$) $\to$ ($i$
   : \code{Integer}) $\to$ $T_i$ $\to$ \key{Void}]\ \\ Given a vector
   proxy, this operation writes a value to the $i$th element of the
   underlying vector.
@@ -11894,8 +11894,8 @@ Next we describe each of the new primitive operations.
 
 Now to discuss the translation that differentiates vectors from
 proxies. First, every type annotation in the program must be
-translated (recursively) to replace \code{Vector} with \code{GVector}.
-Next, we must insert uses of \code{GVector} operations in the
+translated (recursively) to replace \code{Vector} with \code{PVector}.
+Next, we must insert uses of \code{PVector} operations in the
 appropriate places. For example, we wrap every vector creation with an
 \code{inject-vector}.
 \begin{lstlisting}
@@ -11942,14 +11942,14 @@ Recall that the \code{reveal-casts} pass
 particular, \code{Project} turns into a conditional expression that
 inspects the tag and retrieves the underlying value.  Here we need to
 augment the translation of \code{Project} to handle the situation when
-the target type is \code{GVector}.  Instead of using
+the target type is \code{PVector}.  Instead of using
 \code{vector-length} we need to use \code{proxy-vector-length}.
 \begin{lstlisting}
-(project |$e$| (GVector Any|$_1$| |$\ldots$| Any|$_n$|))
+(project |$e$| (PVector Any|$_1$| |$\ldots$| Any|$_n$|))
 |$\Rightarrow$|
 (let |$\itm{tmp}$| |$e'$|
    (if (eq? (tag-of-any |$\itm{tmp}$| 2))
-      (let |$\itm{vec}$| (value-of |$\itm{tmp}$| (GVector Any |$\ldots$| Any))
+      (let |$\itm{vec}$| (value-of |$\itm{tmp}$| (PVector Any |$\ldots$| Any))
         (if (eq? (proxy-vector-length |$\itm{vec}$|) |$n$|) |$\itm{vec}$| (exit)))
       (exit)))
 \end{lstlisting}
@@ -11960,22 +11960,22 @@ the target type is \code{GVector}.  Instead of using
 
 The closure conversion pass only requires one minor adjustment.  The
 auxiliary function that translates type annotations needs to be
-updated to handle the \code{GVector} type.
+updated to handle the \code{PVector} type.
 
 \section{Explicate Control}
 \label{sec:explicate-control-gradual}
 
 Update the \code{explicate-control} pass to handle the new primitive
-operations on the \code{GVector} type.
+operations on the \code{PVector} type.
 
 \section{Select Instructions}
 \label{sec:select-instructions-gradual}
 
 Recall that the \code{select-instructions} pass is responsible for
 lowering the primitive operations into x86 instructions.  So we need
-to translate the new \code{GVector} operations to x86.  To do so, the
+to translate the new \code{PVector} operations to x86.  To do so, the
 first question we need to answer is how will we differentiate the two
-kinds of values (vectors and proxies) that can inhabit \code{GVector}.
+kinds of values (vectors and proxies) that can inhabit \code{PVector}.
 We need just one bit to accomplish this, so we use the $57$th bit of
 the 64-bit tag at the front of every vector (see
 Figure~\ref{fig:tuple-rep}). So far, this bit has been set to $0$, so
@@ -12035,7 +12035,7 @@ of type \code{Any}, and similarly for \code{any-vector-set!}  and
 Section~\ref{sec:select-r6} we selected instructions for these
 operations based on the idea that the underlying value was a real
 vector. But in the current setting, the underlying value is of type
-\code{GVector}. So \code{any-vector-ref} can be translates to
+\code{PVector}. So \code{any-vector-ref} can be translates to
 pseudo-x86 as follows. We begin by projecting the underlying value out
 of the tagged value and then call the \code{proxy\_vector\_ref}
 procedure in the runtime.
@@ -12133,8 +12133,6 @@ be translated in a similar way.
 
 Figure~\ref{fig:R9-passes} provides an overview of all the passes needed
 for the compilation of $R_9$.
-
-
 
 \section{Further Reading}
 
@@ -12623,7 +12621,7 @@ In this chapter we use the mixed representation approach, partly
 because of its favorable attributes, and partly because it is
 straightforward to implement using the tools that we have already
 built to support gradual typing. To compile polymorphic functions, we
-add just one new pass, \code{erase-types}, to compile $R_{10}$ to
+add just one new pass, \code{erase-types}, to compile $R'_{10}$ to
 $R'_9$.
 
 \section{Erase Types}
@@ -12729,6 +12727,79 @@ annotations and the body.
   programs that use polymorphic functions. Some of them should make
   use of first-class polymorphism. 
 \end{exercise}
+
+\begin{figure}[p]
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (R10) at (9,4)  {\large $R_{10}$};
+\node (R10p) at (6,4)  {\large $R'_{10}$};
+\node (R9p) at (3,4)  {\large $R'_9$};
+\node (R8pp) at (0,4)  {\large $R''_8$};
+\node (R8proxy) at (0,2)  {\large $R^p_8$};
+\node (R8proxy-2) at (3,2)  {\large $R^p_8$};
+\node (R8proxy-3) at (6,2)  {\large $R^p_8$};
+\node (R8proxy-4) at (9,2)  {\large $R^p_8$};
+\node (R8proxy-5) at (12,2)  {\large $R^p_8$};
+\node (F1-1) at (12,0)  {\large $R^p_8$};
+\node (F1-2) at (9,0)  {\large $R^p_8$};
+\node (F1-3) at (6,0)  {\large $R^p_8$};
+\node (F1-4) at (3,0)  {\large $R^p_8$};
+\node (F1-5) at (0,0)  {\large $R^p_8$};
+\node (C3-2) at (3,-2)  {\large $C^p_7$};
+
+\node (x86-2) at (3,-4)  {\large $\text{x86}^{*}_3$};
+\node (x86-3) at (6,-4)  {\large $\text{x86}^{*}_3$};
+\node (x86-4) at (9,-4) {\large $\text{x86}^{*}_3$};
+\node (x86-5) at (9,-6) {\large $\text{x86}^{\dagger}_3$};
+
+\node (x86-2-1) at (3,-6)  {\large $\text{x86}^{*}_3$};
+\node (x86-2-2) at (6,-6)  {\large $\text{x86}^{*}_3$};
+
+\path[->,bend right=15] (R10) edge [above] node
+     {\ttfamily\footnotesize type-check} (R10p);
+\path[->,bend right=15] (R10p) edge [above] node
+     {\ttfamily\footnotesize erase-types} (R9p);
+\path[->,bend right=15] (R9p) edge [above] node
+     {\ttfamily\footnotesize lower-casts} (R8pp);
+\path[->,bend right=15] (R8pp) edge [right] node
+     {\ttfamily\footnotesize differentiate-proxies} (R8proxy);
+\path[->,bend left=15] (R8proxy) edge [above] node
+     {\ttfamily\footnotesize shrink} (R8proxy-2);
+\path[->,bend left=15] (R8proxy-2) edge [above] node
+     {\ttfamily\footnotesize uniquify} (R8proxy-3);
+\path[->,bend left=15] (R8proxy-3) edge [above] node
+     {\ttfamily\footnotesize reveal-functions} (R8proxy-4);
+\path[->,bend left=15] (R8proxy-4) edge [above] node
+     {\ttfamily\footnotesize reveal-casts} (R8proxy-5);
+\path[->,bend left=15] (R8proxy-5) edge [left] node
+     {\ttfamily\footnotesize convert-assignments} (F1-1);
+\path[->,bend left=15] (F1-1) edge [below] node
+     {\ttfamily\footnotesize convert-to-clos.} (F1-2);
+\path[->,bend right=15] (F1-2) edge [above] node
+     {\ttfamily\footnotesize limit-fun.} (F1-3);
+\path[->,bend right=15] (F1-3) edge [above] node
+     {\ttfamily\footnotesize expose-alloc.} (F1-4);
+\path[->,bend right=15] (F1-4) edge [above] node
+     {\ttfamily\footnotesize remove-complex.} (F1-5);
+\path[->,bend right=15] (F1-5) edge [right] node
+     {\ttfamily\footnotesize explicate-control} (C3-2);
+\path[->,bend left=15] (C3-2) edge [left] node
+     {\ttfamily\footnotesize select-instr.} (x86-2);
+\path[->,bend right=15] (x86-2) edge [left] node
+     {\ttfamily\footnotesize uncover-live} (x86-2-1);
+\path[->,bend right=15] (x86-2-1) edge [below] node 
+     {\ttfamily\footnotesize build-inter.} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [left] node
+     {\ttfamily\footnotesize allocate-reg.} (x86-3);
+\path[->,bend left=15] (x86-3) edge [above] node
+     {\ttfamily\footnotesize patch-instr.} (x86-4);
+\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print-x86} (x86-5);
+\end{tikzpicture}
+  \caption{Diagram of the passes for $R_{10}$ (parametric polymorphism).}
+\label{fig:R10-passes}
+\end{figure}
+
+Figure~\ref{fig:R10-passes} provides an overview of all the passes needed
+for the compilation of $R_{10}$.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% \chapter{High-level Optimization}
