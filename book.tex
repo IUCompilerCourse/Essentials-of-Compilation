@@ -11831,9 +11831,9 @@ function in Figure~\ref{fig:guarded-vector}.  In the
 \code{differentiate-proxies} pass we shift this responsibility to the
 generated code.
 
-We begin by designing the output language $R_{\mathrm{proxy}}$.  In
+We begin by designing the output language $R^p_8$.  In
 $R_9$ we used the type \code{Vector} for both real vectors and vector
-proxies. In $R_{\mathrm{proxy}}$ we return the \code{Vector} type to
+proxies. In $R^p_8$ we return the \code{Vector} type to
 its original meaning, as the type of real vectors, and we introduce a
 new type, \code{GVector}, whose values can be either real vectors or
 vector proxies. This new type comes with a suite of new primitive
@@ -12064,6 +12064,78 @@ be translated in a similar way.
   \code{((lambda (x) x) e)}.
 \end{exercise}
 
+\begin{figure}[p]
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (R9) at (6,4)  {\large $R_9$};
+\node (R9p) at (3,4)  {\large $R'_9$};
+\node (R8pp) at (0,4)  {\large $R''_8$};
+\node (R8proxy) at (0,2)  {\large $R^p_8$};
+\node (R8proxy-2) at (3,2)  {\large $R^p_8$};
+\node (R8proxy-3) at (6,2)  {\large $R^p_8$};
+\node (R8proxy-4) at (9,2)  {\large $R^p_8$};
+\node (R8proxy-5) at (12,2)  {\large $R^p_8$};
+\node (F1-1) at (12,0)  {\large $R^p_8$};
+\node (F1-2) at (9,0)  {\large $R^p_8$};
+\node (F1-3) at (6,0)  {\large $R^p_8$};
+\node (F1-4) at (3,0)  {\large $R^p_8$};
+\node (F1-5) at (0,0)  {\large $R^p_8$};
+\node (C3-2) at (3,-2)  {\large $C^p_7$};
+
+\node (x86-2) at (3,-4)  {\large $\text{x86}^{*}_3$};
+\node (x86-3) at (6,-4)  {\large $\text{x86}^{*}_3$};
+\node (x86-4) at (9,-4) {\large $\text{x86}^{*}_3$};
+\node (x86-5) at (9,-6) {\large $\text{x86}^{\dagger}_3$};
+
+\node (x86-2-1) at (3,-6)  {\large $\text{x86}^{*}_3$};
+\node (x86-2-2) at (6,-6)  {\large $\text{x86}^{*}_3$};
+
+\path[->,bend right=15] (R9) edge [above] node
+     {\ttfamily\footnotesize type-check} (R9p);
+\path[->,bend right=15] (R9p) edge [above] node
+     {\ttfamily\footnotesize lower-casts} (R8pp);
+\path[->,bend right=15] (R8pp) edge [right] node
+     {\ttfamily\footnotesize differentiate-proxies} (R8proxy);
+\path[->,bend left=15] (R8proxy) edge [above] node
+     {\ttfamily\footnotesize shrink} (R8proxy-2);
+\path[->,bend left=15] (R8proxy-2) edge [above] node
+     {\ttfamily\footnotesize uniquify} (R8proxy-3);
+\path[->,bend left=15] (R8proxy-3) edge [above] node
+     {\ttfamily\footnotesize reveal-functions} (R8proxy-4);
+\path[->,bend left=15] (R8proxy-4) edge [above] node
+     {\ttfamily\footnotesize reveal-casts} (R8proxy-5);
+\path[->,bend left=15] (R8proxy-5) edge [left] node
+     {\ttfamily\footnotesize convert-assignments} (F1-1);
+\path[->,bend left=15] (F1-1) edge [below] node
+     {\ttfamily\footnotesize convert-to-clos.} (F1-2);
+\path[->,bend right=15] (F1-2) edge [above] node
+     {\ttfamily\footnotesize limit-fun.} (F1-3);
+\path[->,bend right=15] (F1-3) edge [above] node
+     {\ttfamily\footnotesize expose-alloc.} (F1-4);
+\path[->,bend right=15] (F1-4) edge [above] node
+     {\ttfamily\footnotesize remove-complex.} (F1-5);
+\path[->,bend right=15] (F1-5) edge [right] node
+     {\ttfamily\footnotesize explicate-control} (C3-2);
+\path[->,bend left=15] (C3-2) edge [left] node
+     {\ttfamily\footnotesize select-instr.} (x86-2);
+\path[->,bend right=15] (x86-2) edge [left] node
+     {\ttfamily\footnotesize uncover-live} (x86-2-1);
+\path[->,bend right=15] (x86-2-1) edge [below] node 
+     {\ttfamily\footnotesize build-inter.} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [left] node
+     {\ttfamily\footnotesize allocate-reg.} (x86-3);
+\path[->,bend left=15] (x86-3) edge [above] node
+     {\ttfamily\footnotesize patch-instr.} (x86-4);
+\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print-x86} (x86-5);
+\end{tikzpicture}
+  \caption{Diagram of the passes for $R_9$ (gradual typing).}
+\label{fig:R9-passes}
+\end{figure}
+
+Figure~\ref{fig:R9-passes} provides an overview of all the passes needed
+for the compilation of $R_9$.
+
+
+
 \section{Further Reading}
 
 This chapter just scratches the surface of gradual typing.  The basic
@@ -12134,6 +12206,7 @@ type for parameter \code{a}. In Figure~\ref{fig:map-vec-poly} we apply
 vector of Booleans (and a function on Booleans).
 
 \begin{figure}[tbp]
+  % poly_test_2.rkt
 \begin{lstlisting}
 (: map-vec (All (a) ((a -> a) (Vector a a) -> (Vector a a))))
 (define (map-vec f v)
@@ -12299,6 +12372,24 @@ process in next pass of the compiler.
 \label{fig:r10-prime-syntax}
 \end{figure}
 
+The output of the type checker on the polymorphic \code{map-vec}
+example is listed in Figure~\ref{fig:map-vec-type-check}.
+
+\begin{figure}[tbp]
+  % poly_test_2.rkt
+\begin{lstlisting}
+(poly (a) (define (map-vec [f : (a -> a)] [v : (Vector a a)]) : (Vector a a)
+  (vector (f (vector-ref v 0)) (f (vector-ref v 1)))))
+
+(define (add1 [x : Integer]) : Integer (+ x 1))
+
+(vector-ref ((inst map-vec (All (a) ((a -> a) (Vector a a) -> (Vector a a)))
+                           (Integer))
+              add1 (vector 0 41)) 1)
+\end{lstlisting}
+\caption{Output of the type checker on the \code{map-vec} example.}
+\label{fig:map-vec-type-check}
+\end{figure}
 
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
@@ -12439,7 +12530,7 @@ process in next pass of the compiler.
 
 
 \begin{figure}[tbp]
-\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+\begin{lstlisting}%[basicstyle=\ttfamily\scriptsize]
 (define/public ((check-well-formed env) ty)
   (match ty
     ['Integer (void)]
@@ -12463,12 +12554,12 @@ process in next pass of the compiler.
 \label{fig:well-formed-types}
 \end{figure}
 
-% TODO: interpreter for R10
+% TODO: interpreter for R'_10
 
 \section{Compiling Polymorphism}
 \label{sec:compiling-poly}
 
-Broadly speaking, there are three approaches to compiling parametric
+Broadly speaking, there are four approaches to compiling parametric
 polymorphism, which we describe below.
 
 \begin{description}
@@ -12482,65 +12573,162 @@ polymorphism, which we describe below.
   generic functions are used with which type arguments during
   compilation. (It can be done at runtime, with just-in-time
   compilation.) This approach is used to compile C++
-  templates~\citep{stroustrup88:_param_types}.
+  templates~\citep{stroustrup88:_param_types} and polymorphic
+  functions in NESL~\citep{Blelloch:1993aa} and
+  ML~\citep{Weeks:2006aa}.
   
 \item[Uniform representation] generates one version of each
-  polymorphic function but requires all values have a common format,
-  such as values of the \code{Any} type in $R_6$. Non-polymorphic code
-  (i.e. monomorphic code) is compiled similarly to code in a
-  dynamically typed language (like $R_7$), in which primitive
-  operators require their arguments to be projected from \code{Any}
-  and their results are injected into \code{Any}. This approach is
+  polymorphic function but requires all values have a common ``boxed''
+  format, such as the tagged values of type \code{Any} in
+  $R_6$. Non-polymorphic code (i.e. monomorphic code) is compiled
+  similarly to code in a dynamically typed language (like $R_7$), in
+  which primitive operators require their arguments to be projected
+  from \code{Any} and their results are injected into \code{Any}.  (In
+  object-oriented languages, the projection is accomplished via
+  virtual method dispatch.) The uniform representation approach is
   compatible with separate compilation and with first-class
   polymorphism.  However, it produces the least-efficient code because
   it introduces overhead in the entire program, including
-  non-polymorphic code. Some compilers for the ML language use the
-  uniform representation~\citep{Cardelli:1984aa,Appel:1987aa}.
-
-\item[Mixed representation] also generates one version of each
-  polymorphic function, using \code{Any} to represent type variables.
-  However, non-polymorphic code is compiled as usual (as in $R_8$) and
-  conversions are applied at the points of instantiations. This
-  approach is also compatible with separate compilation and
-  first-class polymorphism, but maintains the efficiency of
-  non-polymorphic code. The cost is some overhead at the boundary
-  between monomorphic and polymorphic code.
-
-  UNDER CONSTRUCTION
-  \citet{Leroy:1992qb}
-  \citep{Morrison:1991aa}
-  Java
+  non-polymorphic code. This approach is used in the implementation of
+  CLU~\cite{liskov79:_clu_ref,Liskov:1993dk},
+  ML~\citep{Cardelli:1984aa,Appel:1987aa}, and
+  Java~\citep{Bracha:1998fk}.
+  
+\item[Mixed representation] generates one version of each polymorphic
+  function, using a boxed representation for type
+  variables. Monomorphic code is compiled as usual (as in $R_8$) and
+  conversions are performed at the boundaries between monomorphic and
+  polymorphic (e.g. when a polymorphic function is instantiated and
+  called). This approach is compatible with separate compilation and
+  first-class polymorphism and maintains the efficiency for
+  monomorphic code. The tradeoff is increased overhead at the boundary
+  between monomorphic and polymorphic code.  This approach is used in
+  compilers for variants of ML~\citep{Leroy:1992qb} and starting in
+  Java 5 with the addition of autoboxing.
+  
+\item[Type passing] uses the unboxed representation in both
+  monomorphic and polymorphic code. Each polymorphic function is
+  compiled to a single function with extra parameters that describe
+  the type arguments. The type information is used by the generated
+  code to direct access of the unboxed values at runtime. This
+  approach is used in compilers for the Napier88
+  language~\citep{Morrison:1991aa} and ML~\citep{Harper:1995um}.  This
+  approach is compatible with separate compilation and first-class
+  polymorphism and maintains the efficiency for monomorphic
+  code. There is runtime overhead in polymorphic code from dispatching
+  on type information.
 \end{description}
 
-
-%% This chapter may be based on ideas from \citet{Cardelli:1984aa},
-%% \citet{Leroy:1992qb}, \citet{Shao:1997uj}, or \citet{Harper:1995um}.
-
-% compile-time specialization: Ada, C++
-%   pos: efficient wrt. time
-%   neg: code size, no separate compilation, no first-class polymorphism
-
-% run-time specialization: C#
-
-% box everywhere: early ML \citep{Cardelli:1984aa,Appel:1987aa}
-
-% mixed representations:
-%    Vliet:1985aa
-%    (Gallium Caml compiler) \citet{Leroy:1992qb}, 
-%    Napier88 \citep{Morrison:1991aa}
-%    Java
-
-% Morrison:1991aa An ad hoc approach to the implementation of polymorphism.
-% by Morrison, Dearle, Connor, and Brown, 1991.
-%    uses type tags
-
-% Cardelli:1984aa: 
+In this chapter we use the mixed representation approach, partly
+because of its favorable attributes, and partly because it is
+straightforward to implement using the tools that we have already
+built to support gradual typing. To compile polymorphic functions, we
+add just one new pass, \code{erase-types}, to compile $R_{10}$ to
+$R'_9$.
 
 \section{Erase Types}
 \label{sec:erase-types}
 
+We use the \code{Any} type from Chapter~\ref{ch:type-dynamic} to
+represent type variables. For example, Figure~\ref{fig:map-vec-erase}
+shows the output of the \code{erase-types} pass on the polymorphic
+\code{map-vec} (Figure~\ref{fig:map-vec-poly}). The occurrences of
+type parameter \code{a} are replaced by \code{Any} and the polymorphic
+\code{All} types are removed from the type of \code{map-vec}. 
 
+\begin{figure}[tbp]
+\begin{lstlisting}
+(define (map-vec [f : (Any -> Any)] [v : (Vector Any Any)])
+                   : (Vector Any Any)
+  (vector (f (vector-ref v 0)) (f (vector-ref v 1))))
 
+(define (add1 [x : Integer]) : Integer (+ x 1))
+
+(vector-ref ((cast map-vec
+                     ((Any -> Any) (Vector Any Any) -> (Vector Any Any))  
+                     ((Integer -> Integer) (Vector Integer Integer)
+                               -> (Vector Integer Integer)))
+             add1 (vector 0 41)) 1)
+\end{lstlisting}
+\caption{The polymorphic \code{map-vec} example after type erasure.}
+\label{fig:map-vec-erase}
+\end{figure}
+
+This process of type erasure creates a challenge at points of
+instantiation. For example, consider the instantiation of
+\code{map-vec} in Figure~\ref{fig:map-vec-type-check}.
+The type of \code{map-vec} is
+\begin{lstlisting}
+(All (a) ((a -> a) (Vector a a) -> (Vector a a)))
+\end{lstlisting}
+and it is instantiated to 
+\begin{lstlisting}
+((Integer -> Integer) (Vector Integer Integer)
+   -> (Vector Integer Integer))
+\end{lstlisting}
+After erasure, the type of \code{map-vec} is
+\begin{lstlisting}
+((Any -> Any) (Vector Any Any) -> (Vector Any Any))
+\end{lstlisting}
+but we need to convert it to the instantiated type.  This is easy to
+do in the target language $R'_9$ with a single \code{cast}.  In
+Figure~\ref{fig:map-vec-erase}, the instantiation of \code{map-vec}
+has been compiled to a \code{cast} from the type of \code{map-vec} to
+the instantiated type. The source and target type of a cast must be
+consistent (Figure~\ref{fig:consistent}), which indeed is the case
+because both the source and target are obtained from the same
+polymorphic type of \code{map-vec}, replacing the type parameters with
+\code{Any} in the former and with the deduced type arguments in the
+later. (Recall that the \code{Any} type is consistent with any type.)
+
+To implement the \code{erase-types} pass, we recommend defining a
+recursive auxiliary function named \code{erase-type} that applies the
+following two transformations. It replaces type variables with
+\code{Any}
+\begin{lstlisting}
+|$x$|
+|$\Rightarrow$|
+Any
+\end{lstlisting}
+and it removes the polymorphic \code{All} types.
+\begin{lstlisting}
+(All |$xs$| |$T_1$|)
+|$\Rightarrow$|
+|$T'_1$|
+\end{lstlisting}
+Apply the \code{erase-type} function to all of the type annotations in
+the program.
+
+Regarding the translation of expressions, the case for \code{Inst} is
+the interesting one. We translate it into a \code{Cast}, as shown
+below. The type of the subexpression $e$ is the polymorphic type
+$\LP\key{All} xs T\RP$. The source type of the cast is the erasure of
+$T$, the type $T'$. The target type $T''$ is the result of
+substituting the arguments types $ts$ for the type parameters $xs$ in
+$T$ followed by doing type erasure.
+\begin{lstlisting}
+(Inst |$e$| (All |$xs$| |$T$|) |$ts$|)
+|$\Rightarrow$|
+(Cast |$e'$| |$T'$| |$T''$|)
+\end{lstlisting}
+where $T'' = \LP\code{erase-type}~\LP\code{subst-type}~s~T\RP\RP$
+and $s = \LP\code{map}~\code{cons}~xs~ts\RP$.
+
+Finally, each polymorphic function is translated to a regular
+functions in which type erasure has been applied to all the type
+annotations and the body.
+\begin{lstlisting}
+(Poly |$ts$| (Def |$f$| ([|$x_1$| : |$T_1$|] |$\ldots$|) |$T_r$| |$\itm{info}$| |$e$|))
+|$\Rightarrow$|          
+(Def |$f$| ([|$x_1$| : |$T'_1$|] |$\ldots$|) |$T'_r$| |$\itm{info}$| |$e'$|)
+\end{lstlisting}
+
+\begin{exercise}\normalfont
+  Implement a compiler for the polymorphic language $R_{10}$ by
+  extending and adapting your compiler for $R_9$. Create 6 new test
+  programs that use polymorphic functions. Some of them should make
+  use of first-class polymorphism. 
+\end{exercise}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% \chapter{High-level Optimization}
