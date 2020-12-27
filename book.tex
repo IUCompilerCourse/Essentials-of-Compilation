@@ -1508,11 +1508,9 @@ writes the result back to the destination $d$.
 The move instruction $\key{movq}\,s\key{,}\,d$ reads from $s$ and
 stores the result in $d$.
 %
-The $\key{callq}\,\itm{label}$ instruction executes the procedure
+The $\key{callq}\,\itm{label}$ instruction jumps to the procedure
 specified by the label and $\key{retq}$ returns from a procedure to
-its caller. The abstract syntax for \code{callq} includes an extra
-integer field that represents the arity (number of parameters) of the
-function being called.
+its caller. 
 %
 We discuss procedure calls in more detail later in this
 chapter and in Chapter~\ref{ch:functions}. The
@@ -1572,13 +1570,14 @@ increase the size of the stack by subtracting from the stack pointer.
 In the context of a procedure call, the \emph{return
   address}\index{return address} is the instruction after the call
 instruction on the caller side. The function call instruction,
-\code{callq}, pushes the return address onto the stack.  The register
-\key{rbp} is the \emph{base pointer}\index{base pointer} and is used
-to access variables associated with the current procedure call.  The
-base pointer of the caller is pushed onto the stack after the return
-address. We number the variables from $1$ to $n$. Variable $1$ is
-stored at address $-8\key{(\%rbp)}$, variable $2$ at
-$-16\key{(\%rbp)}$, etc.
+\code{callq}, pushes the return address onto the stack prior to
+jumping to the procedure.  The register \key{rbp} is the \emph{base
+  pointer}\index{base pointer} and is used to access variables that
+are stored in the frame of the current procedure call.  The base
+pointer of the caller is pushed onto the stack after the return
+address. In Figure~\ref{fig:frame} we number the variables from $1$ to
+$n$. Variable $1$ is stored at address $-8\key{(\%rbp)}$, variable $2$
+at $-16\key{(\%rbp)}$, etc.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -1678,16 +1677,17 @@ labeled instructions to appear anywhere, but instead organizes
 instructions into a group called a
 \emph{block}\index{block}\index{basic block} and associates a label
 with every block, which is why the \key{CFG} struct (for control-flow
-graph) includes an alist mapping labels to blocks. The reason for this
-organization becomes apparent in Chapter~\ref{ch:bool-types} when we
-introduce conditional branching. The \code{Block} structure includes
-an $\itm{info}$ field that is not needed for this chapter, but will
-become useful in Chapter~\ref{ch:register-allocation-r1}.  For now,
-the $\itm{info}$ field should just contain an empty list. Also,
-regarding the abstract syntax for \code{callq}, the \code{Callq}
-struct includes an integer for representing the arity of the function,
-i.e., the number of arguments, which is helpful to know during
-register allocation (Chapter~\ref{ch:register-allocation-r1}).
+graph) includes an alist mapping labels to blocks. The reason for
+using blocks and a control-flow graph becomes apparent in
+Chapter~\ref{ch:bool-types} when we introduce conditional
+branching. The \code{Block} structure includes an $\itm{info}$ field
+that is not needed for this chapter, but will become useful in
+Chapter~\ref{ch:register-allocation-r1}.  For now, the $\itm{info}$
+field should just contain an empty list. Also, regarding the abstract
+syntax for \code{callq}, the \code{Callq} struct includes an integer
+for representing the arity of the function, i.e., the number of
+arguments, which is helpful to know during register allocation
+(Chapter~\ref{ch:register-allocation-r1}).
 
 \begin{figure}[tp]
 \fbox{
@@ -1730,9 +1730,9 @@ and x86 assembly? Here are some of the most important ones:
   Furthermore, some instructions place special restrictions on their
   arguments.
 
-\item[(b)] An argument of an $R_1$ operator can be any expression,
-  whereas x86 instructions restrict their arguments to be integers
-  constants, registers, and memory locations.
+\item[(b)] An argument of an $R_1$ operator can be a deeply-nested
+  expression, whereas x86 instructions restrict their arguments to be
+  integers constants, registers, and memory locations.
 
 \item[(c)] The order of execution in x86 is explicit in the syntax: a
   sequence of instructions and jumps to labeled positions, whereas in
@@ -1743,8 +1743,8 @@ and x86 assembly? Here are some of the most important ones:
   x86 has 16 registers and the procedure calls stack.
 
 \item[(e)] Variables in $R_1$ can overshadow other variables with the
-  same name. The registers and memory locations of x86 all have unique
-  names or addresses.
+  same name. In x86, registers have unique names and memory locations
+  have unique addresses.
 \end{enumerate}
 
 We ease the challenge of compiling from $R_1$ to x86 by breaking down
@@ -1752,8 +1752,8 @@ the problem into several steps, dealing with the above differences one
 at a time.  Each of these steps is called a \emph{pass} of the
 compiler.\index{pass}\index{compiler pass}
 %
-This terminology comes from each step traverses (i.e. passes over) the
-AST of the program.
+This terminology comes from each step passing over the AST of the
+program.
 %
 We begin by sketching how we might implement each pass, and give them
 names.  We then figure out an ordering of the passes and the
@@ -1767,30 +1767,28 @@ non-terminal in the grammar of the input language of the pass.
 \index{intermediate language}
 
 \begin{description}
-\item[Pass \key{select-instructions}] To handle the difference between
+\item[Pass \key{select-instructions}] handles the difference between
   $R_1$ operations and x86 instructions we convert each $R_1$
   operation to a short sequence of instructions that accomplishes the
   same task.
 
-\item[Pass \key{remove-complex-opera*}] To ensure that each
+\item[Pass \key{remove-complex-opera*}] ensures that each
   subexpression (i.e. operator and operand, and hence the name
   \key{opera*}) is an \emph{atomic} expression (a variable or
   integer), we introduce temporary variables to hold the results
   of subexpressions.\index{atomic expression}
   
-\item[Pass \key{explicate-control}] To make the execution order of the
+\item[Pass \key{explicate-control}] makes the execution order of the
   program explicit, we convert from the abstract syntax tree
-  representation into a control-flow graph in which each node
-  contains a sequence of statements and the edges between nodes say
-  where to go at the end of the sequence.
+  representation into a control-flow graph in which each node contains
+  a sequence of statements and the edges between nodes say which nodes
+  contain jumps to other nodes.
 
-\item[Pass \key{assign-homes}] To handle the difference between the
-  variables in $R_1$ versus the registers and stack locations in x86,
-  we map each variable to a register or stack location.
+\item[Pass \key{assign-homes}] assigns the variables in $R_1$ to
+  registers or stack locations in x86.
 
-\item[Pass \key{uniquify}] This pass deals with the shadowing of variables
-  by renaming every variable to a unique name, so that shadowing no
-  longer occurs.
+\item[Pass \key{uniquify}] deals with the shadowing of variables by
+  renaming every variable to a unique name.
 \end{description}
 
 The next question is: in what order should we apply these passes? This
@@ -1800,14 +1798,14 @@ efficient code, etc.) so oftentimes trial-and-error is
 involved. Nevertheless, we can try to plan ahead and make educated
 choices regarding the ordering.
 
-Let us consider the ordering of \key{uniquify} and
-\key{remove-complex-opera*}. The assignment of subexpressions to
-temporary variables involves introducing new variables and moving
-subexpressions, which might change the shadowing of variables and
-inadvertently change the behavior of the program.  But if we apply
-\key{uniquify} first, this will not be an issue. Of course, this means
-that in \key{remove-complex-opera*}, we need to ensure that the
-temporary variables that it creates are unique.
+%% Let us consider the ordering of \key{uniquify} and
+%% \key{remove-complex-opera*}. The assignment of subexpressions to
+%% temporary variables involves introducing new variables and moving
+%% subexpressions, which might change the shadowing of variables and
+%% inadvertently change the behavior of the program.  But if we apply
+%% \key{uniquify} first, this will not be an issue. Of course, this means
+%% that in \key{remove-complex-opera*}, we need to ensure that the
+%% temporary variables that it creates are unique.
 
 What should be the ordering of \key{explicate-control} with respect to
 \key{uniquify}? The \key{uniquify} pass should come first because
@@ -1815,36 +1813,41 @@ What should be the ordering of \key{explicate-control} with respect to
 become local variables whose scope is the entire program, which would
 confuse variables with the same name.
 %
-Likewise, we place \key{explicate-control} after
-\key{remove-complex-opera*} because \key{explicate-control} removes
-the \key{let} form, but it is convenient to use \key{let} in the
-output of \key{remove-complex-opera*}.
+Likewise, we place \key{remove-complex-opera*} before
+\key{explicate-control} because \key{explicate-control} removes the
+\key{let} form, but it is convenient to use \key{let} in the output of
+\key{remove-complex-opera*}.
 %
-Regarding \key{assign-homes}, it is helpful to place
-\key{explicate-control} first because \key{explicate-control} changes
-\key{let}-bound variables into program-scope variables.  This means
-that the \key{assign-homes} pass can read off the variables from the
-$\itm{info}$ of the \key{Program} AST node instead of traversing the
-entire program in search of \key{let}-bound variables.
+The ordering of \key{uniquify} and \key{remove-complex-opera*} does
+not matter, so we arbitrarily choose \key{uniquify} to come first.
 
-Last, we need to decide on the ordering of \key{select-instructions}
-and \key{assign-homes}.  These two passes are intertwined, creating a
-Gordian Knot. To do a good job of assigning homes, it is helpful to
-have already determined which instructions will be used, because x86
-instructions have restrictions about which of their arguments can be
-registers versus stack locations. One might want to give preferential
-treatment to variables that occur in register-argument positions. On
-the other hand, it may turn out to be impossible to make sure that all
-such variables are assigned to registers, and then one must redo the
-selection of instructions. Some compilers handle this problem by
-iteratively repeating these two passes until a good solution is found.
-We use a simpler approach in which \key{select-instructions}
-comes first, followed by the \key{assign-homes}, then a third
-pass named \key{patch-instructions} that uses a reserved register to
-patch-up outstanding problems regarding instructions with too many
-memory accesses. The disadvantage of this approach is some programs
-may not execute as efficiently as they would if we used the iterative
-approach and used all of the registers for variables.
+%% Regarding \key{assign-homes}, it is helpful to place
+%% \key{explicate-control} first because \key{explicate-control} changes
+%% \key{let}-bound variables into program-scope variables.  This means
+%% that the \key{assign-homes} pass can read off the variables from the
+%% $\itm{info}$ of the \key{Program} AST node instead of traversing the
+%% entire program in search of \key{let}-bound variables.
+
+Last, we consider \key{select-instructions} and \key{assign-homes}.
+These two passes are intertwined, creating a Gordian Knot. To do a
+good job of assigning homes, it is helpful to have already determined
+which instructions will be used, because x86 instructions have
+restrictions about which of their arguments can be registers versus
+stack locations. One might want to give preferential treatment to
+variables that occur in register-argument positions. On the other
+hand, it may turn out to be impossible to make sure that all such
+variables are assigned to registers, and then one must redo the
+selection of instructions. A sophisticated solution to this problem is
+to iteratively repeat the two passes until a good solution is found.
+To reduce implementation complexity, we recommend a simpler approach
+in which \key{select-instructions} comes first, followed by the
+\key{assign-homes}, then a third pass named \key{patch-instructions}
+that uses a reserved register to patch-up outstanding problems
+regarding instructions with too many memory accesses.
+
+%% The disadvantage of this approach is some programs may not execute
+%% as efficiently as they would if we used the iterative approach and
+%% used all of the registers for variables.
 
 
 \begin{figure}[tbp]
@@ -1877,12 +1880,15 @@ Figure~\ref{fig:R1-passes} presents the ordering of the compiler
 passes in the form of a graph. Each pass is an edge and the
 input/output language of each pass is a node in the graph.  The output
 of \key{uniquify} and \key{remove-complex-opera*} are programs that
-are still in the $R_1$ language, but the output of the pass
-\key{explicate-control} is in a different language $C_0$ that is
-designed to make the order of evaluation explicit in its syntax, which
-we introduce in the next section. The \key{select-instruction} pass
-translates from $C_0$ to a variant of x86. The \key{assign-homes} and
-\key{patch-instructions} passes input and output variants of x86
+are still in the $R_1$ language, through the output of the later is a
+subset of $R_1$, a language we name $R^\dagger_1$ and describe in
+Section~\ref{sec:remove-complex-opera-R1}.
+%
+The output of \key{explicate-control} is in an intermediate language
+$C_0$ designed to make the order of evaluation explicit in its syntax,
+which we introduce in the next section. The \key{select-instruction}
+pass translates from $C_0$ to a variant of x86. The \key{assign-homes}
+and \key{patch-instructions} passes input and output variants of x86
 assembly. The last pass in Figure~\ref{fig:R1-passes} is
 \key{print-x86}, which converts from the abstract syntax of
 $\text{x86}_0$ to the concrete syntax of x86.
@@ -1954,18 +1960,19 @@ C_0 & ::= & \PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label}\,\key{.}\,\Tail\key{)}\
 
 The x86$^{*}_0$ language, pronounced ``pseudo x86'', is the output of
 the pass \key{select-instructions}. It extends x86$_0$ with an
-unbounded number of program-scope variables and has looser rules
-regarding instruction arguments. The x86$^{\dagger}$ language, the
-output of \key{print-x86}, is the concrete syntax for x86.
+unbounded number of program-scope variables and it does not have
+special-case rules regarding instruction arguments. The
+x86$^{\dagger}$ language, the output of \key{print-x86}, is the
+concrete syntax for x86.
 
 
 \section{Uniquify Variables}
 \label{sec:uniquify-s0}
 
-The \code{uniquify} pass compiles arbitrary $R_1$ programs into $R_1$
-programs in which every \key{let} uses a unique variable name. For
-example, the \code{uniquify} pass should translate the program on the
-left into the program on the right. \\
+The \code{uniquify} pass compiles $R_1$ programs into $R_1$ programs
+in which every \key{let} uses a unique variable name. For example, the
+\code{uniquify} pass should translate the program on the left into the
+program on the right. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -2007,25 +2014,23 @@ $\Rightarrow$
 \end{minipage}
 \end{tabular}
 
-We recommend implementing \code{uniquify} by creating a function named
-\code{uniquify-exp} that is structurally recursive function and mostly
-just copies the input program. However, when encountering a \key{let},
-it should generate a unique name for the variable (the Racket function
+We recommend implementing \code{uniquify} by creating a structurally
+recursive function function named \code{uniquify-exp} that mostly just
+copies the input program. However, when encountering a \key{let}, it
+should generate a unique name for the variable (the Racket function
 \code{gensym} is handy for this) and associate the old name with the
-new unique name in an alist. The \code{uniquify-exp}
-function will need to access this alist when it gets to a
-variable reference, so we add another parameter to \code{uniquify-exp}
-for the alist.
-
+new unique name in an alist. The \code{uniquify-exp} function will
+need to access this alist when it gets to a variable reference, so we
+add another parameter to \code{uniquify-exp} for the alist.
 
 The skeleton of the \code{uniquify-exp} function is shown in
 Figure~\ref{fig:uniquify-s0}.  The function is curried so that it is
-convenient to partially apply it to a symbol table and then apply it
-to different expressions, as in the last clause for primitive
-operations in Figure~\ref{fig:uniquify-s0}.  The \href{https://docs.racket-lang.org/reference/for.html#%28form._%28%28lib._racket%2Fprivate%2Fbase..rkt%29._for%2Flist%29%29}{\key{for/list}}
-form is useful for applying a function to each element of a list to produce
-a new list.
-\index{for/list}
+convenient to partially apply it to an alist and then apply it to
+different expressions, as in the last clause for primitive operations
+in Figure~\ref{fig:uniquify-s0}.  The
+\href{https://docs.racket-lang.org/reference/for.html#%28form._%28%28lib._racket%2Fprivate%2Fbase..rkt%29._for%2Flist%29%29}{\key{for/list}}
+  form is useful for applying a function to each element of a list to
+  produce a new list.  \index{for/list}
 
 \begin{exercise}
 \normalfont % I don't like the italics for exercises. -Jeremy
@@ -2036,21 +2041,19 @@ implement the clauses for variables and for the \key{let} form.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-   (define (uniquify-exp symtab)
+   (define (uniquify-exp env)
      (lambda (e)
        (match e
          [(Var x) ___]
          [(Int n) (Int n)]
          [(Let x e body) ___]
          [(Prim op es)
-          (Prim op (for/list ([e es]) ((uniquify-exp symtab) e)))]
+          (Prim op (for/list ([e es]) ((uniquify-exp env) e)))]
          )))
 
    (define (uniquify p)
      (match p
-       [(Program '() e)
-        (Program '() ((uniquify-exp '()) e))]
-       )))
+       [(Program '() e) (Program '() ((uniquify-exp '()) e))]))
 \end{lstlisting}
 \caption{Skeleton for the \key{uniquify} pass.}
 \label{fig:uniquify-s0}
@@ -2059,11 +2062,11 @@ implement the clauses for variables and for the \key{let} form.
 \begin{exercise}
 \normalfont % I don't like the italics for exercises. -Jeremy
 
-Test your \key{uniquify} pass by creating five example $R_1$ programs
-and checking whether the output programs produce the same result as
-the input programs. The $R_1$ programs should be designed to test the
-most interesting parts of the \key{uniquify} pass, that is, the
-programs should include \key{let} forms, variables, and variables that
+Test your \key{uniquify} pass by creating five example $R_1$ programs.
+Check whether the output programs produce the same result as the input
+programs. The $R_1$ programs should be designed to test the most
+interesting parts of the \key{uniquify} pass, that is, the programs
+should include \key{let} forms, variables, and variables that
 overshadow each other.  The five programs should be in a subdirectory
 named \key{tests} and they should have the same file name except for a
 different integer at the end of the name, followed by the ending
@@ -2129,12 +2132,11 @@ R^{\dagger}_1  &::=& \PROGRAM{\code{'()}}{\Exp}
 \end{figure}
 
 Figure~\ref{fig:r1-anf-syntax} presents the grammar for the output of
-this pass, language $R_1^{\dagger}$. The main difference is that
+this pass, the language $R_1^{\dagger}$. The main difference is that
 operator arguments are required to be atomic expressions.  In the
 literature, this is called \emph{administrative normal form}, or ANF
-for short~\citep{Danvy:1991fk,Flanagan:1993cg}.
-\index{administrative normal form}
-\index{ANF}
+for short~\citep{Danvy:1991fk,Flanagan:1993cg}.  \index{administrative
+  normal form} \index{ANF}
 
 We recommend implementing this pass with two mutually recursive
 functions, \code{rco-atom} and \code{rco-exp}. The idea is to apply
@@ -13154,22 +13156,22 @@ C_3 & ::= & \Def\ldots
 %%  LocalWords:  deallocating Ungar Detlefs Tene kx FromSpace ToSpace
 %%  LocalWords:  Appel Diwan Siebert ptr  fromspace rootstack typedef
 %%  LocalWords:  len prev rootlen heaplen setl lt Kohlbecker dk multi
-% LocalWords:  Bloomington Wollowski definitional whitespace deref JM
-% LocalWords:  subexpression subexpressions iteratively ANF Danvy rco
-% LocalWords:  goto stmt JS ly cmp ty le ge jle goto's EFLAG CFG pred
-% LocalWords:  acyclic worklist Aho qf tsort implementer's hj Shidal
-% LocalWords:  nonnegative Shahriyar endian salq sarq uint cheney ior
-% LocalWords:  tospace vecinit collectret alloc initret decrement jl
-% LocalWords:  dereferencing GC di vals ps mcons ds mcdr callee's th
-% LocalWords:  mainDef tailcall prepending mainstart num params rT qb
-% LocalWords:  mainconclusion Cardelli bodyT fvs clos fvts subtype uj
-% LocalWords:  polymorphism untyped elts tys tagof Vectorof tyeq orq
-% LocalWords:  andq untagged Shao inlining ebp jge setle setg setge
-% LocalWords:  struct symtab Friedman's MacOS Nystrom alist sam kate
-% LocalWords:  alists arity github unordered pqueue exprs ret param
-% LocalWords:  tyerr bytereg dh dl JmpIf HasType Osterlund Jacek TODO
-% LocalWords:  Gamari GlobalValue ProgramDefsExp prm ProgramDefs vn
-% LocalWords:  FunRef TailCall tailjmp IndirectCallq TailJmp Gilray
-% LocalWords:  dereference unbox Dataflow versa dataflow Kildall rhs
-% LocalWords:  Kleene enqueue dequeue AssignedFree FV cnvt SetBang tg
-% LocalWords:  ValueOf typechecker
+% LocalWords: Bloomington Wollowski definitional whitespace deref JM
+% LocalWords: subexpression subexpressions iteratively ANF Danvy rco
+% LocalWords: goto stmt JS ly cmp ty le ge jle goto's EFLAG CFG pred
+% LocalWords: acyclic worklist Aho qf tsort implementer's hj Shidal
+% LocalWords: nonnegative Shahriyar endian salq sarq uint cheney ior
+% LocalWords: tospace vecinit collectret alloc initret decrement jl
+% LocalWords: dereferencing GC di vals ps mcons ds mcdr callee's th
+% LocalWords: mainDef tailcall prepending mainstart num params rT qb
+% LocalWords: mainconclusion Cardelli bodyT fvs clos fvts subtype uj
+% LocalWords: polymorphism untyped elts tys tagof Vectorof tyeq orq
+% LocalWords: andq untagged Shao inlining ebp jge setle setg setge
+% LocalWords: struct Friedman's MacOS Nystrom alist sam kate
+% LocalWords: alists arity github unordered pqueue exprs ret param
+% LocalWords: tyerr bytereg dh dl JmpIf HasType Osterlund Jacek TODO
+% LocalWords: Gamari GlobalValue ProgramDefsExp prm ProgramDefs vn
+% LocalWords: FunRef TailCall tailjmp IndirectCallq TailJmp Gilray
+% LocalWords: dereference unbox Dataflow versa dataflow Kildall rhs
+% LocalWords: Kleene enqueue dequeue AssignedFree FV cnvt SetBang tg
+% LocalWords: ValueOf typechecker
