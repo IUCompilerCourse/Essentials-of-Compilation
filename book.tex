@@ -2458,20 +2458,21 @@ start:
 \end{minipage}
 \end{tabular} \\
 
-In the output of \code{select-instructions}, there is a entry for
-\code{locals-types} in the $\itm{info}$ of the \code{Program} node,
-which is needed here so that we have the list of variables that should
-be assigned to homes. The support code computes the
-\code{locals-types} entry. In particular, \code{type-check-Cvar}
-installs it in the $\itm{info}$ field of the \code{Program} node.
-When using \code{interp-tests} or \code{compiler-tests} (see Appendix,
-Section~\ref{appendix:utilities}), specify \code{type-check-Cvar} as the
-type checker to use after \code{explicate-control}.
+There is a entry for \code{locals-types} in the $\itm{info}$ of the
+\code{X86Program} node, which is needed here so that we have the list
+of variables that should be assigned to homes. The support code
+computes the \code{locals-types} entry. In particular,
+\code{type-check-Cvar} installs it in the $\itm{info}$ field of the
+\code{CProgram} node, which should be propagated to the
+\code{X86Program} node. When using \code{interp-tests} or
+\code{compiler-tests} (see Appendix,
+Section~\ref{appendix:utilities}), specify \code{type-check-Cvar} as
+the type checker to use after \code{explicate-control}.
 
 In the process of assigning variables to stack locations, it is
 convenient for you to compute and store the size of the frame (in
-bytes) in the $\itm{info}$ field of the \key{Program} node, with the
-key \code{stack-space}, which is needed later to generate the
+bytes) in the $\itm{info}$ field of the \key{X86Program} node, with
+the key \code{stack-space}, which is needed later to generate the
 conclusion of the \code{main} procedure. The x86-64 standard requires
 the frame size to be a multiple of 16 bytes. \index{frame}
 
@@ -2786,7 +2787,7 @@ view, the caller view and the callee view:
 \end{itemize}
 
 In x86, registers are also used for passing arguments to a function
-and for the return value.  In particular, the first six arguments of a
+and for the return value.  In particular, the first six arguments to a
 function are passed in the following six registers, in the order
 given.
 \begin{lstlisting}
@@ -2796,9 +2797,9 @@ If there are more than six arguments, then the convention is to use
 space on the frame of the caller for the rest of the
 arguments. However, in Chapter~\ref{ch:functions} we arrange to never
 need more than six arguments. For now, the only function we care about
-is \code{read\_int} and it takes zero argument.
+is \code{read\_int} and it takes zero arguments.
 %
-The register \code{rax} is for the return value of a function.
+The register \code{rax} is used for the return value of a function.
 
 The next question is how these calling conventions impact register
 allocation. Consider the \LangVar{} program in
@@ -2814,12 +2815,12 @@ approach is to save all the values in caller-saved registers to the
 stack prior to each function call, and restore them after each
 call. That way, if the register allocator chooses to assign \code{x}
 to a caller-saved register, its value will be preserved across the
-call to \code{read}.  However, the disadvantage of this approach is
-that saving and restoring to the stack is relatively slow. If \code{x}
-is not used many times, it may be better to assign \code{x} to a stack
-location in the first place. Or better yet, if we can arrange for
-\code{x} to be placed in a callee-saved register, then it won't need
-to be saved and restored during function calls.
+call to \code{read}.  However, saving and restoring to the stack is
+relatively slow. If \code{x} is not used many times, it may be better
+to assign \code{x} to a stack location in the first place. Or better
+yet, if we can arrange for \code{x} to be placed in a callee-saved
+register, then it won't need to be saved and restored during function
+calls.
 
 The approach that we recommend for variables that are in-use during a
 function call is to either assign them to callee-saved registers or to
@@ -2855,12 +2856,12 @@ setting the \code{rbp} to the current stack pointer. We now know why
 it is necessary to save the \code{rbp}: it is a callee-saved register.
 The prelude then pushes \code{rbx} to the stack because 1) \code{rbx}
 is also a callee-saved register and 2) \code{rbx} is assigned to a
-variable (\code{x}). There are several more callee-saved register that
-are not saved in the prelude because they were not assigned to
-variables. The prelude subtracts 8 bytes from the \code{rsp} to make
-it 16-byte aligned and then jumps to the \code{start} block. Shifting
-attention to the \code{conclusion}, we see that \code{rbx} is restored
-from the stack with a \code{popq} instruction.
+variable (\code{x}). There are several more callee-saved registers
+that are not saved in the prelude because they were not used. The
+prelude subtracts 8 bytes from the \code{rsp} to make it 16-byte
+aligned and then jumps to the \code{start} block. Shifting attention
+to the \code{conclusion}, we see that \code{rbx} is restored from the
+stack with a \code{popq} instruction.
 \index{prelude}\index{conclusion}
 
 \begin{figure}[tp]
@@ -2909,12 +2910,18 @@ conclusion:
 \label{sec:liveness-analysis-r1}
 \index{liveness analysis}
 
+In this section we describe a program analysis, called \emph{liveness
+  analysis}, that discovers which variables are in-use in different
+regions of a program.
+%
 A variable or register is \emph{live} at a program point if its
 current value is used at some later point in the program.  We 
 refer to variables and registers collectively as \emph{locations}.
 %
 Consider the following code fragment in which there are two writes to
 \code{b}. Are \code{a} and \code{b} both live at the same time?
+\begin{center}
+  \begin{minipage}{0.96\textwidth}
 \begin{lstlisting}[numbers=left,numberstyle=\tiny]
 movq $5, a
 movq $30, b
@@ -2922,6 +2929,8 @@ movq a, c
 movq $10, b
 addq b, c
 \end{lstlisting}
+\end{minipage}
+\end{center}
 The answer is no because the integer \code{30} written to \code{b} on
 line 2 is never used. The variable \code{b} is read on line 5 and
 there is an intervening write to \code{b} on line 4, so the read on
