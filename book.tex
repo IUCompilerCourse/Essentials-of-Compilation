@@ -11332,8 +11332,15 @@ and \ref{fig:type-check-Rgradual-3}.
            (values (Prim 'eq? (list (make-cast e1^ t1 T) (make-cast e2^ t2 T)))
                    'Boolean)]
           [(Prim 'not (list e1))
-           (recur (If (Prim 'eq? (list e1 (Inject (Bool #f) 'Boolean)))
-                      (Bool #t) (Bool #f)))]
+           (define-values (e1^ t1) (recur e1))
+           (match t1
+             ['Any
+              (recur (If (Prim 'eq? (list e1 (Inject (Bool #f) 'Boolean)))
+                         (Bool #t) (Bool #f)))]
+             [else
+              (define-values (t-ret new-es^)
+                (type-check-op 'not (list t1) (list e1^) e))
+              (values (Prim 'not new-es^) t-ret)])]
           [(Prim 'and (list e1 e2))
            (recur (If e1 e2 (Bool #f)))]
           [(Prim 'or (list e1 e2))
