@@ -1669,15 +1669,15 @@ returns the stack pointer to where it was prior to the procedure call.
 
 The compiler needs a convenient representation for manipulating x86
 programs, so we define an abstract syntax for x86 in
-Figure~\ref{fig:x86-0-ast}. We refer to this language as \LangXASTInt{} with
-a subscript $0$ because later we introduce extended versions of this
-assembly language. The main difference compared to the concrete syntax
-of x86 (Figure~\ref{fig:x86-0-concrete}) is that it does not allow
-labeled instructions to appear anywhere, but instead organizes
-instructions into a group called a
-\emph{block}\index{block}\index{basic block} and associates a label
-with every block, which is why the \key{CFG} struct (for control-flow
-graph) includes an alist mapping labels to blocks. The reason for
+Figure~\ref{fig:x86-0-ast}. We refer to this language as
+\LangXASTInt{} with a subscript $0$ because later we introduce
+extended versions of this assembly language. The main difference
+compared to the concrete syntax of x86
+(Figure~\ref{fig:x86-0-concrete}) is that it does not allow labeled
+instructions to appear anywhere, but instead organizes instructions
+into a group called a \emph{block}\index{block}\index{basic block} and
+associates a label with every block, which is why the \key{X86Program}
+struct includes an alist mapping labels to blocks. The reason for
 using blocks and a control-flow graph becomes apparent in
 Chapter~\ref{ch:bool-types} when we introduce conditional
 branching. The \code{Block} structure includes an $\itm{info}$ field
@@ -1691,7 +1691,7 @@ arguments, which is helpful to know during register allocation
 
 \begin{figure}[tp]
 \fbox{
-\begin{minipage}{0.96\textwidth}
+\begin{minipage}{0.98\textwidth}
 \small    
 \[
 \begin{array}{lcl}
@@ -1704,8 +1704,8 @@ arguments, which is helpful to know during register allocation
        \mid \UNIINSTR{\code{'negq}}{\Arg}\\
        &\mid& \CALLQ{\itm{label}}{\itm{int}} \mid \RETQ{} 
        \mid \PUSHQ{\Arg} \mid \POPQ{\Arg} \mid \JMP{\itm{label}} \\
-\Block &::= & \BLOCK{\itm{info}}{\Instr\ldots} \\
-\LangXASTInt{} &::= & \PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label} \,\key{.}\, \Block \key{)}\ldots}}
+\Block &::= & \BLOCK{\itm{info}}{\LP\Instr\ldots\RP} \\
+\LangXASTInt{} &::= & \XPROGRAM{\itm{info}}{\LP\LP\itm{label} \,\key{.}\, \Block \RP\ldots\RP}
 \end{array}
 \]
 \end{minipage}
@@ -1855,8 +1855,8 @@ regarding instructions with too many memory accesses.
 \node (Rvar) at (0,2)  {\large \LangVar{}};
 \node (Rvar-2) at (3,2)  {\large \LangVar{}};
 \node (Rvar-3) at (6,2)  {\large \LangVarANF{}};
-%\node (C0-1) at (6,0)  {\large \LangCVar{}};
-\node (C0-2) at (3,0)  {\large \LangCVar{}};
+%\node (Cvar-1) at (6,0)  {\large \LangCVar{}};
+\node (Cvar-2) at (3,0)  {\large \LangCVar{}};
 
 \node (x86-2) at (3,-2)  {\large \LangXVar{}};
 \node (x86-3) at (6,-2)  {\large \LangXVar{}};
@@ -1865,8 +1865,8 @@ regarding instructions with too many memory accesses.
 
 \path[->,bend left=15] (Rvar) edge [above] node {\ttfamily\footnotesize uniquify} (Rvar-2);
 \path[->,bend left=15] (Rvar-2) edge [above] node {\ttfamily\footnotesize remove-complex.} (Rvar-3);
-\path[->,bend left=15] (Rvar-3) edge [right] node {\ttfamily\footnotesize explicate-control} (C0-2);
-\path[->,bend right=15] (C0-2) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
+\path[->,bend left=15] (Rvar-3) edge [right] node {\ttfamily\footnotesize explicate-control} (Cvar-2);
+\path[->,bend right=15] (Cvar-2) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
 \path[->,bend left=15] (x86-2) edge [above] node {\ttfamily\footnotesize assign-homes} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-4);
 \path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize print-x86} (x86-5);
@@ -1946,7 +1946,7 @@ assignment.
  &\mid& \ADD{\Atm}{\Atm}\\
 \Stmt &::=& \ASSIGN{\VAR{\Var}}{\Exp} \\
 \Tail &::= & \RETURN{\Exp} \mid \SEQ{\Stmt}{\Tail} \\
-\LangCVar{} & ::= & \PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label}\,\key{.}\,\Tail\key{)}\ldots}}
+\LangCVar{} & ::= & \CPROGRAM{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP}
 \end{array}
 \]
 \end{minipage}
@@ -2462,10 +2462,10 @@ In the output of \code{select-instructions}, there is a entry for
 \code{locals-types} in the $\itm{info}$ of the \code{Program} node,
 which is needed here so that we have the list of variables that should
 be assigned to homes. The support code computes the
-\code{locals-types} entry. In particular, \code{type-check-C0}
+\code{locals-types} entry. In particular, \code{type-check-Cvar}
 installs it in the $\itm{info}$ field of the \code{Program} node.
 When using \code{interp-tests} or \code{compiler-tests} (see Appendix,
-Section~\ref{appendix:utilities}), specify \code{type-check-C0} as the
+Section~\ref{appendix:utilities}), specify \code{type-check-Cvar} as the
 type checker to use after \code{explicate-control}.
 
 In the process of assigning variables to stack locations, it is
@@ -3802,7 +3802,7 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \node (Rvar) at (0,2)  {\large \LangVar{}};
 \node (Rvar-2) at (3,2)  {\large \LangVar{}};
 \node (Rvar-3) at (6,2)  {\large \LangVar{}};
-\node (C0-1) at (3,0)  {\large \LangCVar{}};
+\node (Cvar-1) at (3,0)  {\large \LangCVar{}};
 
 \node (x86-2) at (3,-2)  {\large \LangXVar{}};
 \node (x86-3) at (6,-2)  {\large \LangXVar{}};
@@ -3814,8 +3814,8 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 
 \path[->,bend left=15] (Rvar) edge [above] node {\ttfamily\footnotesize uniquify} (Rvar-2);
 \path[->,bend left=15] (Rvar-2) edge [above] node {\ttfamily\footnotesize remove-complex.} (Rvar-3);
-\path[->,bend left=15] (Rvar-3) edge [right] node {\ttfamily\footnotesize explicate-control} (C0-1);
-\path[->,bend right=15] (C0-1) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
+\path[->,bend left=15] (Rvar-3) edge [right] node {\ttfamily\footnotesize explicate-control} (Cvar-1);
+\path[->,bend right=15] (Cvar-1) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
 \path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize uncover-live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build-inter.} (x86-2-2);
 \path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate-reg.} (x86-3);
@@ -4692,7 +4692,7 @@ the first argument:
 
 \begin{figure}[tp]
 \fbox{
-\begin{minipage}{0.96\textwidth}
+\begin{minipage}{0.98\textwidth}
 \small    
 \[
 \begin{array}{lcl}
@@ -4712,8 +4712,8 @@ the first argument:
        &\mid& \BININSTR{\code{'set}}{\itm{cc}}{\Arg} 
        \mid \BININSTR{\code{'movzbq}}{\Arg}{\Arg}\\
        &\mid&  \JMPIF{\itm{cc}}{\itm{label}} \\
-\Block &::= & \gray{\BLOCK{\itm{info}}{\Instr\ldots}} \\
-\LangXASTIf{} &::= & \gray{\PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label} \,\key{.}\, \Block \key{)}\ldots}}}
+\Block &::= & \gray{\BLOCK{\itm{info}}{\LP\Instr\ldots\RP}} \\
+\LangXASTIf{} &::= & \gray{\XPROGRAM{\itm{info}}{\LP\LP\itm{label} \,\key{.}\, \Block \RP\ldots\RP}}
 \end{array}
 \]
 \end{minipage}
@@ -4793,7 +4793,7 @@ expressions and \key{goto}'s.
 \Tail &::= & \gray{\RETURN{\Exp} \mid \SEQ{\Stmt}{\Tail} } 
     \mid \GOTO{\itm{label}} \\
     &\mid& \IFSTMT{\BINOP{\itm{cmp}}{\Atm}{\Atm}}{\GOTO{\itm{label}}}{\GOTO{\itm{label}}} \\
-\LangCIf{} & ::= & \gray{\PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label}\,\key{.}\,\Tail\key{)}\ldots}}}
+\LangCIf{} & ::= & \gray{\CPROGRAM{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP}}
 \end{array}
 \]
 \end{minipage}
@@ -6543,16 +6543,16 @@ R^{\dagger}_3  &::=& \gray{ \PROGRAM{\code{'()}}{\Exp} }
 \Exp &::= & \gray{ \Atm \mid \READ{} } \\
    &\mid& \gray{ \NEG{\Atm} \mid \ADD{\Atm}{\Atm} }\\
    &\mid& \gray{ \UNIOP{\key{not}}{\Atm} \mid \BINOP{\itm{cmp}}{\Atm}{\Atm}  } \\
-   &\mid& (\key{Allocate} \,\itm{int}\,\itm{type}) \\
+   &\mid& \LP\key{Allocate} \,\itm{int}\,\itm{type}\RP \\
    &\mid& \BINOP{\key{'vector-ref}}{\Atm}{\INT{\Int}}  \\
-   &\mid& (\key{Prim}~\key{'vector-set!}\,(\key{list}\,\Atm\,\INT{\Int}\,\Atm))\\
-   &\mid& (\key{GlobalValue} \,\Var) \mid (\key{Void})\\
+   &\mid& \LP\key{Prim}~\key{'vector-set!}\,\LP\Atm\,\INT{\Int}\,\Atm\RP\RP\\
+   &\mid& \LP\key{GlobalValue} \,\Var\RP \mid \LP\key{Void}\RP\\
 \Stmt &::=& \gray{ \ASSIGN{\VAR{\Var}}{\Exp} } 
-       \mid (\key{Collect} \,\itm{int}) \\
+       \mid \LP\key{Collect} \,\itm{int}\RP \\
 \Tail &::= & \gray{ \RETURN{\Exp} \mid \SEQ{\Stmt}{\Tail} 
        \mid \GOTO{\itm{label}} } \\
       &\mid& \gray{ \IFSTMT{\BINOP{\itm{cmp}}{\Atm}{\Atm}}{\GOTO{\itm{label}}}{\GOTO{\itm{label}}}  }\\
-\LangCVec{} & ::= & \gray{ \PROGRAM{\itm{info}}{\CFG{(\itm{label}\,\key{.}\,\Tail)\ldots}} }
+\LangCVec{} & ::= & \gray{ \CPROGRAM{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP} }
 \end{array}
 \]
 \end{minipage}
@@ -6695,7 +6695,7 @@ available for use by the register allocator.
   \Arg &::=&  \gray{  \INT{\Int} \mid \REG{\Reg} \mid \DEREF{\Reg}{\Int}
    \mid \BYTEREG{\Reg}} \\
    &\mid& (\key{Global}~\Var) \\
-\LangXASTGlobal{} &::= & \gray{ \PROGRAM{\itm{info}}{\CFG{\key{(}\itm{label} \,\key{.}\, \Block \key{)}\ldots}} }
+\LangXASTGlobal{} &::= & \gray{ \XPROGRAM{\itm{info}}{\LP\LP\itm{label} \,\key{.}\, \Block \RP\ldots\RP} }
 \end{array}
 \]
 \end{minipage}
@@ -12817,7 +12817,7 @@ for the compilation of \LangPoly{}.
 We provide interpreters for each of the source languages \LangInt{},
 \LangVar{}, $\ldots$ in the files \code{interp-Rint.rkt},
 \code{interp-Rvar.rkt}, etc.  The interpreters for the intermediate
-languages \LangCVar{} and \LangCIf{} are in \code{interp-C0.rkt} and
+languages \LangCVar{} and \LangCIf{} are in \code{interp-Cvar.rkt} and
 \code{interp-C1.rkt}.  The interpreters for \LangCVec{}, \LangCFun{}, pseudo-x86,
 and x86 are in the \key{interp.rkt} file.
 
