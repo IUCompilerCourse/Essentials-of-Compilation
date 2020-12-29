@@ -768,7 +768,7 @@ grammar, and the body of each clause makes a recursive call on each
 child node.\footnote{This principle of structuring code according to
   the data definition is advocated in the book \emph{How to Design
     Programs}\url{http://www.ccs.neu.edu/home/matthias/HtDP2e/}.}.
-Below we also define a second function, named \code{R0?}, that
+Below we also define a second function, named \code{Rint?}, that
 determines whether an AST is an \LangInt{} program.  In general we can
 expect to write one recursive function to handle each non-terminal in
 a grammar.\index{structural recursion}
@@ -785,13 +785,13 @@ a grammar.\index{structural recursion}
       (and (exp? e1) (exp? e2))]
     [else #f]))
 
-(define (R0? ast)
+(define (Rint? ast)
   (match ast
     [(Program '() e) (exp? e)]
     [else #f]))
 
-(R0? (Program '() ast1.1)
-(R0? (Program '()
+(Rint? (Program '() ast1.1)
+(Rint? (Program '()
        (Prim '- (list (Prim 'read '())
                       (Prim '+ (list (Num 8)))))))
 \end{lstlisting}
@@ -823,13 +823,13 @@ You may be tempted to merge the two functions into one, like this:
 \begin{center}
 \begin{minipage}{0.5\textwidth}
 \begin{lstlisting}
-(define (R0? ast)
+(define (Rint? ast)
   (match ast
     [(Int n) #t]
     [(Prim 'read '()) #t]
-    [(Prim '- (list e)) (R0? e)]
-    [(Prim '+ (list e1 e2)) (and (R0? e1) (R0? e2))]
-    [(Program '() e) (R0? e)]
+    [(Prim '- (list e)) (Rint? e)]
+    [(Prim '+ (list e1 e2)) (and (Rint? e1) (Rint? e2))]
+    [(Program '() e) (Rint? e)]
     [else #f]))
 \end{lstlisting}
 \end{minipage}
@@ -840,12 +840,12 @@ it comes to the \code{Program} wrapper.  Yet this style is generally
 \emph{not} recommended because it can get you into trouble.
 %
 For example, the above function is subtly wrong:
-\lstinline{(R0? (Program '() (Program '() (Int 3))))}
+\lstinline{(Rint? (Program '() (Program '() (Int 3))))}
 would return true, when it should return false.
 
 
 \section{Interpreters}
-\label{sec:interp-R0}
+\label{sec:interp-Rint}
 \index{interpreter}
 
 In general, the intended behavior of a program is defined by the
@@ -857,8 +857,8 @@ that is designated as the definition of a language is called a
 \emph{definitional interpreter}~\citep{reynolds72:_def_interp}.
 \index{definitional interpreter} We warm up by creating a definitional
 interpreter for the \LangInt{} language, which serves as a second example
-of structural recursion. The \texttt{interp-R0} function is defined in
-Figure~\ref{fig:interp-R0}. The body of the function is a match on the
+of structural recursion. The \texttt{interp-Rint} function is defined in
+Figure~\ref{fig:interp-Rint}. The body of the function is a match on the
 input program followed by a call to the \lstinline{interp-exp} helper
 function, which in turn has one match clause per grammar rule for
 \LangInt{} expressions.
@@ -871,7 +871,7 @@ function, which in turn has one match clause per grammar rule for
     [(Prim 'read '())
      (define r (read))
      (cond [(fixnum? r) r]
-           [else (error 'interp-R0 "expected an integer" r)])]
+           [else (error 'interp-exp "read expected an integer" r)])]
     [(Prim '- (list e))
      (define v (interp-exp e))
      (fx- 0 v)]
@@ -881,13 +881,13 @@ function, which in turn has one match clause per grammar rule for
      (fx+ v1 v2)]
     ))
 
-(define (interp-R0 p)
+(define (interp-Rint p)
   (match p
     [(Program '() e) (interp-exp e)]
     ))
 \end{lstlisting}
 \caption{Interpreter for the \LangInt{} language.}
-\label{fig:interp-R0}
+\label{fig:interp-Rint}
 \end{figure}
 
 Let us consider the result of interpreting a few \LangInt{} programs. The
@@ -948,7 +948,7 @@ operation prompts the user of the program for an integer.  Recall that
 program \eqref{eq:arith-prog} performs a \key{read} and then subtracts
 \code{8}. So if we run
 \begin{lstlisting}
-(interp-R0 (Program '() ast1.1))
+(interp-Rint (Program '() ast1.1))
 \end{lstlisting}
 and if the input is \code{50}, then we get the answer to life, the
 universe, and everything: \code{42}!\footnote{\emph{The Hitchhiker's
@@ -1031,7 +1031,7 @@ functions is the output of partially evaluating the children.
     [(Prim '+ (list e1 e2)) (pe-add (pe-exp e1) (pe-exp e2))]
     ))
 
-(define (pe-R0 p)
+(define (pe-Rint p)
   (match p
     [(Program '() e) (Program '() (pe-exp e))]
     ))
@@ -1055,8 +1055,8 @@ Appendix~\ref{appendix:utilities}.\\
 \begin{minipage}{1.0\textwidth}
 \begin{lstlisting}
 (define (test-pe p)
-  (assert "testing pe-R0"
-     (equal? (interp-R0 p) (interp-R0 (pe-R0 p)))))
+  (assert "testing pe-Rint"
+     (equal? (interp-Rint p) (interp-Rint (pe-Rint p)))))
 
 (test-pe (parse-program `(program () (+ 10 (- (+ 5 3))))))
 (test-pe (parse-program `(program () (+ 1 (+ 3 1)))))
@@ -1195,10 +1195,10 @@ interpreter for \LangVar{}. The following code sketches this idea.
 \begin{center}
   \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-(define (interp-R1 e)
+(define (interp-Rvar e)
   (match e
     [(Prim '- (list e))
-     (define v (interp-R1 e))
+     (define v (interp-Rvar e))
      (fx- 0 v)]
     ...
     ))
@@ -1206,15 +1206,15 @@ interpreter for \LangVar{}. The following code sketches this idea.
 \end{minipage}
 \begin{minipage}{0.45\textwidth}
   \begin{lstlisting}
-(define (interp-R2 e)
+(define (interp-Rif e)
   (match e
     [(If cnd thn els)
-     (define b (interp-R2 cnd))
+     (define b (interp-Rif cnd))
      (match b
-       [#t (interp-R2 thn)]
-       [#f (interp-R2 els)])]
+       [#t (interp-Rif thn)]
+       [#f (interp-Rif els)])]
     ...
-    [else (interp-R1 e)]  
+    [else (interp-Rvar e)]  
     ))    
 \end{lstlisting}
 \end{minipage}
@@ -1225,11 +1225,11 @@ feature, like the \code{-} operator, as in the following program.
 \begin{lstlisting}
 (Prim '- (list (If (Bool #t) (Int 42) (Int 0))))
 \end{lstlisting}
-If we invoke \code{interp-R2} on this program, it dispatches to
-\code{interp-R1} to handle the \code{-} operator, but then it
-recurisvely calls \code{interp-R1} again on the argument of \code{-},
+If we invoke \code{interp-Rif} on this program, it dispatches to
+\code{interp-Rvar} to handle the \code{-} operator, but then it
+recurisvely calls \code{interp-Rvar} again on the argument of \code{-},
 which is an \code{If}.  But there is no case for \code{If} in
-\code{interp-R1}, so we get an error!
+\code{interp-Rvar}, so we get an error!
 
 To make our intepreters extensible we need something called \emph{open
   recursion}\index{open recursion}. That is, a recursive call should
@@ -1249,7 +1249,7 @@ from \LangVar{}, that dispatches to the \code{interp-exp} for \LangVar{}.
 \begin{center}
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-(define interp-R1-class
+(define interp-Rvar-class
   (class object%
     (define/public (interp-exp e)
       (match e
@@ -1264,8 +1264,8 @@ from \LangVar{}, that dispatches to the \code{interp-exp} for \LangVar{}.
 \end{minipage}
 \begin{minipage}{0.45\textwidth}
   \begin{lstlisting}
-(define interp-R2-class
-  (class interp-R1-class
+(define interp-Rif-class
+  (class interp-Rvar-class
     (define/override (interp-exp e)
       (match e
         [(If cnd thn els)
@@ -1289,7 +1289,7 @@ We can invoke the \code{interp-exp} method for \LangIf{} on this
 expression by creating an object of the \LangIf{} class and sending it the
 \code{interp-exp} method with the argument \code{e0}.
 \begin{lstlisting}
-(send (new interp-R2-class) interp-exp e0)
+(send (new interp-Rif-class) interp-exp e0)
 \end{lstlisting}
 This will again hit the default case of \code{interp-exp} in \LangIf{} and
 dispatch to the \code{interp-exp} method for \LangVar{}, which will handle
@@ -1339,7 +1339,7 @@ way.
 
 Now that we have explained why we use classes and methods to implement
 interpreters, we turn to the discussion of the actual interpreter for
-\LangVar{}.  Figure~\ref{fig:interp-R1} shows the definitional interpreter
+\LangVar{}.  Figure~\ref{fig:interp-Rvar} shows the definitional interpreter
 for the \LangVar{} language. It is similar to the interpreter for \LangInt{} but
 it adds two new \key{match} clauses for variables and for \key{let}.
 For \key{let}, we need a way to communicate the value of a variable to
@@ -1352,7 +1352,7 @@ variables to information about them. We refer to these mappings as
 For simplicity, we use an
 association list (alist) to represent the environment. The sidebar to
 the right gives a brief introduction to alists and the
-\code{racket/dict} package.  The \code{interp-R1} function takes the
+\code{racket/dict} package.  The \code{interp-Rvar} function takes the
 current environment, \code{env}, as an extra parameter.  When the
 interpreter encounters a variable, it finds the corresponding value
 using the \code{dict-ref} function.  When the interpreter encounters a
@@ -1362,7 +1362,7 @@ environment with the result value bound to the variable, using
 
 \begin{figure}[tp]
 \begin{lstlisting}
-(define interp-R1-class
+(define interp-Rvar-class
   (class object%
     (super-new)
     
@@ -1392,17 +1392,17 @@ environment with the result value bound to the variable, using
         ))
     ))
 
-(define (interp-R1 p)
-  (send (new interp-R1-class) interp-program p))
+(define (interp-Rvar p)
+  (send (new interp-Rvar-class) interp-program p))
 \end{lstlisting}
 \caption{Interpreter for the \LangVar{} language.}
-\label{fig:interp-R1}
+\label{fig:interp-Rvar}
 \end{figure}
 
 The goal for this chapter is to implement a compiler that translates
 any program $P_1$ written in the \LangVar{} language into an x86 assembly
 program $P_2$ such that $P_2$ exhibits the same behavior when run on a
-computer as the $P_1$ program interpreted by \code{interp-R1}.  That
+computer as the $P_1$ program interpreted by \code{interp-Rvar}.  That
 is, they output the same integer $n$. We depict this correctness
 criteria in the following diagram.
 \[
@@ -1458,7 +1458,7 @@ the x86 instructions used in this book.
 
 
 % to do: finish treatment of imulq
-% it's needed for vector's in R6/R7
+% it's needed for vector's in Rany/Rdyn
 
 \newcommand{\allregisters}{\key{rsp} \mid \key{rbp} \mid \key{rax} \mid \key{rbx} \mid \key{rcx}
               \mid \key{rdx} \mid \key{rsi} \mid \key{rdi} \mid \\
@@ -1852,9 +1852,9 @@ regarding instructions with too many memory accesses.
 
 \begin{figure}[tbp]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (R1) at (0,2)  {\large \LangVar{}};
-\node (R1-2) at (3,2)  {\large \LangVar{}};
-\node (R1-3) at (6,2)  {\large \LangVarANF{}};
+\node (Rvar) at (0,2)  {\large \LangVar{}};
+\node (Rvar-2) at (3,2)  {\large \LangVar{}};
+\node (Rvar-3) at (6,2)  {\large \LangVarANF{}};
 %\node (C0-1) at (6,0)  {\large \LangCVar{}};
 \node (C0-2) at (3,0)  {\large \LangCVar{}};
 
@@ -1863,9 +1863,9 @@ regarding instructions with too many memory accesses.
 \node (x86-4) at (9,-2) {\large \LangXASTInt{}};
 \node (x86-5) at (12,-2) {\large \LangXInt{}};
 
-\path[->,bend left=15] (R1) edge [above] node {\ttfamily\footnotesize uniquify} (R1-2);
-\path[->,bend left=15] (R1-2) edge [above] node {\ttfamily\footnotesize remove-complex.} (R1-3);
-\path[->,bend left=15] (R1-3) edge [right] node {\ttfamily\footnotesize explicate-control} (C0-2);
+\path[->,bend left=15] (Rvar) edge [above] node {\ttfamily\footnotesize uniquify} (Rvar-2);
+\path[->,bend left=15] (Rvar-2) edge [above] node {\ttfamily\footnotesize remove-complex.} (Rvar-3);
+\path[->,bend left=15] (Rvar-3) edge [right] node {\ttfamily\footnotesize explicate-control} (C0-2);
 \path[->,bend right=15] (C0-2) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
 \path[->,bend left=15] (x86-2) edge [above] node {\ttfamily\footnotesize assign-homes} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-4);
@@ -1873,16 +1873,16 @@ regarding instructions with too many memory accesses.
 \end{tikzpicture}
 
 \caption{Diagram of the passes for compiling \LangVar{}. }
-\label{fig:R1-passes}
+\label{fig:Rvar-passes}
 \end{figure}
 
-Figure~\ref{fig:R1-passes} presents the ordering of the compiler
+Figure~\ref{fig:Rvar-passes} presents the ordering of the compiler
 passes in the form of a graph. Each pass is an edge and the
 input/output language of each pass is a node in the graph.  The output
 of \key{uniquify} and \key{remove-complex-opera*} are programs that
 are still in the \LangVar{} language, through the output of the later
 is a subset of \LangVar{}, a language we name \LangVarANF{} and
-describe in Section~\ref{sec:remove-complex-opera-R1}.
+describe in Section~\ref{sec:remove-complex-opera-Rvar}.
 %
 The output of \key{explicate-control} is in an intermediate language
 \LangCVar{} designed to make the order of evaluation explicit in its
@@ -1890,13 +1890,13 @@ syntax, which we introduce in the next section. The
 \key{select-instruction} pass translates from \LangCVar{} to a variant
 of x86. The \key{assign-homes} and \key{patch-instructions} passes
 input and output variants of x86 assembly. The last pass in
-Figure~\ref{fig:R1-passes} is \key{print-x86}, which converts from the
+Figure~\ref{fig:Rvar-passes} is \key{print-x86}, which converts from the
 abstract syntax of \LangXASTInt{} to the concrete syntax.
 
 In the next sections we discuss the \LangCVar{} language and the
 \LangXVar{} and \LangXInt{} dialects of x86.  The
 remainder of this chapter gives hints regarding the implementation of
-each of the compiler passes in Figure~\ref{fig:R1-passes}.
+each of the compiler passes in Figure~\ref{fig:Rvar-passes}.
 
 
 \subsection{The \LangCVar{} Intermediate Language}
@@ -2082,7 +2082,7 @@ repository at the following URL:
 \end{exercise}
 
 \section{Remove Complex Operands}
-\label{sec:remove-complex-opera-R1}
+\label{sec:remove-complex-opera-Rvar}
 
 The \code{remove-complex-opera*} pass compiles \LangVar{} programs into
 \LangVar{} programs in which the arguments of operations are atomic
@@ -2587,14 +2587,14 @@ to compile the provided \key{runtime.c} file to \key{runtime.o} using
 
 
 \section{Challenge: Partial Evaluator for \LangVar{}}
-\label{sec:pe-R1}
+\label{sec:pe-Rvar}
 \index{partial evaluation}
 
 This section describes optional challenge exercises that involve
 adapting and improving the partial evaluator for \LangInt{} that was
 introduced in Section~\ref{sec:partial-evaluation}.
 
-\begin{exercise}\label{ex:pe-R1}
+\begin{exercise}\label{ex:pe-Rvar}
 \normalfont
   
 Adapt the partial evaluator from Section~\ref{sec:partial-evaluation}
@@ -2606,7 +2606,7 @@ evaluation pass to the front of your compiler and make sure that your
 compiler still passes all of the tests.
 \end{exercise}
 
-The next exercise builds on Exercise~\ref{ex:pe-R1}.
+The next exercise builds on Exercise~\ref{ex:pe-Rvar}.
 
 \begin{exercise}
 \normalfont
@@ -3799,9 +3799,9 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 
 \begin{figure}[tbp]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (R1) at (0,2)  {\large \LangVar{}};
-\node (R1-2) at (3,2)  {\large \LangVar{}};
-\node (R1-3) at (6,2)  {\large \LangVar{}};
+\node (Rvar) at (0,2)  {\large \LangVar{}};
+\node (Rvar-2) at (3,2)  {\large \LangVar{}};
+\node (Rvar-3) at (6,2)  {\large \LangVar{}};
 \node (C0-1) at (3,0)  {\large \LangCVar{}};
 
 \node (x86-2) at (3,-2)  {\large \LangXVar{}};
@@ -3812,9 +3812,9 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \node (x86-2-1) at (3,-4)  {\large \LangXVar{}};
 \node (x86-2-2) at (6,-4)  {\large \LangXVar{}};
 
-\path[->,bend left=15] (R1) edge [above] node {\ttfamily\footnotesize uniquify} (R1-2);
-\path[->,bend left=15] (R1-2) edge [above] node {\ttfamily\footnotesize remove-complex.} (R1-3);
-\path[->,bend left=15] (R1-3) edge [right] node {\ttfamily\footnotesize explicate-control} (C0-1);
+\path[->,bend left=15] (Rvar) edge [above] node {\ttfamily\footnotesize uniquify} (Rvar-2);
+\path[->,bend left=15] (Rvar-2) edge [above] node {\ttfamily\footnotesize remove-complex.} (Rvar-3);
+\path[->,bend left=15] (Rvar-3) edge [right] node {\ttfamily\footnotesize explicate-control} (C0-1);
 \path[->,bend right=15] (C0-1) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
 \path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize uncover-live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build-inter.} (x86-2-2);
@@ -4312,9 +4312,9 @@ Section~\ref{sec:type-check-r2}.
 \label{fig:r2-syntax}
 \end{figure}
 
-Figure~\ref{fig:interp-R2} defines the interpreter for \LangIf{},
+Figure~\ref{fig:interp-Rif} defines the interpreter for \LangIf{},
 inheriting from the interpreter for \LangVar{}
-(Figure~\ref{fig:interp-R1}). The literals \code{\#t} and \code{\#f}
+(Figure~\ref{fig:interp-Rvar}). The literals \code{\#t} and \code{\#f}
 evaluate to the corresponding Boolean values. The conditional
 expression $(\key{if}\, \itm{cnd}\,\itm{thn}\,\itm{els})$ evaluates
 the Boolean expression \itm{cnd} and then either evaluates \itm{thn}
@@ -4329,15 +4329,15 @@ With the increase in the number of primitive operations, the
 interpreter code for them could become repetitive without some
 care. We factor out the different parts of the code for primitive
 operations into the \code{interp-op} method shown in in
-Figure~\ref{fig:interp-op-R2}. The match clause for \code{Prim} makes
+Figure~\ref{fig:interp-op-Rif}. The match clause for \code{Prim} makes
 the recursive calls to interpret the arguments and then passes the
 resulting values to \code{interp-op}. We do not use \code{interp-op}
 for the \code{and} operation because of its short-circuiting behavior.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(define interp-R2-class
-  (class interp-R1-class
+(define interp-Rif-class
+  (class interp-Rvar-class
     (super-new)
 
     (define/public (interp-op op) ...)
@@ -4362,12 +4362,12 @@ for the \code{and} operation because of its short-circuiting behavior.
         ))
     ))
 
-(define (interp-R2 p)
-  (send (new interp-R2-class) interp-program p))
+(define (interp-Rif p)
+  (send (new interp-Rif-class) interp-program p))
 \end{lstlisting}
 \caption{Interpreter for the \LangIf{} language. (See
-  Figure~\ref{fig:interp-op-R2} for \code{interp-op}.)}
-\label{fig:interp-R2}
+  Figure~\ref{fig:interp-op-Rif} for \code{interp-op}.)}
+\label{fig:interp-Rif}
 \end{figure}
 
 \begin{figure}[tbp]
@@ -4402,7 +4402,7 @@ for the \code{and} operation because of its short-circuiting behavior.
     ))
 \end{lstlisting}
 \caption{Interpreter for the primitive operators in the \LangIf{} language.}
-\label{fig:interp-op-R2}
+\label{fig:interp-op-Rif}
 \end{figure}
 
 
@@ -4438,10 +4438,10 @@ checker enforces the rule that the argument of \code{not} must be a
 We implement type checking using classes and method overriding for the
 same reason that we use them to implement the interpreters. We
 separate the type checker for the \LangVar{} fragment into its own class,
-shown in Figure~\ref{fig:type-check-R1}. The type checker for \LangIf{} is
-shown in Figure~\ref{fig:type-check-R2}; inherits from the one for
+shown in Figure~\ref{fig:type-check-Rvar}. The type checker for \LangIf{} is
+shown in Figure~\ref{fig:type-check-Rif}; inherits from the one for
 \LangVar{}. The code for these type checkers are in the files
-\code{type-check-R1.rkt} and \code{type-check-R2.rkt} of the support
+\code{type-check-Rvar.rkt} and \code{type-check-Rif.rkt} of the support
 code.
 %
 Each type checker is a structurally recursive function over the AST.
@@ -4462,7 +4462,7 @@ environment.
 
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define type-check-R1-class
+(define type-check-Rvar-class
   (class object%
     (super-new)
 
@@ -4487,7 +4487,6 @@ environment.
 
     (define/public (type-check-exp env)
       (lambda (e)
-        (debug 'type-check-exp "R1" e)
         (match e
           [(Var x)  (values (Var x) (dict-ref env x))]
           [(Int n)  (values (Int n) 'Integer)]
@@ -4507,20 +4506,20 @@ environment.
          (define-values (body^ Tb) ((type-check-exp '()) body))
          (check-type-equal? Tb 'Integer body)
          (Program info body^)]
-        [else (error 'type-check-R1 "couldn't match ~a" e)]))
+        [else (error 'type-check-Rvar "couldn't match ~a" e)]))
     ))
 
-(define (type-check-R1 p)
-  (send (new type-check-R1-class) type-check-program p))
+(define (type-check-Rvar p)
+  (send (new type-check-Rvar-class) type-check-program p))
 \end{lstlisting}
 \caption{Type checker for the \LangVar{} fragment of \LangIf{}.}
-\label{fig:type-check-R1}
+\label{fig:type-check-Rvar}
 \end{figure}
 
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define type-check-R2-class
-  (class type-check-R1-class
+(define type-check-Rif-class
+  (class type-check-Rvar-class
     (super-new)
     (inherit check-type-equal?)
     
@@ -4555,11 +4554,11 @@ environment.
           [else ((super type-check-exp env) e)])))
     ))
 
-(define (type-check-R2 p)
-  (send (new type-check-R2-class) type-check-program p))
+(define (type-check-Rif p)
+  (send (new type-check-Rif-class) type-check-program p))
 \end{lstlisting}
 \caption{Type checker for the \LangIf{} language.}
-\label{fig:type-check-R2}
+\label{fig:type-check-Rif}
 \end{figure}
 
 Three auxiliary methods are used in the type checker. The method
@@ -4807,7 +4806,7 @@ expressions and \key{goto}'s.
 \clearpage
 
 \section{Remove Complex Operands}
-\label{sec:remove-complex-opera-R2}
+\label{sec:remove-complex-opera-Rif}
 
 Add cases for \code{Bool} and \code{If} to the \code{rco-exp} and
 \code{rco-atom} functions according to the definition of the output
@@ -5456,11 +5455,11 @@ Test your compiler using your previously created programs on the
 
 \begin{figure}[tbp]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (R2) at (0,2)  {\large \LangIf{}};
-\node (R2-2) at (3,2)  {\large \LangIf{}};
-\node (R2-3) at (6,2)  {\large \LangIf{}};
-\node (R2-4) at (9,2)  {\large \LangIf{}};
-\node (R2-5) at (12,2)  {\large \LangIf{}};
+\node (Rif) at (0,2)  {\large \LangIf{}};
+\node (Rif-2) at (3,2)  {\large \LangIf{}};
+\node (Rif-3) at (6,2)  {\large \LangIf{}};
+\node (Rif-4) at (9,2)  {\large \LangIf{}};
+\node (Rif-5) at (12,2)  {\large \LangIf{}};
 \node (C1-1) at (3,0)  {\large \LangCIf{}};
 
 \node (x86-2) at (3,-2)  {\large \LangXIfVar{}};
@@ -5470,11 +5469,11 @@ Test your compiler using your previously created programs on the
 \node (x86-4) at (9,-2) {\large \LangXIf{}};
 \node (x86-5) at (9,-4) {\large \LangXIf{}};
 
-\path[->,bend left=15] (R2) edge [above] node {\ttfamily\footnotesize type-check} (R2-2);
-\path[->,bend left=15] (R2-2) edge [above] node {\ttfamily\footnotesize shrink} (R2-3);
-\path[->,bend left=15] (R2-3) edge [above] node {\ttfamily\footnotesize uniquify} (R2-4);
-\path[->,bend left=15] (R2-4) edge [above] node {\ttfamily\footnotesize remove-complex.} (R2-5);
-\path[->,bend left=15] (R2-5) edge [left] node {\ttfamily\footnotesize explicate-control} (C1-1);
+\path[->,bend left=15] (Rif) edge [above] node {\ttfamily\footnotesize type-check} (Rif-2);
+\path[->,bend left=15] (Rif-2) edge [above] node {\ttfamily\footnotesize shrink} (Rif-3);
+\path[->,bend left=15] (Rif-3) edge [above] node {\ttfamily\footnotesize uniquify} (Rif-4);
+\path[->,bend left=15] (Rif-4) edge [above] node {\ttfamily\footnotesize remove-complex.} (Rif-5);
+\path[->,bend left=15] (Rif-5) edge [left] node {\ttfamily\footnotesize explicate-control} (C1-1);
 \path[->,bend right=15] (C1-1) edge [left] node {\ttfamily\footnotesize select-instructions} (x86-2);
 \path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize uncover-live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build-inter.} (x86-2-2);
@@ -5483,10 +5482,10 @@ Test your compiler using your previously created programs on the
 \path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print-x86 } (x86-5);
 \end{tikzpicture}
 \caption{Diagram of the passes for \LangIf{}, a language with conditionals.}
- \label{fig:R2-passes}
+ \label{fig:Rif-passes}
 \end{figure}
 
-Figure~\ref{fig:R2-passes} lists all the passes needed for the
+Figure~\ref{fig:Rif-passes} lists all the passes needed for the
 compilation of \LangIf{}.
 
 \section{An Example Translation}
@@ -5937,7 +5936,7 @@ would run out of memory.\footnote{The \LangVec{} language does not have
   recursive functions in the next Chapter!} A Racket implementation
 must therefore perform automatic garbage collection.
 
-Figure~\ref{fig:interp-R3} shows the definitional interpreter for the
+Figure~\ref{fig:interp-Rvec} shows the definitional interpreter for the
 \LangVec{} language. We define the \code{vector}, \code{vector-length},
 \code{vector-ref}, and \code{vector-set!} operations for \LangVec{} in
 terms of the corresponding operations in Racket. One subtle point is
@@ -5952,8 +5951,8 @@ otherwise.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(define interp-R3-class
-  (class interp-R2-class
+(define interp-Rvec-class
+  (class interp-Rif-class
     (super-new)
 
     (define/override (interp-op op)
@@ -5980,23 +5979,23 @@ otherwise.
         ))
     ))
 
-(define (interp-R3 p)
-  (send (new interp-R3-class) interp-program p))
+(define (interp-Rvec p)
+  (send (new interp-Rvec-class) interp-program p))
 \end{lstlisting}
 \caption{Interpreter for the \LangVec{} language.}
-\label{fig:interp-R3}
+\label{fig:interp-Rvec}
 \end{figure}
 
-Figure~\ref{fig:type-check-R3} shows the type checker for \LangVec{}, which
+Figure~\ref{fig:type-check-Rvec} shows the type checker for \LangVec{}, which
 deserves some explanation. When allocating a vector, we need to know
 which elements of the vector are pointers (i.e. are also vectors). We
 can obtain this information during type checking. The type checker in
-Figure~\ref{fig:type-check-R3} not only computes the type of an
+Figure~\ref{fig:type-check-Rvec} not only computes the type of an
 expression, it also wraps every \key{vector} creation with the form
 $(\key{HasType}~e~T)$, where $T$ is the vector's type.
 %
 To create the s-expression for the \code{Vector} type in
-Figure~\ref{fig:type-check-R3}, we use the
+Figure~\ref{fig:type-check-Rvec}, we use the
 \href{https://docs.racket-lang.org/reference/quasiquote.html}{unquote-splicing
   operator} \code{,@} to insert the list \code{t*} without its usual
 start and end parentheses.  \index{unquote-slicing}
@@ -6004,8 +6003,8 @@ start and end parentheses.  \index{unquote-slicing}
 
 \begin{figure}[tp]
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-(define type-check-R3-class
-  (class type-check-R2-class
+(define type-check-Rvec-class
+  (class type-check-Rif-class
     (super-new)
     (inherit check-type-equal?)
 
@@ -6059,11 +6058,11 @@ start and end parentheses.  \index{unquote-slicing}
           )))
     ))
 
-(define (type-check-R3 p)
-  (send (new type-check-R3-class) type-check-program p))
+(define (type-check-Rvec p)
+  (send (new type-check-Rvec-class) type-check-program p))
 \end{lstlisting}
 \caption{Type checker for the \LangVec{} language.}
-\label{fig:type-check-R3}
+\label{fig:type-check-Rvec}
 \end{figure}
 
 
@@ -6376,7 +6375,7 @@ references.
 \end{lstlisting}
 
 \section{Shrink}
-\label{sec:shrink-R3}
+\label{sec:shrink-Rvec}
 
 Recall that the \code{shrink} pass translates the primitives operators
 into a smaller set of primitives. Because this pass comes after type
@@ -6490,7 +6489,7 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
 
 
 \section{Remove Complex Operands}
-\label{sec:remove-complex-opera-R3}
+\label{sec:remove-complex-opera-Rvec}
 
 The new forms \code{collect}, \code{allocate}, and \code{global-value}
 should all be treated as complex operands.
@@ -6943,11 +6942,11 @@ conclusion:
 
 \begin{figure}[p]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (R3) at (0,2)  {\large \LangVec{}};
-\node (R3-2) at (3,2)  {\large \LangVec{}};
-\node (R3-3) at (6,2)  {\large \LangVec{}};
-\node (R3-4) at (9,2)  {\large \LangVec{}};
-\node (R3-5) at (12,2)  {\large \LangAlloc{}};
+\node (Rvec) at (0,2)  {\large \LangVec{}};
+\node (Rvec-2) at (3,2)  {\large \LangVec{}};
+\node (Rvec-3) at (6,2)  {\large \LangVec{}};
+\node (Rvec-4) at (9,2)  {\large \LangVec{}};
+\node (Rvec-5) at (12,2)  {\large \LangAlloc{}};
 \node (C2-4) at (3,0)  {\large \LangCVec{}};
 
 \node (x86-2) at (3,-2)  {\large \LangXGlobalVar{}};
@@ -6958,12 +6957,12 @@ conclusion:
 \node (x86-5) at (9,-4) {\large \LangXGlobal{}};
 
 
-%\path[->,bend left=15] (R3) edge [above] node {\ttfamily\footnotesize type-check} (R3-2);
-\path[->,bend left=15] (R3) edge [above] node {\ttfamily\footnotesize shrink} (R3-2);
-\path[->,bend left=15] (R3-2) edge [above] node {\ttfamily\footnotesize uniquify} (R3-3);
-\path[->,bend left=15] (R3-3) edge [above] node {\ttfamily\footnotesize expose-alloc.} (R3-4);
-\path[->,bend left=15] (R3-4) edge [above] node {\ttfamily\footnotesize remove-complex.} (R3-5);
-\path[->,bend left=20] (R3-5) edge [left] node {\ttfamily\footnotesize explicate-control} (C2-4);
+%\path[->,bend left=15] (Rvec) edge [above] node {\ttfamily\footnotesize type-check} (Rvec-2);
+\path[->,bend left=15] (Rvec) edge [above] node {\ttfamily\footnotesize shrink} (Rvec-2);
+\path[->,bend left=15] (Rvec-2) edge [above] node {\ttfamily\footnotesize uniquify} (Rvec-3);
+\path[->,bend left=15] (Rvec-3) edge [above] node {\ttfamily\footnotesize expose-alloc.} (Rvec-4);
+\path[->,bend left=15] (Rvec-4) edge [above] node {\ttfamily\footnotesize remove-complex.} (Rvec-5);
+\path[->,bend left=20] (Rvec-5) edge [left] node {\ttfamily\footnotesize explicate-control} (C2-4);
 \path[->,bend left=15] (C2-4) edge [right] node {\ttfamily\footnotesize select-instr.} (x86-2);
 \path[->,bend right=15] (x86-2) edge [left] node {\ttfamily\footnotesize uncover-live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build-inter.} (x86-2-2);
@@ -6972,10 +6971,10 @@ conclusion:
 \path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print-x86} (x86-5);
 \end{tikzpicture}
 \caption{Diagram of the passes for \LangVec{}, a language with tuples.}
-\label{fig:R3-passes}
+\label{fig:Rvec-passes}
 \end{figure}
 
-Figure~\ref{fig:R3-passes} gives an overview of all the passes needed
+Figure~\ref{fig:Rvec-passes} gives an overview of all the passes needed
 for the compilation of \LangVec{}.
 
 \section{Challenge: Simple Structures}
@@ -7269,7 +7268,7 @@ The program applies
 \end{figure}
 
 The definitional interpreter for \LangFun{} is in
-Figure~\ref{fig:interp-R4}. The case for the \code{ProgramDefsExp} form is
+Figure~\ref{fig:interp-Rfun}. The case for the \code{ProgramDefsExp} form is
 responsible for setting up the mutual recursion between the top-level
 function definitions. We use the classic back-patching \index{back-patching}
 approach that uses mutable variables and makes two passes over the function
@@ -7282,8 +7281,8 @@ update the \code{lambda} values to use the top-level environment.
 
 \begin{figure}[tp]
 \begin{lstlisting}
-(define interp-R4-class
-  (class interp-R3-class
+(define interp-Rfun-class
+  (class interp-Rvec-class
     (super-new)
 
     (define/override ((interp-exp env) e)
@@ -7322,22 +7321,22 @@ update the \code{lambda} values to use the top-level environment.
            ((interp-exp top-level) body))]))
     ))
 
-(define (interp-R4 p)
-  (send (new interp-R4-class) interp-program p))
+(define (interp-Rfun p)
+  (send (new interp-Rfun-class) interp-program p))
 \end{lstlisting}
 \caption{Interpreter for the \LangFun{} language.}
-\label{fig:interp-R4}
+\label{fig:interp-Rfun}
 \end{figure}
 
 
 \margincomment{TODO: explain type checker}
 
-The type checker for \LangFun{} is is in Figure~\ref{fig:type-check-R4}.
+The type checker for \LangFun{} is is in Figure~\ref{fig:type-check-Rfun}.
 
 \begin{figure}[tp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define type-check-R4-class
-  (class type-check-R3-class
+(define type-check-Rfun-class
+  (class type-check-Rvec-class
     (super-new)
     (inherit check-type-equal?)
 
@@ -7387,11 +7386,11 @@ The type checker for \LangFun{} is is in Figure~\ref{fig:type-check-R4}.
          (check-type-equal? ty 'Integer body)
          (ProgramDefsExp info ds^ body^)]))))
 
-(define (type-check-R4 p)
-  (send (new type-check-R4-class) type-check-program p))
+(define (type-check-Rfun p)
+  (send (new type-check-Rfun-class) type-check-program p))
 \end{lstlisting}
 \caption{Type checker for the \LangFun{} language.}
-\label{fig:type-check-R4}
+\label{fig:type-check-Rfun}
 \end{figure}
 
 
@@ -8152,9 +8151,9 @@ previously created test programs.
 
 \begin{figure}[tbp]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (R4) at (0,2)  {\large \LangFun{}};
-\node (R4-1) at (3,2)  {\large \LangFun{}};
-\node (R4-2) at (6,2)  {\large \LangFun{}};
+\node (Rfun) at (0,2)  {\large \LangFun{}};
+\node (Rfun-1) at (3,2)  {\large \LangFun{}};
+\node (Rfun-2) at (6,2)  {\large \LangFun{}};
 \node (F1-1) at (12,0)  {\large \LangFunRef{}};
 \node (F1-2) at (9,0)  {\large \LangFunRef{}};
 \node (F1-3) at (6,0)  {\large \LangFunRefAlloc{}};
@@ -8169,11 +8168,11 @@ previously created test programs.
 \node (x86-2-1) at (3,-6)  {\large \LangXIndCallVar{}};
 \node (x86-2-2) at (6,-6)  {\large \LangXIndCallVar{}};
 
-\path[->,bend left=15] (R4) edge [above] node
-     {\ttfamily\footnotesize shrink} (R4-1);
-\path[->,bend left=15] (R4-1) edge [above] node
-     {\ttfamily\footnotesize uniquify} (R4-2);
-\path[->,bend left=15] (R4-2) edge [right] node
+\path[->,bend left=15] (Rfun) edge [above] node
+     {\ttfamily\footnotesize shrink} (Rfun-1);
+\path[->,bend left=15] (Rfun-1) edge [above] node
+     {\ttfamily\footnotesize uniquify} (Rfun-2);
+\path[->,bend left=15] (Rfun-2) edge [right] node
      {\ttfamily\footnotesize ~~reveal-functions} (F1-1);
 \path[->,bend left=15] (F1-1) edge [below] node
      {\ttfamily\footnotesize limit-functions} (F1-2);
@@ -8196,10 +8195,10 @@ previously created test programs.
 \path[->,bend right=15] (x86-4) edge [left] node {\ttfamily\footnotesize print-x86} (x86-5);
 \end{tikzpicture}
 \caption{Diagram of the passes for \LangFun{}, a language with functions.}
-\label{fig:R4-passes}
+\label{fig:Rfun-passes}
 \end{figure}
 
-Figure~\ref{fig:R4-passes} gives an overview of the passes for
+Figure~\ref{fig:Rfun-passes} gives an overview of the passes for
 compiling \LangFun{} to x86.
 
 \section{An Example Translation}
@@ -8504,9 +8503,9 @@ syntax for function application.
 \end{figure}
 
 \index{interpreter}
-\label{sec:interp-R5}
+\label{sec:interp-Rlambda}
 
-Figure~\ref{fig:interp-R5} shows the definitional interpreter for
+Figure~\ref{fig:interp-Rlambda} shows the definitional interpreter for
 \LangLam{}. The clause for \key{lambda} saves the current environment
 inside the returned \key{lambda}. Then the clause for \key{Apply} uses
 the environment from the \key{lambda}, the \code{lam-env}, when
@@ -8516,8 +8515,8 @@ values.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(define interp-R5-class
-  (class interp-R4-class
+(define interp-Rlambda-class
+  (class interp-Rfun-class
     (super-new)
 
     (define/override (interp-op op)
@@ -8537,18 +8536,18 @@ values.
         [else ((super interp-exp env) e)]))
     ))
 
-(define (interp-R5 p)
-  (send (new interp-R5-class) interp-program p))
+(define (interp-Rlambda p)
+  (send (new interp-Rlambda-class) interp-program p))
 \end{lstlisting}
 \caption{Interpreter for \LangLam{}.}
-\label{fig:interp-R5}
+\label{fig:interp-Rlambda}
 \end{figure}
 
 
 \label{sec:type-check-r5}
 \index{type checking}
 
-Figure~\ref{fig:type-check-R5} shows how to type check the new
+Figure~\ref{fig:type-check-Rlambda} shows how to type check the new
 \key{lambda} form. The body of the \key{lambda} is checked in an
 environment that includes the current environment (because it is
 lexically scoped) and also includes the \key{lambda}'s parameters.  We
@@ -8556,7 +8555,7 @@ require the body's type to match the declared return type.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(define (type-check-R5 env)
+(define (type-check-Rlambda env)
   (lambda (e)
     (match e
       [(Lambda (and params `([,xs : ,Ts] ...)) rT body)
@@ -8572,7 +8571,7 @@ require the body's type to match the declared return type.
       )))
 \end{lstlisting}
 \caption{Type checking the \key{lambda}'s in \LangLam{}.}
-\label{fig:type-check-R5}
+\label{fig:type-check-Rlambda}
 \end{figure}
 
 
@@ -8809,7 +8808,7 @@ operators.
 
 
 \section{Select Instructions}
-\label{sec:select-instructions-R5}
+\label{sec:select-instructions-Rlambda}
 
 Compile \ALLOCCLOS{\itm{len}}{\itm{type}}{\itm{arity}} in almost the
 same way as the \ALLOC{\itm{len}}{\itm{type}} form
@@ -8826,9 +8825,9 @@ shift it by $57$ bits to the right.
 
 \begin{figure}[p]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (R4) at (0,2)  {\large \LangFun{}};
-\node (R4-2) at (3,2)  {\large \LangFun{}};
-\node (R4-3) at (6,2)  {\large \LangFun{}};
+\node (Rfun) at (0,2)  {\large \LangFun{}};
+\node (Rfun-2) at (3,2)  {\large \LangFun{}};
+\node (Rfun-3) at (6,2)  {\large \LangFun{}};
 \node (F1-1) at (12,0)  {\large \LangFunRef{}};
 \node (F1-2) at (9,0)  {\large \LangFunRef{}};
 \node (F1-3) at (6,0)  {\large $F_1$};
@@ -8844,11 +8843,11 @@ shift it by $57$ bits to the right.
 \node (x86-5) at (9,-6) {\large \LangXIndCall{}};
 
 
-\path[->,bend left=15] (R4) edge [above] node
-     {\ttfamily\footnotesize shrink} (R4-2);
-\path[->,bend left=15] (R4-2) edge [above] node
-     {\ttfamily\footnotesize uniquify} (R4-3);
-\path[->,bend left=15] (R4-3) edge [right] node
+\path[->,bend left=15] (Rfun) edge [above] node
+     {\ttfamily\footnotesize shrink} (Rfun-2);
+\path[->,bend left=15] (Rfun-2) edge [above] node
+     {\ttfamily\footnotesize uniquify} (Rfun-3);
+\path[->,bend left=15] (Rfun-3) edge [right] node
      {\ttfamily\footnotesize reveal-functions} (F1-1);
 \path[->,bend left=15] (F1-1) edge [below] node
      {\ttfamily\footnotesize convert-to-clos.} (F1-2);
@@ -8875,10 +8874,10 @@ shift it by $57$ bits to the right.
 \end{tikzpicture}
   \caption{Diagram of the passes for \LangLam{}, a language with lexically-scoped
   functions.}
-\label{fig:R5-passes}
+\label{fig:Rlambda-passes}
 \end{figure}
 
-Figure~\ref{fig:R5-passes} provides an overview of all the passes needed
+Figure~\ref{fig:Rlambda-passes} provides an overview of all the passes needed
 for the compilation of \LangLam{}.
 
 \clearpage
@@ -9125,10 +9124,10 @@ There is no type checker for \LangDyn{} because it is not a statically
 typed language (it's dynamically typed!).
 
 The definitional interpreter for \LangDyn{} is presented in
-Figure~\ref{fig:interp-R7} and its auxiliary functions are defined in
-Figure~\ref{fig:interp-R7-aux}. Consider the match clause for
+Figure~\ref{fig:interp-Rdyn} and its auxiliary functions are defined in
+Figure~\ref{fig:interp-Rdyn-aux}. Consider the match clause for
 \code{(Int n)}.  Instead of simply returning the integer \code{n} (as
-in the interpreter for \LangVar{} in Figure~\ref{fig:interp-R1}), the
+in the interpreter for \LangVar{} in Figure~\ref{fig:interp-Rvar}), the
 interpreter for \LangDyn{} creates a \emph{tagged value}\index{tagged
   value} that combines an underlying value with a tag that identifies
 what kind of value it is. We define the following struct
@@ -9144,10 +9143,10 @@ example, a vector of type \code{(Vector Any Any)} is tagged with
 is tagged with \code{Procedure}.
 
 Next consider the match clause for \code{vector-ref}.  The
-\code{check-tag} auxiliary function (Figure~\ref{fig:interp-R7-aux})
+\code{check-tag} auxiliary function (Figure~\ref{fig:interp-Rdyn-aux})
 is used to ensure that the first argument is a vector and the second
 is an integer. If they are not, a \code{trapped-error} is raised.
-Recall from Section~\ref{sec:interp-R0} that when a definition
+Recall from Section~\ref{sec:interp-Rint} that when a definition
 interpreter raises a \code{trapped-error} error, the compiled code
 must also signal an error by exiting with return code \code{255}.  A
 \code{trapped-error} is also raised if the index is not less than
@@ -9156,8 +9155,8 @@ length of the vector.
 
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define ((interp-R7-exp env) ast)
-  (define recur (interp-R7-exp env))
+(define ((interp-Rdyn-exp env) ast)
+  (define recur (interp-Rdyn-exp env))
   (match ast
     [(Var x) (lookup x env)]
     [(Int n) (Tagged n 'Integer)]
@@ -9179,7 +9178,7 @@ length of the vector.
        (error 'trapped-error "index ~a too big\nin ~v" (Tagged-value i) ast))
      (vector-set! (Tagged-value vec) (Tagged-value i) arg)
      (Tagged (void) 'Void)]
-    [(Let x e body) ((interp-R7-exp (cons (cons x (recur e)) env)) body)]
+    [(Let x e body) ((interp-Rdyn-exp (cons (cons x (recur e)) env)) body)]
     [(Prim 'and (list e1 e2)) (recur (If e1 e2 (Bool #f)))]
     [(Prim 'or (list e1 e2))
      (define v1 (recur e1))
@@ -9206,11 +9205,11 @@ length of the vector.
         (unless (eq? (length xs) (length args))
          (error 'trapped-error "~a != ~a\nin ~v" (length args) (length xs) ast))
         (define new-env (append (map cons xs args) lam-env))
-        ((interp-R7-exp new-env) body)]
-       [else (error "interp-R7-exp, expected function, not" f-val)])]))
+        ((interp-Rdyn-exp new-env) body)]
+       [else (error "interp-Rdyn-exp, expected function, not" f-val)])]))
 \end{lstlisting}
 \caption{Interpreter for the \LangDyn{} language.}
-\label{fig:interp-R7}
+\label{fig:interp-Rdyn}
 \end{figure}
 
 \begin{figure}[tbp]
@@ -9267,7 +9266,7 @@ length of the vector.
     (error 'trapped-error "expected ~a, not ~a\nin ~v" expected tag ast)))
 \end{lstlisting}
 \caption{Auxiliary functions for the \LangDyn{} interpreter.}
-\label{fig:interp-R7-aux}
+\label{fig:interp-Rdyn-aux}
 \end{figure}
 
 \clearpage
@@ -9357,19 +9356,19 @@ produce a tagged value; they return \key{\#t} if the tag corresponds
 to the predicate and they return \key{\#f} otherwise.
 
 The type checker for \LangAny{} is shown in
-Figures~\ref{fig:type-check-R6-part-1} and
-\ref{fig:type-check-R6-part-2} and uses the auxiliary functions in
-Figure~\ref{fig:type-check-R6-aux}.
+Figures~\ref{fig:type-check-Rany-part-1} and
+\ref{fig:type-check-Rany-part-2} and uses the auxiliary functions in
+Figure~\ref{fig:type-check-Rany-aux}.
 %
-The interpreter for \LangAny{} is in Figure~\ref{fig:interp-R6} and the
+The interpreter for \LangAny{} is in Figure~\ref{fig:interp-Rany} and the
 auxiliary functions \code{apply-inject} and \code{apply-project} are
 in Figure~\ref{fig:apply-project}.
 
 
 \begin{figure}[btp]
  \begin{lstlisting}[basicstyle=\ttfamily\small]
-(define type-check-R6-class
-  (class type-check-R5-class
+(define type-check-Rany-class
+  (class type-check-Rlambda-class
     (super-new)
     (inherit check-type-equal?)
 
@@ -9409,7 +9408,7 @@ in Figure~\ref{fig:apply-project}.
            (values (Prim 'any-vector-set! (list e1^ e2^ e3^)) 'Void)]
 \end{lstlisting}
 \caption{Type checker for the \LangAny{} language, part 1.}
-\label{fig:type-check-R6-part-1}
+\label{fig:type-check-Rany-part-1}
 \end{figure}
 
 \begin{figure}[btp]
@@ -9442,7 +9441,7 @@ in Figure~\ref{fig:apply-project}.
 ))
 \end{lstlisting}
 \caption{Type checker for the \LangAny{} language, part 2.}
-\label{fig:type-check-R6-part-2}
+\label{fig:type-check-Rany-part-2}
 \end{figure}
 
 
@@ -9486,14 +9485,14 @@ in Figure~\ref{fig:apply-project}.
         [else #f]))
 \end{lstlisting}
 \caption{Auxiliary methods for type checking \LangAny{}.}
-\label{fig:type-check-R6-aux}
+\label{fig:type-check-Rany-aux}
 \end{figure}
 
 
 \begin{figure}[btp]
 \begin{lstlisting}
-(define interp-R6-class
-  (class interp-R5-class
+(define interp-Rany-class
+  (class interp-Rlambda-class
     (super-new)
 
     (define/override (interp-op op)
@@ -9530,11 +9529,11 @@ in Figure~\ref{fig:apply-project}.
         [else ((super interp-exp env) e)]))
     ))
 
-(define (interp-R6 p)
-  (send (new interp-R6-class) interp-program p))
+(define (interp-Rany p)
+  (send (new interp-Rany-class) interp-program p))
 \end{lstlisting}
 \caption{Interpreter for \LangAny{}.}
-\label{fig:interp-R6}
+\label{fig:interp-Rany}
 \end{figure}
 
 \begin{figure}[tbp]
@@ -9790,7 +9789,7 @@ translation of \code{Project}.
 The \code{any-vector-ref} and \code{any-vector-set!} operations
 combine the projection action with the vector operation.  Also, the
 read and write operations allow arbitrary expressions for the index so
-the type checker for \LangAny{} (Figure~\ref{fig:type-check-R6-part-1})
+the type checker for \LangAny{} (Figure~\ref{fig:type-check-Rany-part-1})
 cannot guarantee that the index is within bounds. Thus, we insert code
 to perform bounds checking at runtime. The translation for
 \code{any-vector-ref} is as follows and the other two operations are
@@ -10025,13 +10024,13 @@ completion without error.
 
 \begin{figure}[p]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (R4) at (0,4)  {\large \LangDyn{}};
-\node (R4-2) at (3,4)  {\large \LangDyn{}};
-\node (R4-3) at (6,4)  {\large \LangDyn{}};
-\node (R4-4) at (9,4)  {\large \LangDynFunRef{}};
-\node (R4-5) at (9,2)  {\large \LangAnyFunRef{}};
-\node (R4-6) at (12,2)  {\large \LangAnyFunRef{}};
-\node (R4-7) at (12,0)  {\large \LangAnyFunRef{}};
+\node (Rfun) at (0,4)  {\large \LangDyn{}};
+\node (Rfun-2) at (3,4)  {\large \LangDyn{}};
+\node (Rfun-3) at (6,4)  {\large \LangDyn{}};
+\node (Rfun-4) at (9,4)  {\large \LangDynFunRef{}};
+\node (Rfun-5) at (9,2)  {\large \LangAnyFunRef{}};
+\node (Rfun-6) at (12,2)  {\large \LangAnyFunRef{}};
+\node (Rfun-7) at (12,0)  {\large \LangAnyFunRef{}};
 
 \node (F1-2) at (9,0)  {\large \LangAnyFunRef{}};
 \node (F1-3) at (6,0)  {\large \LangAnyFunRef{}};
@@ -10046,20 +10045,20 @@ completion without error.
 \node (x86-4) at (9,-4) {\large \LangXIndCall{}};
 \node (x86-5) at (9,-6) {\large \LangXIndCall{}};
 
-\path[->,bend left=15] (R4) edge [above] node
-     {\ttfamily\footnotesize shrink} (R4-2);
-\path[->,bend left=15] (R4-2) edge [above] node
-     {\ttfamily\footnotesize uniquify} (R4-3);
-\path[->,bend left=15] (R4-3) edge [above] node
-     {\ttfamily\footnotesize reveal-functions} (R4-4);
-\path[->,bend right=15] (R4-4) edge [left] node
-     {\ttfamily\footnotesize cast-insert} (R4-5);
-\path[->,bend left=15] (R4-5) edge [above] node
-     {\ttfamily\footnotesize check-bounds} (R4-6);
-\path[->,bend left=15] (R4-6) edge [left] node
-     {\ttfamily\footnotesize reveal-casts} (R4-7);
+\path[->,bend left=15] (Rfun) edge [above] node
+     {\ttfamily\footnotesize shrink} (Rfun-2);
+\path[->,bend left=15] (Rfun-2) edge [above] node
+     {\ttfamily\footnotesize uniquify} (Rfun-3);
+\path[->,bend left=15] (Rfun-3) edge [above] node
+     {\ttfamily\footnotesize reveal-functions} (Rfun-4);
+\path[->,bend right=15] (Rfun-4) edge [left] node
+     {\ttfamily\footnotesize cast-insert} (Rfun-5);
+\path[->,bend left=15] (Rfun-5) edge [above] node
+     {\ttfamily\footnotesize check-bounds} (Rfun-6);
+\path[->,bend left=15] (Rfun-6) edge [left] node
+     {\ttfamily\footnotesize reveal-casts} (Rfun-7);
      
-\path[->,bend left=15] (R4-7) edge [below] node
+\path[->,bend left=15] (Rfun-7) edge [below] node
      {\ttfamily\footnotesize convert-to-clos.} (F1-2);
 \path[->,bend right=15] (F1-2) edge [above] node
      {\ttfamily\footnotesize limit-fun.} (F1-3);
@@ -10083,10 +10082,10 @@ completion without error.
      {\ttfamily\footnotesize print-x86} (x86-5);
 \end{tikzpicture}
   \caption{Diagram of the passes for \LangDyn{}, a dynamically typed language.}
-\label{fig:R7-passes}
+\label{fig:Rdyn-passes}
 \end{figure}
 
-Figure~\ref{fig:R7-passes} provides an overview of all the passes needed
+Figure~\ref{fig:Rdyn-passes} provides an overview of all the passes needed
 for the compilation of \LangDyn{}.
 
 
@@ -10188,7 +10187,7 @@ Figure~\ref{fig:r8-concrete-syntax} and its abstract syntax is defined
 in Figure~\ref{fig:r8-syntax}.
 %
 The definitional interpreter for \LangLoop{} is shown in
-Figure~\ref{fig:interp-R8}. We add three new cases for \code{SetBang},
+Figure~\ref{fig:interp-Rwhile}. We add three new cases for \code{SetBang},
 \code{WhileLoop}, and \code{Begin} and we make changes to the cases
 for \code{Var}, \code{Let}, and \code{Apply} regarding variables. To
 support assignment to variables and to make their lifetimes indefinite
@@ -10213,8 +10212,8 @@ and returns the result from \itm{body}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define interp-R8-class
-  (class interp-R6-class
+(define interp-Rwhile-class
+  (class interp-Rany-class
     (super-new)
 
     (define/override ((interp-exp env) e)
@@ -10233,15 +10232,15 @@ and returns the result from \itm{body}.
         [else ((super interp-exp env) e)]))
     ))
 
-(define (interp-R8 p)
-  (send (new interp-R8-class) interp-program p))
+(define (interp-Rwhile p)
+  (send (new interp-Rwhile-class) interp-program p))
 \end{lstlisting}
 \caption{Interpreter for \LangLoop{}.}
-\label{fig:interp-R8}
+\label{fig:interp-Rwhile}
 \end{figure}
 
 The type checker for \LangLoop{} is define in
-Figure~\ref{fig:type-check-R8}.  For \code{SetBang}, the type of the
+Figure~\ref{fig:type-check-Rwhile}.  For \code{SetBang}, the type of the
 variable and the right-hand-side must agree. The result type is
 \code{Void}. For the \code{WhileLoop}, the condition must be a
 \code{Boolean}. The result type is also \code{Void}.  For
@@ -10249,8 +10248,8 @@ variable and the right-hand-side must agree. The result type is
 
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define type-check-R8-class
-  (class type-check-R6-class
+(define type-check-Rwhile-class
+  (class type-check-Rany-class
     (super-new)
     (inherit check-type-equal?)
 
@@ -10276,12 +10275,12 @@ variable and the right-hand-side must agree. The result type is
           [else ((super type-check-exp env) e)])))
     ))
 
-(define (type-check-R8 p)
-  (send (new type-check-R8-class) type-check-program p))
+(define (type-check-Rwhile p)
+  (send (new type-check-Rwhile-class) type-check-program p))
 \end{lstlisting}
 \caption{Type checking \key{SetBang}, \key{WhileLoop},
     and \code{Begin} in \LangLoop{}.}
-\label{fig:type-check-R8}
+\label{fig:type-check-Rwhile}
 \end{figure}
 
 
@@ -10954,10 +10953,10 @@ The \code{analyze-dataflow} function has four parameters.
 
 \begin{figure}[p]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (R4) at (0,2)  {\large \LangLoop{}};
-\node (R4-2) at (3,2)  {\large \LangLoop{}};
-\node (R4-3) at (6,2)  {\large \LangLoop{}};
-\node (R4-4) at (9,2)  {\large \LangLoopFunRef{}};
+\node (Rfun) at (0,2)  {\large \LangLoop{}};
+\node (Rfun-2) at (3,2)  {\large \LangLoop{}};
+\node (Rfun-3) at (6,2)  {\large \LangLoop{}};
+\node (Rfun-4) at (9,2)  {\large \LangLoopFunRef{}};
 \node (F1-1) at (12,0)  {\large \LangLoopFunRef{}};
 \node (F1-2) at (9,0)  {\large \LangLoopFunRef{}};
 \node (F1-3) at (6,0)  {\large \LangLoopFunRef{}};
@@ -10973,15 +10972,15 @@ The \code{analyze-dataflow} function has four parameters.
 \node (x86-5) at (9,-6) {\large \LangXIndCall{}};
 
 
-%% \path[->,bend left=15] (R4) edge [above] node
-%%      {\ttfamily\footnotesize type-check} (R4-2);
-\path[->,bend left=15] (R4) edge [above] node
-     {\ttfamily\footnotesize shrink} (R4-2);
-\path[->,bend left=15] (R4-2) edge [above] node
-     {\ttfamily\footnotesize uniquify} (R4-3);
-\path[->,bend left=15] (R4-3) edge [above] node
-     {\ttfamily\footnotesize reveal-functions} (R4-4);
-\path[->,bend left=15] (R4-4) edge [right] node
+%% \path[->,bend left=15] (Rfun) edge [above] node
+%%      {\ttfamily\footnotesize type-check} (Rfun-2);
+\path[->,bend left=15] (Rfun) edge [above] node
+     {\ttfamily\footnotesize shrink} (Rfun-2);
+\path[->,bend left=15] (Rfun-2) edge [above] node
+     {\ttfamily\footnotesize uniquify} (Rfun-3);
+\path[->,bend left=15] (Rfun-3) edge [above] node
+     {\ttfamily\footnotesize reveal-functions} (Rfun-4);
+\path[->,bend left=15] (Rfun-4) edge [right] node
      {\ttfamily\footnotesize convert-assignments} (F1-1);
 \path[->,bend left=15] (F1-1) edge [below] node
      {\ttfamily\footnotesize convert-to-clos.} (F1-2);
@@ -11006,10 +11005,10 @@ The \code{analyze-dataflow} function has four parameters.
 \path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print-x86} (x86-5);
 \end{tikzpicture}
   \caption{Diagram of the passes for \LangLoop{} (loops and assignment).}
-\label{fig:R8-passes}
+\label{fig:Rwhile-passes}
 \end{figure}
 
-Figure~\ref{fig:R8-passes} provides an overview of all the passes needed
+Figure~\ref{fig:Rwhile-passes} provides an overview of all the passes needed
 for the compilation of \LangLoop{}.
 
 % TODO: challenge assignment
@@ -11255,14 +11254,14 @@ is cast from \code{(Any -> Any)} to \code{(Integer -> Integer)}.
 
 
 The type checker for \LangGrad{} is defined in
-Figures~\ref{fig:type-check-R9-1}, \ref{fig:type-check-R9-2},
-and \ref{fig:type-check-R9-3}.
+Figures~\ref{fig:type-check-Rgradual-1}, \ref{fig:type-check-Rgradual-2},
+and \ref{fig:type-check-Rgradual-3}.
 
 
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
 (define type-check-gradual-class
-  (class type-check-R8-class
+  (class type-check-Rwhile-class
     (super-new)
     (inherit operator-types type-predicates)
 
@@ -11320,7 +11319,7 @@ and \ref{fig:type-check-R9-3}.
 	     [else (error 'type-check "expected vector not ~a\nin ~v" t1 e)])]
 \end{lstlisting}
 \caption{Type checker for the \LangGrad{} language, part 1.}
-\label{fig:type-check-R9-1}
+\label{fig:type-check-Rgradual-1}
 \end{figure}
 
 \begin{figure}[tbp]
@@ -11379,7 +11378,7 @@ and \ref{fig:type-check-R9-3}.
            (values (WhileLoop (make-cast e1^ T1 'Boolean) e2^) 'Void)]
 \end{lstlisting}
 \caption{Type checker for the \LangGrad{} language, part 2.}
-\label{fig:type-check-R9-2}
+\label{fig:type-check-Rgradual-2}
 \end{figure}
 
 
@@ -11416,7 +11415,7 @@ and \ref{fig:type-check-R9-3}.
           )))
 \end{lstlisting}
 \caption{Type checker for the \LangGrad{} language, part 3.}
-\label{fig:type-check-R9-3}
+\label{fig:type-check-Rgradual-3}
 \end{figure}
 
 
@@ -11485,7 +11484,7 @@ and \ref{fig:type-check-R9-3}.
 	[else (error 'fun-def-type "ill-formed function definition in ~a" d)]))
 \end{lstlisting}
 \caption{Auxiliary functions for type checking \LangGrad{}.}
-\label{fig:type-check-R9-aux}
+\label{fig:type-check-Rgradual-aux}
 \end{figure}
 
 \clearpage
@@ -11498,7 +11497,7 @@ casts involving simple types such as \code{Integer} and
 \code{Boolean}.  For example, a cast from \code{Integer} to \code{Any}
 can be accomplished with the \code{Inject} operator of \LangAny{}, which
 puts the integer into a tagged value
-(Figure~\ref{fig:interp-R6}). Similarly, a cast from \code{Any} to
+(Figure~\ref{fig:interp-Rany}). Similarly, a cast from \code{Any} to
 \code{Integer} is accomplished with the \code{Project} operator, that
 is, by checking the value's tag and either retrieving the underlying
 integer or signaling an error if it the tag is not the one for
@@ -11645,15 +11644,15 @@ of the kinds of casts that we've discussed in this section.
 \end{figure}
 
 The interpreter for \LangCast{} is defined in
-Figure~\ref{fig:interp-R9-prime}, with the case for \code{Cast}
+Figure~\ref{fig:interp-Rcast}, with the case for \code{Cast}
 dispatching to \code{apply-cast}. To handle the addition of vector
 proxies, we update the vector primitives in \code{interp-op} using the
 functions in Figure~\ref{fig:guarded-vector}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define interp-R9-prime-class
-  (class interp-R8-class
+(define interp-Rcast-class
+  (class interp-Rwhile-class
     (super-new)
     (inherit apply-fun apply-inject apply-project)
 
@@ -11682,11 +11681,11 @@ functions in Figure~\ref{fig:guarded-vector}.
         [else ((super interp-exp env) e)]))
     ))
 
-(define (interp-R9-prime p)
-  (send (new interp-R9-prime-class) interp-program p))
+(define (interp-Rcast p)
+  (send (new interp-Rcast-class) interp-program p))
 \end{lstlisting}
 \caption{The interpreter for \LangCast{}.}
-  \label{fig:interp-R9-prime}
+  \label{fig:interp-Rcast}
 \end{figure}
 
 
@@ -12026,7 +12025,7 @@ We have another batch of vector operations to deal with, those for the
 \code{Any} type. Recall that the type checker for \LangGrad{} generates an
 \code{any-vector-ref} when there is a \code{vector-ref} on something
 of type \code{Any}, and similarly for \code{any-vector-set!}  and
-\code{any-vector-length} (Figure~\ref{fig:type-check-R9-1}). In
+\code{any-vector-length} (Figure~\ref{fig:type-check-Rgradual-1}). In
 Section~\ref{sec:select-r6} we selected instructions for these
 operations based on the idea that the underlying value was a real
 vector. But in the current setting, the underlying value is of type
@@ -12061,14 +12060,14 @@ be translated in a similar way.
 
 \begin{figure}[p]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (R9) at (6,4)  {\large \LangGrad{}};
-\node (R9p) at (3,4)  {\large \LangCast{}};
-\node (R8pp) at (0,4)  {\large \LangProxy{}};
-\node (R8proxy) at (0,2)  {\large \LangPVec{}};
-\node (R8proxy-2) at (3,2)  {\large \LangPVec{}};
-\node (R8proxy-3) at (6,2)  {\large \LangPVec{}};
-\node (R8proxy-4) at (9,2)  {\large \LangPVecFunRef{}};
-\node (R8proxy-5) at (12,2)  {\large \LangPVecFunRef{}};
+\node (Rgradual) at (6,4)  {\large \LangGrad{}};
+\node (Rgradualp) at (3,4)  {\large \LangCast{}};
+\node (Rwhilepp) at (0,4)  {\large \LangProxy{}};
+\node (Rwhileproxy) at (0,2)  {\large \LangPVec{}};
+\node (Rwhileproxy-2) at (3,2)  {\large \LangPVec{}};
+\node (Rwhileproxy-3) at (6,2)  {\large \LangPVec{}};
+\node (Rwhileproxy-4) at (9,2)  {\large \LangPVecFunRef{}};
+\node (Rwhileproxy-5) at (12,2)  {\large \LangPVecFunRef{}};
 \node (F1-1) at (12,0)  {\large \LangPVecFunRef{}};
 \node (F1-2) at (9,0)  {\large \LangPVecFunRef{}};
 \node (F1-3) at (6,0)  {\large \LangPVecFunRef{}};
@@ -12084,21 +12083,21 @@ be translated in a similar way.
 \node (x86-5) at (9,-6) {\large \LangXIndCall{}};
 
 
-\path[->,bend right=15] (R9) edge [above] node
-     {\ttfamily\footnotesize type-check} (R9p);
-\path[->,bend right=15] (R9p) edge [above] node
-     {\ttfamily\footnotesize lower-casts} (R8pp);
-\path[->,bend right=15] (R8pp) edge [right] node
-     {\ttfamily\footnotesize differentiate-proxies} (R8proxy);
-\path[->,bend left=15] (R8proxy) edge [above] node
-     {\ttfamily\footnotesize shrink} (R8proxy-2);
-\path[->,bend left=15] (R8proxy-2) edge [above] node
-     {\ttfamily\footnotesize uniquify} (R8proxy-3);
-\path[->,bend left=15] (R8proxy-3) edge [above] node
-     {\ttfamily\footnotesize reveal-functions} (R8proxy-4);
-\path[->,bend left=15] (R8proxy-4) edge [above] node
-     {\ttfamily\footnotesize reveal-casts} (R8proxy-5);
-\path[->,bend left=15] (R8proxy-5) edge [left] node
+\path[->,bend right=15] (Rgradual) edge [above] node
+     {\ttfamily\footnotesize type-check} (Rgradualp);
+\path[->,bend right=15] (Rgradualp) edge [above] node
+     {\ttfamily\footnotesize lower-casts} (Rwhilepp);
+\path[->,bend right=15] (Rwhilepp) edge [right] node
+     {\ttfamily\footnotesize differentiate-proxies} (Rwhileproxy);
+\path[->,bend left=15] (Rwhileproxy) edge [above] node
+     {\ttfamily\footnotesize shrink} (Rwhileproxy-2);
+\path[->,bend left=15] (Rwhileproxy-2) edge [above] node
+     {\ttfamily\footnotesize uniquify} (Rwhileproxy-3);
+\path[->,bend left=15] (Rwhileproxy-3) edge [above] node
+     {\ttfamily\footnotesize reveal-functions} (Rwhileproxy-4);
+\path[->,bend left=15] (Rwhileproxy-4) edge [above] node
+     {\ttfamily\footnotesize reveal-casts} (Rwhileproxy-5);
+\path[->,bend left=15] (Rwhileproxy-5) edge [left] node
      {\ttfamily\footnotesize convert-assignments} (F1-1);
 \path[->,bend left=15] (F1-1) edge [below] node
      {\ttfamily\footnotesize convert-to-clos.} (F1-2);
@@ -12123,10 +12122,10 @@ be translated in a similar way.
 \path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print-x86} (x86-5);
 \end{tikzpicture}
   \caption{Diagram of the passes for \LangGrad{} (gradual typing).}
-\label{fig:R9-passes}
+\label{fig:Rgradual-passes}
 \end{figure}
 
-Figure~\ref{fig:R9-passes} provides an overview of all the passes needed
+Figure~\ref{fig:Rgradual-passes} provides an overview of all the passes needed
 for the compilation of \LangGrad{}.
 
 \section{Further Reading}
@@ -12298,7 +12297,7 @@ applies the polymorphic function to a Boolean and to an integer.
 \label{fig:apply-twice}
 \end{figure}
 
-The type checker for \LangPoly{} in Figure~\ref{fig:type-check-R10} has
+The type checker for \LangPoly{} in Figure~\ref{fig:type-check-Rvar0} has
 three new responsibilities (compared to \LangLoop{}). The type checking of
 function application is extended to handle the case where the operator
 expression is a polymorphic function. In that case the type arguments
@@ -12331,7 +12330,7 @@ different even though they are equivalent types. For example,
 \code{(All (a) (a -> a))} is equivalent to \code{(All (b) (b -> b))}.
 Two polymorphic types should be considered equal if they differ only
 in the choice of the names of the type parameters. The
-\code{type-equal?} function in Figure~\ref{fig:type-check-R10-aux}
+\code{type-equal?} function in Figure~\ref{fig:type-check-Rvar0-aux}
 renames the type parameters of the first type to match the type
 parameters of the second type.
 
@@ -12390,7 +12389,7 @@ example is listed in Figure~\ref{fig:map-vec-type-check}.
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
 (define type-check-poly-class
-  (class type-check-R8-class
+  (class type-check-Rwhile-class
     (super-new)
     (inherit check-type-equal?)
   
@@ -12455,7 +12454,7 @@ example is listed in Figure~\ref{fig:map-vec-type-check}.
   ))
 \end{lstlisting}
 \caption{Type checker for the \LangPoly{} language.}
-\label{fig:type-check-R10}
+\label{fig:type-check-Rvar0}
 \end{figure}
 
 \begin{figure}[tbp]
@@ -12521,7 +12520,7 @@ example is listed in Figure~\ref{fig:map-vec-type-check}.
      (cons (Def f params rt info body) (combine-decls-defs ds^))]))
 \end{lstlisting}
 \caption{Auxiliary functions for type checking \LangPoly{}.}
-\label{fig:type-check-R10-aux}
+\label{fig:type-check-Rvar0-aux}
 \end{figure}
 
 
@@ -12728,15 +12727,15 @@ annotations and the body.
 
 \begin{figure}[p]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (R10) at (9,4)  {\large \LangPoly{}};
-\node (R10p) at (6,4)  {\large \LangInst{}};
-\node (R9p) at (3,4)  {\large \LangCast{}};
-\node (R8pp) at (0,4)  {\large \LangProxy{}};
-\node (R8proxy) at (0,2)  {\large \LangPVec{}};
-\node (R8proxy-2) at (3,2)  {\large \LangPVec{}};
-\node (R8proxy-3) at (6,2)  {\large \LangPVec{}};
-\node (R8proxy-4) at (9,2)  {\large \LangPVecFunRef{}};
-\node (R8proxy-5) at (12,2)  {\large \LangPVecFunRef{}};
+\node (Rpoly) at (9,4)  {\large \LangPoly{}};
+\node (Rpolyp) at (6,4)  {\large \LangInst{}};
+\node (Rgradualp) at (3,4)  {\large \LangCast{}};
+\node (Rwhilepp) at (0,4)  {\large \LangProxy{}};
+\node (Rwhileproxy) at (0,2)  {\large \LangPVec{}};
+\node (Rwhileproxy-2) at (3,2)  {\large \LangPVec{}};
+\node (Rwhileproxy-3) at (6,2)  {\large \LangPVec{}};
+\node (Rwhileproxy-4) at (9,2)  {\large \LangPVecFunRef{}};
+\node (Rwhileproxy-5) at (12,2)  {\large \LangPVecFunRef{}};
 \node (F1-1) at (12,0)  {\large \LangPVecFunRef{}};
 \node (F1-2) at (9,0)  {\large \LangPVecFunRef{}};
 \node (F1-3) at (6,0)  {\large \LangPVecFunRef{}};
@@ -12752,23 +12751,23 @@ annotations and the body.
 \node (x86-5) at (9,-6) {\large \LangXIndCall{}};
 
 
-\path[->,bend right=15] (R10) edge [above] node
-     {\ttfamily\footnotesize type-check} (R10p);
-\path[->,bend right=15] (R10p) edge [above] node
-     {\ttfamily\footnotesize erase-types} (R9p);
-\path[->,bend right=15] (R9p) edge [above] node
-     {\ttfamily\footnotesize lower-casts} (R8pp);
-\path[->,bend right=15] (R8pp) edge [right] node
-     {\ttfamily\footnotesize differentiate-proxies} (R8proxy);
-\path[->,bend left=15] (R8proxy) edge [above] node
-     {\ttfamily\footnotesize shrink} (R8proxy-2);
-\path[->,bend left=15] (R8proxy-2) edge [above] node
-     {\ttfamily\footnotesize uniquify} (R8proxy-3);
-\path[->,bend left=15] (R8proxy-3) edge [above] node
-     {\ttfamily\footnotesize reveal-functions} (R8proxy-4);
-\path[->,bend left=15] (R8proxy-4) edge [above] node
-     {\ttfamily\footnotesize reveal-casts} (R8proxy-5);
-\path[->,bend left=15] (R8proxy-5) edge [left] node
+\path[->,bend right=15] (Rpoly) edge [above] node
+     {\ttfamily\footnotesize type-check} (Rpolyp);
+\path[->,bend right=15] (Rpolyp) edge [above] node
+     {\ttfamily\footnotesize erase-types} (Rgradualp);
+\path[->,bend right=15] (Rgradualp) edge [above] node
+     {\ttfamily\footnotesize lower-casts} (Rwhilepp);
+\path[->,bend right=15] (Rwhilepp) edge [right] node
+     {\ttfamily\footnotesize differentiate-proxies} (Rwhileproxy);
+\path[->,bend left=15] (Rwhileproxy) edge [above] node
+     {\ttfamily\footnotesize shrink} (Rwhileproxy-2);
+\path[->,bend left=15] (Rwhileproxy-2) edge [above] node
+     {\ttfamily\footnotesize uniquify} (Rwhileproxy-3);
+\path[->,bend left=15] (Rwhileproxy-3) edge [above] node
+     {\ttfamily\footnotesize reveal-functions} (Rwhileproxy-4);
+\path[->,bend left=15] (Rwhileproxy-4) edge [above] node
+     {\ttfamily\footnotesize reveal-casts} (Rwhileproxy-5);
+\path[->,bend left=15] (Rwhileproxy-5) edge [left] node
      {\ttfamily\footnotesize convert-assignments} (F1-1);
 \path[->,bend left=15] (F1-1) edge [below] node
      {\ttfamily\footnotesize convert-to-clos.} (F1-2);
@@ -12793,10 +12792,10 @@ annotations and the body.
 \path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print-x86} (x86-5);
 \end{tikzpicture}
   \caption{Diagram of the passes for \LangPoly{} (parametric polymorphism).}
-\label{fig:R10-passes}
+\label{fig:Rpoly-passes}
 \end{figure}
 
-Figure~\ref{fig:R10-passes} provides an overview of all the passes needed
+Figure~\ref{fig:Rpoly-passes} provides an overview of all the passes needed
 for the compilation of \LangPoly{}.
 
 % TODO: challenge problem: specialization of instantiations
@@ -12809,8 +12808,8 @@ for the compilation of \LangPoly{}.
 \index{interpreter}
 
 We provide interpreters for each of the source languages \LangInt{},
-\LangVar{}, $\ldots$ in the files \code{interp-R0.rkt},
-\code{interp-R1.rkt}, etc.  The interpreters for the intermediate
+\LangVar{}, $\ldots$ in the files \code{interp-Rint.rkt},
+\code{interp-Rvar.rkt}, etc.  The interpreters for the intermediate
 languages \LangCVar{} and \LangCIf{} are in \code{interp-C0.rkt} and
 \code{interp-C1.rkt}.  The interpreters for \LangCVec{}, \LangCFun{}, pseudo-x86,
 and x86 are in the \key{interp.rkt} file.
@@ -12846,8 +12845,9 @@ parameters:
   \item and a type checker for the output language.  Type checkers for
     the $R$ and $C$ languages are provided in the support code.  For
     example, the type checkers for \LangVar{} and \LangCVar{} are in
-    \code{type-check-R1.rkt}. The type checker entry is optional.  The
-    support code does not provide type checkers for the x86 languages.
+    \code{type-check-Rvar.rkt} and \code{type-check-Cvar.rkt}. The
+    type checker entry is optional.  The support code does not provide
+    type checkers for the x86 languages.
   \end{enumerate}
 
 \item[source-interp] an interpreter for the source language. The
