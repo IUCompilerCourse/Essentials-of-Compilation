@@ -1408,7 +1408,7 @@ suffices for compiling \LangVar{}.
 \label{sec:x86}
 \index{x86}
 
-Figure~\ref{fig:x86-0-concrete} defines the concrete syntax for
+Figure~\ref{fig:x86-int-concrete} defines the concrete syntax for
 \LangXASTInt{}.  We use the AT\&T syntax expected by the GNU
 assembler.
 %
@@ -1456,12 +1456,12 @@ integer constant (called \emph{immediate value}\index{immediate
 \end{minipage}
 }
 \caption{The syntax of the \LangXASTInt{} assembly language (AT\&T syntax).}
-\label{fig:x86-0-concrete}
+\label{fig:x86-int-concrete}
 \end{figure}
 
 A register is a special kind of variable. Each one holds a 64-bit
 value; there are 16 general-purpose registers in the computer and
-their names are given in Figure~\ref{fig:x86-0-concrete}.  A register
+their names are given in Figure~\ref{fig:x86-int-concrete}.  A register
 is written with a \key{\%} followed by the register name, such as
 \key{\%rax}.
 
@@ -1633,9 +1633,9 @@ one and adds $8$ to the stack pointer.
 
 The compiler needs a convenient representation for manipulating x86
 programs, so we define an abstract syntax for x86 in
-Figure~\ref{fig:x86-0-ast}. We refer to this language as
+Figure~\ref{fig:x86-int-ast}. We refer to this language as
 \LangXASTInt{}. The main difference compared to the concrete syntax of
-\LangXInt{} (Figure~\ref{fig:x86-0-concrete}) is that labels are not
+\LangXInt{} (Figure~\ref{fig:x86-int-concrete}) is that labels are not
 allowed in front of every instructions. Instead instructions are
 grouped into \emph{blocks}\index{block}\index{basic block} with a
 label associated with every block, which is why the \key{X86Program}
@@ -1672,7 +1672,7 @@ of arguments, which is helpful to know during register allocation
 \end{minipage}
 }
 \caption{The abstract syntax of \LangXASTInt{} assembly.}
-\label{fig:x86-0-ast}
+\label{fig:x86-int-ast}
 \end{figure}
 
 \section{Planning the trip to x86 via the \LangCVar{} language}
@@ -2281,24 +2281,25 @@ for conditional expressions in Chapter~\ref{ch:bool-types}.
 In the \code{select-instructions} pass we begin the work of
 translating from \LangCVar{} to \LangXVar{}. The target language of
 this pass is a variant of x86 that still uses variables, so we add an
-AST node of the form $\VAR{\itm{var}}$ to the \LangXASTInt{} abstract
-syntax of Figure~\ref{fig:x86-0-ast}.  We recommend implementing the
-\code{select-instructions} in terms of three auxiliary functions, one
-for each of the non-terminals of \LangCVar{}: $\Atm$, $\Stmt$, and $\Tail$.
+AST node of the form $\VAR{\itm{var}}$ to the \Arg{} non-terminal of
+the \LangXASTInt{} abstract syntax (Figure~\ref{fig:x86-int-ast}).  We
+recommend implementing the \code{select-instructions} with
+three auxiliary functions, one for each of the non-terminals of
+\LangCVar{}: $\Atm$, $\Stmt$, and $\Tail$.
 
 The cases for $\Atm$ are straightforward, variables stay
 the same and integer constants are changed to immediates:
 $\INT{n}$ changes to $\IMM{n}$.
 
 Next we consider the cases for $\Stmt$, starting with arithmetic
-operations. For example, in \LangCVar{} an addition operation can take the
-form below, to the left of the $\Rightarrow$.  To translate to x86, we
-need to use the \key{addq} instruction which does an in-place
-update. So we must first move \code{10} to \code{x}. \\
+operations. For example, consider the addition operation below that
+puts the sum of \code{y} and \code{z} into \code{x}. We can use the
+\key{addq} instruction, but it performs an in-place update.  So we
+could move \code{y} to \code{x} and then add \code{z} to \code{x}. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-x = (+ 10 32);
+x = (+ y z);
 \end{lstlisting}
 \end{minipage}
 &
@@ -2306,18 +2307,18 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-movq $10, x
-addq $32, x
+movq y, x
+addq z, x
 \end{lstlisting}
 \end{minipage}
 \end{tabular} \\
 %
-There are cases that require special care to avoid generating
-needlessly complicated code. If one of the arguments of the addition
-is the same as the left-hand side of the assignment, then there is no
-need for the extra move instruction.  For example, the following
-assignment statement can be translated into a single \key{addq}
-instruction.\\
+There are also cases that require special care to avoid generating
+needlessly complicated code. For example, if one of the arguments of
+the addition is the same variable as the left-hand side of the
+assignment, then there is no need for the extra move instruction.  The
+following assignment statement can be translated into a single
+\key{addq} instruction.\\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -2332,26 +2333,26 @@ $\Rightarrow$
 addq $10, x
 \end{lstlisting}
 \end{minipage}
-\end{tabular} \\
+\end{tabular}
 
 The \key{read} operation does not have a direct counterpart in x86
-assembly, so we have instead implemented this functionality in the C
-language~\citep{Kernighan:1988nx}, with the function \code{read\_int}
-in the file \code{runtime.c}. In general, we refer to all of the
-functionality in this file as the \emph{runtime system}\index{runtime system},
-or simply the \emph{runtime} for short. When compiling your generated x86
-assembly code, you need to compile \code{runtime.c} to \code{runtime.o} (an
-``object file'', using \code{gcc} option \code{-c}) and link it into
-the executable. For our purposes of code generation, all you need to
-do is translate an assignment of \key{read} into some variable
-$\itm{lhs}$ (for left-hand side) into a call to the \code{read\_int}
-function followed by a move from \code{rax} to the left-hand side.
-The move from \code{rax} is needed because the return value from
+assembly, so we provide this functionality with the function
+\code{read\_int} in the file \code{runtime.c}, written in
+C~\citep{Kernighan:1988nx}. In general, we refer to all of the
+functionality in this file as the \emph{runtime system}\index{runtime
+  system}, or simply the \emph{runtime} for short. When compiling your
+generated x86 assembly code, you need to compile \code{runtime.c} to
+\code{runtime.o} (an ``object file'', using \code{gcc} option
+\code{-c}) and link it into the executable. For our purposes of code
+generation, all you need to do is translate an assignment of
+\key{read} into a call to the \code{read\_int} function followed by a
+move from \code{rax} to the left-hand-side of the assignment.  The
+move from \code{rax} is needed because the return value from
 \code{read\_int} goes into \code{rax}, as is the case in general.  \\
 \begin{tabular}{lll}
 \begin{minipage}{0.3\textwidth}
 \begin{lstlisting}
-|$\itm{var}$| = (read);
+x = (read);
 \end{lstlisting}
 \end{minipage}
 &
@@ -2360,26 +2361,25 @@ $\Rightarrow$
 \begin{minipage}{0.3\textwidth}
 \begin{lstlisting}
 callq read_int
-movq %rax, |$\itm{var}$|
+movq %rax, x
 \end{lstlisting}
 \end{minipage}
-\end{tabular} \\
+\end{tabular} 
 
 There are two cases for the $\Tail$ non-terminal: \key{Return} and
 \key{Seq}. Regarding \key{Return}, we recommend treating it as an
 assignment to the \key{rax} register followed by a jump to the
 conclusion of the program (so the conclusion needs to be labeled).
 For $\SEQ{s}{t}$, you can translate the statement $s$ and tail $t$
-recursively and append the resulting instructions.
+recursively and then append the resulting instructions.
 
 \begin{exercise}
-\normalfont
-Implement the \key{select-instructions} pass and test it on all of the
-example programs that you created for the previous passes and create
-three new example programs that are designed to exercise all of the
-interesting code in this pass. Use the \key{interp-tests} function
-(Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to test
-your passes on the example programs.
+\normalfont Implement the \key{select-instructions} pass in
+\code{compiler.rkt}. Create three new example programs that are
+designed to exercise all of the interesting cases in this pass.  In
+the \code{run-tests.rkt} script, uncomment the line for this pass in
+the list of \code{passes} and then run the script to test your
+compiler.
 \end{exercise}
 
 
@@ -2397,28 +2397,23 @@ mechanics of placing variables on the stack. We study an algorithm for
 placing variables in registers in
 Chapter~\ref{ch:register-allocation-r1}.
 
-Consider again the following \LangVar{} program.
+Consider again the following \LangVar{} program from
+Section~\ref{sec:remove-complex-opera-Rvar}.
 % s0_20.rkt
 \begin{lstlisting}
 (let ([a 42])
   (let ([b a])
     b))
 \end{lstlisting}
-For reference, we repeat the output of \code{select-instructions} on
-the left and show the output of \code{assign-homes} on the right.
-%
-%% Recall that \key{explicate-control} associated the list of
-%% variables with the \code{locals} symbol in the program's $\itm{info}$
-%% field, so \code{assign-homes} has convenient access to the them.
-%
-In this example, we assign variable \code{a} to stack location
-\code{-8(\%rbp)} and variable \code{b} to location
-\code{-16(\%rbp)}.\\
+The output of \code{select-instructions} is shown on the left and the
+output of \code{assign-homes} on the right.  In this example, we
+assign variable \code{a} to stack location \code{-8(\%rbp)} and
+variable \code{b} to location \code{-16(\%rbp)}.\\
 \begin{tabular}{l}
   \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 locals-types:
-    a : 'Integer, b : 'Integer
+    a : Integer, b : Integer
 start: 
     movq $42, a
     movq a, b
@@ -2437,54 +2432,52 @@ start:
     jmp conclusion
 \end{lstlisting}
 \end{minipage}
-\end{tabular} \\
+\end{tabular} 
 
-There is a entry for \code{locals-types} in the $\itm{info}$ of the
-\code{X86Program} node, which is needed here so that we have the list
-of variables that should be assigned to homes. The support code
-computes the \code{locals-types} entry. In particular,
-\code{type-check-Cvar} installs it in the $\itm{info}$ field of the
-\code{CProgram} node, which should be propagated to the
-\code{X86Program} node. When using \code{interp-tests} or
-\code{compiler-tests} (see Appendix,
-Section~\ref{appendix:utilities}), specify \code{type-check-Cvar} as
-the type checker to use after \code{explicate-control}.
+The \code{locals-types} entry in the $\itm{info}$ of the
+\code{X86Program} node is an alist mapping all the variables in the
+program to their types (for now just \code{Integer}).  The
+\code{assign-homes} pass should replace all uses of those variables
+with stack locations.  As an aside, the \code{locals-types} entry is
+computed by \code{type-check-Cvar} in the support code, which installs
+it in the $\itm{info}$ field of the \code{CProgram} node, which should
+be propagated to the \code{X86Program} node.
 
 In the process of assigning variables to stack locations, it is
 convenient for you to compute and store the size of the frame (in
 bytes) in the $\itm{info}$ field of the \key{X86Program} node, with
 the key \code{stack-space}, which is needed later to generate the
 conclusion of the \code{main} procedure. The x86-64 standard requires
-the frame size to be a multiple of 16 bytes. \index{frame}
+the frame size to be a multiple of 16 bytes.\index{frame}
 
-\begin{exercise}
-\normalfont Implement the \key{assign-homes} pass and test it on all
-of the example programs that you created for the previous passes pass.
-We recommend that \key{assign-homes} take an extra parameter that is a
-mapping of variable names to homes (stack locations for now).  Use the
-\key{interp-tests} function (Appendix~\ref{appendix:utilities}) from
-\key{utilities.rkt} to test your passes on the example programs.
+\begin{exercise}\normalfont
+Implement the \key{assign-homes} pass in \code{compiler.rkt}, defining
+auxiliary functions for the non-terminals \Arg{}, \Instr{}, and
+\Block{}.  We recommend that the auxiliary functions take an extra
+parameter that is an alist mapping variable names to homes (stack
+locations for now).  In the \code{run-tests.rkt} script, uncomment the
+line for this pass in the list of \code{passes} and then run the
+script to test your compiler.
 \end{exercise}
 
 
 \section{Patch Instructions}
 \label{sec:patch-s0}
 
-The \code{patch-instructions} pass compiles \LangXVar{}
-programs to \LangXASTInt{} programs by making sure that each
-instruction adheres to the restrictions of the x86 assembly language.
-In particular, at most one argument of an instruction may be a memory
-reference.
+The \code{patch-instructions} pass compiles from \LangXVar{} to
+\LangXASTInt{} by making sure that each instruction adheres to the
+restriction that at most one argument of an instruction may be a
+memory reference.
 
-We return to the following running example.
+We return to the following example.
 % s0_20.rkt
 \begin{lstlisting}
    (let ([a 42])
      (let ([b a])
        b))
 \end{lstlisting}
-After the \key{assign-homes} pass, the above program has been translated to
-the following. \\
+The \key{assign-homes} pass produces the following output
+for this program. \\
 \begin{minipage}{0.5\textwidth}
 \begin{lstlisting}
 stack-space: 16
@@ -2505,13 +2498,12 @@ from \key{rax} to the destination location, as follows.
 \end{lstlisting}
 
 \begin{exercise}
-\normalfont
-Implement the \key{patch-instructions} pass and test it on all of the
-example programs that you created for the previous passes and create
-three new example programs that are designed to exercise all of the
-interesting code in this pass. Use the \key{interp-tests} function
-(Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to test
-your passes on the example programs.
+\normalfont Implement the \key{patch-instructions} pass in
+\code{compiler.rkt}. Create three new example programs that are
+designed to exercise all of the interesting cases in this pass.  In
+the \code{run-tests.rkt} script, uncomment the line for this pass in
+the list of \code{passes} and then run the script to test your
+compiler.
 \end{exercise}
 
 
@@ -2519,52 +2511,31 @@ your passes on the example programs.
 \label{sec:print-x86}
 
 The last step of the compiler from \LangVar{} to x86 is to convert the
-\LangXASTInt{} AST (defined in Figure~\ref{fig:x86-0-ast}) to the
-string representation (defined in Figure~\ref{fig:x86-0-concrete}). The Racket
-\key{format} and \key{string-append} functions are useful in this
-regard. The main work that this step needs to perform is to create the
-\key{main} function and the standard instructions for its prelude and
-conclusion, as shown in Figure~\ref{fig:p1-x86} of
-Section~\ref{sec:x86}. You need to know the number of stack-allocated
-variables, so we suggest computing it in the \key{assign-homes} pass
-(Section~\ref{sec:assign-r1}) and storing it in the $\itm{info}$ field
-of the \key{program} node.
+\LangXASTInt{} AST (defined in Figure~\ref{fig:x86-int-ast}) to the
+string representation (defined in
+Figure~\ref{fig:x86-int-concrete}). The Racket \key{format} and
+\key{string-append} functions are useful in this regard. The main work
+that this step needs to perform is to create the \key{main} function
+and the standard instructions for its prelude and conclusion, as shown
+in Figure~\ref{fig:p1-x86} of Section~\ref{sec:x86}. You will need to
+know the amount of space needed for the stack frame, which you can
+obtain from the \code{stack-space} entry in the $\itm{info}$ field of
+the \key{X86Program} node.
 
-%% Your compiled code should print the result of the program's execution
-%% by using the \code{print\_int} function provided in
-%% \code{runtime.c}. If your compiler has been implemented correctly so
-%% far, this final result should be stored in the \key{rax} register.
-%% We'll talk more about how to perform function calls with arguments in
-%% general later on, but for now, place the following after the compiled
-%% code for the \LangVar{} program but before the conclusion:
-
-%% \begin{lstlisting}
-%%     movq %rax, %rdi
-%%     callq print_int
-%% \end{lstlisting}
-
-%% These lines move the value in \key{rax} into the \key{rdi} register, which
-%% stores the first argument to be passed into \key{print\_int}.
-
-If you want your program to run on Mac OS X, your code needs to
-determine whether or not it is running on a Mac, and prefix
-underscores to labels like \key{main}.  You can determine the platform
-with the Racket call \code{(system-type 'os)}, which returns
-\code{'macosx}, \code{'unix}, or \code{'windows}.  
-%% In addition to
-%% placing underscores on \key{main}, you need to put them in front of
-%% \key{callq} labels (so \code{callq print\_int} becomes \code{callq
-%%   \_print\_int}).
+When running on Mac OS X, you compiler should prefix an underscore to
+labels like \key{main}. The Racket call \code{(system-type 'os)} is
+useful for determining which operating system the compiler is running
+on. It returns \code{'macosx}, \code{'unix}, or \code{'windows}.
 
 \begin{exercise}
-\normalfont Implement the \key{print-x86} pass and test it on all of
-the example programs that you created for the previous passes. Use the
-\key{compiler-tests} function (Appendix~\ref{appendix:utilities}) from
-\key{utilities.rkt} to test your complete compiler on the example
-programs.  See the \key{run-tests.rkt} script in the student support
-code for an example of how to use \key{compiler-tests}. Also, remember
-to compile the provided \key{runtime.c} file to \key{runtime.o} using
-\key{gcc}.
+  \normalfont Implement the \key{print-x86} pass in
+  \code{compiler.rkt}. Uncomment the line for this pass in the list of
+  \code{passes} in the \code{run-tests.rkt} script. Also uncomment the
+  call to the \key{compiler-tests} function
+  (Appendix~\ref{appendix:utilities}), which tests your complete
+  compiler by executing the generated x86 code. Compile the provided
+  \key{runtime.c} file to \key{runtime.o} using \key{gcc}. Run the
+  script to test your compiler.
 \end{exercise}
 
 
@@ -2602,7 +2573,11 @@ arithmetic. For example, your partial evaluator should translate
 \]
 To accomplish this, the \code{pe-exp} function should produce output
 in the form of the $\itm{residual}$ non-terminal of the following
-grammar.
+grammar. The idea is that when processing an addition expression, we
+can always produce either 1) an integer constant, 2) and addition
+expression with an integer constant on the left-hand side but not the
+right-hand side, or 3) or an addition expression in which neither
+subexpression is a constant.
 \[
 \begin{array}{lcl}
 \itm{inert} &::=& \Var \mid \LP\key{read}\RP \mid \LP\key{-} \;\Var\RP
@@ -2612,11 +2587,11 @@ grammar.
 \itm{residual} &::=& \Int \mid \LP\key{+}\; \Int\; \itm{inert}\RP \mid \itm{inert} 
 \end{array}
 \]
-The \code{pe-add} and \code{pe-neg} functions may therefore assume
-that their inputs are $\itm{residual}$ expressions and they should
-return $\itm{residual}$ expressions.  Once the improvements are
-complete, make sure that your compiler still passes all of the tests.
-After all, fast code is useless if it produces incorrect results!
+The \code{pe-add} and \code{pe-neg} functions may assume that their
+inputs are $\itm{residual}$ expressions and they should return
+$\itm{residual}$ expressions.  Once the improvements are complete,
+make sure that your compiler still passes all of the tests.  After
+all, fast code is useless if it produces incorrect results!
 \end{exercise}
 
 
@@ -4677,7 +4652,7 @@ the first argument:
 \]
 \end{minipage}
 }
-\caption{The concrete syntax of \LangXIf{}  (extends \LangXASTInt{} of Figure~\ref{fig:x86-0-concrete}).}
+\caption{The concrete syntax of \LangXIf{}  (extends \LangXASTInt{} of Figure~\ref{fig:x86-int-concrete}).}
 \label{fig:x86-1-concrete}
 \end{figure}
 
@@ -4709,7 +4684,7 @@ the first argument:
 \]
 \end{minipage}
 }
-\caption{The abstract syntax of \LangXASTIf{} (extends \LangXASTInt{} of Figure~\ref{fig:x86-0-ast}).}
+\caption{The abstract syntax of \LangXASTIf{} (extends \LangXASTInt{} of Figure~\ref{fig:x86-int-ast}).}
 \label{fig:x86-1}
 \end{figure}
 
