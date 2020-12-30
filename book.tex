@@ -1034,7 +1034,7 @@ functions is the output of partially evaluating the children.
   (match p
     [(Program '() e) (Program '() (pe-exp e))]))
 \end{lstlisting}
-\caption{A partial evaluator for \LangInt{} expressions.}
+\caption{A partial evaluator for \LangInt{}.}
 \label{fig:pe-arith}
 \end{figure}
 
@@ -1068,23 +1068,23 @@ Appendix~\ref{appendix:utilities}.\\
 \chapter{Integers and Variables}
 \label{ch:int-exp}
 
-This chapter is about compiling a subset of Racket named \LangVar{}, that
-includes integer arithmetic and local variable binding, to x86-64
-assembly code~\citep{Intel:2015aa}.  Henceforth we refer to x86-64
-simply as x86.  The chapter begins with a description of the \LangVar{}
-language (Section~\ref{sec:s0}) followed by a description of x86
-(Section~\ref{sec:x86}). The x86 assembly language is large so we
-discuss only what is needed for compiling \LangVar{}. We introduce more of
-x86 in later chapters. Once we have introduced \LangVar{} and x86, we
-reflect on their differences and come up with a plan to break down the
-translation from \LangVar{} to x86 into a handful of steps
-(Section~\ref{sec:plan-s0-x86}).  The rest of the sections in this
-chapter give detailed hints regarding each step
-(Sections~\ref{sec:uniquify-s0} through \ref{sec:patch-s0}).  We hope
-to give enough hints that the well-prepared reader, together with a
-few friends, can implement a compiler from \LangVar{} to x86 in a couple
-weeks.  To give the reader a feeling for the scale of this first
-compiler, the instructor solution for the \LangVar{} compiler is
+This chapter is about compiling a subset of Racket to x86-64 assembly
+code~\citep{Intel:2015aa}. The subset, named \LangVar{}, includes
+integer arithmetic and local variable binding.  We often refer to
+x86-64 simply as x86.  The chapter begins with a description of the
+\LangVar{} language (Section~\ref{sec:s0}) followed by an introduction
+to of x86 assembly (Section~\ref{sec:x86}). The x86 assembly language
+is large so we discuss only the instructions needed for compiling
+\LangVar{}. We introduce more x86 instructions in later chapters.
+After introducing \LangVar{} and x86, we reflect on their differences
+and come up with a plan to break down the translation from \LangVar{}
+to x86 into a handful of steps (Section~\ref{sec:plan-s0-x86}).  The
+rest of the sections in this chapter give detailed hints regarding
+each step (Sections~\ref{sec:uniquify-s0} through \ref{sec:patch-s0}).
+We hope to give enough hints that the well-prepared reader, together
+with a few friends, can implement a compiler from \LangVar{} to x86 in
+a couple weeks.  To give the reader a feeling for the scale of this
+first compiler, the instructor solution for the \LangVar{} compiler is
 approximately 500 lines of code.
 
 \section{The \LangVar{} Language}
@@ -1142,10 +1142,10 @@ exhibit several compilation techniques.
 \end{figure}
 
 Let us dive further into the syntax and semantics of the \LangVar{}
-language.  The \key{Let} feature defines a variable for use within its
+language.  The \key{let} feature defines a variable for use within its
 body and initializes the variable with the value of an expression.
-The abstract syntax for \key{Let} is defined in Figure~\ref{fig:r1-syntax}.
-The concrete syntax for \key{Let} is
+The abstract syntax for \key{let} is defined in
+Figure~\ref{fig:r1-syntax}.  The concrete syntax for \key{let} is
 \begin{lstlisting}
 (let ([|$\itm{var}$| |$\itm{exp}$|]) |$\itm{exp}$|)
 \end{lstlisting}
@@ -1196,10 +1196,8 @@ interpreter for \LangVar{}. The following code sketches this idea.
 (define (interp-Rvar e)
   (match e
     [(Prim '- (list e))
-     (define v (interp-Rvar e))
-     (fx- 0 v)]
-    ...
-    ))
+     (fx- 0 (interp-Rvar e))]
+    ...))
 \end{lstlisting}
 \end{minipage}
 \begin{minipage}{0.45\textwidth}
@@ -1207,13 +1205,11 @@ interpreter for \LangVar{}. The following code sketches this idea.
 (define (interp-Rif e)
   (match e
     [(If cnd thn els)
-     (define b (interp-Rif cnd))
-     (match b
+     (match (interp-Rif cnd)
        [#t (interp-Rif thn)]
        [#f (interp-Rif els)])]
     ...
-    [else (interp-Rvar e)]  
-    ))    
+    [else (interp-Rvar e)]))    
 \end{lstlisting}
 \end{minipage}
 \end{center}
@@ -1229,21 +1225,22 @@ recurisvely calls \code{interp-Rvar} again on the argument of \code{-},
 which is an \code{If}.  But there is no case for \code{If} in
 \code{interp-Rvar}, so we get an error!
 
-To make our intepreters extensible we need something called \emph{open
-  recursion}\index{open recursion}. That is, a recursive call should
-always invoke the ``top'' interpreter, even if the recursive call is
-made from interpreters that are lower down.  Object-oriented languages
-provide open recursion in the form of method overriding\index{method
-  overriding}. The following code sketches this idea for interpreting
-\LangVar{} and \LangIf{} using the
+To make our interpreters extensible we need something called
+\emph{open recursion}\index{open recursion}, where the tying of the
+recursive knot is delayed to when the functions are
+composed. Object-oriented languages provide open recursion with the
+late-binding of overridden methods\index{method overriding}. The
+following code sketches this idea for interpreting \LangVar{} and
+\LangIf{} using the
 \href{https://docs.racket-lang.org/guide/classes.html}{\code{class}}
 \index{class} feature of Racket.  We define one class for each
 language and define a method for interpreting expressions inside each
-class. The class for \LangIf{} inherits from the class for \LangVar{} and the
-method \code{interp-exp} for \LangIf{} overrides the \code{interp-exp} for
-\LangVar{}. Note that the default case in \code{interp-exp} for \LangIf{} uses
-\code{super} to invoke \code{interp-exp}, and because \LangIf{} inherits
-from \LangVar{}, that dispatches to the \code{interp-exp} for \LangVar{}.
+class. The class for \LangIf{} inherits from the class for \LangVar{}
+and the method \code{interp-exp} in \LangIf{} overrides the
+\code{interp-exp} in \LangVar{}. Note that the default case of
+\code{interp-exp} in \LangIf{} uses \code{super} to invoke
+\code{interp-exp}, and because \LangIf{} inherits from \LangVar{},
+that dispatches to the \code{interp-exp} in \LangVar{}.
 \begin{center}
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
@@ -1252,12 +1249,9 @@ from \LangVar{}, that dispatches to the \code{interp-exp} for \LangVar{}.
     (define/public (interp-exp e)
       (match e
         [(Prim '- (list e))
-         (define v (interp-exp e))
-         (fx- 0 v)]
-        ...
-        ))
-    ...
-  ))
+         (fx- 0 (interp-exp e))]
+        ...))
+    ...))
 \end{lstlisting}
 \end{minipage}
 \begin{minipage}{0.45\textwidth}
@@ -1267,13 +1261,11 @@ from \LangVar{}, that dispatches to the \code{interp-exp} for \LangVar{}.
     (define/override (interp-exp e)
       (match e
         [(If cnd thn els)
-         (define b (interp-exp cnd))
-         (match b
+         (match (interp-exp cnd)
            [#t (interp-exp thn)]
            [#f (interp-exp els)])]
         ...
-        [else (super interp-exp e)]  
-        ))
+        [else (super interp-exp e)]))
     ...
   ))
 \end{lstlisting}
@@ -1289,13 +1281,13 @@ expression by creating an object of the \LangIf{} class and sending it the
 \begin{lstlisting}
 (send (new interp-Rif-class) interp-exp e0)
 \end{lstlisting}
-This will again hit the default case of \code{interp-exp} in \LangIf{} and
-dispatch to the \code{interp-exp} method for \LangVar{}, which will handle
-the \code{-} operator. But then for the recursive method call, it will
-dispatch back to \code{interp-exp} for \LangIf{}, where the \code{If} will
-be correctly handled. Thus, method overriding gives us the open
-recursion that we need to implement our interpreters in an extensible
-way.
+The default case of \code{interp-exp} in \LangIf{} handles it by
+dispatching to the \code{interp-exp} method in \LangVar{}, which
+handles the \code{-} operator. But then for the recursive method call,
+it dispatches back to \code{interp-exp} in \LangIf{}, where the
+\code{If} is handled correctly. Thus, method overriding gives us the
+open recursion that we need to implement our interpreters in an
+extensible way.
 
 \newpage
 
@@ -1335,28 +1327,29 @@ way.
 \end{tcolorbox}
 \end{wrapfigure}
 
-Now that we have explained why we use classes and methods to implement
-interpreters, we turn to the discussion of the actual interpreter for
-\LangVar{}.  Figure~\ref{fig:interp-Rvar} shows the definitional interpreter
-for the \LangVar{} language. It is similar to the interpreter for \LangInt{} but
-it adds two new \key{match} clauses for variables and for \key{let}.
-For \key{let}, we need a way to communicate the value of a variable to
-all the uses of a variable. To accomplish this, we maintain a mapping
-from variables to values. Throughout the compiler we often need to map
-variables to information about them. We refer to these mappings as
-\emph{environments}\index{environment}
-\footnote{Another common term for environment in the compiler
-  literature is \emph{symbol table}\index{symbol table}.}.
-For simplicity, we use an
-association list (alist) to represent the environment. The sidebar to
-the right gives a brief introduction to alists and the
-\code{racket/dict} package.  The \code{interp-Rvar} function takes the
-current environment, \code{env}, as an extra parameter.  When the
-interpreter encounters a variable, it finds the corresponding value
-using the \code{dict-ref} function.  When the interpreter encounters a
-\key{Let}, it evaluates the initializing expression, extends the
-environment with the result value bound to the variable, using
-\code{dict-set}, then evaluates the body of the \key{Let}.
+Having justified the use of classes and methods to implement
+interpreters, we turn to the definitional interpreter for \LangVar{}
+in Figure~\ref{fig:interp-Rvar}. It is similar to the interpreter for
+\LangInt{} but adds two new \key{match} clauses for variables and
+\key{let}.  For \key{let} we need a way to communicate the value bound
+to a variable to all the uses of the variable. To accomplish this, we
+maintain a mapping from variables to values. Throughout the compiler
+we often need to map variables to information about them. We refer to
+these mappings as
+\emph{environments}\index{environment}.\footnote{Another common term
+  for environment in the compiler literature is \emph{symbol
+    table}\index{symbol table}.}
+%
+For simplicity, we use an association list (alist) to represent the
+environment. The sidebar to the right gives a brief introduction to
+alists and the \code{racket/dict} package.  The \code{interp-exp}
+function takes the current environment, \code{env}, as an extra
+parameter.  When the interpreter encounters a variable, it finds the
+corresponding value using the \code{dict-ref} function.  When the
+interpreter encounters a \key{Let}, it evaluates the initializing
+expression, extends the environment with the result value bound to the
+variable, using \code{dict-set}, then evaluates the body of the
+\key{Let}.
 
 \begin{figure}[tp]
 \begin{lstlisting}
@@ -1371,23 +1364,17 @@ environment with the result value bound to the variable, using
          (define r (read))
          (cond [(fixnum? r) r]
                [else (error 'interp-exp "expected an integer" r)])]
-        [(Prim '- (list e))
-         (define v ((interp-exp env) e))
-         (fx- 0 v)]
+        [(Prim '- (list e)) (fx- 0 ((interp-exp env) e))]
         [(Prim '+ (list e1 e2))
-         (define v1 ((interp-exp env) e1))
-         (define v2 ((interp-exp env) e2))
-         (fx+ v1 v2)]
+         (fx+ ((interp-exp env) e1) ((interp-exp env) e2))]
         [(Var x) (dict-ref env x)]
         [(Let x e body)
          (define new-env (dict-set env x ((interp-exp env) e)))
-         ((interp-exp new-env) body)]
-        ))
+         ((interp-exp new-env) body)]))
 
     (define/public (interp-program p)
       (match p
-        [(Program '() e) ((interp-exp '()) e)]
-        ))
+        [(Program '() e) ((interp-exp '()) e)]))
     ))
 
 (define (interp-Rvar p)
