@@ -1397,53 +1397,38 @@ criteria in the following diagram.
  \node (o)  at (4, -2) {$n$};
 
  \path[->] (p1) edge [above] node {\footnotesize compile} (p2);
- \path[->] (p1) edge [left]  node {\footnotesize interp-\LangVar{}} (o);
- \path[->] (p2) edge [right] node {\footnotesize interp-x86} (o);
+ \path[->] (p1) edge [left]  node {\footnotesize\code{interp-Rvar}} (o);
+ \path[->] (p2) edge [right] node {\footnotesize\code{interp-x86int}} (o);
 \end{tikzpicture}
 \]
-In the next section we introduce enough of the x86 assembly
-language to compile \LangVar{}.
+In the next section we introduce the \LangXASTInt{} subset of x86 that
+suffices for compiling \LangVar{}.
 
 \section{The \LangXASTInt{} Assembly Language}
 \label{sec:x86}
 \index{x86}
 
-Figure~\ref{fig:x86-0-concrete} defines the concrete syntax for the subset of
-the x86 assembly language needed for this chapter, which we call \LangXASTInt{}.
+Figure~\ref{fig:x86-0-concrete} defines the concrete syntax for
+\LangXASTInt{}.  We use the AT\&T syntax expected by the GNU
+assembler.
 %
-An x86 program begins with a \code{main} label followed by a sequence
-of instructions.  In the grammar, ellipses such as $\ldots$ are used to
-indicate a sequence of items, e.g., $\Instr \ldots$ is a sequence of
-instructions.\index{instruction}
+A program begins with a \code{main} label followed by a sequence of
+instructions. The \key{globl} directive says that the \key{main}
+procedure is externally visible, which is necessary so that the
+operating system can call it.  In the grammar, ellipses such as
+$\ldots$ are used to indicate a sequence of items, e.g., $\Instr
+\ldots$ is a sequence of instructions.\index{instruction}
 %
-An x86 program is stored in the computer's memory and the computer has
-a \emph{program counter} (PC)\index{program counter}\index{PC}
-that points to the address of the next
-instruction to be executed. For most instructions, once the
-instruction is executed, the program counter is incremented to point
-to the immediately following instruction in memory. Most x86
+An x86 program is stored in the computer's memory.  For our purposes,
+the computer's memory is as a mapping of 64-bit addresses to 64-bit
+values.  The computer has a \emph{program counter} (PC)\index{program
+  counter}\index{PC} stored in the \code{rip} register that points to
+the address of the next instruction to be executed.  For most
+instructions, the program counter is incremented after the instruction
+is executed, so it points to the next instruction in memory.  Most x86
 instructions take two operands, where each operand is either an
-integer constant (called \emph{immediate value}\index{immediate value}),
-a \emph{register}\index{register}, or a memory location.
-A register is a special kind of variable. Each
-one holds a 64-bit value; there are 16 registers in the computer and
-their names are given in Figure~\ref{fig:x86-0-concrete}. The computer's memory
-as a mapping of 64-bit addresses to 64-bit values%
-\footnote{This simple story suffices for describing how sequential
-  programs access memory but is not sufficient for multi-threaded
-  programs. However, multi-threaded execution is beyond the scope of
-  this book.}.
-%
-We use the AT\&T syntax expected by the GNU assembler, which comes
-with the \key{gcc} compiler that we use for compiling assembly code to
-machine code.
-%
-Appendix~\ref{sec:x86-quick-reference} is a quick-reference for all of
-the x86 instructions used in this book.
-
-
-% to do: finish treatment of imulq
-% it's needed for vector's in Rany/Rdyn
+integer constant (called \emph{immediate value}\index{immediate
+  value}), a \emph{register}\index{register}, or a memory location.
 
 \newcommand{\allregisters}{\key{rsp} \mid \key{rbp} \mid \key{rax} \mid \key{rbx} \mid \key{rcx}
               \mid \key{rdx} \mid \key{rsi} \mid \key{rdi} \mid \\
@@ -1474,17 +1459,21 @@ the x86 instructions used in this book.
 \label{fig:x86-0-concrete}
 \end{figure}
 
+A register is a special kind of variable. Each one holds a 64-bit
+value; there are 16 general-purpose registers in the computer and
+their names are given in Figure~\ref{fig:x86-0-concrete}.  A register
+is written with a \key{\%} followed by the register name, such as
+\key{\%rax}.
+
 An immediate value is written using the notation \key{\$}$n$ where $n$
 is an integer.
 %
-A register is written with a \key{\%} followed by the register name,
-such as \key{\%rax}.
 %
 An access to memory is specified using the syntax $n(\key{\%}r)$,
 which obtains the address stored in register $r$ and then adds $n$
-bytes to the address. The resulting address is used to either load or
-store to memory depending on whether it occurs as a source or
-destination argument of an instruction.
+bytes to the address. The resulting address is used to load or store
+to memory depending on whether it occurs as a source or destination
+argument of an instruction.
 
 An arithmetic instruction such as $\key{addq}\,s\key{,}\,d$ reads from the
 source $s$ and destination $d$, applies the arithmetic operation, then
@@ -1497,31 +1486,28 @@ The $\key{callq}\,\itm{label}$ instruction jumps to the procedure
 specified by the label and $\key{retq}$ returns from a procedure to
 its caller. 
 %
-We discuss procedure calls in more detail later in this
-chapter and in Chapter~\ref{ch:functions}. The
-$\key{jmp}\,\itm{label}$ instruction updates the program counter to
-the address of the instruction after the specified label.
+We discuss procedure calls in more detail later in this chapter and in
+Chapter~\ref{ch:functions}. The instruction $\key{jmp}\,\itm{label}$
+updates the program counter to the address of the instruction after
+the specified label.
 
-Figure~\ref{fig:p0-x86} depicts an x86 program that is equivalent
-to \code{(+ 10 32)}. The \key{globl} directive says that the
-\key{main} procedure is externally visible, which is necessary so
-that the operating system can call it. The label \key{main:}
-indicates the beginning of the \key{main} procedure which is where
-the operating system starts executing this program.  The instruction
-\lstinline{movq $10, %rax} puts $10$ into register \key{rax}. The
-following instruction \lstinline{addq $32, %rax} adds $32$ to the
-$10$ in \key{rax} and puts the result, $42$, back into
-  \key{rax}.
+Appendix~\ref{sec:x86-quick-reference} contains a quick-reference for
+all of the x86 instructions used in this book.
+
+Figure~\ref{fig:p0-x86} depicts an x86 program that is equivalent to
+\code{(+ 10 32)}. The instruction \lstinline{movq $10, %rax}
+puts $10$ into register \key{rax} and then \lstinline{addq $32, %rax}
+adds $32$ to the $10$ in \key{rax} and
+puts the result, $42$, back into \key{rax}.
 %
 The last instruction, \key{retq}, finishes the \key{main} function by
 returning the integer in \key{rax} to the operating system. The
 operating system interprets this integer as the program's exit
 code. By convention, an exit code of 0 indicates that a program
 completed successfully, and all other exit codes indicate various
-errors.  Nevertheless, we return the result of the program as the exit
-code.
+errors. Nevertheless, in this book we return the result of the program
+as the exit code.
 
-%\begin{wrapfigure}{r}{2.25in}
 \begin{figure}[tbp]
 \begin{lstlisting}
 	.globl main
@@ -1532,14 +1518,13 @@ main:
 \end{lstlisting}
 \caption{An x86 program equivalent to \code{(+ 10 32)}.}
 \label{fig:p0-x86}
-%\end{wrapfigure}
 \end{figure}
 
-Unfortunately, x86 varies in a couple ways depending on what operating
-system it is assembled in. The code examples shown here are correct on
-Linux and most Unix-like platforms, but when assembled on Mac OS X,
-labels like \key{main} must be prefixed with an underscore, as in
-\key{\_main}.
+The x86 assembly language varies in a couple ways depending on what
+operating system it is assembled in. The code examples shown here are
+correct on Linux and most Unix-like platforms, but when assembled on
+Mac OS X, labels like \key{main} must be prefixed with an underscore,
+as in \key{\_main}.
 
 We exhibit the use of memory for storing intermediate results in the
 next example.  Figure~\ref{fig:p1-x86} lists an x86 program that is
@@ -1560,9 +1545,10 @@ jumping to the procedure.  The register \key{rbp} is the \emph{base
   pointer}\index{base pointer} and is used to access variables that
 are stored in the frame of the current procedure call.  The base
 pointer of the caller is pushed onto the stack after the return
-address. In Figure~\ref{fig:frame} we number the variables from $1$ to
-$n$. Variable $1$ is stored at address $-8\key{(\%rbp)}$, variable $2$
-at $-16\key{(\%rbp)}$, etc.
+address and then the base pointer is set to the location of the old
+base pointer. In Figure~\ref{fig:frame} we number the variables from
+$1$ to $n$. Variable $1$ is stored at address $-8\key{(\%rbp)}$,
+variable $2$ at $-16\key{(\%rbp)}$, etc.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -1584,7 +1570,7 @@ conclusion:
 	popq	%rbp
 	retq
 \end{lstlisting}
-\caption{An x86 program equivalent to \code{(+ 10 32)}.}
+\caption{An x86 program equivalent to \code{(+ 52 (- 10))}.}
 \label{fig:p1-x86}
 \end{figure}
 
@@ -1616,62 +1602,52 @@ alignment (because the \code{callq} pushed the return address).  The
 first three instructions are the typical \emph{prelude}\index{prelude}
 for a procedure.  The instruction \code{pushq \%rbp} saves the base
 pointer for the caller onto the stack and subtracts $8$ from the stack
-pointer. At this point the stack pointer is back to being 16-byte
-aligned. The second instruction \code{movq \%rsp, \%rbp} changes the
+pointer. The second instruction \code{movq \%rsp, \%rbp} changes the
 base pointer so that it points the location of the old base
 pointer. The instruction \code{subq \$16, \%rsp} moves the stack
 pointer down to make enough room for storing variables.  This program
-needs one variable ($8$ bytes) but we round up to 16 bytes to maintain
-the 16-byte alignment of the \code{rsp}. With the \code{rsp} aligned,
-we are ready to make calls to other functions. The last instruction of
-the prelude is \code{jmp start}, which transfers control to the
-instructions that were generated from the Racket expression \code{(+
-  10 32)}.
+needs one variable ($8$ bytes) but we round up to 16 bytes so that
+\code{rsp} is 16-byte aligned and we're ready to make calls to other
+functions. The last instruction of the prelude is \code{jmp start},
+which transfers control to the instructions that were generated from
+the Racket expression \code{(+ 52 (- 10))}.
 
-The four instructions under the label \code{start} carry out the work
-of computing \code{(+ 52 (- 10)))}.
-%
-The first instruction \code{movq \$10, -8(\%rbp)} stores $10$ in
-variable $1$.
+The first instruction under the \code{start} label is
+\code{movq \$10, -8(\%rbp)}, which stores $10$ in variable $1$.
 %
 The instruction \code{negq -8(\%rbp)} changes variable $1$ to $-10$.
 %
-The following instruction moves the $-10$ from variable $1$ into the
+The next instruction moves the $-10$ from variable $1$ into the
 \code{rax} register.  Finally, \code{addq \$52, \%rax} adds $52$ to
 the value in \code{rax}, updating its contents to $42$.
 
 The three instructions under the label \code{conclusion} are the
 typical \emph{conclusion}\index{conclusion} of a procedure.  The first
-two instructions are necessary to get the state of the machine back to
-where it was at the beginning of the procedure.  The instruction
-\key{addq \$16, \%rsp} moves the stack pointer back to point at the
-old base pointer. The amount added here needs to match the amount that
-was subtracted in the prelude of the procedure. Then \key{popq \%rbp}
-returns the old base pointer to \key{rbp} and adds $8$ to the stack
-pointer.  The last instruction, \key{retq}, jumps back to the
-procedure that called this one and adds 8 to the stack pointer, which
-returns the stack pointer to where it was prior to the procedure call.
+two instructions restore the \code{rsp} and \code{rbp} registers to
+the state they were in at the beginning of the procedure.  The
+instruction \key{addq \$16, \%rsp} moves the stack pointer back to
+point at the old base pointer. Then \key{popq \%rbp} returns the old
+base pointer to \key{rbp} and adds $8$ to the stack pointer.  The last
+instruction, \key{retq}, jumps back to the procedure that called this
+one and adds $8$ to the stack pointer.
 
 The compiler needs a convenient representation for manipulating x86
 programs, so we define an abstract syntax for x86 in
 Figure~\ref{fig:x86-0-ast}. We refer to this language as
-\LangXASTInt{} with a subscript $0$ because later we introduce
-extended versions of this assembly language. The main difference
-compared to the concrete syntax of x86
-(Figure~\ref{fig:x86-0-concrete}) is that it does not allow labeled
-instructions to appear anywhere, but instead organizes instructions
-into a group called a \emph{block}\index{block}\index{basic block} and
-associates a label with every block, which is why the \key{X86Program}
-struct includes an alist mapping labels to blocks. The reason for
-using blocks and a control-flow graph becomes apparent in
-Chapter~\ref{ch:bool-types} when we introduce conditional
-branching. The \code{Block} structure includes an $\itm{info}$ field
-that is not needed for this chapter, but will become useful in
-Chapter~\ref{ch:register-allocation-r1}.  For now, the $\itm{info}$
-field should just contain an empty list. Also, regarding the abstract
-syntax for \code{callq}, the \code{Callq} struct includes an integer
-for representing the arity of the function, i.e., the number of
-arguments, which is helpful to know during register allocation
+\LangXASTInt{}. The main difference compared to the concrete syntax of
+\LangXInt{} (Figure~\ref{fig:x86-0-concrete}) is that labels are not
+allowed in front of every instructions. Instead instructions are
+grouped into \emph{blocks}\index{block}\index{basic block} with a
+label associated with every block, which is why the \key{X86Program}
+struct includes an alist mapping labels to blocks. The reason for this
+organization becomes apparent in Chapter~\ref{ch:bool-types} when we
+introduce conditional branching. The \code{Block} structure includes
+an $\itm{info}$ field that is not needed for this chapter, but becomes
+useful in Chapter~\ref{ch:register-allocation-r1}.  For now, the
+$\itm{info}$ field should contain an empty list. Also, regarding the
+abstract syntax for \code{callq}, the \code{Callq} struct includes an
+integer for representing the arity of the function, i.e., the number
+of arguments, which is helpful to know during register allocation
 (Chapter~\ref{ch:register-allocation-r1}).
 
 \begin{figure}[tp]
@@ -1683,10 +1659,10 @@ arguments, which is helpful to know during register allocation
 \Reg &::=& \allregisters{} \\
 \Arg &::=&  \IMM{\Int} \mid \REG{\Reg}
    \mid \DEREF{\Reg}{\Int} \\
-\Instr &::=& \BININSTR{\code{'addq}}{\Arg}{\Arg} 
-       \mid \BININSTR{\code{'subq}}{\Arg}{\Arg} \\
-       &\mid& \BININSTR{\code{'movq}}{\Arg}{\Arg}
-       \mid \UNIINSTR{\code{'negq}}{\Arg}\\
+\Instr &::=& \BININSTR{\code{addq}}{\Arg}{\Arg} 
+       \mid \BININSTR{\code{subq}}{\Arg}{\Arg} \\
+       &\mid& \BININSTR{\code{movq}}{\Arg}{\Arg}
+       \mid \UNIINSTR{\code{negq}}{\Arg}\\
        &\mid& \CALLQ{\itm{label}}{\itm{int}} \mid \RETQ{} 
        \mid \PUSHQ{\Arg} \mid \POPQ{\Arg} \mid \JMP{\itm{label}} \\
 \Block &::= & \BLOCK{\itm{info}}{\LP\Instr\ldots\RP} \\
@@ -1724,8 +1700,8 @@ and x86 assembly? Here are some of the most important ones:
   \LangVar{} the order of evaluation is a left-to-right depth-first
   traversal of the abstract syntax tree.
 
-\item[(d)] An \LangVar{} program can have any number of variables whereas
-  x86 has 16 registers and the procedure calls stack.
+\item[(d)] A program in \LangVar{} can have any number of variables
+  whereas x86 has 16 registers and the procedure calls stack.
 
 \item[(e)] Variables in \LangVar{} can overshadow other variables with the
   same name. In x86, registers have unique names and memory locations
@@ -1737,60 +1713,55 @@ the problem into several steps, dealing with the above differences one
 at a time.  Each of these steps is called a \emph{pass} of the
 compiler.\index{pass}\index{compiler pass}
 %
-This terminology comes from each step passing over the AST of the
-program.
+This terminology comes from the way each step passes over the AST of
+the program.
 %
 We begin by sketching how we might implement each pass, and give them
 names.  We then figure out an ordering of the passes and the
-input/output language for each pass. The very first pass has \LangVar{} as
-its input language and the last pass has x86 as its output
-language. In between we can choose whichever language is most
-convenient for expressing the output of each pass, whether that be
-\LangVar{}, x86, or new \emph{intermediate languages} of our own design.
-Finally, to implement each pass we write one recursive function per
-non-terminal in the grammar of the input language of the pass.
-\index{intermediate language}
+input/output language for each pass. The very first pass has
+\LangVar{} as its input language and the last pass has \LangXInt{} as
+its output language. In between we can choose whichever language is
+most convenient for expressing the output of each pass, whether that
+be \LangVar{}, \LangXInt{}, or new \emph{intermediate languages} of
+our own design.  Finally, to implement each pass we write one
+recursive function per non-terminal in the grammar of the input
+language of the pass.  \index{intermediate language}
 
 \begin{description}
-\item[Pass \key{select-instructions}] handles the difference between
-  \LangVar{} operations and x86 instructions we convert each \LangVar{}
-  operation to a short sequence of instructions that accomplishes the
-  same task.
+\item[\key{select-instructions}] handles the difference between
+  \LangVar{} operations and x86 instructions. This pass converts each
+  \LangVar{} operation to a short sequence of instructions that
+  accomplishes the same task.
 
-\item[Pass \key{remove-complex-opera*}] ensures that each
-  subexpression (i.e. operator and operand, and hence the name
-  \key{opera*}) is an \emph{atomic} expression (a variable or
-  integer), we introduce temporary variables to hold the results
-  of subexpressions.\index{atomic expression}
+\item[\key{remove-complex-opera*}] ensures that each subexpression of
+  a primitive operation is a variable or integer, that is, an
+  \emph{atomic} expression. We refer to non-atomic expressions as
+  \emph{complex}.  This pass introduces temporary variables to hold
+  the results of complex subexpressions.\index{atomic
+    expression}\index{complex expression}%
+  \footnote{The subexpressions of an operation are often called
+    operators and operands which explains the presence of
+    \code{opera*} in the name of this pass.}
   
-\item[Pass \key{explicate-control}] makes the execution order of the
-  program explicit, we convert from the abstract syntax tree
-  representation into a control-flow graph in which each node contains
-  a sequence of statements and the edges between nodes say which nodes
-  contain jumps to other nodes.
+\item[\key{explicate-control}] makes the execution order of the
+  program explicit. It convert the abstract syntax tree representation
+  into a control-flow graph in which each node contains a sequence of
+  statements and the edges between nodes say which nodes contain jumps
+  to other nodes.
 
-\item[Pass \key{assign-homes}] assigns the variables in \LangVar{} to
+\item[\key{assign-homes}] replaces the variables in \LangVar{} with
   registers or stack locations in x86.
 
-\item[Pass \key{uniquify}] deals with the shadowing of variables by
+\item[\key{uniquify}] deals with the shadowing of variables by
   renaming every variable to a unique name.
 \end{description}
 
 The next question is: in what order should we apply these passes? This
 question can be challenging because it is difficult to know ahead of
-time which orders will be better (easier to implement, produce more
+time which orderings will be better (easier to implement, produce more
 efficient code, etc.) so oftentimes trial-and-error is
 involved. Nevertheless, we can try to plan ahead and make educated
 choices regarding the ordering.
-
-%% Let us consider the ordering of \key{uniquify} and
-%% \key{remove-complex-opera*}. The assignment of subexpressions to
-%% temporary variables involves introducing new variables and moving
-%% subexpressions, which might change the shadowing of variables and
-%% inadvertently change the behavior of the program.  But if we apply
-%% \key{uniquify} first, this will not be an issue. Of course, this means
-%% that in \key{remove-complex-opera*}, we need to ensure that the
-%% temporary variables that it creates are unique.
 
 What should be the ordering of \key{explicate-control} with respect to
 \key{uniquify}? The \key{uniquify} pass should come first because
@@ -1798,42 +1769,30 @@ What should be the ordering of \key{explicate-control} with respect to
 become local variables whose scope is the entire program, which would
 confuse variables with the same name.
 %
-Likewise, we place \key{remove-complex-opera*} before
-\key{explicate-control} because \key{explicate-control} removes the
-\key{let} form, but it is convenient to use \key{let} in the output of
-\key{remove-complex-opera*}.
+We place \key{remove-complex-opera*} before \key{explicate-control}
+because the later removes the \key{let} form, but it is convenient to
+use \key{let} in the output of \key{remove-complex-opera*}.
 %
-The ordering of \key{uniquify} and \key{remove-complex-opera*} does
-not matter, so we arbitrarily choose \key{uniquify} to come first.
-
-%% Regarding \key{assign-homes}, it is helpful to place
-%% \key{explicate-control} first because \key{explicate-control} changes
-%% \key{let}-bound variables into program-scope variables.  This means
-%% that the \key{assign-homes} pass can read off the variables from the
-%% $\itm{info}$ of the \key{Program} AST node instead of traversing the
-%% entire program in search of \key{let}-bound variables.
+The ordering of \key{uniquify} with respect to
+\key{remove-complex-opera*} does not matter so we arbitrarily choose
+\key{uniquify} to come first.
 
 Last, we consider \key{select-instructions} and \key{assign-homes}.
-These two passes are intertwined, creating a Gordian Knot. To do a
-good job of assigning homes, it is helpful to have already determined
-which instructions will be used, because x86 instructions have
-restrictions about which of their arguments can be registers versus
-stack locations. One might want to give preferential treatment to
-variables that occur in register-argument positions. On the other
-hand, it may turn out to be impossible to make sure that all such
-variables are assigned to registers, and then one must redo the
-selection of instructions. A sophisticated solution to this problem is
-to iteratively repeat the two passes until a good solution is found.
-To reduce implementation complexity, we recommend a simpler approach
-in which \key{select-instructions} comes first, followed by the
-\key{assign-homes}, then a third pass named \key{patch-instructions}
-that uses a reserved register to patch-up outstanding problems
-regarding instructions with too many memory accesses.
-
-%% The disadvantage of this approach is some programs may not execute
-%% as efficiently as they would if we used the iterative approach and
-%% used all of the registers for variables.
-
+These two passes are intertwined. In Chapter~\ref{ch:functions} we
+learn that, in x86, registers are used for passing arguments to
+functions and it is preferable to assign parameters to their
+corresponding registers. On the other hand, by selecting instructions
+first we may run into a dead end in \key{assign-homes}. Recall that
+only one argument of an x86 instruction may be a memory access but
+\key{assign-homes} might fail to assign even one of them to a
+register.
+%
+A sophisticated approach is to iteratively repeat the two passes until
+a solution is found. However, to reduce implementation complexity we
+recommend a simpler approach in which \key{select-instructions} comes
+first, followed by the \key{assign-homes}, then a third pass named
+\key{patch-instructions} that uses a reserved register to fix
+outstanding problems.
 
 \begin{figure}[tbp]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
@@ -1862,27 +1821,27 @@ regarding instructions with too many memory accesses.
 \end{figure}
 
 Figure~\ref{fig:Rvar-passes} presents the ordering of the compiler
-passes in the form of a graph. Each pass is an edge and the
-input/output language of each pass is a node in the graph.  The output
-of \key{uniquify} and \key{remove-complex-opera*} are programs that
-are still in the \LangVar{} language, through the output of the later
-is a subset of \LangVar{}, a language we name \LangVarANF{} and
-describe in Section~\ref{sec:remove-complex-opera-Rvar}.
-%
-The output of \key{explicate-control} is in an intermediate language
-\LangCVar{} designed to make the order of evaluation explicit in its
-syntax, which we introduce in the next section. The
-\key{select-instruction} pass translates from \LangCVar{} to a variant
-of x86. The \key{assign-homes} and \key{patch-instructions} passes
-input and output variants of x86 assembly. The last pass in
-Figure~\ref{fig:Rvar-passes} is \key{print-x86}, which converts from the
-abstract syntax of \LangXASTInt{} to the concrete syntax.
+passes and identifies the input and output language of each pass.  The
+last pass, \key{print-x86}, converts from the abstract syntax of
+\LangXASTInt{} to the concrete syntax.  In the following two sections
+we discuss the \LangCVar{} intermediate language and the \LangXVar{}
+dialect of x86. The remainder of this chapter gives hints regarding
+the implementation of each of the compiler passes in
+Figure~\ref{fig:Rvar-passes}.
 
-In the next sections we discuss the \LangCVar{} language and the
-\LangXVar{} and \LangXInt{} dialects of x86.  The
-remainder of this chapter gives hints regarding the implementation of
-each of the compiler passes in Figure~\ref{fig:Rvar-passes}.
+%% The output of \key{uniquify} and \key{remove-complex-opera*}
+%% are programs that are still in the \LangVar{} language, though the
+%% output of the later is a subset of \LangVar{} named \LangVarANF{}
+%% (Section~\ref{sec:remove-complex-opera-Rvar}).
+%% %
+%% The output of \key{explicate-control} is in an intermediate language
+%% \LangCVar{} designed to make the order of evaluation explicit in its
+%% syntax, which we introduce in the next section. The
+%% \key{select-instruction} pass translates from \LangCVar{} to
+%% \LangXVar{}. The \key{assign-homes} and
 
+%% \key{patch-instructions}
+%% passes input and output variants of x86 assembly.
 
 \subsection{The \LangCVar{} Intermediate Language}
 
@@ -1893,28 +1852,24 @@ abstract syntax for \LangCVar{} is defined in Figure~\ref{fig:c0-syntax}.
 (The concrete syntax for \LangCVar{} is in the Appendix,
 Figure~\ref{fig:c0-concrete-syntax}.)
 %
-The \LangCVar{} language supports the same operators as \LangVar{} but the
-arguments of operators are restricted to atomic expressions (variables
-and integers), thanks to the \key{remove-complex-opera*} pass. Instead
-of \key{Let} expressions, \LangCVar{} has assignment statements which can be
-executed in sequence using the \key{Seq} form. A sequence of
-statements always ends with \key{Return}, a guarantee that is baked
-into the grammar rules for the \itm{tail} non-terminal. The naming of
-this non-terminal comes from the term \emph{tail position}\index{tail position},
-which refers to an expression that is the last one to execute within a
-function. (An expression in tail position may contain subexpressions,
-and those may or may not be in tail position depending on the kind of
-expression.)
+The \LangCVar{} language supports the same operators as \LangVar{} but
+the arguments of operators are restricted to atomic
+expressions. Instead of \key{let} expressions, \LangCVar{} has
+assignment statements which can be executed in sequence using the
+\key{Seq} form. A sequence of statements always ends with
+\key{Return}, a guarantee that is baked into the grammar rules for
+\itm{tail}. The naming of this non-terminal comes from the term
+\emph{tail position}\index{tail position}, which refers to an
+expression that is the last one to execute within a function.
 
-A \LangCVar{} program consists of a control-flow graph (represented as an
-alist mapping labels to tails). This is more general than
-necessary for the present chapter, as we do not yet need to introduce
-\key{goto} for jumping to labels, but it saves us from having to
-change the syntax of the program construct in
+A \LangCVar{} program consists of a control-flow graph represented as
+an alist mapping labels to tails. This is more general than necessary
+for the present chapter, as we do not yet introduce \key{goto} for
+jumping to labels, but it saves us from having to change the syntax in
 Chapter~\ref{ch:bool-types}.  For now there will be just one label,
 \key{start}, and the whole program is its tail.
 %
-The $\itm{info}$ field of the \key{Program} form, after the
+The $\itm{info}$ field of the \key{CProgram} form, after the
 \key{explicate-control} pass, contains a mapping from the symbol
 \key{locals} to a list of variables, that is, a list of all the
 variables used in the program. At the start of the program, these
@@ -1940,24 +1895,29 @@ assignment.
 \label{fig:c0-syntax}
 \end{figure}
 
+The definitional interpreter for \LangCVar{} is in the support code
+for this book, in the file \code{interp-Cvar.rkt}. The support code is
+in a \code{github} repository at the following URL:
+\begin{center}\footnotesize
+  \url{https://github.com/IUCompilerCourse/public-student-support-code}
+\end{center}
 
-\subsection{The dialects of x86}
 
-The \LangXVar{} language, pronounced ``pseudo x86'', is the output of
-the pass \key{select-instructions}. It extends \LangXASTInt{} with an
-unbounded number of program-scope variables and it does not have
-special-case rules regarding instruction arguments. The
-x86$^{\dagger}$ language, the output of \key{print-x86}, is the
-concrete syntax for x86.
+\subsection{The \LangXVar{} dialect}
+
+The \LangXVar{} language, which we call ``pseudo x86'', is the output
+of the pass \key{select-instructions}. It extends \LangXASTInt{} with
+an unbounded number of program-scope variables and removes the
+restrictions regarding instruction arguments.
 
 
 \section{Uniquify Variables}
-\label{sec:uniquify-s0}
+\label{sec:uniquify-Rvar}
 
-The \code{uniquify} pass compiles \LangVar{} programs into \LangVar{} programs
-in which every \key{let} uses a unique variable name. For example, the
-\code{uniquify} pass should translate the program on the left into the
-program on the right. \\
+The \code{uniquify} pass compiles \LangVar{} programs into \LangVar{}
+programs in which every \key{let} binds a unique variable name. For
+example, the \code{uniquify} pass should translate the program on the
+left into the program on the right. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -2000,71 +1960,70 @@ $\Rightarrow$
 \end{tabular}
 
 We recommend implementing \code{uniquify} by creating a structurally
-recursive function function named \code{uniquify-exp} that mostly just
-copies the input program. However, when encountering a \key{let}, it
-should generate a unique name for the variable (the Racket function
-\code{gensym} is handy for this) and associate the old name with the
-new unique name in an alist. The \code{uniquify-exp} function will
-need to access this alist when it gets to a variable reference, so we
-add another parameter to \code{uniquify-exp} for the alist.
+recursive function named \code{uniquify-exp} that mostly just copies
+an expression. However, when encountering a \key{let}, it should
+generate a unique name for the variable and associate the old name
+with the new name in an alist.\footnote{The Racket function
+  \code{gensym} is handy for generating unique variable names.} The
+\code{uniquify-exp} function needs to access this alist when it gets
+to a variable reference, so we add a parameter to \code{uniquify-exp}
+for the alist.
 
 The skeleton of the \code{uniquify-exp} function is shown in
-Figure~\ref{fig:uniquify-s0}.  The function is curried so that it is
+Figure~\ref{fig:uniquify-Rvar}.  The function is curried so that it is
 convenient to partially apply it to an alist and then apply it to
 different expressions, as in the last clause for primitive operations
-in Figure~\ref{fig:uniquify-s0}.  The
+in Figure~\ref{fig:uniquify-Rvar}.  The
+%
 \href{https://docs.racket-lang.org/reference/for.html#%28form._%28%28lib._racket%2Fprivate%2Fbase..rkt%29._for%2Flist%29%29}{\key{for/list}}
-  form is useful for applying a function to each element of a list to
-  produce a new list.  \index{for/list}
+%
+form of Racket is useful for transforming each element of a list to
+produce a new list.\index{for/list}
 
 \begin{exercise}
 \normalfont % I don't like the italics for exercises. -Jeremy
 
-Complete the \code{uniquify} pass by filling in the blanks, that is,
-implement the clauses for variables and for the \key{let} form.
+Complete the \code{uniquify} pass by filling in the blanks in
+Figure~\ref{fig:uniquify-Rvar}, that is, implement the clauses for
+variables and for the \key{let} form in the file \code{compiler.rkt}
+in the support code.
 \end{exercise}
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-   (define (uniquify-exp env)
-     (lambda (e)
-       (match e
-         [(Var x) ___]
-         [(Int n) (Int n)]
-         [(Let x e body) ___]
-         [(Prim op es)
-          (Prim op (for/list ([e es]) ((uniquify-exp env) e)))]
-         )))
+(define (uniquify-exp env)
+  (lambda (e)
+    (match e
+      [(Var x) ___]
+      [(Int n) (Int n)]
+      [(Let x e body) ___]
+      [(Prim op es)
+       (Prim op (for/list ([e es]) ((uniquify-exp env) e)))])))
 
-   (define (uniquify p)
-     (match p
-       [(Program '() e) (Program '() ((uniquify-exp '()) e))]))
+(define (uniquify p)
+  (match p
+    [(Program '() e) (Program '() ((uniquify-exp '()) e))]))
 \end{lstlisting}
 \caption{Skeleton for the \key{uniquify} pass.}
-\label{fig:uniquify-s0}
+\label{fig:uniquify-Rvar}
 \end{figure}
 
 \begin{exercise}
 \normalfont % I don't like the italics for exercises. -Jeremy
 
-Test your \key{uniquify} pass by creating five example \LangVar{} programs.
-Check whether the output programs produce the same result as the input
-programs. The \LangVar{} programs should be designed to test the most
-interesting parts of the \key{uniquify} pass, that is, the programs
-should include \key{let} forms, variables, and variables that
-overshadow each other.  The five programs should be in a subdirectory
-named \key{tests} and they should have the same file name except for a
-different integer at the end of the name, followed by the ending
-\key{.rkt}. Use the \key{interp-tests} function
+Creating five \LangVar{} programs to test the most interesting parts
+of the \key{uniquify} pass, that is, the programs should include
+\key{let} forms, variables, and variables that overshadow each other.
+The five programs should be placed in the subdirectory named
+\key{tests} and the file names should start with \code{var\_test\_}
+followed by a unique integer and end with the file extension
+\key{.rkt}. Run the \key{run-tests.rkt} script in the support code to
+check whether the output programs produce the same result as the input
+programs. The script uses the \key{interp-tests} function
 (Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to test
-your \key{uniquify} pass on the example programs.  See the
-\key{run-tests.rkt} script in the support code for an example of how
-to use \key{interp-tests}. The support code is in a \code{github}
-repository at the following URL:
-\begin{center}\footnotesize
-  \url{https://github.com/IUCompilerCourse/public-student-support-code}
-\end{center}
+your \key{uniquify} pass on the example programs.
 \end{exercise}
+
 
 \section{Remove Complex Operands}
 \label{sec:remove-complex-opera-Rvar}
@@ -2117,7 +2076,7 @@ R^{\dagger}_1  &::=& \PROGRAM{\code{'()}}{\Exp}
 \end{figure}
 
 Figure~\ref{fig:r1-anf-syntax} presents the grammar for the output of
-this pass, the language \LangVarANF{}. The main difference is that
+this pass, the language \LangVarANF{}. The only difference is that
 operator arguments are required to be atomic expressions.  In the
 literature, this is called \emph{administrative normal form}, or ANF
 for short~\citep{Danvy:1991fk,Flanagan:1993cg}.  \index{administrative
@@ -2161,9 +2120,9 @@ tmp.1
 \end{minipage}
 \end{tabular}
 
-Take special care of programs such as the next one that \key{let}-bind
-variables with integers or other variables. You should leave them
-unchanged, as shown in to the program on the right \\
+Take special care of programs such as the following one that binds a
+variable to an atomic expression. You should leave such variable
+bindings unchanged, as shown in to the program on the right \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 % s0_20.rkt
@@ -2185,7 +2144,7 @@ $\Rightarrow$
 \end{minipage}
 \end{tabular} \\
 A careless implementation of \key{rco-exp} and \key{rco-atom} might
-produce the following output.\\
+produce the following output with unnecessary temporary variables.\\
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
 (let ([tmp.1 42])
@@ -2197,13 +2156,13 @@ produce the following output.\\
 \end{minipage}
 
 \begin{exercise}
-\normalfont Implement the \code{remove-complex-opera*} pass.
-Test the new pass on all of the example programs that you created to test the
-\key{uniquify} pass and create three new example programs that are
-designed to exercise the interesting code in the
-\code{remove-complex-opera*} pass. Use the \key{interp-tests} function
-(Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to test
-your passes on the example programs.
+  \normalfont Implement the \code{remove-complex-opera*} in
+  \code{compiler.rkt}.  Create three new \LangInt{} programs that are
+  designed to exercise the interesting code in the
+  \code{remove-complex-opera*} pass (Following the same file name
+  guidelines as before.). In the \code{run-tests.rkt} script,
+  uncomment the line for this pass in the list of \code{passes} and
+  then run the script to test your compiler.
 \end{exercise}
 
 
@@ -2227,7 +2186,7 @@ sequence of assignment statements. For example, consider the following
 The output of the previous pass and of \code{explicate-control} is
 shown below. Recall that the right-hand-side of a \key{let} executes
 before its body, so the order of evaluation for this program is to
-assign \code{20} to \code{x.1}, assign \code{22} to \code{x.2}, assign
+assign \code{20} to \code{x.1}, \code{22} to \code{x.2}, and
 \code{(+ x.1 x.2)} to \code{y}, then return \code{y}. Indeed, the
 output of \code{explicate-control} makes this ordering explicit.\\
 \begin{tabular}{lll}
@@ -2243,7 +2202,7 @@ output of \code{explicate-control} makes this ordering explicit.\\
 $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
-\begin{lstlisting}
+\begin{lstlisting}[language=C]
 start:
   x.1 = 20;
   x.2 = 22;
@@ -2253,30 +2212,67 @@ start:
 \end{minipage}
 \end{tabular}
 
-We recommend implementing \code{explicate-control} using two mutually
-recursive functions: \code{explicate-tail} and
-\code{explicate-assign}.  The first function should be applied to
-expressions in tail position whereas the second should be applied to
-expressions that occur on the right-hand-side of a \key{let}.
-%
-The \code{explicate-tail} function takes an \LangVar{} expression as input
-and produces a \LangCVar{} $\Tail$ (see Figure~\ref{fig:c0-syntax}).
-%
-The \code{explicate-assign} function takes an \LangVar{} expression, the
-variable that it is to be assigned to, and \LangCVar{} code (a $\Tail$) that
-should come after the assignment (e.g., the code generated for the
-body of the \key{let}) and returns a $\Tail$. The
-\code{explicate-assign} function is in accumulator-passing style in
-that its third parameter is some \LangCVar{} code that it adds to and
-returns. The reader might be tempted to instead organize
-\code{explicate-assign} in a more direct fashion, without the third
-parameter and perhaps using \code{append} to combine statements. We
-warn against that alternative because the accumulator-passing style is
-key to how we generate high-quality code for conditional expressions
-in Chapter~\ref{ch:bool-types}.
+\begin{figure}[tbp]
+\begin{lstlisting}
+(define (explicate-tail e)
+  (match e
+    [(Var x) ___]
+    [(Int n) (Return (Int n))]
+    [(Let x rhs body) ___]
+    [(Prim op es) ___]
+    [else (error "explicate-tail unhandled case" e)]))
 
-The top-level \code{explicate-control} function should invoke
-\code{explicate-tail} on the body of the \key{Program} AST node.
+(define (explicate-assign e x cont)
+  (match e
+    [(Var x) ___]
+    [(Int n) (Seq (Assign (Var x) (Int n)) cont)]
+    [(Let y rhs body) ___]
+    [(Prim op es) ___]
+    [else (error "explicate-assign unhandled case" e)]))
+
+(define (explicate-control p)
+  (match p
+    [(Program info body) ___]))
+\end{lstlisting}
+\caption{Skeleton for the \key{explicate-control} pass.}
+\label{fig:explicate-control-Rvar}
+\end{figure}
+
+The organization of this pass depends on the notion of tail position
+that we have alluded to earlier. Formally, \emph{tail
+  position}\index{tail position} in the context of \LangVar{} is
+defined recursively by the following two rules.
+\begin{enumerate}
+\item In $\PROGRAM{\code{()}}{e}$, expression $e$ is in tail position.
+\item If $\LET{x}{e_1}{e_2}$ is in tail position, then so is $e_2$.
+\end{enumerate}
+
+We recommend implementing \code{explicate-control} using two mutually
+recursive functions, \code{explicate-tail} and
+\code{explicate-assign}, as suggested in the skeleton code in
+Figure~\ref{fig:explicate-control-Rvar}.  The \code{explicate-tail}
+function should be applied to expressions in tail position whereas the
+\code{explicate-assign} should be applied to expressions that occur on
+the right-hand-side of a \key{let}.
+%
+The \code{explicate-tail} function takes an \Exp{} in \LangVar{} as
+input and produces a \Tail{} in \LangCVar{} (see
+Figure~\ref{fig:c0-syntax}).
+%
+The \code{explicate-assign} function takes an \Exp{} in \LangVar{},
+the variable that it is to be assigned to, and a \Tail{} in
+\LangCVar{} for the code that will come after the assignment.  The
+\code{explicate-assign} function returns a $\Tail$ in \LangCVar{}.
+
+The \code{explicate-assign} function is in accumulator-passing style
+in that the \code{cont} parameter is used for accumulating the
+output. The reader might be tempted to instead organize
+\code{explicate-assign} in a more direct fashion, without the
+\code{cont} parameter and perhaps using \code{append} to combine
+statements. We warn against that alternative because the
+accumulator-passing style is key to how we generate high-quality code
+for conditional expressions in Chapter~\ref{ch:bool-types}.
+
 
 \section{Select Instructions}
 \label{sec:select-r1}
