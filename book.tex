@@ -1905,10 +1905,10 @@ in a \code{github} repository at the following URL:
 
 \subsection{The \LangXVar{} dialect}
 
-The \LangXVar{} language, which we call ``pseudo x86'', is the output
-of the pass \key{select-instructions}. It extends \LangXASTInt{} with
-an unbounded number of program-scope variables and removes the
-restrictions regarding instruction arguments.
+The \LangXVar{} language is the output of the pass
+\key{select-instructions}. It extends \LangXASTInt{} with an unbounded
+number of program-scope variables and removes the restrictions
+regarding instruction arguments.
 
 
 \section{Uniquify Variables}
@@ -2862,9 +2862,10 @@ conclusion:
 \label{sec:liveness-analysis-r1}
 \index{liveness analysis}
 
-In this section we describe a program analysis, called \emph{liveness
-  analysis}, that discovers which variables are in-use in different
-regions of a program.
+
+The \code{uncover-live} pass performs \emph{liveness analysis}, that
+is, it discovers which variables are in-use in different regions of a
+program.
 %
 A variable or register is \emph{live} at a program point if its
 current value is used at some later point in the program.  We 
@@ -2883,10 +2884,10 @@ addq b, c
 \end{lstlisting}
 \end{minipage}
 \end{center}
-The answer is no because the integer \code{30} written to \code{b} on
-line 2 is never used. The variable \code{b} is read on line 5 and
-there is an intervening write to \code{b} on line 4, so the read on
-line 5 receives the value written on line 4, not line 2.
+The answer is no because \code{a} is live from line 1 to 3 and
+\code{b} is live from line 4 to 5.  The integer written to \code{b} on
+line 2 is never used because it is overwritten (line 4) before the
+next read (line 5).
 
 \begin{wrapfigure}[19]{l}[1.0in]{0.6\textwidth}
   \small
@@ -2916,8 +2917,7 @@ instruction.  \index{live-after} \index{live-before}
   L_{\mathsf{after}}(k) = L_{\mathsf{before}}(k+1)
 \end{equation}
 To start things off, there are no live locations after the last
-instruction\footnote{Technically, the \code{rax} register is live
-but we do not use it for register allocation.}, so
+instruction, so
 \begin{equation}\label{eq:live-last-empty}
   L_{\mathsf{after}}(n) = \emptyset
 \end{equation}
@@ -2930,14 +2930,14 @@ where $W(k)$ are the locations written to by instruction $I_k$ and
 $R(k)$ are the locations read by instruction $I_k$.
 
 There is a special case for \code{jmp} instructions.  The locations
-that are live before a \code{jmp} should be the locations that are
-live before the instruction that follows the target label. So we
-recommend maintaining an alist, perhaps called \code{label->live},
-that maps each label to a set of such locations. Recall that for now,
-the only \code{jmp} in a pseudo-x86 program is the one at the end, to
-the \code{conclusion}. (For example, see Figure~\ref{fig:reg-eg}.) So
-the alist should map \code{conclusion} to the set
-$\{\ttm{rax},\ttm{rsp}\}$.
+that are live before a \code{jmp} should be the locations in
+$L_{\mathtt{before}}$ at the target of the jump. So we recommend
+maintaining an alist named \code{label->live} that maps each label to
+the $L_{\mathtt{before}}$ for the first instruction in its block. For
+now the only \code{jmp} in a \LangXVar{} program is the one at the
+end, to the conclusion. (For example, see Figure~\ref{fig:reg-eg}.)
+The conclusion reads from \ttm{rax} and \ttm{rsp}, so the alist should
+map \code{conclusion} to the set $\{\ttm{rax},\ttm{rsp}\}$.
 
 Let us walk through the above example, applying these formulas
 starting with the instruction on line 5. We collect the answers in the
@@ -3036,10 +3036,9 @@ shown between each instruction to make the figure easy to read.
 \end{figure}
 
 \begin{exercise}\normalfont
-Implement the compiler pass named \code{uncover-live} that computes
-the live-after sets. We recommend storing the live-after sets (a list
-of a set of variables) in the $\itm{info}$ field of the \code{Block}
-structure.
+Implement the \code{uncover-live} pass that computes the live-after
+sets. We recommend storing the live-after sets (a list of a set of
+variables) in the $\itm{info}$ field of the \code{Block} structure.
 %
 We recommend organizing your code to use a helper function that takes
 a list of instructions and an initial live-after set (typically empty)
