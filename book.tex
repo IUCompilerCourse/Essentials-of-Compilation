@@ -3076,9 +3076,11 @@ arity.)
     \emph{undirected}.
     \index{graph}\index{directed graph}\index{undirected graph}
   \begin{description}
-  \item[$\LP\code{directed-graph}\,\itm{edges}\RP$] constructs a
-    directed graph from a list of edges. Each edge is a list
-    containing the source and target vertex.
+  %% We currently don't use directed graphs. We instead use
+  %% directed multi-graphs. -Jeremy
+  %% \item[$\LP\code{directed-graph}\,\itm{edges}\RP$] constructs a
+  %%   directed graph from a list of edges. Each edge is a list
+  %%   containing the source and target vertex.
   \item[$\LP\code{undirected-graph}\,\itm{edges}\RP$] constructs a
     undirected graph from a list of edges. Each edge is represented by
     a list containing two vertices.
@@ -3094,38 +3096,36 @@ arity.)
 \end{tcolorbox}
 \end{wrapfigure}
 
-Based on the liveness analysis, we know where each location is used
-(read from).  However, during register allocation, we need to answer
-questions of the specific form: are locations $u$ and $v$ live at the
-same time?  (And therefore cannot be assigned to the same register.)
-To make this question easier to answer, we create an explicit data
+Based on the liveness analysis, we know where each location is live.
+However, during register allocation, we need to answer questions of
+the specific form: are locations $u$ and $v$ live at the same time?
+(And therefore cannot be assigned to the same register.)  To make this
+question more efficient to answer, we create an explicit data
 structure, an \emph{interference graph}\index{interference graph}.  An
 interference graph is an undirected graph that has an edge between two
 locations if they are live at the same time, that is, if they
 interfere with each other.
 
-The most obvious way to compute the interference graph is to look at
-the set of live location between each statement in the program and add
-an edge to the graph for every pair of variables in the same set.
-This approach is less than ideal for two reasons. First, it can be
-expensive because it takes $O(n^2)$ time to look at every pair in a
-set of $n$ live locations. Second, there is a special case in which
-two locations that are live at the same time do not actually interfere
-with each other: when they both contain the same value because we have
-assigned one to the other.
+An obvious way to compute the interference graph is to look at the set
+of live location between each instruction and add an edge to the graph
+for every pair of variables in the same set.  This approach is less
+than ideal for two reasons. First, it can be expensive because it
+takes $O(n^2)$ time to consider at every pair in a set of $n$ live
+locations. Second, in the special case where two locations hold the
+same value (because one was assigned to the other), they can be live
+at the same time without interfering with each other.
 
-A better way to compute the interference graph is to focus on the
-writes~\cite{Appel:2003fk}. We do not want the writes performed by an
-instruction to overwrite something in a live location. So for each
+A better way to compute the interference graph is to focus on
+writes~\citep{Appel:2003fk}. The writes performed by an instruction
+must not overwrite something in a live location. So for each
 instruction, we create an edge between the locations being written to
-and all the other live locations. (Except that one should not create
-self edges.)  Recall that for a \key{callq} instruction, we consider
-all of the caller-saved registers as being written to, so an edge will
-be added between every live variable and every caller-saved
-register. For \key{movq}, we deal with the above-mentioned special
-case by not adding an edge between a live variable $v$ and destination
-$d$ if $v$ matches the source of the move. So we have the following
-two rules.
+and the live locations. (Except that one should not create self
+edges.)  Note that for the \key{callq} instruction, we consider all of
+the caller-saved registers as being written to, so an edge is added
+between every live variable and every caller-saved register. For
+\key{movq}, we deal with the above-mentioned special case by not
+adding an edge between a live variable $v$ and the destination if $v$
+matches the source. So we have the following two rules.
 
 \begin{enumerate}
 \item If instruction $I_k$ is a move such as \key{movq} $s$\key{,}
@@ -3146,18 +3146,22 @@ two rules.
 
 Working from the top to bottom of Figure~\ref{fig:live-eg}, we apply
 the above rules to each instruction. We highlight a few of the
-instructions and then refer the reader to
-Figure~\ref{fig:interference-results} for all the interference
-results.  The first instruction is \lstinline{movq $1, v}, so rule 3
-applies, and the live-after set is $\{\ttm{v}\}$. We do not add any
-interference edges because the one live variable \code{v} is also the
-destination of this instruction.
+instructions.  The first instruction is \lstinline{movq $1, v} and the
+live-after set is $\{\ttm{v},\ttm{rsp}\}$. Rule 1 applies, so \code{v}
+interferes with \code{rsp}.
 %
-For the second instruction, \lstinline{movq $42, w}, so rule 3 applies
-again, and the live-after set is $\{\ttm{v},\ttm{w}\}$. So the target
-$\ttm{w}$ of \key{movq} interferes with $\ttm{v}$.
+The fourth instruction is \lstinline{addq $7, x} and the live-after
+set is $\{\ttm{w},\ttm{x},\ttm{rsp}\}$. Rule 2 applies so $\ttm{x}$
+interferes with \ttm{w} and \ttm{rsp}.
 %
-Next we skip forward to the instruction \lstinline{movq x, y}.
+The next instruction is \lstinline{movq x, y} and the live-after set
+is $\{\ttm{w},\ttm{x},\ttm{y},\ttm{rsp}\}$. Rule 1 applies, so \ttm{y}
+interferes with \ttm{w} and \ttm{rsp} but not \ttm{x} because \ttm{x}
+is the source of the move and therefore \ttm{x} and \ttm{y} hold the
+same value. Figure~\ref{fig:interference-results} lists the
+interference results for all of the instructions and the resulting
+interference graph is shown in Figure~\ref{fig:interfere}.
+
 
 \begin{figure}[tbp]
 \begin{quote}
@@ -3180,8 +3184,6 @@ Next we skip forward to the instruction \lstinline{movq x, y}.
 \label{fig:interference-results}
 \end{figure}
 
-The resulting interference graph is shown in
-Figure~\ref{fig:interfere}.
 
 \begin{figure}[tbp]
 \large
@@ -10057,7 +10059,10 @@ for the compilation of \LangDyn{}.
 \chapter{Loops and Assignment}
 \label{ch:loop}
 
-% todo: define R'_8
+% TODO: define R'_8
+
+% TODO: multi-graph
+
 
 In this chapter we study two features that are the hallmarks of
 imperative programming languages: loops and assignments to local
