@@ -3607,89 +3607,7 @@ In the last step of the algorithm, we color \code{x} with $1$.
 \end{tikzpicture}
 \]
 
-With the coloring complete, we finalize the assignment of variables to
-registers and stack locations. We map the first $k$ colors to the $k$
-registers and the rest of the colors to stack locations.  Suppose for
-the moment that we have just one register to use for register
-allocation, \key{rcx}. Then we have the following map from colors to
-locations.
-\[
-  \{ 0 \mapsto \key{\%rcx}, \; 1 \mapsto \key{-8(\%rbp)}, \; 2 \mapsto \key{-16(\%rbp)} \}
-\]
-Composing this mapping with the coloring, we arrive at the following
-assignment of variables to locations.
-\begin{gather*}
-  \{ \ttm{v} \mapsto \key{\%rcx}, \,
-     \ttm{w} \mapsto \key{\%rcx},  \,
-     \ttm{x} \mapsto \key{-8(\%rbp)}, \,
-     \ttm{y} \mapsto \key{-16(\%rbp)}, \\
-     \ttm{z} \mapsto \key{-8(\%rbp)}, \,
-     \ttm{t} \mapsto \key{\%rcx} \}
-\end{gather*}
-Applying this assignment to our running example, on the left, yields
-the program on the right.
-% why frame size of 32? -JGS
-\begin{center}
-  \begin{minipage}{0.3\textwidth}
-\begin{lstlisting}
-movq $1, v
-movq $42, w
-movq v, x
-addq $7, x
-movq x, y
-movq x, z
-addq w, z
-movq y, t
-negq t
-movq z, %rax
-addq t, %rax
-jmp conclusion
-\end{lstlisting}
-\end{minipage}
-$\Rightarrow\qquad$
-\begin{minipage}{0.45\textwidth}
-\begin{lstlisting}
-movq $1, %rcx
-movq $42, %rcx
-movq %rcx, -8(%rbp)
-addq $7, -8(%rbp)
-movq -8(%rbp), -16(%rbp)
-movq -8(%rbp), -8(%rbp)
-addq %rcx, -8(%rbp)
-movq -16(%rbp), %rcx
-negq %rcx
-movq -8(%rbp), %rax
-addq %rcx, %rax
-jmp conclusion
-\end{lstlisting}
-\end{minipage}
-\end{center}
-
-
-
-The resulting program is almost an x86 program. The remaining step is
-the patch instructions pass. In this example, the trivial move of
-\code{-8(\%rbp)} to itself is deleted and the addition of
-\code{-8(\%rbp)} to \key{-16(\%rbp)} is fixed by going through
-\code{rax} as follows.
-\begin{lstlisting}
-movq -8(%rbp), %rax
-addq %rax, -16(%rbp)
-\end{lstlisting}
-
-We recommend creating a helper function named \code{color-graph} that
-takes an interference graph and a list of all the variables in the
-program. This function should return a mapping of variables to their
-colors (represented as natural numbers). By creating this helper
-function, you will be able to reuse it in Chapter~\ref{ch:functions}
-when you add support for functions.  To prioritize the processing of
-highly saturated nodes inside your \code{color-graph} function, we
-recommend using the priority queue data structure (see the side bar on
-the right). Note that you will also need to maintain a mapping from
-variables to their ``handles'' in the priority queue so that you can
-notify the priority queue when their saturation changes.
-
-\begin{wrapfigure}[23]{r}[1.0in]{0.6\textwidth}
+\begin{wrapfigure}[25]{r}[1.0in]{0.6\textwidth}
   \small
   \begin{tcolorbox}[title=Priority Queue]
     A \emph{priority queue} is a collection of items in which the
@@ -3716,21 +3634,159 @@ notify the priority queue when their saturation changes.
 \end{tcolorbox}
 \end{wrapfigure}
 
-Once you have obtained the coloring from \code{color-graph}, you can
-assign the variables to registers or stack locations and then reuse
-code from the \code{assign-homes} pass from
-Section~\ref{sec:assign-r1} to replace the variables with their
-assigned location. 
+We recommend creating an auxiliary function named \code{color-graph}
+that takes an interference graph and a list of all the variables in
+the program. This function should return a mapping of variables to
+their colors (represented as natural numbers). By creating this helper
+function, you will be able to reuse it in Chapter~\ref{ch:functions}
+when we add support for functions.
+
+To prioritize the processing of highly saturated nodes inside the
+\code{color-graph} function, we recommend using the priority queue
+data structure (see the side bar on the right). In addition, you will
+need to maintain a mapping from variables to their ``handles'' in the
+priority queue so that you can notify the priority queue when their
+saturation changes.
+
+With the coloring complete, we finalize the assignment of variables to
+registers and stack locations. We map the first $k$ colors to the $k$
+registers and the rest of the colors to stack locations.  Suppose for
+the moment that we have just one register to use for register
+allocation, \key{rcx}. Then we have the following map from colors to
+locations.
+\[
+  \{ 0 \mapsto \key{\%rcx}, \; 1 \mapsto \key{-8(\%rbp)}, \; 2 \mapsto \key{-16(\%rbp)} \}
+\]
+Composing this mapping with the coloring, we arrive at the following
+assignment of variables to locations.
+\begin{gather*}
+  \{ \ttm{v} \mapsto \key{-8(\%rbp)}, \,
+     \ttm{w} \mapsto \key{\%rcx},  \,
+     \ttm{x} \mapsto \key{-8(\%rbp)}, \,
+     \ttm{y} \mapsto \key{-16(\%rbp)}, \\
+     \ttm{z} \mapsto \key{-8(\%rbp)}, \,
+     \ttm{t} \mapsto \key{\%rcx} \}
+\end{gather*}
+
+Adapt the code from the \code{assign-homes} pass
+(Section~\ref{sec:assign-r1}) to replace the variables with their
+assigned location. Applying the above assignment to our running
+example, on the left, yields the program on the right.
+% why frame size of 32? -JGS
+\begin{center}
+  \begin{minipage}{0.3\textwidth}
+\begin{lstlisting}
+movq $1, v
+movq $42, w
+movq v, x
+addq $7, x
+movq x, y
+movq x, z
+addq w, z
+movq y, t
+negq t
+movq z, %rax
+addq t, %rax
+jmp conclusion
+\end{lstlisting}
+\end{minipage}
+$\Rightarrow\qquad$
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+movq $1, -8(%rbp)
+movq $42, %rcx
+movq -8(%rbp), -8(%rbp)
+addq $7, -8(%rbp)
+movq -8(%rbp), -16(%rbp)
+movq -8(%rbp), -8(%rbp)
+addq %rcx, -8(%rbp)
+movq -16(%rbp), %rcx
+negq %rcx
+movq -8(%rbp), %rax
+addq %rcx, %rax
+jmp conclusion
+\end{lstlisting}
+\end{minipage}
+\end{center}
+
+\begin{exercise}\normalfont
+%
+Implement the compiler pass \code{allocate-registers}.
+%
+Create five programs that exercise all of the register allocation
+algorithm, including spilling variables to the stack.
+%
+Replace \code{assign-homes} in the list of \code{passes} in the
+\code{run-tests.rkt} script with the three new passes:
+\code{uncover-live}, \code{build-interference}, and
+\code{allocate-registers}.
+%
+Temporarily remove the \code{print-x86} pass from the list of passes
+and the call to \code{compiler-tests}.
+%
+Run the script to test the register allocator.
+\end{exercise}
+
+
+\section{Patch Instructions}
+\label{sec:patch-instructions}
+
+The remaining step in the compilation to x86 is to ensure that the
+instructions have at most one argument that is a memory access.
+In the running example, the instruction \code{movq -8(\%rbp), -16(\%rbp)}
+is problematic. The fix is to first move \code{-8(\%rbp)}
+into \code{rax} and then move \code{rax} into \code{-16(\%rbp)}.
+%
+The two moves from \code{-8(\%rbp)} to \code{-8(\%rbp)} are also
+problematic, but they can be fixed by simply deleting them. In
+general, we recommend deleting all the trivial moves whose source and
+destination are the same location.
+%
+The following is the output of \code{patch-instructions} on the
+running example.
+\begin{center}
+  \begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+movq $1, -8(%rbp)
+movq $42, %rcx
+movq -8(%rbp), -8(%rbp)
+addq $7, -8(%rbp)
+movq -8(%rbp), -16(%rbp)
+movq -8(%rbp), -8(%rbp)
+addq %rcx, -8(%rbp)
+movq -16(%rbp), %rcx
+negq %rcx
+movq -8(%rbp), %rax
+addq %rcx, %rax
+jmp conclusion
+\end{lstlisting}
+\end{minipage}
+$\Rightarrow\qquad$
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+movq $1, -8(%rbp)
+movq $42, %rcx
+addq $7, -8(%rbp)
+movq -8(%rbp), %rax
+movq %rax, -16(%rbp)
+addq %rcx, -8(%rbp)
+movq -16(%rbp), %rcx
+negq %rcx
+movq -8(%rbp), %rax
+addq %rcx, %rax
+jmp conclusion
+\end{lstlisting}
+\end{minipage}
+\end{center}
   
 \begin{exercise}\normalfont
-  Implement the compiler pass \code{allocate-registers}, which should
-  come after the \code{build-interference} pass. The three new passes
-  described in this chapter replace the \code{assign-homes} pass of
-  Section~\ref{sec:assign-r1}.  
-%  
-  Test your updated compiler by creating new example programs that
-  exercise all of the register allocation algorithm, such as forcing
-  variables to be spilled to the stack.
+%
+Implement the \code{patch-instructions} compiler pass.
+%
+Insert it after \code{allocate-registers} in the list of \code{passes}
+in the \code{run-tests.rkt} script.
+%
+Run the script to test the \code{patch-instructions} pass.
 \end{exercise}
 
 
@@ -3789,6 +3845,16 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \caption{Diagram of the passes for \LangVar{} with register allocation.}
 \label{fig:reg-alloc-passes}
 \end{figure}
+
+\begin{exercise}\normalfont
+Update the \code{print-x86} pass as described in this section.
+%
+In the \code{run-tests.rkt} script, reinstate \code{print-x86} in the
+list of passes and the call to \code{compiler-tests}.
+%
+Run the script to test the complete compiler for \LangVar{} that
+performs register allocation.
+\end{exercise}
 
 \section{Challenge: Move Biasing}
 \label{sec:move-biasing}
