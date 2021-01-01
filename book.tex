@@ -3796,23 +3796,20 @@ Run the script to test the \code{patch-instructions} pass.
 \index{prelude}\index{conclusion}
 
 Recall that the \code{print-x86} pass generates the prelude and
-conclusion instructions for the \code{main} function.
+conclusion instructions to satisfy the x86 calling conventions
+(Section~\ref{sec:calling-conventions}). With the addition of the
+register allocator, the callee-saved registers used by the register
+allocator must be saved in the prelude and restored in the conclusion.
+In the \code{allocate-registers} pass, add an entry to the \itm{info}
+of \code{X86Program} named \code{used-callee} that stores the set of
+callee-saved registers that were assigned to variables. The
+\code{print-x86} pass can then access this information to decide which
+callee-saved registers need to be saved and restored.
 %
-The prelude saved the values in \code{rbp} and \code{rsp} and the
-conclusion returned those values to \code{rbp} and \code{rsp}.  The
-reason for this is that our \code{main} function must adhere to the
-x86 calling conventions that we described in
-Section~\ref{sec:calling-conventions}.  Furthermore, if your register
-allocator assigned variables to other callee-saved registers
-(e.g. \code{rbx}, \code{r12}, etc.), then those variables must also be
-saved to the stack in the prelude and restored in the conclusion.  The
-simplest approach is to save and restore all of the callee-saved
-registers. The more efficient approach is to keep track of which
-callee-saved registers were used and only save and restore
-them. Either way, make sure to take this use of stack space into
-account when you are calculating the size of the frame and adjusting
-the \code{rsp} in the prelude. Also, don't forget that the size of the
-frame needs to be a multiple of 16 bytes!
+When calculating the size of the frame to adjust the \code{rsp} in the
+prelude, make sure to take into account the space used for saving the
+callee-saved registers. Also, don't forget that the frame needs to be
+a multiple of 16 bytes!
 
 An overview of all of the passes involved in register allocation is
 shown in Figure~\ref{fig:reg-alloc-passes}.
