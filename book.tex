@@ -1080,7 +1080,7 @@ After introducing \LangVar{} and x86, we reflect on their differences
 and come up with a plan to break down the translation from \LangVar{}
 to x86 into a handful of steps (Section~\ref{sec:plan-s0-x86}).  The
 rest of the sections in this chapter give detailed hints regarding
-each step (Sections~\ref{sec:uniquify-s0} through \ref{sec:patch-s0}).
+each step (Sections~\ref{sec:uniquify-Rvar} through \ref{sec:patch-s0}).
 We hope to give enough hints that the well-prepared reader, together
 with a few friends, can implement a compiler from \LangVar{} to x86 in
 a couple weeks.  To give the reader a feeling for the scale of this
@@ -3260,14 +3260,12 @@ program, under the key \code{conflicts}.
 \index{Sudoku}
 \index{color}
 
-We come to the main event, mapping variables to registers (or to stack
-locations in the event that we run out of registers).  We need to make
-sure that two variables do not get mapped to the same register if the
-two variables interfere with each other.  Thinking about the
-interference graph, this means that adjacent vertices must be mapped
-to different registers.  If we think of registers as colors, the
-register allocation problem becomes the widely-studied graph coloring
-problem~\citep{Balakrishnan:1996ve,Rosen:2002bh}.
+We come to the main event, mapping variables to registers and stack
+locations. Variables that interfere with each other must be mapped to
+different locations.  In terms of the interference graph, this means
+that adjacent vertices must be mapped to different locations.  If we
+think of locations as colors, the register allocation problem becomes
+the graph coloring problem~\citep{Balakrishnan:1996ve,Rosen:2002bh}.
 
 The reader may be more familiar with the graph coloring problem than he
 or she realizes; the popular game of Sudoku is an instance of the
@@ -3298,23 +3296,20 @@ all of the vertices would make the graph unreadable.
 \label{fig:sudoku-graph}
 \end{figure}
 
-
-Given that Sudoku is an instance of graph coloring, one can use Sudoku
-strategies to come up with an algorithm for allocating registers. For
-example, one of the basic techniques for Sudoku is called Pencil
-Marks. The idea is to use a process of elimination to determine what
-numbers no longer make sense for a square and write down those
-numbers in the square (writing very small). For example, if the number
-$1$ is assigned to a square, then by process of elimination, you can
-write the pencil mark $1$ in all the squares in the same row, column,
-and region. Many Sudoku computer games provide automatic support for
-Pencil Marks.
+It turns out that some techniques for playing Sudoku correspond to
+heuristics used in graph coloring algorithms.  For example, one of the
+basic techniques for Sudoku is called Pencil Marks. The idea is to use
+a process of elimination to determine what numbers are no longer
+available for a square and write down those numbers in the square
+(writing very small). For example, if the number $1$ is assigned to a
+square, then write the pencil mark $1$ in all the squares in the same
+row, column, and region.
 %
 The Pencil Marks technique corresponds to the notion of
-\emph{saturation}\index{saturation} due to \cite{Brelaz:1979eu}.
-The saturation of a
-vertex, in Sudoku terms, is the set of numbers that are no longer
-available. In graph terminology, we have the following definition:
+\emph{saturation}\index{saturation} due to \cite{Brelaz:1979eu}.  The
+saturation of a vertex, in Sudoku terms, is the set of numbers that
+are no longer available. In graph terminology, we have the following
+definition:
 \begin{equation*}
   \mathrm{saturation}(u) = \{ c \;|\; \exists v. v \in \mathrm{neighbors}(u)
      \text{ and } \mathrm{color}(v) = c \}
@@ -3326,7 +3321,7 @@ Using the Pencil Marks technique leads to a simple strategy for
 filling in numbers: if there is a square with only one possible number
 left, then choose that number! But what if there are no squares with
 only one possibility left? One brute-force approach is to try them
-all: choose the first  and if it ultimately leads to a solution,
+all: choose the first one and if it ultimately leads to a solution,
 great.  If not, backtrack and choose the next possibility.  One good
 thing about Pencil Marks is that it reduces the degree of branching in
 the search tree. Nevertheless, backtracking can be horribly time
@@ -3335,38 +3330,38 @@ most-constrained-first heuristic. That is, when choosing a square,
 always choose one with the fewest possibilities left (the vertex with
 the highest saturation).  The idea is that choosing highly constrained
 squares earlier rather than later is better because later on there may
-not be any possibilities left for those squares.
+not be any possibilities left in the highly saturated squares.
 
 However, register allocation is easier than Sudoku because the
 register allocator can map variables to stack locations when the
-registers run out. Thus, it makes sense to drop backtracking in favor
-of greedy search, that is, make the best choice at the time and keep
-going. We still wish to minimize the number of colors needed, so
-keeping the most-constrained-first heuristic is a good idea.
+registers run out. Thus, it makes sense to replace backtracking with
+greedy search: make the best choice at the time and keep going. We
+still wish to minimize the number of colors needed, so we use the
+most-constrained-first heuristic in the greedy search.
 Figure~\ref{fig:satur-algo} gives the pseudo-code for a simple greedy
 algorithm for register allocation based on saturation and the
 most-constrained-first heuristic. It is roughly equivalent to the
-DSATUR algorithm of \cite{Brelaz:1979eu} (also known as saturation
-degree ordering~\citep{Gebremedhin:1999fk,Omari:2006uq}).  Just as in
-Sudoku, the algorithm represents colors with integers. The integers
-$0$ through $k-1$ correspond to the $k$ registers that we use for
-register allocation. The integers $k$ and larger correspond to stack
-locations. The registers that are not used for register allocation,
-such as \code{rax}, are assigned to negative integers. In particular,
-we assign $-1$ to \code{rax} and $-2$ to \code{rsp}.
+DSATUR
+algorithm~\citep{Brelaz:1979eu,Gebremedhin:1999fk,Omari:2006uq}.  Just
+as in Sudoku, the algorithm represents colors with integers. The
+integers $0$ through $k-1$ correspond to the $k$ registers that we use
+for register allocation. The integers $k$ and larger correspond to
+stack locations. The registers that are not used for register
+allocation, such as \code{rax}, are assigned to negative integers. In
+particular, we assign $-1$ to \code{rax} and $-2$ to \code{rsp}.
 
-One might wonder why we include registers at all in the liveness
-analysis and interference graph, for example, we never allocate a
-variable to \code{rax} and \code{rsp}, so it would be harmless to
-leave them out.  As we see in Chapter~\ref{ch:tuples}, when we begin
-to use register for passing arguments to functions, it will be
-necessary for those registers to appear in the interference graph
-because those registers will also be assigned to variables, and we
-don't want those two uses to encroach on each other. Regarding
-registers such as \code{rax} and \code{rsp} that are not used for
-variables, we could omit them from the interference graph but that
-would require adding special cases to our algorithm, which would
-complicate the logic for little gain.
+%% One might wonder why we include registers at all in the liveness
+%% analysis and interference graph, for example, we never allocate a
+%% variable to \code{rax} and \code{rsp}, so it would be harmless to
+%% leave them out.  As we see in Chapter~\ref{ch:tuples}, when we begin
+%% to use register for passing arguments to functions, it will be
+%% necessary for those registers to appear in the interference graph
+%% because those registers will also be assigned to variables, and we
+%% don't want those two uses to encroach on each other. Regarding
+%% registers such as \code{rax} and \code{rsp} that are not used for
+%% variables, we could omit them from the interference graph but that
+%% would require adding special cases to our algorithm, which would
+%% complicate the logic for little gain.
 
 
 \begin{figure}[btp]
@@ -3392,12 +3387,13 @@ With the DSATUR algorithm in hand, let us return to the running
 example and consider how to color the interference graph in
 Figure~\ref{fig:interfere}.
 %
-We color the vertices for registers with their own color. For example,
-\code{rax} is assigned the color $-1$ and \code{rsp} is assigned $-2$.
-The vertices for variables are not yet colored, so they annotated with
-a dash. We then update the saturation for vertices that are adjacent
-to a register. For example, the saturation for \code{t} is $\{-1,-2\}$
-because it interferes with both \code{rax} and \code{rsp}.
+We start by assigning the register nodes to their own color. For
+example, \code{rax} is assigned the color $-1$ and \code{rsp} is
+assigned $-2$.  The variables are not yet colored, so they are
+annotated with a dash. We then update the saturation for vertices that
+are adjacent to a register, obtaining the following annotated
+graph. For example, the saturation for \code{t} is $\{-1,-2\}$ because
+it interferes with both \code{rax} and \code{rsp}.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (rax) at (0,0) {$\ttm{rax}:-1,\{-2\}$};
@@ -3458,10 +3454,10 @@ and \ttm{rsp} because they interfere with $\ttm{t}$.
 \draw (rax) to (rsp);
 \end{tikzpicture}
 \]
-We repeat the process, selecting another maximally saturated
-vertex, which is \code{z}, and color it with the first available
-number, which is $1$. We add $1$ to the saturation for the
-neighboring vertices \code{t}, \code{y}, \code{w}, and \code{rsp}.
+We repeat the process, selecting the next maximally saturated vertex,
+which is \code{z}, and color it with the first available number, which
+is $1$. We add $1$ to the saturation for the neighboring vertices
+\code{t}, \code{y}, \code{w}, and \code{rsp}.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (rax) at (0,0) {$\ttm{rax}:-1,\{0,-2\}$};
@@ -3612,16 +3608,16 @@ In the last step of the algorithm, we color \code{x} with $1$.
 \]
 
 With the coloring complete, we finalize the assignment of variables to
-registers and stack locations. Recall that if we have $k$ registers to
-use for allocation, we map the first $k$ colors to registers and the
-rest to stack locations.  Suppose for the moment that we have just one
-register to use for register allocation, \key{rcx}. Then the following
-maps of colors to registers and stack allocations.
+registers and stack locations. We map the first $k$ colors to the $k$
+registers and the rest of the colors to stack locations.  Suppose for
+the moment that we have just one register to use for register
+allocation, \key{rcx}. Then we have the following map from colors to
+locations.
 \[
   \{ 0 \mapsto \key{\%rcx}, \; 1 \mapsto \key{-8(\%rbp)}, \; 2 \mapsto \key{-16(\%rbp)} \}
 \]
-Putting this mapping together with the above coloring of the
-variables, we arrive at the following assignment.
+Composing this mapping with the coloring, we arrive at the following
+assignment of variables to locations.
 \begin{gather*}
   \{ \ttm{v} \mapsto \key{\%rcx}, \,
      \ttm{w} \mapsto \key{\%rcx},  \,
@@ -3668,6 +3664,8 @@ jmp conclusion
 \end{lstlisting}
 \end{minipage}
 \end{center}
+
+
 
 The resulting program is almost an x86 program. The remaining step is
 the patch instructions pass. In this example, the trivial move of
