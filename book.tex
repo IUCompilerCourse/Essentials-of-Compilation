@@ -3857,20 +3857,20 @@ performs register allocation.
 \label{sec:move-biasing}
 \index{move biasing}
 
-This section describes an optional enhancement to register allocation
-for those students who are looking for an extra challenge or who have
-a deeper interest in register allocation.
+This section describes an enhancement to the register allocator for
+students looking for an extra challenge or who have a deeper interest
+in register allocation.
 
-We return to the running example, but we remove the supposition that
-we only have one register to use. So we have the following mapping of
-color numbers to registers.
+To motivate the need for move biasing we return to the running example
+but this time use all of the general purpose registers.  So we have
+the following mapping of color numbers to registers.
 \[
-  \{ 0 \mapsto \key{\%rbx}, \; 1 \mapsto \key{\%rcx}, \; 2 \mapsto \key{\%rdx} \}
+  \{ 0 \mapsto \key{\%rcx}, \; 1 \mapsto \key{\%rdx}, \; 2 \mapsto \key{\%rsi} \}
 \]
 Using the same assignment of variables to color numbers that was
 produced by the register allocator described in the last section, we
 get the following program.
-
+\begin{center}
 \begin{minipage}{0.3\textwidth}
 \begin{lstlisting}
 movq $1, v
@@ -3890,21 +3890,21 @@ jmp conclusion
 $\Rightarrow\qquad$
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-movq $1, %rcx
-movq $42, $rbx
-movq %rcx, %rcx
-addq $7, %rcx
-movq %rcx, %rdx
-movq %rcx, %rcx
-addq %rbx, %rcx
-movq %rdx, %rbx
-negq %rbx
-movq %rcx, %rax
-addq %rbx, %rax
+movq $1, %rdx
+movq $42, %rcx
+movq %rdx, %rdx
+addq $7, %rdx
+movq %rdx, %rsi
+movq %rdx, %rdx
+addq %rcx, %rdx
+movq %rsi, %rcx
+negq %rcx
+movq %rdx, %rax
+addq %rcx, %rax
 jmp conclusion
 \end{lstlisting}
 \end{minipage}
-
+\end{center}
 In the above output code there are two \key{movq} instructions that
 can be removed because their source and target are the same.  However,
 if we had put \key{t}, \key{v}, \key{x}, and \key{y} into the same
@@ -4071,18 +4071,17 @@ At this point, vertices \code{x} and \code{v} are most saturated, but
 
 So we have the following assignment of variables to registers.
 \begin{gather*}
-  \{ \ttm{v} \mapsto \key{\%rbx}, \,
-     \ttm{w} \mapsto \key{\%rdx}, \,
-     \ttm{x} \mapsto \key{\%rbx}, \,
-     \ttm{y} \mapsto \key{\%rbx}, \,
-     \ttm{z} \mapsto \key{\%rcx}, \,
-     \ttm{t} \mapsto \key{\%rbx} \}
+  \{ \ttm{v} \mapsto \key{\%rcx}, \,
+     \ttm{w} \mapsto \key{\%rsi}, \,
+     \ttm{x} \mapsto \key{\%rcx}, \,
+     \ttm{y} \mapsto \key{\%rcx}, \,
+     \ttm{z} \mapsto \key{\%rdx}, \,
+     \ttm{t} \mapsto \key{\%rcx} \}
 \end{gather*}
 
 We apply this register assignment to the running example, on the left,
 to obtain the code in the middle.  The \code{patch-instructions} then
-removes the three trivial moves from \key{rbx} to \key{rbx} to obtain
-the code on the right.
+removes the three trivial moves to obtain the code on the right.
 
 \begin{minipage}{0.25\textwidth}
 \begin{lstlisting}
@@ -4102,42 +4101,42 @@ jmp conclusion
 \end{minipage}
 $\Rightarrow\qquad$
 \begin{minipage}{0.25\textwidth}
-  \begin{lstlisting}
-movq $1, %rbx
-movq $42, %rdx
-movq %rbx, %rbx
-addq $7, %rbx
-movq %rbx, %rbx
-movq %rbx, %rcx
-addq %rdx, %rcx
-movq %rbx, %rbx
-negq %rbx
-movq %rcx, %rax
-addq %rbx, %rax
+\begin{lstlisting}
+movq $1, %rcx
+movq $42, %rsi
+movq %rcx, %rcx
+addq $7, %rcx
+movq %rcx, %rcx
+movq %rcx, %rdx
+addq %rsi, %rdx
+movq %rcx, %rcx
+negq %rcx
+movq %rdx, %rax
+addq %rcx, %rax
 jmp conclusion
 \end{lstlisting}
 \end{minipage}
 $\Rightarrow\qquad$
 \begin{minipage}{0.25\textwidth}
 \begin{lstlisting}
-movq $1, %rbx
-movq $42, %rdx
-addq $7, %rbx
-movq %rbx, %rcx
-addq %rdx, %rcx
-negq %rbx
-movq %rcx, %rax
-addq %rbx, %rax
+movq $1, %rcx
+movq $42, %rsi
+addq $7, %rcx
+movq %rcx, %rdx
+addq %rsi, %rdx
+negq %rcx
+movq %rdx, %rax
+addq %rcx, %rax
 jmp conclusion
 \end{lstlisting}
 \end{minipage}
 
 \begin{exercise}\normalfont
 Change your implementation of \code{allocate-registers} to take move
-biasing into account. Make sure that your compiler still passes all of
-the previous tests. Create two new tests that include at least one
+biasing into account. Create two new tests that include at least one
 opportunity for move biasing and visually inspect the output x86
-programs to make sure that your move biasing is working properly.
+programs to make sure that your move biasing is working properly. Make
+sure that your compiler still passes all of the tests.
 \end{exercise}
 
 \margincomment{\footnotesize To do: another neat challenge would be to do
