@@ -1178,6 +1178,7 @@ $52$ then $10$, the following produces $42$ (not $-42$).
 \end{lstlisting}
 
 \subsection{Extensible Interpreters via Method Overriding}
+\label{sec:extensible-interp}
 
 To prepare for discussing the interpreter for \LangVar{}, we need to
 explain why we choose to implement the interpreter using
@@ -4376,19 +4377,16 @@ separately because of its short-circuiting behavior.
       (match e
         [(Bool b) b]
         [(If cnd thn els)
-         (define b (recur cnd))
-         (match b
+         (match (recur cnd)
            [#t (recur thn)]
            [#f (recur els)])]
         [(Prim 'and (list e1 e2))
-         (define v1 (recur e1))
-         (match v1
+         (match (recur e1)
            [#t (match (recur e2) [#t #t] [#f #f])]
            [#f #f])]
         [(Prim op args)
          (apply (interp-op op) (for/list ([e args]) (recur e)))]
-        [else ((super interp-exp env) e)]
-        ))
+        [else ((super interp-exp env) e)]))
     ))
 
 (define (interp-Rif p)
@@ -4427,8 +4425,7 @@ separately because of its short-circuiting behavior.
     ['>= (lambda (v1 v2)
            (cond [(and (fixnum? v1) (fixnum? v2))
                   (>= v1 v2)]))]
-    [else (error 'interp-op "unknown operator")]
-    ))
+    [else (error 'interp-op "unknown operator")]))
 \end{lstlisting}
 \caption{Interpreter for the primitive operators in the \LangIf{} language.}
 \label{fig:interp-op-Rif}
@@ -4455,39 +4452,56 @@ produces a \key{Boolean}.
 
 Another way to think about type checking is that it enforces a set of
 rules about which operators can be applied to which kinds of
-values. For example, our type checker for \LangIf{} will signal an error
-for the below expression because, as we have seen above, the
-expression \code{(+ 10 ...)} has type \key{Integer} but the type
-checker enforces the rule that the argument of \code{not} must be a
-\key{Boolean}.
+values. For example, our type checker for \LangIf{} signals an error
+for the below expression
 \begin{lstlisting}
    (not (+ 10 (- (+ 12 20))))
 \end{lstlisting}
+The subexpression \code{(+ 10 (- (+ 12 20)))} has type \key{Integer}
+but the type checker enforces the rule that the argument of \code{not}
+must be a \key{Boolean}.
 
-We implement type checking using classes and method overriding for the
-same reason that we use them to implement the interpreters. We
-separate the type checker for the \LangVar{} fragment into its own class,
-shown in Figure~\ref{fig:type-check-Rvar}. The type checker for \LangIf{} is
-shown in Figure~\ref{fig:type-check-Rif}; inherits from the one for
-\LangVar{}. The code for these type checkers are in the files
-\code{type-check-Rvar.rkt} and \code{type-check-Rif.rkt} of the support
-code.
+We implement type checking using classes and methods because they
+provide the open recursion needed to reuse code as we extend the type
+checker in later chapters, analogous to the use of classes and methods
+for the interpreters (Section~\ref{sec:extensible-interp}).
+
+We separate the type checker for the \LangVar{} fragment into its own
+class, shown in Figure~\ref{fig:type-check-Rvar}. The type checker for
+\LangIf{} is shown in Figure~\ref{fig:type-check-Rif} and it inherits
+from the type checker for \LangVar{}. These type checkers are in the
+files \code{type-check-Rvar.rkt} and \code{type-check-Rif.rkt} of the
+support code.
 %
 Each type checker is a structurally recursive function over the AST.
 Given an input expression \code{e}, the type checker either signals an
 error or returns an expression and its type (\key{Integer} or
-\key{Boolean}). There are situations in which we want to change or
-update the expression.
-%
-The type of an integer literal is \code{Integer} and
-the type of a Boolean literal is \code{Boolean}.  To handle variables,
-the type checker uses the environment \code{env} to map variables to
-types. Consider the clause for \key{let}.  We type check the
-initializing expression to obtain its type \key{T} and then associate
-type \code{T} with the variable \code{x} in the environment used to
-type check the body of the \key{let}. Thus, when the type checker
-encounters a use of variable \code{x}, it can find its type in the
-environment.
+\key{Boolean}). It returns an expression because there are situations
+in which we want to change or update the expression.
+
+Next we discuss the \code{match} clauses in \code{type-check-exp} of
+Figure~\ref{fig:type-check-Rvar}.  The type of an integer constant is
+\code{Integer}.  To handle variables, the type checker uses the
+environment \code{env} to map variables to types. Consider the clause
+for \key{let}.  We type check the initializing expression to obtain
+its type \key{T} and then associate type \code{T} with the variable
+\code{x} in the environment used to type check the body of the
+\key{let}. Thus, when the type checker encounters a use of variable
+\code{x}, it can find its type in the environment.  Regarding
+primitive operators, we recursively analyze the arguments and then
+invoke \code{type-check-op} to check whether the argument types are
+allowed.
+
+Several auxiliary methods are used in the type checker. The method
+\code{operator-types} defines a dictionary that maps the operator
+names to their parameter and return types. The \code{type-equal?}
+method determines whether two types are equal, which for now simply
+dispatches to \code{equal?}  (deep equality). The
+\code{check-type-equal?} method triggers an error if the two types are
+not equal. The \code{type-check-op} method looks up the operator in
+the \code{operator-types} dictionary and then checks whether the
+argument types are equal to the parameter types.  The result is the
+return type of the operator.
 
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
@@ -4517,8 +4531,8 @@ environment.
     (define/public (type-check-exp env)
       (lambda (e)
         (match e
-          [(Var x)  (values (Var x) (dict-ref env x))]
           [(Int n)  (values (Int n) 'Integer)]
+          [(Var x)  (values (Var x) (dict-ref env x))]
           [(Let x e body)
            (define-values (e^ Te) ((type-check-exp env) e))
            (define-values (b Tb) ((type-check-exp (dict-set env x Te)) body))
@@ -4541,7 +4555,7 @@ environment.
 (define (type-check-Rvar p)
   (send (new type-check-Rvar-class) type-check-program p))
 \end{lstlisting}
-\caption{Type checker for the \LangVar{} fragment of \LangIf{}.}
+\caption{Type checker for the \LangVar{} language.}
 \label{fig:type-check-Rvar}
 \end{figure}
 
@@ -4567,6 +4581,11 @@ environment.
     (define/override (type-check-exp env)
       (lambda (e)
         (match e
+          [(Prim 'eq? (list e1 e2))
+           (define-values (e1^ T1) ((type-check-exp env) e1))
+           (define-values (e2^ T2) ((type-check-exp env) e2))
+           (check-type-equal? T1 T2 e)
+           (values (Prim 'eq? (list e1^ e2^)) 'Boolean)]
           [(Bool b) (values (Bool b) 'Boolean)]
           [(If cnd thn els)
            (define-values (cnd^ Tc) ((type-check-exp env) cnd))
@@ -4575,11 +4594,6 @@ environment.
            (check-type-equal? Tc 'Boolean e)
            (check-type-equal? Tt Te e)
            (values (If cnd^ thn^ els^) Te)]
-          [(Prim 'eq? (list e1 e2))
-           (define-values (e1^ T1) ((type-check-exp env) e1))
-           (define-values (e2^ T2) ((type-check-exp env) e2))
-           (check-type-equal? T1 T2 e)
-           (values (Prim 'eq? (list e1^ e2^)) 'Boolean)]
           [else ((super type-check-exp env) e)])))
     ))
 
@@ -4590,46 +4604,93 @@ environment.
 \label{fig:type-check-Rif}
 \end{figure}
 
-Three auxiliary methods are used in the type checker. The method
-\code{operator-types} defines a dictionary that maps the operator
-names to their parameter and return types. The \code{type-equal?}
-method determines whether two types are equal, which for now simply
-dispatches to \code{equal?}  (deep equality). The \code{type-check-op}
-method looks up the operator in the \code{operator-types} dictionary
-and then checks whether the argument types are equal to the parameter
-types.  The result is the return type of the operator.
+Next we discuss the type checker for \LangIf{} in
+Figure~\ref{fig:type-check-Rif}.  The operator \code{eq?} requires the
+two arguments to have the same type. The type of a Boolean constant is
+\code{Boolean}. The condition of an \code{if} must be of
+\code{Boolean} type and the two branches must have the same type.  The
+\code{operator-types} function adds dictionary entries for the other
+new operators.
 
 \begin{exercise}\normalfont
-Create 10 new example programs in \LangIf{}. Half of the example programs
-should have a type error. For those programs, to signal that a type
-error is expected, create an empty file with the same base name but
-with file extension \code{.tyerr}. For example, if the test
-\code{r2\_14.rkt} is expected to error, then create an empty file
-named \code{r2\_14.tyerr}.  The other half of the example programs
-should not have type errors. Note that if the type checker does not
-signal an error for a program, then interpreting that program should
-not encounter an error.
+Create 10 new test programs in \LangIf{}. Half of the programs should
+have a type error. For those programs, create an empty file with the
+same base name but with file extension \code{.tyerr}. For example, if
+the test \code{cond\_test\_14.rkt} is expected to error, then create
+an empty file named \code{cond\_test\_14.tyerr}.  This indicates to
+\code{interp-tests} and \code{compiler-tests} that a type error is
+expected. The other half of the test programs should not have type
+errors.
+
+In the \code{run-tests.rkt} script, change the second argument of
+\code{interp-tests} and \code{compiler-tests} to
+\code{type-check-Rif}, which causes the type checker to run prior to
+the compiler passes. Temporarily change the \code{passes} to an empty
+list and run the script, thereby checking that the new test programs
+either type check or not as intended.
 \end{exercise}
 
+
+\section{The \LangCIf{} Intermediate Language}
+\label{sec:Cif}
+
+Figure~\ref{fig:c1-syntax} defines the abstract syntax of the
+\LangCIf{} intermediate language. (The concrete syntax is in the
+Appendix, Figure~\ref{fig:c1-concrete-syntax}.)  Compared to
+\LangCVar{}, the \LangCIf{} language adds logical and comparison
+operators to the \Exp{} non-terminal and the literals \key{\#t} and
+\key{\#f} to the \Arg{} non-terminal.
+
+Regarding control flow, \LangCIf{} adds \key{goto} and \code{if}
+statements to the \Tail{} non-terminal. The condition of an \code{if}
+statement is a comparison operation and the branches are \code{goto}
+statements, making it straightforward to compile \code{if} statements
+to x86.
+
+
+\begin{figure}[tp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\small    
+\[
+\begin{array}{lcl}
+\Atm &::=& \gray{\INT{\Int} \mid \VAR{\Var}} \mid \BOOL{\itm{bool}} \\
+\itm{cmp} &::= & \key{eq?} \mid \key{<}  \\
+\Exp &::= & \gray{ \Atm \mid \READ{} }\\
+     &\mid& \gray{ \NEG{\Atm} \mid \ADD{\Atm}{\Atm} } \\
+     &\mid& \UNIOP{\key{'not}}{\Atm} 
+     \mid \BINOP{\key{'}\itm{cmp}}{\Atm}{\Atm} \\
+\Stmt &::=& \gray{ \ASSIGN{\VAR{\Var}}{\Exp} } \\
+\Tail &::= & \gray{\RETURN{\Exp} \mid \SEQ{\Stmt}{\Tail} } 
+    \mid \GOTO{\itm{label}} \\
+    &\mid& \IFSTMT{\BINOP{\itm{cmp}}{\Atm}{\Atm}}{\GOTO{\itm{label}}}{\GOTO{\itm{label}}} \\
+\LangCIf{} & ::= & \gray{\CPROGRAM{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP}}
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The abstract syntax of \LangCIf{}, an extension of \LangCVar{}
+  (Figure~\ref{fig:c0-syntax}).}
+\label{fig:c1-syntax}
+\end{figure}
 
 \section{The \LangXASTIf{} Language}
 \label{sec:x86-if}
 
-\index{x86}
-To implement the new logical operations, the comparison operations,
-and the \key{if} expression, we need to delve further into the x86
-language. Figures~\ref{fig:x86-1-concrete} and \ref{fig:x86-1} define
-the concrete and abstract syntax for a larger subset of x86 that
-includes instructions for logical operations, comparisons, and
-conditional jumps.
+\index{x86} To implement the new logical operations, the comparison
+operations, and the \key{if} expression, we need to delve further into
+the x86 language. Figures~\ref{fig:x86-1-concrete} and \ref{fig:x86-1}
+define the concrete and abstract syntax for the \LangXASTIf{} subset
+of x86, which includes instructions for logical operations,
+comparisons, and conditional jumps.
 
-One small challenge is that x86 does not provide an instruction that
-directly implements logical negation (\code{not} in \LangIf{} and \LangCIf{}).
-However, the \code{xorq} instruction can be used to encode \code{not}.
-The \key{xorq} instruction takes two arguments, performs a pairwise
-exclusive-or ($\mathrm{XOR}$) operation on each bit of its arguments,
-and writes the results into its second argument.  Recall the truth
-table for exclusive-or:
+One challenge is that x86 does not provide an instruction that
+directly implements logical negation (\code{not} in \LangIf{} and
+\LangCIf{}).  However, the \code{xorq} instruction can be used to
+encode \code{not}.  The \key{xorq} instruction takes two arguments,
+performs a pairwise exclusive-or ($\mathrm{XOR}$) operation on each
+bit of its arguments, and writes the results into its second argument.
+Recall the truth table for exclusive-or:
 \begin{center}
 \begin{tabular}{l|cc}
    & 0 & 1 \\ \hline
@@ -4694,16 +4755,16 @@ the first argument:
 \Arg &::=&  \gray{\IMM{\Int} \mid \REG{\Reg} \mid \DEREF{\Reg}{\Int}} 
      \mid \BYTEREG{\itm{bytereg}} \\
 \itm{cc} & ::= & \key{e} \mid \key{l} \mid \key{le} \mid \key{g} \mid \key{ge} \\
-\Instr &::=& \gray{ \BININSTR{\code{'addq}}{\Arg}{\Arg} 
-       \mid \BININSTR{\code{'subq}}{\Arg}{\Arg} } \\
+\Instr &::=& \gray{ \BININSTR{\code{addq}}{\Arg}{\Arg} 
+       \mid \BININSTR{\code{subq}}{\Arg}{\Arg} } \\
        &\mid& \gray{ \BININSTR{\code{'movq}}{\Arg}{\Arg} 
-       \mid \UNIINSTR{\code{'negq}}{\Arg} } \\
+       \mid \UNIINSTR{\code{negq}}{\Arg} } \\
        &\mid& \gray{ \CALLQ{\itm{label}}{\itm{int}} \mid \RETQ{} 
        \mid \PUSHQ{\Arg} \mid \POPQ{\Arg} \mid \JMP{\itm{label}} } \\
-       &\mid& \BININSTR{\code{'xorq}}{\Arg}{\Arg}
-       \mid \BININSTR{\code{'cmpq}}{\Arg}{\Arg}\\
-       &\mid& \BININSTR{\code{'set}}{\itm{cc}}{\Arg} 
-       \mid \BININSTR{\code{'movzbq}}{\Arg}{\Arg}\\
+       &\mid& \BININSTR{\code{xorq}}{\Arg}{\Arg}
+       \mid \BININSTR{\code{cmpq}}{\Arg}{\Arg}\\
+       &\mid& \BININSTR{\code{set}}{\itm{cc}}{\Arg} 
+       \mid \BININSTR{\code{movzbq}}{\Arg}{\Arg}\\
        &\mid&  \JMPIF{\itm{cc}}{\itm{label}} \\
 \Block &::= & \gray{\BLOCK{\itm{info}}{\LP\Instr\ldots\RP}} \\
 \LangXASTIf{} &::= & \gray{\XPROGRAM{\itm{info}}{\LP\LP\itm{label} \,\key{.}\, \Block \RP\ldots\RP}}
@@ -4724,91 +4785,45 @@ placed. The argument order is backwards: if you want to test whether
 $x < y$, then write \code{cmpq} $y$\code{,} $x$. The result of
 \key{cmpq} is placed in the special EFLAGS register. This register
 cannot be accessed directly but it can be queried by a number of
-instructions, including the \key{set} instruction. The \key{set}
-instruction puts a \key{1} or \key{0} into its destination depending
-on whether the comparison came out according to the condition code
-\itm{cc} (\key{e} for equal, \key{l} for less, \key{le} for
-less-or-equal, \key{g} for greater, \key{ge} for greater-or-equal).
-The \key{set} instruction has an annoying quirk in that its
-destination argument must be single byte register, such as \code{al}
-(L for lower bits) or \code{ah} (H for higher bits), which are part of
-the \code{rax} register.  Thankfully, the \key{movzbq} instruction can
-then be used to move from a single byte register to a normal 64-bit
-register.
+instructions, including the \key{set} instruction. The instruction
+$\key{set}cc~d$ puts a \key{1} or \key{0} into the destination $d$
+depending on whether the comparison comes out according to the
+condition code \itm{cc} (\key{e} for equal, \key{l} for less, \key{le}
+for less-or-equal, \key{g} for greater, \key{ge} for
+greater-or-equal).  The \key{set} instruction has an annoying quirk in
+that its destination argument must be single byte register, such as
+\code{al} (L for lower bits) or \code{ah} (H for higher bits), which
+are part of the \code{rax} register.  Thankfully, the \key{movzbq}
+instruction can be used to move from a single byte register to a
+normal 64-bit register.  The abstract syntax for the \code{set}
+instruction differs from the concrete syntax in that it separates the
+instruction name from the condition code.
 
-The x86 instruction for conditional jump are relevant to the
-compilation of \key{if} expressions.  The \key{JmpIf} instruction
-updates the program counter to point to the instruction after the
-indicated label depending on whether the result in the EFLAGS register
-matches the condition code \itm{cc}, otherwise the \key{JmpIf}
-instruction falls through to the next instruction.  The abstract
-syntax for \key{JmpIf} differs from the concrete syntax for x86 in
-that it separates the instruction name from the condition code. For
+The x86 instruction for conditional jump is relevant to the
+compilation of \key{if} expressions.  The instruction
+$\key{j}\itm{cc}~\itm{label}$ updates the program counter to point to
+the instruction after \itm{label} depending on whether the result in
+the EFLAGS register matches the condition code \itm{cc}, otherwise the
+jump instruction falls through to the next instruction.  Like the
+abstract syntax for \code{set}, the abstract syntax for conditional
+jump separates the instruction name from the condition code. For
 example, \code{(JmpIf le foo)} corresponds to \code{jle foo}.  Because
-the \key{JmpIf} instruction relies on the EFLAGS register, it is
-common for the \key{JmpIf} to be immediately preceded by a \key{cmpq}
-instruction to set the EFLAGS register.
+the conditional jump instruction relies on the EFLAGS register, it is
+common for it to be immediately preceded by a \key{cmpq} instruction
+to set the EFLAGS register.
 
-
-\section{The \LangCIf{} Intermediate Language}
-\label{sec:Cif}
-
-As with \LangVar{}, we compile \LangIf{} to a C-like intermediate language, but
-we need to grow that intermediate language to handle the new features
-in \LangIf{}: Booleans and conditional expressions.
-Figure~\ref{fig:c1-syntax} defines the abstract syntax of \LangCIf{}. (The
-concrete syntax is in the Appendix,
-Figure~\ref{fig:c1-concrete-syntax}.)  The \LangCIf{} language adds logical
-and comparison operators to the $\Exp$ non-terminal and the literals
-\key{\#t} and \key{\#f} to the $\Arg$ non-terminal.  Regarding control
-flow, \LangCIf{} differs considerably from \LangIf{}.  Instead of \key{if}
-expressions, \LangCIf{} has \key{goto} and conditional \key{goto} in the
-grammar for $\Tail$. This means that a sequence of statements may now
-end with a \code{goto} or a conditional \code{goto}. The conditional
-\code{goto} jumps to one of two labels depending on the outcome of the
-comparison. In Section~\ref{sec:explicate-control-Rif} we discuss how
-to translate from \LangIf{} to \LangCIf{}, bridging this gap between \key{if}
-expressions and \key{goto}'s.
-
-\begin{figure}[tp]
-\fbox{
-\begin{minipage}{0.96\textwidth}
-\small    
-\[
-\begin{array}{lcl}
-\Atm &::=& \gray{\INT{\Int} \mid \VAR{\Var}} \mid \BOOL{\itm{bool}} \\
-\itm{cmp} &::= & \key{eq?} \mid \key{<}  \\
-\Exp &::= & \gray{ \Atm \mid \READ{} }\\
-     &\mid& \gray{ \NEG{\Atm} \mid \ADD{\Atm}{\Atm} } \\
-     &\mid& \UNIOP{\key{'not}}{\Atm} 
-     \mid \BINOP{\key{'}\itm{cmp}}{\Atm}{\Atm} \\
-\Stmt &::=& \gray{ \ASSIGN{\VAR{\Var}}{\Exp} } \\
-\Tail &::= & \gray{\RETURN{\Exp} \mid \SEQ{\Stmt}{\Tail} } 
-    \mid \GOTO{\itm{label}} \\
-    &\mid& \IFSTMT{\BINOP{\itm{cmp}}{\Atm}{\Atm}}{\GOTO{\itm{label}}}{\GOTO{\itm{label}}} \\
-\LangCIf{} & ::= & \gray{\CPROGRAM{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP}}
-\end{array}
-\]
-\end{minipage}
-}
-\caption{The abstract syntax of \LangCIf{}, an extension of \LangCVar{}
-  (Figure~\ref{fig:c0-syntax}).}
-\label{fig:c1-syntax}
-\end{figure}
-
-\clearpage
 
 \section{Shrink the \LangIf{} Language}
 \label{sec:shrink-Rif}
 
 The \LangIf{} language includes several operators that are easily
-expressible in terms of other operators. For example, subtraction is
-expressible in terms of addition and negation.
+expressible with other operators. For example, subtraction is
+expressible using addition and negation.
 \[
  \key{(-}\; e_1 \; e_2\key{)} \quad \Rightarrow \quad \LP\key{+} \; e_1 \; \LP\key{-} \; e_2\RP\RP
 \]
-Several of the comparison operations are expressible in terms of
-less-than and logical negation.
+Several of the comparison operations are expressible using less-than
+and logical negation.
 \[
 \LP\key{<=}\; e_1 \; e_2\RP \quad \Rightarrow \quad
 \LP\key{let}~\LP\LS\key{tmp.1}~e_1\RS\RP~\LP\key{not}\;\LP\key{<}\;e_2\;\key{tmp.1})\RP\RP
@@ -4816,39 +4831,56 @@ less-than and logical negation.
 The \key{let} is needed in the above translation to ensure that
 expression $e_1$ is evaluated before $e_2$.
 
-By performing these translations near the front-end of the compiler,
-the later passes of the compiler do not need to deal with these
-constructs, making those passes shorter. On the other hand, sometimes
-these translations make it more difficult to generate the most
-efficient code with respect to the number of instructions. However,
-these differences typically do not affect the number of accesses to
-memory, which is the primary factor that determines execution time on
-modern computer architectures.
+By performing these translations in the front-end of the compiler, the
+later passes of the compiler do not need to deal with these operators,
+making the passes shorter.
+
+%% On the other hand, sometimes
+%% these translations make it more difficult to generate the most
+%% efficient code with respect to the number of instructions. However,
+%% these differences typically do not affect the number of accesses to
+%% memory, which is the primary factor that determines execution time on
+%% modern computer architectures.
 
 \begin{exercise}\normalfont
-  Implement the pass \code{shrink} that removes subtraction,
-  \key{and}, \key{or}, \key{<=}, \key{>}, and \key{>=} from the language
-  by translating them to other constructs in \LangIf{}.  Create tests to
-  make sure that the behavior of all of these constructs stays the
-  same after translation.
+Implement the pass \code{shrink} to remove subtraction, \key{and},
+\key{or}, \key{<=}, \key{>}, and \key{>=} from the language by
+translating them to other constructs in \LangIf{}.
+%
+Create six test programs that involve these operators.
+%
+In the \code{run-tests.rkt} script, add the following entry for
+\code{shrink} to the list of passes (it should be the only pass at
+this point).
+\begin{lstlisting}
+(list "shrink" shrink interp-Rif type-check-Rif)
+\end{lstlisting}
+This instructs \code{interp-tests} to run the intepreter
+\code{interp-Rif} and the type checker \code{type-check-Rif} on the
+output of \code{shrink}.
+%
+Run the script to test the \code{shrink} pass on all the test
+programs.
+
 \end{exercise}
 
 \section{Remove Complex Operands}
 \label{sec:remove-complex-opera-Rif}
 
+The output language for this pass is \LangIfANF{}
+(Figure~\ref{fig:Rif-anf-syntax}), the administrative normal form of
+\LangIf{}.  The \code{Bool} form is an atomic expressions but
+\code{If} is not.  All three sub-expressions of an \code{If} are
+allowed to be complex expressions but the operands of \code{not} and
+the comparisons must be atoms.
+
 Add cases for \code{Bool} and \code{If} to the \code{rco-exp} and
-\code{rco-atom} functions according to the definition of the output
-language for this pass, \LangIfANF{}, the administrative normal
-form of \LangIf{}, which is defined in Figure~\ref{fig:Rif-anf-syntax}. The
-\code{Bool} form is an atomic expressions but \code{If} is not. All
-three sub-expressions of an \code{If} are allowed to be complex
-expressions in the output of \code{remove-complex-opera*}, but the
-operands of \code{not} and the comparisons must be atoms.  Regarding
-the \code{If} form, it is particularly important to \textbf{not}
+\code{rco-atom} functions according to whether the output needs to be
+\Exp{} or \Atm{} as specified in the grammar for \LangIfANF{}.
+Regarding \code{If}, it is particularly important to \textbf{not}
 replace its condition with a temporary variable because that would
 interfere with the generation of high-quality output in the
 \code{explicate-control} pass.
-
 
 \begin{figure}[tp]
 \centering
@@ -4877,7 +4909,7 @@ R^{\dagger}_2  &::=& \PROGRAM{\code{'()}}{\Exp}
 
 Recall that the purpose of \code{explicate-control} is to make the
 order of evaluation explicit in the syntax of the program.  With the
-addition of \key{if} in \LangIf{} this get more interesting.
+addition of \key{if} this get more interesting.
 
 As a motivating example, consider the following program that has an
 \key{if} expression nested in the predicate of another \key{if}.
@@ -4899,7 +4931,7 @@ handle each of them in isolation, regardless of their context.  Each
 comparison would be translated into a \key{cmpq} instruction followed
 by a couple instructions to move the result from the EFLAGS register
 into a general purpose register or stack location. Each \key{if} would
-be translated into the combination of a \key{cmpq} and a conditional
+be translated into a \key{cmpq} instruction followed by a conditional
 jump. The generated code for the inner \key{if} in the above example
 would be as follows.
 \begin{center}
@@ -4909,7 +4941,7 @@ would be as follows.
     cmpq $1, x          ;; (< x 1)
     setl %al
     movzbq %al, tmp
-    cmpq $1, tmp        ;; (if (< x 1) ...)
+    cmpq $1, tmp        ;; (if ...)
     je then_branch_1
     jmp else_branch_1
     ...
@@ -4917,11 +4949,26 @@ would be as follows.
 \end{minipage}
 \end{center}
 However, if we take context into account we can do better and reduce
-the use of \key{cmpq} and EFLAG-accessing instructions.
+the use of \key{cmpq} instructions for accessing the EFLAG register.
 
-One idea is to try and reorganize the code at the level of \LangIf{},
-pushing the outer \key{if} inside the inner one. This would yield the
-following code.
+Our goal will be compile \key{if} expressions so that the relevant
+comparison instruction appears directly before the conditional jump.
+For example, we want to generate the following code for the inner
+\code{if}.
+\begin{center}
+\begin{minipage}{0.96\textwidth}
+\begin{lstlisting}
+    ...
+    cmpq $1, x
+    je then_branch_1
+    jmp else_branch_1
+    ...
+\end{lstlisting}
+\end{minipage}
+\end{center}
+One way to achieve this is to reorganize the code at the level of
+\LangIf{}, pushing the outer \key{if} inside the inner one, yielding
+the following code.
 \begin{center}
 \begin{minipage}{0.96\textwidth}
 \begin{lstlisting}
@@ -4937,24 +4984,24 @@ following code.
 \end{lstlisting}
 \end{minipage}
 \end{center}
-Unfortunately, this approach duplicates the two branches, and a
-compiler must never duplicate code!
+Unfortunately, this approach duplicates the two branches from the
+outer \code{if} and a compiler must never duplicate code!
 
-We need a way to perform the above transformation, but without
+We need a way to perform the above transformation but without
 duplicating code. That is, we need a way for different parts of a
-program to refer to the same piece of code, that is, to \emph{share}
-code. At the level of x86 assembly this is straightforward because we
-can label the code for each of the branches and insert jumps in all
-the places that need to execute the branches. At the higher level of
-our intermediate languages, we need to move away from abstract syntax
-\emph{trees} and instead use \emph{graphs}. In particular, we use a
-standard program representation called a \emph{control flow graph}
-(CFG), due to Frances Elizabeth \citet{Allen:1970uq}.
-\index{control-flow graph} Each vertex is a labeled sequence of code,
-called a \emph{basic block}, and each edge represents a jump to
-another block. The \key{Program} construct of \LangCVar{} and \LangCIf{} contains
-a control flow graph represented as an alist mapping labels to basic
-blocks. Each basic block is represented by the $\Tail$ non-terminal.
+program to refer to the same piece of code. At the level of x86
+assembly this is straightforward because we can label the code for
+each branch and insert jumps in all the places that need to execute
+the branch. In our intermediate language, we need to move away from
+abstract syntax \emph{trees} and instead use \emph{graphs}. In
+particular, we use a standard program representation called a
+\emph{control flow graph} (CFG), due to Frances Elizabeth
+\citet{Allen:1970uq}.  \index{control-flow graph} Each vertex is a
+labeled sequence of code, called a \emph{basic block}, and each edge
+represents a jump to another block. The \key{CProgram} construct of
+\LangCVar{} and \LangCIf{} contains a control flow graph represented
+as an alist mapping labels to basic blocks. Each basic block is
+represented by the $\Tail$ non-terminal.
 
 Figure~\ref{fig:explicate-control-s1-38} shows the output of the
 \code{remove-complex-opera*} pass and then the
@@ -4963,18 +5010,17 @@ the output program and then discuss the algorithm.
 %
 Following the order of evaluation in the output of
 \code{remove-complex-opera*}, we first have two calls to \code{(read)}
-and then the less-than-comparison to \code{1} in the predicate of the
+and then the comparison \lstinline{(< x 1)} in the predicate of the
 inner \key{if}.  In the output of \code{explicate-control}, in the
-block labeled \code{start}, this becomes two assignment statements
-followed by a conditional \key{goto} to label \code{block40} or
+block labeled \code{start}, is two assignment statements followed by a
+\code{if} statement that branches to \code{block40} or
 \code{block41}. The blocks associated with those labels contain the
-translations of the code \code{(eq? x 0)} and \code{(eq? x 2)},
-respectively. Regarding the block labeled with \code{block40}, we
-start with the comparison to \code{0} and then have a conditional
-goto, either to label \code{block38} or label \code{block39}, which
-are the two branches of the outer \key{if}, i.e., \code{(+ y 2)} and
-\code{(+ y 10)}. The story for the block labeled \code{block41} is
-similar.
+translations of the code \lstinline{(eq? x 0)} and \lstinline{(eq? x 2)},
+respectively.  In particular, we start \code{block40} with the
+comparison \lstinline{(eq? x 0)} and then branch to \code{block38} or
+\code{block39}, the two branches of the outer \key{if}, i.e.,
+\lstinline{(+ y 2)} and \lstinline{(+ y 10)}. The story for
+\code{block41} is similar.
 
 \begin{figure}[tbp]
 \begin{tabular}{lll}
@@ -5008,20 +5054,14 @@ $\Rightarrow$
 start:
     x = (read);
     y = (read);
-    if (< x 1)
-       goto block40;
-    else
-       goto block41;
+    if (< x 1) goto block40;
+    else goto block41;
 block40:
-    if (eq? x 0)
-       goto block38;
-    else
-       goto block39;
+    if (eq? x 0) goto block38;
+    else goto block39;
 block41:
-    if (eq? x 2)
-       goto block38;
-    else
-       goto block39;
+    if (eq? x 2) goto block38;
+    else goto block39;
 block38:
     return (+ y 2);
 block39:
@@ -5049,10 +5089,10 @@ Recall that in Section~\ref{sec:explicate-control-r1} we implement
 functions, \code{explicate-tail} and \code{explicate-assign}.  The
 former function translates expressions in tail position whereas the
 later function translates expressions on the right-hand-side of a
-\key{let}. With the addition of \key{if} expression in \LangIf{} we have a
-new kind of context to deal with: the predicate position of the
-\key{if}. We need another function, \code{explicate-pred}, that takes
-an \LangIf{} expression and two blocks for the then-branch and
+\key{let}. With the addition of \key{if} expression in \LangIf{} we
+have a new kind of position to deal with: the predicate position of
+the \key{if}. We need another function, \code{explicate-pred}, that
+takes an \LangIf{} expression and two blocks for the then-branch and
 else-branch. The output of \code{explicate-pred} is a block.
 %
 %% Note that the three explicate functions need to construct a
@@ -5060,15 +5100,14 @@ else-branch. The output of \code{explicate-pred} is a block.
 %% variable.
 %
 In the following paragraphs we discuss specific cases in the
-\code{explicate-pred} function as well as the additions to the
+\code{explicate-pred} function as well as additions to the
 \code{explicate-tail} and \code{explicate-assign} functions.
 
 The function \code{explicate-pred} will need a case for every
 expression that can have type \code{Boolean}. We detail a few cases
 here and leave the rest for the reader. The input to this function is
 an expression and two blocks, $B_1$ and $B_2$, for the two branches of
-the enclosing \key{if}, though some care will be needed regarding how
-we represent the blocks. Suppose the expression is the Boolean
+the enclosing \key{if}. Suppose the expression is the Boolean
 \code{\#t}.  Then we can perform a kind of partial evaluation
 \index{partial evaluation} and translate it to the ``then'' branch
 $B_1$. Likewise, we translate \code{\#f} to the ``else`` branch $B_2$.
@@ -5078,30 +5117,31 @@ $B_1$. Likewise, we translate \code{\#f} to the ``else`` branch $B_2$.
 \key{\#f} \quad\Rightarrow\quad B_2
 \]
 These two cases demonstrate that we sometimes discard one of the
-blocks that are input to \code{explicate-pred}. We will need to
-arrange for the blocks that we actually use to appear in the resulting
-control-flow graph, but not the discarded blocks.
+blocks that are input to \code{explicate-pred}. We want the blocks
+that we actually use to appear in the resulting control-flow graph,
+but not the discarded blocks. We return to this issue later.
 
 The case for \key{if} in \code{explicate-pred} is particularly
-illuminating as it deals with the challenges that we discussed above
+illuminating because it deals with the challenges we discussed above
 regarding the example of the nested \key{if} expressions.  The
 ``then'' and ``else'' branches of the current \key{if} inherit their
 context from the current one, that is, predicate context. So we
 recursively apply \code{explicate-pred} to the ``then'' and ``else''
-branches. For both of those recursive calls, we shall pass the blocks
-$B_1$ and $B_2$. Thus, $B_1$ may get used twice, once inside each
-recursive call, and likewise for $B_2$. As discussed above, to avoid
-duplicating code, we need to add these blocks to the control-flow
-graph so that we can instead refer to them by name and execute them
-with a \key{goto}. However, as we saw in the cases above for \key{\#t}
-and \key{\#f}, the blocks $B_1$ or $B_2$ may not get used at all and
-we don't want to prematurely add them to the control-flow graph if
-they end up being discarded.
+branches. For both of those recursive calls, we pass the blocks $B_1$
+and $B_2$. Thus, $B_1$ may get used twice, once inside each recursive
+call, and likewise for $B_2$. As discussed above, to avoid duplicating
+code, we need to add these blocks to the control-flow graph so that we
+can instead refer to them by name and execute them with a
+\key{goto}. However, as we saw in the cases above for \key{\#t} and
+\key{\#f}, the blocks $B_1$ or $B_2$ may not get used at all and we
+don't want to prematurely add them to the control-flow graph if they
+end up being discarded.
 
-The solution to this conundrum is to use \emph{lazy evaluation} to
-delay adding the blocks to the control-flow graph until the points
-where we know they will be used~\citep{Friedman:1976aa}.\index{lazy
-  evaluation} Racket provides support for lazy evaluation with the
+The solution to this conundrum is to use \emph{lazy
+  evaluation}\index{lazy evaluation} \citep{Friedman:1976aa} to delay
+adding the blocks to the control-flow graph until the points where we
+know they will be used. Racket provides support for lazy evaluation
+with the
 \href{https://docs.racket-lang.org/reference/Delayed_Evaluation.html}{\code{racket/promise}}
 package. The expression \key{(delay} $e_1 \ldots e_n$\key{)}
 \index{delay} creates a \emph{promise}\index{promise} in which the
