@@ -2292,14 +2292,14 @@ the same and integer constants are changed to immediates:
 $\INT{n}$ changes to $\IMM{n}$.
 
 Next we consider the cases for $\Stmt$, starting with arithmetic
-operations. For example, consider the addition operation below that
-puts the sum of \code{y} and \code{z} into \code{x}. We can use the
-\key{addq} instruction, but it performs an in-place update.  So we
-could move \code{y} to \code{x} and then add \code{z} to \code{x}. \\
+operations. For example, consider the addition operation. We can use
+the \key{addq} instruction, but it performs an in-place update.  So we
+could move $\itm{arg}_1$ into the left-hand side \itm{var} and then
+add $\itm{arg}_2$ to \itm{var}. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-x = (+ y z);
+|$\itm{var}$| = (+ |$\itm{arg}_1$| |$\itm{arg}_2$|);
 \end{lstlisting}
 \end{minipage}
 &
@@ -2307,8 +2307,8 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-movq y, x
-addq z, x
+movq |$\itm{arg}_1$|, |$\itm{var}$|
+addq |$\itm{arg}_2$|, |$\itm{var}$|
 \end{lstlisting}
 \end{minipage}
 \end{tabular} \\
@@ -2317,12 +2317,12 @@ There are also cases that require special care to avoid generating
 needlessly complicated code. For example, if one of the arguments of
 the addition is the same variable as the left-hand side of the
 assignment, then there is no need for the extra move instruction.  The
-following assignment statement can be translated into a single
-\key{addq} instruction.\\
+assignment statement can be translated into a single \key{addq}
+instruction as follows.\\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-x = (+ 10 x);
+|$\itm{var}$| = (+ |$\itm{arg}_1$| |$\itm{var}$|);
 \end{lstlisting}
 \end{minipage}
 &
@@ -2330,7 +2330,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-addq $10, x
+addq |$\itm{arg}_1$|, |$\itm{var}$|
 \end{lstlisting}
 \end{minipage}
 \end{tabular}
@@ -2346,13 +2346,12 @@ generated x86 assembly code, you need to compile \code{runtime.c} to
 \code{-c}) and link it into the executable. For our purposes of code
 generation, all you need to do is translate an assignment of
 \key{read} into a call to the \code{read\_int} function followed by a
-move from \code{rax} to the left-hand-side of the assignment.  The
-move from \code{rax} is needed because the return value from
-\code{read\_int} goes into \code{rax}, as is the case in general.  \\
+move from \code{rax} to the left-hand-side variable.  (Recall that the
+return value of a function goes into \code{rax}.)  \\
 \begin{tabular}{lll}
 \begin{minipage}{0.3\textwidth}
 \begin{lstlisting}
-x = (read);
+|$\itm{var}$| = (read);
 \end{lstlisting}
 \end{minipage}
 &
@@ -2361,7 +2360,7 @@ $\Rightarrow$
 \begin{minipage}{0.3\textwidth}
 \begin{lstlisting}
 callq read_int
-movq %rax, x
+movq %rax, |$\itm{var}$|
 \end{lstlisting}
 \end{minipage}
 \end{tabular} 
@@ -4221,18 +4220,17 @@ conclusion:
 \index{control flow}
 \index{conditional expression}
 
-The \LangInt{} and \LangVar{} languages only have a single kind of value, the
-integers. In this chapter we add a second kind of value, the Booleans,
-to create the \LangIf{} language. The Boolean values \emph{true} and
-\emph{false} are written \key{\#t} and \key{\#f} respectively in
-Racket.  The \LangIf{} language includes several operations that involve
-Booleans (\key{and}, \key{not}, \key{eq?}, \key{<}, etc.) and the
-conditional \key{if} expression. With the addition of \key{if}
-expressions, programs can have non-trivial control flow which which
-significantly impacts the \code{explicate-control} and the liveness
-analysis for register allocation. Also, because we now have two kinds
-of values, we need to handle programs that apply an operation to the
-wrong kind of value, such as \code{(not 1)}.
+The \LangInt{} and \LangVar{} languages only have a single kind of
+value, integers. In this chapter we add a second kind of value, the
+Booleans, to create the \LangIf{} language. The Boolean values
+\emph{true} and \emph{false} are written \key{\#t} and \key{\#f}
+respectively in Racket.  The \LangIf{} language includes several
+operations that involve Booleans (\key{and}, \key{not}, \key{eq?},
+\key{<}, etc.) and the conditional \key{if} expression. With the
+addition of \key{if}, programs can have non-trivial control flow which
+impacts \code{explicate-control} and liveness analysis. Also, because
+we now have two kinds of values, we need to handle programs that apply
+an operation to the wrong kind of value, such as \code{(not 1)}.
 
 There are two language design options for such situations.  One option
 is to signal an error and the other is to provide a wider
@@ -4241,42 +4239,50 @@ these two options, depending on the operation and the kind of
 value. For example, the result of \code{(not 1)} in Racket is
 \code{\#f} because Racket treats non-zero integers as if they were
 \code{\#t}. On the other hand, \code{(car 1)} results in a run-time
-error in Racket stating that \code{car} expects a pair.
+error in Racket because \code{car} expects a pair.
 
-The Typed Racket language makes similar design choices as Racket,
-except much of the error detection happens at compile time instead of
-run time. Like Racket, Typed Racket accepts and runs \code{(not 1)},
-producing \code{\#f}. But in the case of \code{(car 1)}, Typed Racket
-reports a compile-time error because Typed Racket expects the type of
-the argument to be of the form \code{(Listof T)} or \code{(Pairof T1 T2)}.
+Typed Racket makes similar design choices as Racket, except much of
+the error detection happens at compile time instead of run time. Typed
+Racket accepts and runs \code{(not 1)}, producing \code{\#f}. But in
+the case of \code{(car 1)}, Typed Racket reports a compile-time error
+because Typed Racket expects the type of the argument to be of the
+form \code{(Listof T)} or \code{(Pairof T1 T2)}.
 
-For the \LangIf{} language we choose to be more like Typed Racket in that
-we perform type checking during compilation. In
-Chapter~\ref{ch:type-dynamic} we study the alternative choice, that
-is, how to compile a dynamically typed language like Racket.  The
-\LangIf{} language is a subset of Typed Racket but by no means includes
-all of Typed Racket. For many operations we take a narrower
-interpretation than Typed Racket, for example, rejecting \code{(not 1)}.
+The \LangIf{} language performs type checking during compilation like
+Typed Racket. In Chapter~\ref{ch:type-dynamic} we study the
+alternative choice, that is, a dynamically typed language like Racket.
+The \LangIf{} language is a subset of Typed Racket; for some
+operations we are more restrictive, for example, rejecting
+\code{(not 1)}.
 
 This chapter is organized as follows.  We begin by defining the syntax
 and interpreter for the \LangIf{} language
-(Section~\ref{sec:r2-lang}). We then introduce the idea of type
+(Section~\ref{sec:lang-if}). We then introduce the idea of type
 checking and build a type checker for \LangIf{}
-(Section~\ref{sec:type-check-r2}). To compile \LangIf{} we need to
-enlarge the intermediate language \LangCVar{} into \LangCIf{}, which
-we do in Section~\ref{sec:c1}. The remaining sections of this chapter
+(Section~\ref{sec:type-check-Rif}). To compile \LangIf{} we need to
+enlarge the intermediate language \LangCVar{} into \LangCIf{}
+(Section~\ref{sec:Cif}) and \LangXASTInt{} into \LangXASTIf{}
+(Section~\ref{sec:x86-if}). The remaining sections of this chapter
 discuss how our compiler passes change to accommodate Booleans and
-conditional control flow.
+conditional control flow. There is one new pass, named \code{shrink},
+that translates some operators into others, thereby reducing the
+number of operators that need to be handled in later passes.  The
+largest changes occur in \code{explicate-control}, to translate
+\code{if} expressions into control-flow graphs
+(Section~\ref{sec:explicate-control-Rif}).  Regarding register
+allocation, the liveness analysis now has multiple basic blocks to
+process and there is the interesting question of how to handle
+conditional jumps.
 
 
 \section{The \LangIf{} Language}
-\label{sec:r2-lang}
+\label{sec:lang-if}
 
 The concrete syntax of the \LangIf{} language is defined in
-Figure~\ref{fig:r2-concrete-syntax} and the abstract syntax is defined
-in Figure~\ref{fig:r2-syntax}. The \LangIf{} language includes all of
-\LangVar{} (shown in gray), the Boolean literals \code{\#t} and \code{\#f},
-and the conditional \code{if} expression. Also, we expand the
+Figure~\ref{fig:Rif-concrete-syntax} and the abstract syntax is defined
+in Figure~\ref{fig:Rif-syntax}. The \LangIf{} language includes all of
+\LangVar{} (shown in gray), the Boolean literals \code{\#t} and
+\code{\#f}, and the conditional \code{if} expression. We expand the
 operators to include
 \begin{enumerate}
 \item subtraction on integers,
@@ -4286,11 +4292,11 @@ operators to include
   comparing integers.
 \end{enumerate}
 We reorganize the abstract syntax for the primitive operations in
-Figure~\ref{fig:r2-syntax}, using only one grammar rule for all of
+Figure~\ref{fig:Rif-syntax}, using only one grammar rule for all of
 them. This means that the grammar no longer checks whether the arity
 of an operators matches the number of arguments. That responsibility
 is moved to the type checker for \LangIf{}, which we introduce in
-Section~\ref{sec:type-check-r2}.
+Section~\ref{sec:type-check-Rif}.
 
 \begin{figure}[tp]
 \centering
@@ -4313,7 +4319,7 @@ Section~\ref{sec:type-check-r2}.
 }
 \caption{The concrete syntax of \LangIf{}, extending \LangVar{}
   (Figure~\ref{fig:r1-concrete-syntax}) with Booleans and conditionals.}
-\label{fig:r2-concrete-syntax}
+\label{fig:Rif-concrete-syntax}
 \end{figure}
 
 \begin{figure}[tp]
@@ -4335,30 +4341,27 @@ Section~\ref{sec:type-check-r2}.
 \end{minipage}
 }
 \caption{The abstract syntax of \LangIf{}.}
-\label{fig:r2-syntax}
+\label{fig:Rif-syntax}
 \end{figure}
 
 Figure~\ref{fig:interp-Rif} defines the interpreter for \LangIf{},
-inheriting from the interpreter for \LangVar{}
+which inherits from the interpreter for \LangVar{}
 (Figure~\ref{fig:interp-Rvar}). The literals \code{\#t} and \code{\#f}
 evaluate to the corresponding Boolean values. The conditional
 expression $(\key{if}\, \itm{cnd}\,\itm{thn}\,\itm{els})$ evaluates
-the Boolean expression \itm{cnd} and then either evaluates \itm{thn}
-or \itm{els} depending on whether \itm{cnd} produced \code{\#t} or
-\code{\#f}. The logical operations \code{not} and \code{and} behave as
-you might expect, but note that the \code{and} operation is
-short-circuiting. That is, given the expression
-$(\key{and}\,e_1\,e_2)$, the expression $e_2$ is not evaluated if
-$e_1$ evaluates to \code{\#f}.
+\itm{cnd} and then either evaluates \itm{thn} or \itm{els} depending
+on whether \itm{cnd} produced \code{\#t} or \code{\#f}. The logical
+operations \code{not} and \code{and} behave as you might expect, but
+note that the \code{and} operation is short-circuiting. That is, given
+the expression $(\key{and}\,e_1\,e_2)$, the expression $e_2$ is not
+evaluated if $e_1$ evaluates to \code{\#f}.
 
 With the increase in the number of primitive operations, the
-interpreter code for them could become repetitive without some
-care. We factor out the different parts of the code for primitive
-operations into the \code{interp-op} method shown in in
-Figure~\ref{fig:interp-op-Rif}. The match clause for \code{Prim} makes
-the recursive calls to interpret the arguments and then passes the
-resulting values to \code{interp-op}. We do not use \code{interp-op}
-for the \code{and} operation because of its short-circuiting behavior.
+interpreter would become repetitive without some care.  We refactor
+the clause for \code{Prim}, moving the code that differs with each
+operation into the \code{interp-op} method shown in in
+Figure~\ref{fig:interp-op-Rif}. We handle the \code{and} operation
+separately because of its short-circuiting behavior.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -4433,7 +4436,7 @@ for the \code{and} operation because of its short-circuiting behavior.
 
 
 \section{Type Checking \LangIf{} Programs}
-\label{sec:type-check-r2}
+\label{sec:type-check-Rif}
 \index{type checking}
 \index{semantic analysis}
 
@@ -4609,44 +4612,8 @@ not encounter an error.
 \end{exercise}
 
 
-\section{Shrink the \LangIf{} Language}
-\label{sec:shrink-r2}
-
-The \LangIf{} language includes several operators that are easily
-expressible in terms of other operators. For example, subtraction is
-expressible in terms of addition and negation.
-\[
- \key{(-}\; e_1 \; e_2\key{)} \quad \Rightarrow \quad \LP\key{+} \; e_1 \; \LP\key{-} \; e_2\RP\RP
-\]
-Several of the comparison operations are expressible in terms of
-less-than and logical negation.
-\[
-\LP\key{<=}\; e_1 \; e_2\RP \quad \Rightarrow \quad
-\LP\key{let}~\LP\LS\key{tmp.1}~e_1\RS\RP~\LP\key{not}\;\LP\key{<}\;e_2\;\key{tmp.1})\RP\RP
-\]
-The \key{let} is needed in the above translation to ensure that
-expression $e_1$ is evaluated before $e_2$.
-
-By performing these translations near the front-end of the compiler,
-the later passes of the compiler do not need to deal with these
-constructs, making those passes shorter. On the other hand, sometimes
-these translations make it more difficult to generate the most
-efficient code with respect to the number of instructions. However,
-these differences typically do not affect the number of accesses to
-memory, which is the primary factor that determines execution time on
-modern computer architectures.
-
-\begin{exercise}\normalfont
-  Implement the pass \code{shrink} that removes subtraction,
-  \key{and}, \key{or}, \key{<=}, \key{>}, and \key{>=} from the language
-  by translating them to other constructs in \LangIf{}.  Create tests to
-  make sure that the behavior of all of these constructs stays the
-  same after translation.
-\end{exercise}
-
-
 \section{The \LangXASTIf{} Language}
-\label{sec:x86-1}
+\label{sec:x86-if}
 
 \index{x86}
 To implement the new logical operations, the comparison operations,
@@ -4784,7 +4751,7 @@ instruction to set the EFLAGS register.
 
 
 \section{The \LangCIf{} Intermediate Language}
-\label{sec:c1}
+\label{sec:Cif}
 
 As with \LangVar{}, we compile \LangIf{} to a C-like intermediate language, but
 we need to grow that intermediate language to handle the new features
@@ -4799,7 +4766,7 @@ expressions, \LangCIf{} has \key{goto} and conditional \key{goto} in the
 grammar for $\Tail$. This means that a sequence of statements may now
 end with a \code{goto} or a conditional \code{goto}. The conditional
 \code{goto} jumps to one of two labels depending on the outcome of the
-comparison. In Section~\ref{sec:explicate-control-r2} we discuss how
+comparison. In Section~\ref{sec:explicate-control-Rif} we discuss how
 to translate from \LangIf{} to \LangCIf{}, bridging this gap between \key{if}
 expressions and \key{goto}'s.
 
@@ -4831,13 +4798,48 @@ expressions and \key{goto}'s.
 
 \clearpage
 
+\section{Shrink the \LangIf{} Language}
+\label{sec:shrink-Rif}
+
+The \LangIf{} language includes several operators that are easily
+expressible in terms of other operators. For example, subtraction is
+expressible in terms of addition and negation.
+\[
+ \key{(-}\; e_1 \; e_2\key{)} \quad \Rightarrow \quad \LP\key{+} \; e_1 \; \LP\key{-} \; e_2\RP\RP
+\]
+Several of the comparison operations are expressible in terms of
+less-than and logical negation.
+\[
+\LP\key{<=}\; e_1 \; e_2\RP \quad \Rightarrow \quad
+\LP\key{let}~\LP\LS\key{tmp.1}~e_1\RS\RP~\LP\key{not}\;\LP\key{<}\;e_2\;\key{tmp.1})\RP\RP
+\]
+The \key{let} is needed in the above translation to ensure that
+expression $e_1$ is evaluated before $e_2$.
+
+By performing these translations near the front-end of the compiler,
+the later passes of the compiler do not need to deal with these
+constructs, making those passes shorter. On the other hand, sometimes
+these translations make it more difficult to generate the most
+efficient code with respect to the number of instructions. However,
+these differences typically do not affect the number of accesses to
+memory, which is the primary factor that determines execution time on
+modern computer architectures.
+
+\begin{exercise}\normalfont
+  Implement the pass \code{shrink} that removes subtraction,
+  \key{and}, \key{or}, \key{<=}, \key{>}, and \key{>=} from the language
+  by translating them to other constructs in \LangIf{}.  Create tests to
+  make sure that the behavior of all of these constructs stays the
+  same after translation.
+\end{exercise}
+
 \section{Remove Complex Operands}
 \label{sec:remove-complex-opera-Rif}
 
 Add cases for \code{Bool} and \code{If} to the \code{rco-exp} and
 \code{rco-atom} functions according to the definition of the output
 language for this pass, \LangIfANF{}, the administrative normal
-form of \LangIf{}, which is defined in Figure~\ref{fig:r2-anf-syntax}. The
+form of \LangIf{}, which is defined in Figure~\ref{fig:Rif-anf-syntax}. The
 \code{Bool} form is an atomic expressions but \code{If} is not. All
 three sub-expressions of an \code{If} are allowed to be complex
 expressions in the output of \code{remove-complex-opera*}, but the
@@ -4866,12 +4868,12 @@ R^{\dagger}_2  &::=& \PROGRAM{\code{'()}}{\Exp}
 \end{minipage}
 }
 \caption{\LangIfANF{} is \LangIf{} in administrative normal form (ANF).}
-\label{fig:r2-anf-syntax}
+\label{fig:Rif-anf-syntax}
 \end{figure}
 
 
 \section{Explicate Control}
-\label{sec:explicate-control-r2}
+\label{sec:explicate-control-Rif}
 
 Recall that the purpose of \code{explicate-control} is to make the
 order of evaluation explicit in the syntax of the program.  With the
@@ -5258,7 +5260,7 @@ block39:
 
 
 \section{Select Instructions}
-\label{sec:select-r2}
+\label{sec:select-Rif}
 \index{instruction selection}
 
 Recall that the \code{select-instructions} pass lowers from our
@@ -5361,7 +5363,7 @@ the output using the \code{interp-x86} interpreter
 \end{exercise}
 
 \section{Register Allocation}
-\label{sec:register-allocation-r2}
+\label{sec:register-allocation-Rif}
 
 \index{register allocation}
 The changes required for \LangIf{} affect liveness analysis, building the
@@ -5369,7 +5371,7 @@ interference graph, and assigning homes, but the graph coloring
 algorithm itself does not change.
 
 \subsection{Liveness Analysis}
-\label{sec:liveness-analysis-r2}
+\label{sec:liveness-analysis-Rif}
 \index{liveness analysis}
 
 Recall that for \LangVar{} we implemented liveness analysis for a single
@@ -5431,7 +5433,7 @@ argument and for computing the variables read-from ($R$) or written-to
 arguments and instructions in \LangXASTIf{}.
 
 \subsection{Build Interference}
-\label{sec:build-interference-r2}
+\label{sec:build-interference-Rif}
 
 Many of the new instructions in \LangXASTIf{} can be handled in the same way
 as the instructions in \LangXASTInt{}. Thus, if your code was already quite
@@ -5446,7 +5448,7 @@ just like the \key{movq} instruction. See rule number 3 in
 Section~\ref{sec:build-interference}.
 
 %% \subsection{Assign Homes}
-%% \label{sec:assign-homes-r2}
+%% \label{sec:assign-homes-Rif}
 
 %% The \code{assign-homes} function (Section~\ref{sec:assign-r1}) needs
 %% to be updated to handle the \key{if} statement, simply by recursively
@@ -5834,8 +5836,8 @@ passes, including a new compiler pass named \code{expose-allocation}.
 \section{The \LangVec{} Language}
 \label{sec:r3}
 
-Figure~\ref{fig:r3-concrete-syntax} defines the concrete syntax for
-\LangVec{} and Figure~\ref{fig:r3-syntax} defines the abstract syntax.  The
+Figure~\ref{fig:Rvec-concrete-syntax} defines the concrete syntax for
+\LangVec{} and Figure~\ref{fig:Rvec-syntax} defines the abstract syntax.  The
 \LangVec{} language includes three new forms: \code{vector} for creating a
 tuple, \code{vector-ref} for reading an element of a tuple, and
 \code{vector-set!} for writing to an element of a tuple. The program
@@ -5874,8 +5876,8 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
 \end{minipage}
 }
 \caption{The concrete syntax of \LangVec{}, extending \LangIf{}
-  (Figure~\ref{fig:r2-concrete-syntax}).}
-\label{fig:r3-concrete-syntax}
+  (Figure~\ref{fig:Rif-concrete-syntax}).}
+\label{fig:Rvec-concrete-syntax}
 \end{figure}
 
 \begin{figure}[tbp]
@@ -5910,7 +5912,7 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
 \end{minipage}
 }
 \caption{The abstract syntax of \LangVec{}.}
-\label{fig:r3-syntax}
+\label{fig:Rvec-syntax}
 \end{figure}
 
 \index{allocate}
@@ -6523,7 +6525,7 @@ should all be treated as complex operands.
 %% \code{HasType} is needed and the case for \code{Prim} needs to be
 %% handled carefully to prevent the \code{Prim} node from being separated
 %% from its enclosing \code{HasType}.
-Figure~\ref{fig:r3-anf-syntax}
+Figure~\ref{fig:Rvec-anf-syntax}
 shows the grammar for the output language \LangVecANF{} of this
 pass, which is \LangVec{} in administrative normal form.
 
@@ -6550,7 +6552,7 @@ R^{\dagger}_3  &::=& \gray{ \PROGRAM{\code{'()}}{\Exp} }
 \end{minipage}
 }
 \caption{\LangVecANF{} is \LangVec{} in administrative normal form (ANF).}
-\label{fig:r3-anf-syntax}
+\label{fig:Rvec-anf-syntax}
 \end{figure}
 
 
@@ -7046,7 +7048,7 @@ this case the definition of a \code{point} type.
 \end{minipage}
 }
 \caption{The concrete syntax of $R^s_3$, extending \LangVec{}
-  (Figure~\ref{fig:r3-concrete-syntax}).}
+  (Figure~\ref{fig:Rvec-concrete-syntax}).}
 \label{fig:r3s-concrete-syntax}
 \end{figure}
 
@@ -7165,6 +7167,8 @@ from the set.
 \end{exercise}
 
 
+% TODO: challenge, implement homogeneous vectors
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Functions}
 \label{ch:functions}
@@ -7180,8 +7184,8 @@ is the topic of Chapter~\ref{ch:lambdas}.
 \section{The \LangFun{} Language}
 
 The concrete and abstract syntax for function definitions and function
-application is shown in Figures~\ref{fig:r4-concrete-syntax} and
-\ref{fig:r4-syntax}, where we define the \LangFun{} language.  Programs in
+application is shown in Figures~\ref{fig:Rfun-concrete-syntax} and
+\ref{fig:Rfun-syntax}, where we define the \LangFun{} language.  Programs in
 \LangFun{} begin with zero or more function definitions.  The function
 names from these definitions are in-scope for the entire program,
 including all other function definitions (so the ordering of function
@@ -7240,8 +7244,8 @@ inside each other.
 \]
 \end{minipage}
 }
-\caption{The concrete syntax of \LangFun{}, extending \LangVec{} (Figure~\ref{fig:r3-concrete-syntax}).}
-\label{fig:r4-concrete-syntax}
+\caption{The concrete syntax of \LangFun{}, extending \LangVec{} (Figure~\ref{fig:Rvec-concrete-syntax}).}
+\label{fig:Rfun-concrete-syntax}
 \end{figure}
 
 \begin{figure}[tp]
@@ -7263,12 +7267,12 @@ inside each other.
 \]
 \end{minipage}
 }
-\caption{The abstract syntax of \LangFun{}, extending \LangVec{} (Figure~\ref{fig:r3-syntax}).}
-\label{fig:r4-syntax}
+\caption{The abstract syntax of \LangFun{}, extending \LangVec{} (Figure~\ref{fig:Rvec-syntax}).}
+\label{fig:Rfun-syntax}
 \end{figure}
 
 
-The program in Figure~\ref{fig:r4-function-example} is a
+The program in Figure~\ref{fig:Rfun-function-example} is a
 representative example of defining and using functions in \LangFun{}.  We
 define a function \code{map-vec} that applies some other function
 \code{f} to both elements of a vector and returns a new
@@ -7290,7 +7294,7 @@ The program applies
 (vector-ref (map-vec add1 (vector 0 41)) 1)
 \end{lstlisting}
 \caption{Example of using functions in \LangFun{}.}
-\label{fig:r4-function-example}
+\label{fig:Rfun-function-example}
 \end{figure}
 
 The definitional interpreter for \LangFun{} is in
@@ -7711,7 +7715,7 @@ The concrete syntax for a function reference is $\CFUNREF{f}$.
 \end{minipage}
 }
 \caption{The abstract syntax \LangFunRef{}, an extension of \LangFun{}
-  (Figure~\ref{fig:r4-syntax}).}
+  (Figure~\ref{fig:Rfun-syntax}).}
 \label{fig:f1-syntax}
 \end{figure}
 
@@ -7790,7 +7794,7 @@ to be converted to an address using the \code{leaq} instruction. Thus,
 even though \code{FunRef} seems rather simple, it needs to be
 classified as a complex expression so that we generate an assignment
 statement with a left-hand side that can serve as the target of the
-\code{leaq}. Figure~\ref{fig:r4-anf-syntax} defines the
+\code{leaq}. Figure~\ref{fig:Rfun-anf-syntax} defines the
 output language \LangFunANF{} of this pass.
 
 \begin{figure}[tp]
@@ -7817,7 +7821,7 @@ R^{\dagger}_4  &::=& \gray{ \PROGRAMDEFS{\code{'()}}{\Def} }
 \end{minipage}
 }
 \caption{\LangFunANF{} is \LangFun{} in administrative normal form (ANF).}
-\label{fig:r4-anf-syntax}
+\label{fig:Rfun-anf-syntax}
 \end{figure}
 
 
@@ -8464,7 +8468,7 @@ syntax and semantics of \LangLam{} in Section~\ref{sec:r5}.
 
 The concrete and abstract syntax for \LangLam{}, a language with anonymous
 functions and lexical scoping, is defined in
-Figures~\ref{fig:r5-concrete-syntax} and ~\ref{fig:r5-syntax}. It adds
+Figures~\ref{fig:Rlam-concrete-syntax} and ~\ref{fig:Rlam-syntax}. It adds
 the \key{lambda} form to the grammar for \LangFun{}, which already has
 syntax for function application.
 
@@ -8498,9 +8502,9 @@ syntax for function application.
 \]
 \end{minipage}
 }
-\caption{The concrete syntax of \LangLam{}, extending \LangFun{} (Figure~\ref{fig:r4-concrete-syntax}) 
+\caption{The concrete syntax of \LangLam{}, extending \LangFun{} (Figure~\ref{fig:Rfun-concrete-syntax}) 
   with \key{lambda}.}
-\label{fig:r5-concrete-syntax}
+\label{fig:Rlam-concrete-syntax}
 \end{figure}
 
 \begin{figure}[tp]
@@ -8524,8 +8528,8 @@ syntax for function application.
 \]
 \end{minipage}
 }
-\caption{The abstract syntax of \LangLam{}, extending \LangFun{} (Figure~\ref{fig:r4-syntax}).}
-\label{fig:r5-syntax}
+\caption{The abstract syntax of \LangLam{}, extending \LangFun{} (Figure~\ref{fig:Rfun-syntax}).}
+\label{fig:Rlam-syntax}
 \end{figure}
 
 \index{interpreter}
@@ -8626,7 +8630,7 @@ Figure~\ref{fig:f2-syntax}.
 \end{minipage}
 }
 \caption{The abstract syntax $F_2$, an extension of \LangLam{}
-  (Figure~\ref{fig:r5-syntax}).}
+  (Figure~\ref{fig:Rlam-syntax}).}
 \label{fig:f2-syntax}
 \end{figure}
 
@@ -9354,7 +9358,7 @@ in greater detail.
 \]
 \end{minipage}
 }
-\caption{The abstract syntax of \LangAny{}, extending \LangLam{} (Figure~\ref{fig:r5-syntax}).}
+\caption{The abstract syntax of \LangAny{}, extending \LangLam{} (Figure~\ref{fig:Rlam-syntax}).}
 \label{fig:r6-syntax}
 \end{figure}
 
@@ -10397,7 +10401,7 @@ But does that matter?
 %
 Indeed it does.  Recall that for register allocation, the compiler
 performs liveness analysis to determine which variables can share the
-same register.  In Section~\ref{sec:liveness-analysis-r2} we analyze
+same register.  In Section~\ref{sec:liveness-analysis-Rif} we analyze
 the control-flow graph in reverse topological order, but topological
 order is only well-defined for acyclic graphs.
 
@@ -10812,7 +10816,7 @@ function \code{f}.
 
 The three new language forms, \code{while}, \code{set!}, and
 \code{begin} are all complex expressions and their subexpressions are
-allowed to be complex.  Figure~\ref{fig:r4-anf-syntax} defines the
+allowed to be complex.  Figure~\ref{fig:Rfun-anf-syntax} defines the
 output language \LangFunANF{} of this pass.
 
 \begin{figure}[tp]
@@ -10957,7 +10961,7 @@ We recommend using the generic \code{analyze-dataflow} function that
 was presented at the end of Section~\ref{sec:dataflow-analysis} to
 perform liveness analysis, replacing the code in
 \code{uncover-live-CFG} that processed the basic blocks in topological
-order (Section~\ref{sec:liveness-analysis-r2}).
+order (Section~\ref{sec:liveness-analysis-Rif}).
 
 The \code{analyze-dataflow} function has four parameters.
 \begin{enumerate}
@@ -13053,7 +13057,7 @@ Figure~\ref{fig:r6-concrete-syntax}.
 \end{minipage}
 }
 \caption{The concrete syntax of \LangAny{}, extending \LangLam{}
-  (Figure~\ref{fig:r5-syntax}) with \key{Any}.}
+  (Figure~\ref{fig:Rlam-syntax}) with \key{Any}.}
 \label{fig:r6-concrete-syntax}
 \end{figure}
 
