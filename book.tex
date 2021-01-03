@@ -2180,7 +2180,7 @@ name guidelines as before.).
 In the \code{run-tests.rkt} script, add the following entry to the
 list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
-(list "remove complex" remove-complex-opera* interp-Rvar type-check-Rvar)
+(list "remove-complex" remove-complex-opera* interp-Rvar type-check-Rvar)
 \end{lstlisting}
 \end{exercise}
 
@@ -4905,8 +4905,7 @@ This instructs \code{interp-tests} to run the intepreter
 \code{interp-Rif} and the type checker \code{type-check-Rif} on the
 output of \code{shrink}.
 %
-Run the script to test the \code{shrink} pass on all the test
-programs.
+Run the script to test your compiler on all the test programs.
 
 \end{exercise}
 
@@ -4948,6 +4947,22 @@ R^{\dagger}_2  &::=& \PROGRAM{\code{()}}{\Exp}
 \caption{\LangIfANF{} is \LangIf{} in administrative normal form (ANF).}
 \label{fig:Rif-anf-syntax}
 \end{figure}
+
+
+\begin{exercise}\normalfont
+%
+Add cases for Boolean constants and \code{if} to the \code{rco-atom}
+and \code{rco-exp} functions in \code{compiler.rkt}.
+%
+Create three new \LangInt{} programs that exercise the interesting
+code in this pass.
+%
+In the \code{run-tests.rkt} script, add the following entry to the
+list of \code{passes} and then run the script to test your compiler.
+\begin{lstlisting}
+(list "remove-complex" remove-complex-opera* interp-Rif type-check-Rif)
+\end{lstlisting}
+\end{exercise}
 
 
 \section{Explicate Control}
@@ -5355,7 +5370,7 @@ Create test cases that exercise all of the new cases in the code for
 this pass.
 %
 Add the following entry to the list of \code{passes} in
-\code{run-tests.rkt}
+\code{run-tests.rkt} and then run the script to test your compiler.
 \begin{lstlisting}
 (list "explicate-control" explicate-control interp-Cif type-check-Cif)
 \end{lstlisting}
@@ -5367,11 +5382,10 @@ Add the following entry to the list of \code{passes} in
 \label{sec:select-Rif}
 \index{instruction selection}
 
-Recall that the \code{select-instructions} pass lowers from our
-$C$-like intermediate representation to the pseudo-x86 language, which
-is suitable for conducting register allocation. The pass is
-implemented using three auxiliary functions, one for each of the
-non-terminals $\Atm$, $\Stmt$, and $\Tail$.
+The \code{select-instructions} pass translate \LangCIf{} to
+\LangXIfVar{}. Recall that we implement this pass using three
+auxiliary functions, one for each of the non-terminals $\Atm$,
+$\Stmt$, and $\Tail$.
 
 For $\Atm$, we have new cases for the Booleans.  We take the usual
 approach of encoding them as integers, with true as 1 and false as 0.
@@ -5428,21 +5442,19 @@ movzbq %al, |$\Var$|
 \end{tabular}  \\
 
 Regarding the $\Tail$ non-terminal, we have two new cases: \key{goto}
-and conditional \key{goto}. Both are straightforward to handle. A
-\key{goto} becomes a jump instruction.
+and \key{if} statements. Both are straightforward to translate to
+x86. A \key{goto} becomes a jump instruction.
 \[
 \key{goto}\; \ell\key{;} \quad \Rightarrow \quad \key{jmp}\;\ell
 \]
-A conditional \key{goto} becomes a compare instruction followed
-by a conditional jump (for ``then'') and the fall-through is
-to a regular jump (for ``else'').\\
+An \key{if} statement becomes a compare instruction followed by a
+conditional jump (for the ``then'' branch) and the fall-through is to
+a regular jump (for the ``else'' branch).\\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-if (eq? |$\Atm_1$| |$\Atm_2$|)
-   goto |$\ell_1$|;
-else
-   goto |$\ell_2$|;
+if (eq? |$\Atm_1$| |$\Atm_2$|) goto |$\ell_1$|;
+else goto |$\ell_2$|;
 \end{lstlisting}
 \end{minipage}
 &
@@ -5459,11 +5471,15 @@ jmp |$\ell_2$|
 
 \begin{exercise}\normalfont
 Expand your \code{select-instructions} pass to handle the new features
-of the \LangIf{} language. Test the pass on all the examples you have
-created and make sure that you have some test programs that use the
-\code{eq?} and \code{<} operators, creating some if necessary. Test
-the output using the \code{interp-x86} interpreter
-(Appendix~\ref{appendix:interp}).
+of the \LangIf{} language.
+%
+Add the following entry to the list of \code{passes} in
+\code{run-tests.rkt}
+\begin{lstlisting}
+(list "select-instructions" select-instructions interp-pseudo-x86-1)
+\end{lstlisting}
+%
+Run the script to test your compiler on all the test programs.
 \end{exercise}
 
 \section{Register Allocation}
@@ -5638,7 +5654,7 @@ $\Downarrow$
 \begin{lstlisting}
 start:
     tmp7951 = (read);
-    if (eq? tmp7951 1) then
+    if (eq? tmp7951 1)
        goto block7952;
     else
        goto block7953;
