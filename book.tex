@@ -242,7 +242,7 @@ have not had the chance to study compilers at Indiana University.
 %% book leans more towards pedagogy than towards the efficiency of the
 %% generated code. Also, the book differs in places where we I the
 %% opportunity to make the topics more fun, such as in relating register
-%% allocation to Sudoku (Chapter~\ref{ch:register-allocation-r1}).
+%% allocation to Sudoku (Chapter~\ref{ch:register-allocation-Rvar}).
 
 \section*{Prerequisites}
 
@@ -1402,15 +1402,15 @@ criteria in the following diagram.
  \path[->] (p2) edge [right] node {\footnotesize\code{interp-x86int}} (o);
 \end{tikzpicture}
 \]
-In the next section we introduce the \LangXASTInt{} subset of x86 that
+In the next section we introduce the \LangXInt{} subset of x86 that
 suffices for compiling \LangVar{}.
 
-\section{The \LangXASTInt{} Assembly Language}
+\section{The \LangXInt{} Assembly Language}
 \label{sec:x86}
 \index{x86}
 
 Figure~\ref{fig:x86-int-concrete} defines the concrete syntax for
-\LangXASTInt{}.  We use the AT\&T syntax expected by the GNU
+\LangXInt{}.  We use the AT\&T syntax expected by the GNU
 assembler.
 %
 A program begins with a \code{main} label followed by a sequence of
@@ -1456,7 +1456,7 @@ integer constant (called \emph{immediate value}\index{immediate
 \]
 \end{minipage}
 }
-\caption{The syntax of the \LangXASTInt{} assembly language (AT\&T syntax).}
+\caption{The syntax of the \LangXInt{} assembly language (AT\&T syntax).}
 \label{fig:x86-int-concrete}
 \end{figure}
 
@@ -1635,7 +1635,7 @@ one and adds $8$ to the stack pointer.
 The compiler needs a convenient representation for manipulating x86
 programs, so we define an abstract syntax for x86 in
 Figure~\ref{fig:x86-int-ast}. We refer to this language as
-\LangXASTInt{}. The main difference compared to the concrete syntax of
+\LangXInt{}. The main difference compared to the concrete syntax of
 \LangXInt{} (Figure~\ref{fig:x86-int-concrete}) is that labels are not
 allowed in front of every instructions. Instead instructions are
 grouped into \emph{blocks}\index{block}\index{basic block} with a
@@ -1644,12 +1644,12 @@ struct includes an alist mapping labels to blocks. The reason for this
 organization becomes apparent in Chapter~\ref{ch:bool-types} when we
 introduce conditional branching. The \code{Block} structure includes
 an $\itm{info}$ field that is not needed for this chapter, but becomes
-useful in Chapter~\ref{ch:register-allocation-r1}.  For now, the
+useful in Chapter~\ref{ch:register-allocation-Rvar}.  For now, the
 $\itm{info}$ field should contain an empty list. Also, regarding the
 abstract syntax for \code{callq}, the \code{Callq} struct includes an
 integer for representing the arity of the function, i.e., the number
 of arguments, which is helpful to know during register allocation
-(Chapter~\ref{ch:register-allocation-r1}).
+(Chapter~\ref{ch:register-allocation-Rvar}).
 
 \begin{figure}[tp]
 \fbox{
@@ -1667,12 +1667,12 @@ of arguments, which is helpful to know during register allocation
        &\mid& \CALLQ{\itm{label}}{\itm{int}} \mid \RETQ{} 
        \mid \PUSHQ{\Arg} \mid \POPQ{\Arg} \mid \JMP{\itm{label}} \\
 \Block &::= & \BLOCK{\itm{info}}{\LP\Instr\ldots\RP} \\
-\LangXASTInt{} &::= & \XPROGRAM{\itm{info}}{\LP\LP\itm{label} \,\key{.}\, \Block \RP\ldots\RP}
+\LangXInt{} &::= & \XPROGRAM{\itm{info}}{\LP\LP\itm{label} \,\key{.}\, \Block \RP\ldots\RP}
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The abstract syntax of \LangXASTInt{} assembly.}
+\caption{The abstract syntax of \LangXInt{} assembly.}
 \label{fig:x86-int-ast}
 \end{figure}
 
@@ -1805,7 +1805,7 @@ outstanding problems.
 
 \node (x86-2) at (3,-2)  {\large \LangXVar{}};
 \node (x86-3) at (6,-2)  {\large \LangXVar{}};
-\node (x86-4) at (9,-2) {\large \LangXASTInt{}};
+\node (x86-4) at (9,-2) {\large \LangXInt{}};
 \node (x86-5) at (12,-2) {\large \LangXInt{}};
 
 \path[->,bend left=15] (Rvar) edge [above] node {\ttfamily\footnotesize uniquify} (Rvar-2);
@@ -1824,7 +1824,7 @@ outstanding problems.
 Figure~\ref{fig:Rvar-passes} presents the ordering of the compiler
 passes and identifies the input and output language of each pass.  The
 last pass, \key{print-x86}, converts from the abstract syntax of
-\LangXASTInt{} to the concrete syntax.  In the following two sections
+\LangXInt{} to the concrete syntax.  In the following two sections
 we discuss the \LangCVar{} intermediate language and the \LangXVar{}
 dialect of x86. The remainder of this chapter gives hints regarding
 the implementation of each of the compiler passes in
@@ -1907,7 +1907,7 @@ in a \code{github} repository at the following URL:
 \subsection{The \LangXVar{} dialect}
 
 The \LangXVar{} language is the output of the pass
-\key{select-instructions}. It extends \LangXASTInt{} with an unbounded
+\key{select-instructions}. It extends \LangXInt{} with an unbounded
 number of program-scope variables and removes the restrictions
 regarding instruction arguments.
 
@@ -2182,11 +2182,18 @@ list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
 (list "remove-complex" remove-complex-opera* interp-Rvar type-check-Rvar)
 \end{lstlisting}
+While debugging your compiler, it is often useful to see the
+intermediate programs that are output from each pass. To print the
+intermeidate programs, place the following before the call to
+\code{interp-tests} in \code{run-tests.rkt}.
+\begin{lstlisting}
+(debug-level 1)  
+\end{lstlisting}
 \end{exercise}
 
 
 \section{Explicate Control}
-\label{sec:explicate-control-r1}
+\label{sec:explicate-control-Rvar}
 
 The \code{explicate-control} pass compiles \LangVar{} programs into \LangCVar{}
 programs that make the order of execution explicit in their
@@ -2306,14 +2313,14 @@ list of \code{passes} and then run the script to test your compiler.
 \end{exercise}
 
 \section{Select Instructions}
-\label{sec:select-r1}
+\label{sec:select-Rvar}
 \index{instruction selection}
 
 In the \code{select-instructions} pass we begin the work of
 translating from \LangCVar{} to \LangXVar{}. The target language of
 this pass is a variant of x86 that still uses variables, so we add an
 AST node of the form $\VAR{\itm{var}}$ to the \Arg{} non-terminal of
-the \LangXASTInt{} abstract syntax (Figure~\ref{fig:x86-int-ast}).  We
+the \LangXInt{} abstract syntax (Figure~\ref{fig:x86-int-ast}).  We
 recommend implementing the \code{select-instructions} with
 three auxiliary functions, one for each of the non-terminals of
 \LangCVar{}: $\Atm$, $\Stmt$, and $\Tail$.
@@ -2417,7 +2424,7 @@ list of \code{passes} and then run the script to test your compiler.
 
 
 \section{Assign Homes}
-\label{sec:assign-r1}
+\label{sec:assign-Rvar}
 
 The \key{assign-homes} pass compiles \LangXVar{} programs to
 \LangXVar{} programs that no longer use program variables.
@@ -2428,7 +2435,7 @@ are only 16 registers, some programs must necessarily resort to
 placing some variables on the stack. In this chapter we focus on the
 mechanics of placing variables on the stack. We study an algorithm for
 placing variables in registers in
-Chapter~\ref{ch:register-allocation-r1}.
+Chapter~\ref{ch:register-allocation-Rvar}.
 
 Consider again the following \LangVar{} program from
 Section~\ref{sec:remove-complex-opera-Rvar}.
@@ -2502,7 +2509,7 @@ list of \code{passes} and then run the script to test your compiler.
 \label{sec:patch-s0}
 
 The \code{patch-instructions} pass compiles from \LangXVar{} to
-\LangXASTInt{} by making sure that each instruction adheres to the
+\LangXInt{} by making sure that each instruction adheres to the
 restriction that at most one argument of an instruction may be a
 memory reference.
 
@@ -2551,7 +2558,7 @@ list of \code{passes} and then run the script to test your compiler.
 \label{sec:print-x86}
 
 The last step of the compiler from \LangVar{} to x86 is to convert the
-\LangXASTInt{} AST (defined in Figure~\ref{fig:x86-int-ast}) to the
+\LangXInt{} AST (defined in Figure~\ref{fig:x86-int-ast}) to the
 string representation (defined in
 Figure~\ref{fig:x86-int-concrete}). The Racket \key{format} and
 \key{string-append} functions are useful in this regard. The main work
@@ -2644,7 +2651,7 @@ all, fast code is useless if it produces incorrect results!
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Register Allocation}
-\label{ch:register-allocation-r1}
+\label{ch:register-allocation-Rvar}
 
 \index{register allocation}
 
@@ -2706,7 +2713,7 @@ Consider variables \code{x} and \code{z} in Figure~\ref{fig:reg-eg}.
 After the variable \code{x} is moved to \code{z} it is no longer
 needed.  Variable \code{z}, on the other hand, is used only after this
 point, so \code{x} and \code{z} could share the same register. The
-topic of Section~\ref{sec:liveness-analysis-r1} is how to compute
+topic of Section~\ref{sec:liveness-analysis-Rvar} is how to compute
 where a variable is needed.  Once we have that information, we compute
 which variables are needed at the same time, i.e., which ones
 \emph{interfere} with each other, and represent this relation as an
@@ -2831,7 +2838,7 @@ callee-saved register, and 3) spill the variable to the stack.
 It is straightforward to implement this approach in a graph coloring
 register allocator. First, we know which variables are in-use during
 every function call because we compute that information for every
-instruction (Section~\ref{sec:liveness-analysis-r1}). Second, when we
+instruction (Section~\ref{sec:liveness-analysis-Rvar}). Second, when we
 build the interference graph (Section~\ref{sec:build-interference}),
 we can place an edge between each of these variables and the
 caller-saved registers in the interference graph. This will prevent
@@ -2905,7 +2912,7 @@ conclusion:
 \clearpage
 
 \section{Liveness Analysis}
-\label{sec:liveness-analysis-r1}
+\label{sec:liveness-analysis-Rvar}
 \index{liveness analysis}
 
 
@@ -3109,11 +3116,12 @@ called. (This is why the abstract syntax for \code{callq} includes the
 arity.)
 \end{exercise}
 
+\clearpage
 
-\section{Building the Interference Graph}
+\section{Build the Interference Graph}
 \label{sec:build-interference}
 
-\begin{wrapfigure}[27]{r}[1.0in]{0.6\textwidth}
+\begin{wrapfigure}[25]{r}[1.0in]{0.6\textwidth}
   \small
   \begin{tcolorbox}[title=\href{https://docs.racket-lang.org/graph/index.html}{The Racket Graph Library}]
     A \emph{graph} is a collection of vertices and edges where each
@@ -3715,7 +3723,7 @@ assignment of variables to locations.
 \end{gather*}
 
 Adapt the code from the \code{assign-homes} pass
-(Section~\ref{sec:assign-r1}) to replace the variables with their
+(Section~\ref{sec:assign-Rvar}) to replace the variables with their
 assigned location. Applying the above assignment to our running
 example, on the left, yields the program on the right.
 % why frame size of 32? -JGS
@@ -3869,7 +3877,7 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 
 \node (x86-2) at (3,-2)  {\large \LangXVar{}};
 \node (x86-3) at (6,-2)  {\large \LangXVar{}};
-\node (x86-4) at (9,-2) {\large \LangXASTInt{}};
+\node (x86-4) at (9,-2) {\large \LangXInt{}};
 \node (x86-5) at (9,-4) {\large \LangXInt{}};
 
 \node (x86-2-1) at (3,-4)  {\large \LangXVar{}};
@@ -4308,7 +4316,7 @@ and interpreter for the \LangIf{} language
 checking and build a type checker for \LangIf{}
 (Section~\ref{sec:type-check-Rif}). To compile \LangIf{} we need to
 enlarge the intermediate language \LangCVar{} into \LangCIf{}
-(Section~\ref{sec:Cif}) and \LangXASTInt{} into \LangXASTIf{}
+(Section~\ref{sec:Cif}) and \LangXInt{} into \LangXIf{}
 (Section~\ref{sec:x86-if}). The remaining sections of this chapter
 discuss how our compiler passes change to accommodate Booleans and
 conditional control flow. There is one new pass, named \code{shrink},
@@ -4720,13 +4728,13 @@ to x86.
 \label{fig:c1-syntax}
 \end{figure}
 
-\section{The \LangXASTIf{} Language}
+\section{The \LangXIf{} Language}
 \label{sec:x86-if}
 
 \index{x86} To implement the new logical operations, the comparison
 operations, and the \key{if} expression, we need to delve further into
 the x86 language. Figures~\ref{fig:x86-1-concrete} and \ref{fig:x86-1}
-define the concrete and abstract syntax for the \LangXASTIf{} subset
+define the concrete and abstract syntax for the \LangXIf{} subset
 of x86, which includes instructions for logical operations,
 comparisons, and conditional jumps.
 
@@ -4786,7 +4794,7 @@ the first argument:
 \]
 \end{minipage}
 }
-\caption{The concrete syntax of \LangXIf{}  (extends \LangXASTInt{} of Figure~\ref{fig:x86-int-concrete}).}
+\caption{The concrete syntax of \LangXIf{}  (extends \LangXInt{} of Figure~\ref{fig:x86-int-concrete}).}
 \label{fig:x86-1-concrete}
 \end{figure}
 
@@ -4813,12 +4821,12 @@ the first argument:
        \mid \BININSTR{\code{movzbq}}{\Arg}{\Arg}\\
        &\mid&  \JMPIF{\itm{cc}}{\itm{label}} \\
 \Block &::= & \gray{\BLOCK{\itm{info}}{\LP\Instr\ldots\RP}} \\
-\LangXASTIf{} &::= & \gray{\XPROGRAM{\itm{info}}{\LP\LP\itm{label} \,\key{.}\, \Block \RP\ldots\RP}}
+\LangXIf{} &::= & \gray{\XPROGRAM{\itm{info}}{\LP\LP\itm{label} \,\key{.}\, \Block \RP\ldots\RP}}
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The abstract syntax of \LangXASTIf{} (extends \LangXASTInt{} of Figure~\ref{fig:x86-int-ast}).}
+\caption{The abstract syntax of \LangXIf{} (extends \LangXInt{} of Figure~\ref{fig:x86-int-ast}).}
 \label{fig:x86-1}
 \end{figure}
 
@@ -4907,6 +4915,21 @@ output of \code{shrink}.
 %
 Run the script to test your compiler on all the test programs.
 
+\end{exercise}
+
+\section{Uniquify Variables}
+\label{sec:uniquify-Rif}
+
+Add cases to \code{uniquify-exp} to handle Boolean constants and
+\code{if} expressions.
+
+\begin{exercise}\normalfont
+Update the \code{uniquify-exp} for \LangIf{} and add the following
+entry to the list of \code{passes} in the \code{run-tests.rkt} script.
+\begin{lstlisting}
+(list "uniquify" uniquify interp-Rif type-check-Rif)
+\end{lstlisting}
+Run the script to test your compiler.
 \end{exercise}
 
 \section{Remove Complex Operands}
@@ -5145,7 +5168,7 @@ block39:
 %% \code{block95}, that only jump to another block. We discuss a solution
 %% to this problem in Section~\ref{sec:opt-jumps}.
 
-Recall that in Section~\ref{sec:explicate-control-r1} we implement
+Recall that in Section~\ref{sec:explicate-control-Rvar} we implement
 \code{explicate-control} for \LangVar{} using two mutually recursive
 functions, \code{explicate-tail} and \code{explicate-assign}.  The
 former function translates expressions in tail position whereas the
@@ -5370,7 +5393,7 @@ Create test cases that exercise all of the new cases in the code for
 this pass.
 %
 Add the following entry to the list of \code{passes} in
-\code{run-tests.rkt} and then run the script to test your compiler.
+\code{run-tests.rkt} and then run this script to test your compiler.
 \begin{lstlisting}
 (list "explicate-control" explicate-control interp-Cif type-check-Cif)
 \end{lstlisting}
@@ -5495,90 +5518,105 @@ algorithm itself does not change.
 \index{liveness analysis}
 
 Recall that for \LangVar{} we implemented liveness analysis for a single
-basic block (Section~\ref{sec:liveness-analysis-r1}). With the
+basic block (Section~\ref{sec:liveness-analysis-Rvar}). With the
 addition of \key{if} expressions to \LangIf{}, \code{explicate-control}
 produces many basic blocks arranged in a control-flow graph.  We
 recommend that you create a new auxiliary function named
 \code{uncover-live-CFG} that applies liveness analysis to a
 control-flow graph.
 
-The first question we need to consider is: what order should we
-process the basic blocks in the control-flow graph? To perform
-liveness analysis on a basic block, we need to know its live-after
-set. If a basic block has no successor blocks (i.e. no out-edges in
-the control flow graph), then it has an empty live-after set and we
-can immediately apply liveness analysis to it. If a basic block has
-some successors, then we need to complete liveness analysis on those
-blocks first. Thankfully, the control flow graph does not contain any
-cycles because \LangIf{} does not include loops.  (In
-Chapter~\ref{ch:loop} we add loops and study how to handle cycles in
-the control-flow graph.)
+The first question we is: what order should we process the basic
+blocks in the control-flow graph? Recall that to perform liveness
+analysis on a basic block we need to know its live-after set. If a
+basic block has no successors (i.e. no out-edges in the control flow
+graph), then it has an empty live-after set and we can immediately
+apply liveness analysis to it. If a basic block has some successors,
+then we need to complete liveness analysis on those blocks first. In
+graph theory, a sequence of nodes is in \emph{topological
+  order}\index{topological order} if each vertex comes before its
+successors. We need the opposite, so we can transpose the graph
+before computing a topological order.
 %
-Returning to the question of what order should we process the basic
-blocks, the answer is reverse topological order. We recommend using
-the \code{tsort} (topological sort) and \code{transpose} functions of
-the Racket \code{graph} package to obtain this ordering.
-\index{topological order}
-\index{topological sort}
-
-The next question is how to analyze the jump instructions.  In
-Section~\ref{sec:liveness-analysis-r1} we recommended that you
-maintain an alist named \code{label->live} that maps each label to the
-set of live locations at the beginning of the associated block.  Now
-that we have many basic blocks, the alist needs to be extended as we
-process the blocks. In particular, after performing liveness analysis
-on a block, we can take the live-before set for its first instruction
-and associate that with the block's label in the alist.
+Use the \code{tsort} and \code{transpose} functions of the Racket
+\code{graph} package to accomplish this.
 %
-As discussed in Section~\ref{sec:liveness-analysis-r1}, the
-live-before set for a $\JMP{\itm{label}}$ instruction is given by the
-mapping for $\itm{label}$ in \code{label->live}.
+As an aside, a topological ordering is only guaranteed to exist if the
+graph does not contain any cycles. That is indeed the case for the
+control-flow graphs that we generate from \LangIf{} programs.
+However, in Chapter~\ref{ch:loop} we add loops to \LangLoop{} and
+learn how to handle cycles in the control-flow graph.
 
-Now for $x86_1$ we also have the conditional jump
-$\JMPIF{\itm{cc}}{\itm{label}}$ to deal with.  This one is
-particularly interesting because during compilation we do not know, in
-general, which way a conditional jump will go, so we do not know
-whether to use the live-before set for the following instruction or
-the live-before set for $\itm{label}$.  The solution to this challenge
-is based on the observation that there is no harm to the correctness
-of the compiler if we classify more locations as live than the ones
-that are truly live during a particular execution of the
-instruction. Thus, we can take the union of the live-before sets from
-the following instruction and from the mapping fro $\itm{label}$ in
+You'll need to construct a directed graph to represent the
+control-flow graph. Do not use the \code{directed-graph} of the
+\code{graph} package because that only allows at most one edge between
+each pair of vertices, but a control-flow graph may have multiple
+edges between a pair of vertices. The \code{multigraph.rkt} file in
+the support code implements a graph representation that allows
+multiple edges between a pair of vertices.
+
+The next question is how to analyze jump instructions.  Recall that in
+Section~\ref{sec:liveness-analysis-Rvar} we maintain an alist named
+\code{label->live} that maps each label to the set of live locations
+at the beginning of its block. We use \code{label->live} to determine
+the live-before set for each $\JMP{\itm{label}}$ instruction.  Now
+that we have many basic blocks, \code{label->live} needs to be updated
+as we process the blocks. In particular, after performing liveness
+analysis on a block, we take the live-before set of its first
+instruction and associate that with the block's label in the
 \code{label->live}.
 
-The helper functions for computing the variables in an instruction's
-argument and for computing the variables read-from ($R$) or written-to
-($W$) by an instruction need to be updated to handle the new kinds of
-arguments and instructions in \LangXASTIf{}.
+In \LangXIfVar{} we also have the conditional jump
+$\JMPIF{\itm{cc}}{\itm{label}}$ to deal with.  Liveness analysis for
+this instruction is particularly interesting because during
+compilation we do not know which way a conditional jump will go.  So
+we do not know whether to use the live-before set for the following
+instruction or the live-before set for the $\itm{label}$.  However,
+there is no harm to the correctness of the compiler if we classify
+more locations as live than the ones that are truly live during a
+particular execution of the instruction. Thus, we can take the union
+of the live-before sets from the following instruction and from the
+mapping for $\itm{label}$ in \code{label->live}.
 
-\subsection{Build Interference}
+The auxiliary functions for computing the variables in an
+instruction's argument and for computing the variables read-from ($R$)
+or written-to ($W$) by an instruction need to be updated to handle the
+new kinds of arguments and instructions in \LangXIfVar{}.
+
+\begin{exercise}\normalfont
+Update the \code{uncover-live} pass and implement the
+\code{uncover-live-CFG} auxiliary function to apply liveness analysis
+to the control-flow graph.  Add the following entry to the list of
+\code{passes} in the \code{run-tests.rkt} script.
+\begin{lstlisting}
+(list "uncover-live" uncover-live interp-pseudo-x86-1)
+\end{lstlisting}
+\end{exercise}
+
+\subsection{Build the Interference Graph}
 \label{sec:build-interference-Rif}
 
-Many of the new instructions in \LangXASTIf{} can be handled in the same way
-as the instructions in \LangXASTInt{}. Thus, if your code was already quite
-general, it will not need to be changed to handle the new
-instructions. If you code is not general enough, I recommend that you
-change your code to be more general. For example, you can factor out
-the computing of the the read and write sets for each kind of
+Many of the new instructions in \LangXIfVar{} can be handled in the
+same way as the instructions in \LangXVar{}. Thus, if your code was
+already quite general, it will not need to be changed to handle the
+new instructions. If you code is not general enough, we recommend that
+you change your code to be more general. For example, you can factor
+out the computing of the the read and write sets for each kind of
 instruction into two auxiliary functions.
 
 Note that the \key{movzbq} instruction requires some special care,
-just like the \key{movq} instruction. See rule number 3 in
+similar to the \key{movq} instruction. See rule number 1 in
 Section~\ref{sec:build-interference}.
 
-%% \subsection{Assign Homes}
-%% \label{sec:assign-homes-Rif}
-
-%% The \code{assign-homes} function (Section~\ref{sec:assign-r1}) needs
-%% to be updated to handle the \key{if} statement, simply by recursively
-%% processing the child nodes.  Hopefully your code already handles the
-%% other new instructions, but if not, you can generalize your code.
-
 \begin{exercise}\normalfont
-Update the \code{register-allocation} pass so that it works for \LangIf{}
-and test your compiler using your previously created programs on the
-\code{interp-x86} interpreter (Appendix~\ref{appendix:interp}).
+Update the \code{build-interference} pass for \LangXIfVar{} and add the
+following entries to the list of \code{passes} in the
+\code{run-tests.rkt} script.
+\begin{lstlisting}
+(list "build-interference" build-interference interp-pseudo-x86-1)
+(list "allocate-registers" allocate-registers interp-x86-1)
+\end{lstlisting}
+Run the script to test your compiler on all the \LangIf{} test
+programs.
 \end{exercise}
 
 
@@ -5592,13 +5630,17 @@ at most one memory reference.
 %
 The second argument of the \key{movzbq} must be a register.
 %
-There are no special restrictions on the x86 instructions \key{JmpIf}
-and \key{Jmp}.
+There are no special restrictions on the jump instructions.
 
 \begin{exercise}\normalfont
-Update \code{patch-instructions} to handle the new x86 instructions.
-Test your compiler using your previously created programs on the
-\code{interp-x86} interpreter (Appendix~\ref{appendix:interp}).
+%
+Update \code{patch-instructions} pass for \LangXIfVar{}.
+%  
+Add the following entry to the list of \code{passes} in
+\code{run-tests.rkt} and then run this script to test your compiler.
+\begin{lstlisting}
+(list "patch-instructions" patch-instructions interp-x86-1)
+\end{lstlisting}
 \end{exercise}
 
 \begin{figure}[tbp]
@@ -5645,7 +5687,7 @@ x86 assembly code.
 
 \begin{figure}[tbp]
 \begin{tabular}{lll}
-\begin{minipage}{0.5\textwidth}
+\begin{minipage}{0.4\textwidth}
 % cond_test_20.rkt
 \begin{lstlisting}
 (if (eq? (read) 1) 42 0)
@@ -5843,8 +5885,8 @@ conclusion:
 %% \end{exercise}
 
 There is an opportunity for optimizing jumps that is apparent in the
-example of Figure~\ref{fig:if-example-x86}. The \code{start} block end
-with a jump to \code{block7953} and there are no other jumps to
+example of Figure~\ref{fig:if-example-x86}. The \code{start} block
+ends with a jump to \code{block7953} and there are no other jumps to
 \code{block7953} in the rest of the program. In this situation we can
 avoid the runtime overhead of this jump by merging \code{block7953}
 into the preceding block, in this case the \code{start} block.
@@ -5893,13 +5935,21 @@ block7952:
 \end{figure}
 
 \begin{exercise}\normalfont
-  Implement a pass named \code{remove-jumps} that merges basic blocks
-  into their preceding basic block, when there is only one preceding
-  block. The pass should translate from pseudo $x86_1$ to pseudo
-  $x86_1$ and it should come immediately after
-  \code{select-instructions}.  Check that \code{remove-jumps}
-  accomplishes the goal of merging basic blocks on several test
-  programs and check that your compiler passes all of your tests.
+%
+Implement a pass named \code{remove-jumps} that merges basic blocks
+into their preceding basic block, when there is only one preceding
+block. The pass should translate from \LangXIfVar{} to \LangXIfVar{}.
+%  
+In the \code{run-tests.rkt} script, add the following entry to the
+list of \code{passes} between \code{allocate-registers}
+and \code{patch-instructions}.
+\begin{lstlisting}
+(list "remove-jumps" remove-jumps interp-pseudo-x86-1)
+\end{lstlisting}
+Run this script to test your compiler.
+%
+Check that \code{remove-jumps} accomplishes the goal of merging basic
+blocks on several test programs.
 \end{exercise}
 
 
@@ -6721,7 +6771,7 @@ these new forms much like the other expression forms that we've
 already encoutered.
 
 
-\section{Select Instructions and the \LangXASTGlobal{} Language}
+\section{Select Instructions and the \LangXGlobal{} Language}
 \label{sec:select-instructions-gc}
 \index{instruction selection}
 
@@ -6830,7 +6880,7 @@ available for use by the register allocator.
 \]
 \end{minipage}
 }
-\caption{The concrete syntax of \LangXGlobal{}  (extends \LangXASTIf{} of Figure~\ref{fig:x86-1-concrete}).}
+\caption{The concrete syntax of \LangXGlobal{}  (extends \LangXIf{} of Figure~\ref{fig:x86-1-concrete}).}
 \label{fig:x86-2-concrete}
 \end{figure}
 
@@ -6843,18 +6893,18 @@ available for use by the register allocator.
   \Arg &::=&  \gray{  \INT{\Int} \mid \REG{\Reg} \mid \DEREF{\Reg}{\Int}
    \mid \BYTEREG{\Reg}} \\
    &\mid& (\key{Global}~\Var) \\
-\LangXASTGlobal{} &::= & \gray{ \XPROGRAM{\itm{info}}{\LP\LP\itm{label} \,\key{.}\, \Block \RP\ldots\RP} }
+\LangXGlobal{} &::= & \gray{ \XPROGRAM{\itm{info}}{\LP\LP\itm{label} \,\key{.}\, \Block \RP\ldots\RP} }
 \end{array}
 \]
 \end{minipage}
 }
-\caption{The abstract syntax of \LangXASTGlobal{} (extends \LangXASTIf{} of Figure~\ref{fig:x86-1}).}
+\caption{The abstract syntax of \LangXGlobal{} (extends \LangXIf{} of Figure~\ref{fig:x86-1}).}
 \label{fig:x86-2}
 \end{figure}
 
-The concrete and abstract syntax of the \LangXASTGlobal{} language is
+The concrete and abstract syntax of the \LangXGlobal{} language is
 defined in Figures~\ref{fig:x86-2-concrete} and \ref{fig:x86-2}.  It
-differs from \LangXASTIf{} just in the addition of the form for global
+differs from \LangXIf{} just in the addition of the form for global
 variables.
 %
 Figure~\ref{fig:select-instr-output-gc} shows the output of the
@@ -8047,7 +8097,8 @@ language, whose syntax is defined in Figure~\ref{fig:x86-3}.
 \]
 \end{minipage}
 }
-  \caption{The abstract syntax of \LangXIndCall{} (extends \LangXASTGlobal{} of Figure~\ref{fig:x86-2}).}
+\caption{The abstract syntax of \LangXIndCall{} (extends
+  \LangXGlobal{} of Figure~\ref{fig:x86-2}).}
 \label{fig:x86-3}
 \end{figure}
 
@@ -8155,9 +8206,9 @@ means ``pop the frame and then do an indirect jump'', which we name
 argument that specifies where to jump and an integer that represents
 the arity of the function being called.
 
-Recall that in Section~\ref{sec:explicate-control-r1} we recommended
+Recall that in Section~\ref{sec:explicate-control-Rvar} we recommended
 using the label \code{start} for the initial block of a program, and
-in Section~\ref{sec:select-r1} we recommended labeling the conclusion
+in Section~\ref{sec:select-Rvar} we recommended labeling the conclusion
 of the program with \code{conclusion}, so that $(\key{Return}\;\Arg)$
 can be compiled to an assignment to \code{rax} followed by a jump to
 \code{conclusion}. With the addition of function definitions, we will
@@ -8218,7 +8269,7 @@ The primary change to the \code{allocate-registers} pass is adding an
 auxiliary function for handling definitions (the \Def{} non-terminal
 in Figure~\ref{fig:x86-3}) with one case for function definitions. The
 logic is the same as described in
-Chapter~\ref{ch:register-allocation-r1}, except now register
+Chapter~\ref{ch:register-allocation-Rvar}, except now register
 allocation is performed many times, once for each function definition,
 instead of just once for the whole program.
 
