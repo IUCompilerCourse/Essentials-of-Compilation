@@ -2460,15 +2460,14 @@ start:
 \end{minipage}
 \end{tabular} \\
 
-In the output of \code{select-instructions}, there is an entry for
-\code{locals-types} in the $\itm{info}$ of the \code{Program} node,
-which is needed here so that we have the list of variables that should
-be assigned to homes. The support code computes the
-\code{locals-types} entry. In particular, \code{type-check-C0}
-installs it in the $\itm{info}$ field of the \code{Program} node.
-When using \code{interp-tests} or \code{compiler-tests} (see Appendix,
-Section~\ref{appendix:utilities}), specify \code{type-check-C0} as the
-type checker to use after \code{explicate-control}.
+The \code{locals-types} entry in the $\itm{info}$ of the
+\code{X86Program} node is an alist mapping all the variables in the
+program to their types (for now just \code{Integer}).  The
+\code{assign-homes} pass should replace all uses of those variables
+with stack locations.  As an aside, the \code{locals-types} entry is
+computed by \code{type-check-Cvar} in the support code, which installs
+it in the $\itm{info}$ field of the \code{CProgram} node, which should
+be propagated to the \code{X86Program} node.
 
 In the process of assigning variables to stack locations, it is
 convenient for you to compute and store the size of the frame (in
@@ -2801,7 +2800,7 @@ If there are more than six arguments, then the convention is to use
 space on the frame of the caller for the rest of the
 arguments. However, in Chapter~\ref{ch:functions} we arrange to never
 need more than six arguments. For now, the only function we care about
-is \code{read\_int} and it takes zero arguments.
+is \code{read\_int} and it takes zero argument.
 %
 The register \code{rax} is for the return value of a function.
 
@@ -2812,7 +2811,7 @@ example from the caller point of view and then from the callee point
 of view.
 
 The program makes two calls to the \code{read} function.  Also, the
-variable \code{x} is in use during the second call to \code{read}, so
+variable \code{x} is in-use during the second call to \code{read}, so
 we need to make sure that the value in \code{x} does not get
 accidentally wiped out by the call to \code{read}.  One obvious
 approach is to save all the values in caller-saved registers to the
@@ -2826,16 +2825,16 @@ location in the first place. Or better yet, if we can arrange for
 \code{x} to be placed in a callee-saved register, then it won't need
 to be saved and restored during function calls.
 
-The approach that we recommend for variables that are in use during a
+The approach that we recommend for variables that are in-use during a
 function call is to either assign them to callee-saved registers or to
 spill them to the stack. On the other hand, for variables that are not
-in use during a function call, we try the following alternatives in
+in-use during a function call, we try the following alternatives in
 order 1) look for an available caller-saved register (to leave room
 for other variables in the callee-saved register), 2) look for a
 callee-saved register, and 3) spill the variable to the stack.
 
 It is straightforward to implement this approach in a graph coloring
-register allocator. First, we know which variables are in use during
+register allocator. First, we know which variables are in-use during
 every function call because we compute that information for every
 instruction (Section~\ref{sec:liveness-analysis-r1}). Second, when we
 build the interference graph (Section~\ref{sec:build-interference}),
@@ -3145,15 +3144,14 @@ interference graph is an undirected graph that has an edge between two
 locations if they are live at the same time, that is, if they
 interfere with each other.
 
-The most obvious way to compute the interference graph is to look at
-the set of live locations between each statement in the program and add
-an edge to the graph for every pair of variables in the same set.
-This approach is less than ideal for two reasons. First, it can be
-expensive because it takes $O(n^2)$ time to look at every pair in a
-set of $n$ live locations. Second, there is a special case in which
-two locations that are live at the same time do not actually interfere
-with each other: when they both contain the same value because we have
-assigned one to the other.
+An obvious way to compute the interference graph is to look at the set
+of live locations between each instruction and add an edge to the graph
+for every pair of variables in the same set.  This approach is less
+than ideal for two reasons. First, it can be expensive because it
+takes $O(n^2)$ time to consider at every pair in a set of $n$ live
+locations. Second, in the special case where two locations hold the
+same value (because one was assigned to the other), they can be live
+at the same time without interfering with each other.
 
 A better way to compute the interference graph is to focus on the
 writes~\cite{Appel:2003fk}. We do not want the writes performed by an
@@ -3299,14 +3297,12 @@ program, under the key \code{conflicts}.
 \index{Sudoku}
 \index{color}
 
-We come to the main event, mapping variables to registers (or to stack
-locations in the event that we run out of registers).  We need to make
-sure that two variables do not get mapped to the same register if the
-two variables interfere with each other.  Thinking about the
-interference graph, this means that adjacent vertices must be mapped
-to different registers.  If we think of registers as colors, the
-register allocation problem becomes the widely studied graph coloring
-problem~\citep{Balakrishnan:1996ve,Rosen:2002bh}.
+We come to the main event, mapping variables to registers and stack
+locations. Variables that interfere with each other must be mapped to
+different locations.  In terms of the interference graph, this means
+that adjacent vertices must be mapped to different locations.  If we
+think of locations as colors, the register allocation problem becomes
+the graph coloring problem~\citep{Balakrishnan:1996ve,Rosen:2002bh}.
 
 The reader may be more familiar with the graph coloring problem than he
 or she realizes; the popular game of Sudoku is an instance of the
@@ -3394,18 +3390,18 @@ locations. The registers that are not used for register allocation,
 such as \code{rax}, are assigned to negative integers. In particular,
 we assign $-1$ to \code{rax} and $-2$ to \code{rsp}.
 
-One might wonder why we include registers at all in the liveness
-analysis and interference graph.  For example, we never allocate a
-variable to \code{rax} and \code{rsp}, so it would be harmless to
-leave them out.  As we see in Chapter~\ref{ch:tuples}, when we begin
-to use register for passing arguments to functions, it will be
-necessary for those registers to appear in the interference graph
-because those registers will also be assigned to variables, and we
-don't want those two uses to encroach on each other. Regarding
-registers such as \code{rax} and \code{rsp} that are not used for
-variables, we could omit them from the interference graph, but that
-would require adding special cases to our algorithm, which would
-complicate the logic for little gain.
+%% One might wonder why we include registers at all in the liveness
+%% analysis and interference graph, for example, we never allocate a
+%% variable to \code{rax} and \code{rsp}, so it would be harmless to
+%% leave them out.  As we see in Chapter~\ref{ch:tuples}, when we begin
+%% to use register for passing arguments to functions, it will be
+%% necessary for those registers to appear in the interference graph
+%% because those registers will also be assigned to variables, and we
+%% don't want those two uses to encroach on each other. Regarding
+%% registers such as \code{rax} and \code{rsp} that are not used for
+%% variables, we could omit them from the interference graph but that
+%% would require adding special cases to our algorithm, which would
+%% complicate the logic for little gain.
 
 
 \begin{figure}[btp]
@@ -3717,51 +3713,24 @@ the patch instructions pass. In this example, the trivial move of
 movq -8(%rbp), %rax
 addq %rax, -16(%rbp)
 \end{lstlisting}
-
-We recommend creating a helper function named \code{color-graph} that
-takes an interference graph and a list of all the variables in the
-program. This function should return a mapping of variables to their
-colors (represented as natural numbers). By creating this helper
-function, you will be able to reuse it in Chapter~\ref{ch:functions}
-when you add support for functions.  To prioritize the processing of
-highly saturated nodes inside your \code{color-graph} function, we
-recommend using the priority queue data structure (see the side bar on
-the right). Note that you will also need to maintain a mapping from
-variables to their ``handles'' in the priority queue so that you can
-notify the priority queue when their saturation changes.
-
-\begin{wrapfigure}[23]{r}[1.0in]{0.6\textwidth}
-  \small
-  \begin{tcolorbox}[title=Priority Queue]
-    A \emph{priority queue} is a collection of items in which the
-    removal of items is governed by priority. In a ``min'' queue,
-    lower priority items are removed first. An implementation is in
-    \code{priority\_queue.rkt} of the support code.  \index{priority
-      queue} \index{minimum priority queue}
-  \begin{description}
-  \item[$\LP\code{make-pqueue}\,\itm{cmp}\RP$] constructs an empty
-    priority queue that uses the $\itm{cmp}$ predicate to determine
-    whether its first argument has priority lower than or equal to its
-    second argument.
-  \item[$\LP\code{pqueue-count}\,\itm{queue}\RP$] returns the number of
-    items in the queue.
-  \item[$\LP\code{pqueue-push!}\,\itm{queue}\,\itm{item}\RP$] inserts
-    the item into the queue and returns a handle for the item in the
-    queue.
-  \item[$\LP\code{pqueue-pop!}\,\itm{queue}\RP$] returns the item with
-    the lowest priority.
-  \item[$\LP\code{pqueue-decrease-key!}\,\itm{queue}\,\itm{handle}\RP$]
-    notifies the queue that the priority has decreased for the item
-    associated with the given handle.
-  \end{description}
-\end{tcolorbox}
-\end{wrapfigure}
-
-Once you have obtained the coloring from \code{color-graph}, you can
-assign the variables to registers or stack locations and then reuse
-code from the \code{assign-homes} pass from
-Section~\ref{sec:assign-r1} to replace the variables with their
-assigned location. 
+\end{minipage}
+$\Rightarrow\qquad$
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+movq $1, -8(%rbp)
+movq $42, %rcx
+addq $7, -8(%rbp)
+movq -8(%rbp), %rax
+movq %rax, -16(%rbp)
+addq %rcx, -8(%rbp)
+movq -16(%rbp), %rcx
+negq %rcx
+movq -8(%rbp), %rax
+addq %rcx, %rax
+jmp conclusion
+\end{lstlisting}
+\end{minipage}
+\end{center}
   
 \begin{exercise}\normalfont
   Implement the compiler pass \code{allocate-registers}, which should
@@ -7465,7 +7434,7 @@ If there are
 more than six arguments, then the convention is to use space on the
 frame of the caller for the rest of the arguments. However, to ease
 the implementation of efficient tail calls
-(Section~\ref{sec:tail-call}), we arrange never to need more than six
+(Section~\ref{sec:tail-call}), we arrange to never need more than six
 arguments.
 %
 Also recall that the register \code{rax} is for the return value of
