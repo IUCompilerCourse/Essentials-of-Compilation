@@ -1115,7 +1115,7 @@ do anything.  On the other hand, if the error is a
 \code{trapped-error}, then the compiler must produce an executable and
 it is required to report that an error occurred. To signal an error,
 exit with a return code of \code{255}.  The interpreters in chapters
-\ref{ch:type-dynamic} and \ref{ch:Rgrad} use
+\ref{ch:Rdyn} and \ref{ch:Rgrad} use
 \code{trapped-error}.
 
 %% This convention applies to the languages defined in this
@@ -4455,53 +4455,53 @@ Early register allocation algorithms were developed for Fortran
 compilers in the 1950s~\citep{Horwitz:1966aa,Backus:1978aa}.  The use
 of graph coloring began in the late 1970s and early 1980s with the
 work of \citet{Chaitin:1981vl} on an optimizing compiler for PL/I. The
-algorithm is based on an observation of \citet{Kempe:1879aa} from the
-1870s.  If a graph $G$ has a vertex $v$ with degree lower than $k$
-(e.g. the number of registers), then $G$ is $k$ colorable if the
-subgraph of $G$ with $v$ removed is also $k$ colorable. Suppose that
-the subgraph is $k$ colorable.  At worst the neighbors of $v$ are
-assigned different colors, but since there are less than $k$ of them,
-there will be one or more colors left over to use for coloring $v$ in
-$G$.
+algorithm is based on the following observation of
+\citet{Kempe:1879aa} from the 1870s.  If a graph $G$ has a vertex $v$
+with degree lower than $k$, then $G$ is $k$ colorable if the subgraph
+of $G$ with $v$ removed is also $k$ colorable. Suppose that the
+subgraph is $k$ colorable.  At worst the neighbors of $v$ are assigned
+different colors, but since there are less than $k$ of them, there
+will be one or more colors left over to use for coloring $v$ in $G$.
 
-The algorithm of \citet{Chaitin:1981vl} removes a low-degree vertex
-$v$ from the graph and recursively colors the rest of the graph. Upon
-returning from the recursion, it colors $v$ with one of the available
-colors and returns.  \citet{Chaitin:1982vn} augments this algorithm to
-handle spilling as follows. If there are no vertices of degree lower
-than $k$ then pick one at random, spill it, remove it from the graph,
-and proceed recursively on the rest of the graph.
+The algorithm of \citet{Chaitin:1981vl} removes a vertex $v$ of degree
+less than $k$ from the graph and recursively colors the rest of the
+graph. Upon returning from the recursion, it colors $v$ with one of
+the available colors and returns.  \citet{Chaitin:1982vn} augments
+this algorithm to handle spilling as follows. If there are no vertices
+of degree lower than $k$ then pick a vertex at random, spill it,
+remove it from the graph, and proceed recursively to color the rest of
+the graph.
 
 Prior to coloring, \citet{Chaitin:1981vl} merge variables that are
 move-related and that don't interfere with each other, a process
 called \emph{coalescing}. While coalescing decreases the number of
 moves, it can make the graph more difficult to
-color. \citet{Briggs:1994kx} proposes \emph{conservative coalescing}
-in which two variables are merged only if they have fewer than $k$
-neighbors of high degree. \citet{George:1996aa} observes that
+color. \citet{Briggs:1994kx} propose \emph{conservative coalescing} in
+which two variables are merged only if they have fewer than $k$
+neighbors of high degree. \citet{George:1996aa} observe that
 conservative coalescing is sometimes too conservative and make it more
 aggressive by iterating the coalescing with the removal of low-degree
 vertices.
 %
 Attacking the problem from a different angle, \citet{Briggs:1994kx}
-also proposes \emph{biased coloring} in which a variable is assigned
-to the same color as another move-related variable if possible, as
+also propose \emph{biased coloring} in which a variable is assigned to
+the same color as another move-related variable if possible, as
 discussed in Section~\ref{sec:move-biasing}.
 %
-The algorithm of \citet{Chaitin:1981vl} iteratively performs
-coalescing, graph coloring, and spill code insertion until all
-variables have been assigned a location.
+The algorithm of \citet{Chaitin:1981vl} and its successors iteratively
+performs coalescing, graph coloring, and spill code insertion until
+all variables have been assigned a location.
 
 \citet{Briggs:1994kx} observes that \citet{Chaitin:1982vn} sometimes
 spills variables that don't have to be: a high-degree variable can be
 colorable if many of its neighbors are assigned the same color.
-\citet{Briggs:1994kx} proposes \emph{optimistic coloring}, in which a
+\citet{Briggs:1994kx} propose \emph{optimistic coloring}, in which a
 high-degree vertex is not immediately spilled. Instead the decision is
 deferred until after the recursive call, at which point it is apparent
-whether there is actually an available color or not. This algorithm is
-equivalent the smallest-last ordering algorithm~\citep{Matula:1972aa}
-if one takes the first $k$ colors to be registers and the rest to be
-stack locations.
+whether there is actually an available color or not. We observe that
+this algorithm is equivalent to the smallest-last ordering
+algorithm~\citep{Matula:1972aa} if one takes the first $k$ colors to
+be registers and the rest to be stack locations.
 %% biased coloring
 Earlier editions of the compiler course at Indiana University
 \citep{Dybvig:2010aa} were based on the algorithm of
@@ -4517,11 +4517,13 @@ ordering does not depend on the colors assigned, so the algorithm
 could be split into two phases.  Other orderings are possible. For
 example, \citet{Chow:1984ys} order variables according an estimate of
 runtime cost.
-%
+
 An \emph{online} greedy coloring algorithm uses information about the
 current assignment of colors to influence the order in which the
 remaining vertices are colored. The saturation-based algorithm
-described in this chapter is one such algorithm.
+described in this chapter is one such algorithm. We choose to use
+saturation-based coloring is because it is fun to introduce graph
+coloring via Sudoku.
 
 A register allocator may choose to map each variable to just one
 location, as in \citet{Chaitin:1981vl}, or it may choose to map a
@@ -7620,8 +7622,7 @@ from the set.
   passes your test suite.
 \end{exercise}
 
-
-% TODO: challenge, implement homogeneous vectors
+% Further Reading
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Functions}
@@ -8791,6 +8792,7 @@ mainconclusion:
 
 % Challenge idea: inlining! (simple version)
 
+% Further Reading
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Lexically Scoped Functions}
@@ -10594,6 +10596,7 @@ completion without error.
 Figure~\ref{fig:Rdyn-passes} provides an overview of all the passes needed
 for the compilation of \LangDyn{}.
 
+% Further Reading
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Loops and Assignment}
@@ -13417,39 +13420,39 @@ polymorphism, which we describe below.
   polymorphic function but requires all values have a common ``boxed''
   format, such as the tagged values of type \code{Any} in
   \LangAny{}. Non-polymorphic code (i.e. monomorphic code) is compiled
-  similarly to code in a dynamically typed language (like \LangDyn{}), in
-  which primitive operators require their arguments to be projected
+  similarly to code in a dynamically typed language (like \LangDyn{}),
+  in which primitive operators require their arguments to be projected
   from \code{Any} and their results are injected into \code{Any}.  (In
   object-oriented languages, the projection is accomplished via
   virtual method dispatch.) The uniform representation approach is
   compatible with separate compilation and with first-class
   polymorphism.  However, it produces the least-efficient code because
   it introduces overhead in the entire program, including
-  non-polymorphic code. This approach is used in the implementation of
+  non-polymorphic code. This approach is used in implementations of
   CLU~\cite{liskov79:_clu_ref,Liskov:1993dk},
   ML~\citep{Cardelli:1984aa,Appel:1987aa}, and
   Java~\citep{Bracha:1998fk}.
   
 \item[Mixed representation] generates one version of each polymorphic
   function, using a boxed representation for type
-  variables. Monomorphic code is compiled as usual (as in \LangLoop{}) and
-  conversions are performed at the boundaries between monomorphic and
-  polymorphic (e.g. when a polymorphic function is instantiated and
-  called). This approach is compatible with separate compilation and
-  first-class polymorphism and maintains the efficiency for
+  variables. Monomorphic code is compiled as usual (as in \LangLoop{})
+  and conversions are performed at the boundaries between monomorphic
+  and polymorphic (e.g. when a polymorphic function is instantiated
+  and called). This approach is compatible with separate compilation
+  and first-class polymorphism and maintains the efficiency of
   monomorphic code. The tradeoff is increased overhead at the boundary
   between monomorphic and polymorphic code.  This approach is used in
-  compilers for variants of ML~\citep{Leroy:1992qb} and starting in
+  implementations of ML~\citep{Leroy:1992qb} and Java, starting in
   Java 5 with the addition of autoboxing.
   
 \item[Type passing] uses the unboxed representation in both
   monomorphic and polymorphic code. Each polymorphic function is
   compiled to a single function with extra parameters that describe
   the type arguments. The type information is used by the generated
-  code to direct access of the unboxed values at runtime. This
-  approach is used in compilers for the Napier88
-  language~\citep{Morrison:1991aa} and ML~\citep{Harper:1995um}.  This
-  approach is compatible with separate compilation and first-class
+  code to know how to access the unboxed values at runtime. This
+  approach is used in implementation of the Napier88
+  language~\citep{Morrison:1991aa} and ML~\citep{Harper:1995um}.  Type
+  passing is compatible with separate compilation and first-class
   polymorphism and maintains the efficiency for monomorphic
   code. There is runtime overhead in polymorphic code from dispatching
   on type information.
@@ -13640,6 +13643,9 @@ Figure~\ref{fig:Rpoly-passes} provides an overview of all the passes needed
 for the compilation of \LangPoly{}.
 
 % TODO: challenge problem: specialization of instantiations
+
+% Further Reading
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Appendix}
