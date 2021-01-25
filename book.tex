@@ -4439,6 +4439,124 @@ conclusion:
 \label{fig:running-example-x86}
 \end{figure}
 
+% challenge: prioritize variables based on execution frequencies
+%   and the number of uses of a variable
+
+% challenge: enhance the coloring algorithm using Chaitin's
+%  approach of prioritizing high-degree variables
+%  by removing low-degree variables (coloring them later)
+%  from the interference graph
+
+
+\section{Further Reading}
+\label{sec:register-allocation-further-reading}
+
+Early register allocation algorithms were developed for Fortran
+compilers in the 1950s~\citep{Horwitz:1966aa,Backus:1978aa}.  The use
+of graph coloring began in the late 1970s and early 1980s with the
+work of \citet{Chaitin:1981vl} on an optimizing compiler for PL/I. The
+algorithm is based on an observation of \citet{Kempe:1879aa}.  If a
+graph $G$ has a vertex $v$ with degree lower than $k$ (e.g. the number
+of registers), then $G$ is $k$ colorable if the subgraph of $G$ with
+$v$ removed is also $k$ colorable. Suppose that the subgraph is $k$
+colorable.  In the worst case the neighbors of $v$ are assigned
+different colors, but since there are less than $k$ of them, there
+will be one or more colors left over to use for coloring $v$ in $G$.
+
+The algorithm of \citet{Chaitin:1981vl} removes a low-degree vertex
+$v$ from the graph and recursively colors the rest of the graph. Upon
+returning from the recursion, it colors $v$ with one of the available
+colors and returns.  \citet{Chaitin:1982vn} augments this algorithm to
+handle spilling as follows. If there are no vertices of degree lower
+than $k$ then pick one at random, spill it, remove it from the graph,
+and proceed recursively on the rest of the graph.
+
+Prior to coloring, \citet{Chaitin:1981vl} merge variables that are
+move-related and that don't interfere with each other, a process
+called \emph{coalescing}. While coalescing decreases the number of
+moves, it can make the graph more difficult to
+color. \citet{Briggs:1994kx} proposes \emph{conservative coalescing}
+in which two variables are merged only if they have fewer than $k$
+neighbors of high degree. \citet{George:1996aa} observes that
+conservative coalescing is sometimes too conservative and make it more
+aggressive by iterating the coalescing with the removal of low-degree
+vertices.
+%
+Attacking the problem from a different angle, \citet{Briggs:1994kx}
+also proposes \emph{biased coloring} in which a variable is assigned
+to the same color as another move-related variable if possible, as
+discussed in Section~\ref{sec:move-biasing}.
+%
+The algorithm of \citet{Chaitin:1981vl} iteratively performs
+coalescing, graph coloring, and spill code insertion until all
+variables have been assigned a location.
+
+\citet{Briggs:1994kx} observes that \citet{Chaitin:1982vn} sometimes
+spills variables that don't have to be: a high-degree variable can be
+colorable if many of its neighbors are assigned the same color.
+\citet{Briggs:1994kx} proposes \emph{optimistic coloring}, in which a
+high-degree vertex is not immediately spilled. Instead the decision is
+deferred until after the recursive call, at which point it is apparent
+whether there is actually an available color or not. This algorithm is
+equivalent the smallest-last ordering algorithm~\citep{Matula:1972aa}
+if one takes the first $k$ colors to be registers and the rest to be
+stack locations.
+%% biased coloring
+Earlier editions of the compiler course at Indiana University
+\citep{Dybvig:2010aa} were based on the algorithm of
+\citet{Briggs:1994kx}.
+
+The smallest-last ordering algorithm is one of many \emph{greedy}
+coloring algorithms. A greedy coloring algorithm visits all the
+vertices in a particular order and assigns each one the first
+available color. An \emph{offline} greedy algorithm chooses the
+ordering up-front, prior to assigning colors. The algorithm of
+\citet{Chaitin:1981vl} should be considered offline because the vertex
+ordering does not depend on the colors assigned, so the algorithm
+could be split into two phases.  Other orderings are possible. For
+example, \citet{Chow:1984ys} order variables according an estimate of
+runtime cost.
+%
+An \emph{online} greedy coloring algorithm uses information about the
+current assignment of colors to influence the order in which the
+remaining vertices are colored. The saturation-based algorithm
+described in this chapter is one such algorithm.
+
+A register allocator may choose to map each variable to just one
+location, as in \citet{Chaitin:1981vl}, or it may choose to map a
+variable to one or more locations. The later can be achieved by
+\emph{live range splitting}, where a variable is replaced by several
+variables that each handle part of its live
+range~\citep{Chow:1984ys,Briggs:1994kx,Cooper:1998ly}.
+
+%% 1950s, Sheldon Best, Fortran \cite{Backus:1978aa}, Belady's page
+%% replacement algorithm, bottom-up local
+%% \citep{Horwitz:1966aa} straight-line programs, single basic block, 
+
+%% Cooper: top-down (priority bassed), bottom-up
+
+%% top-down
+%%   order variables by priority (estimated cost)
+%%   caveat: split variables into two groups:
+%%     constrained (>k neighbors) and unconstrained (<k neighbors)
+%%     color the constrained ones first
+
+%% \citet{Schwartz:1975aa} graph-coloring, no spill
+%% cite J. Cocke for an algorithm that colors variables
+%%   in a high-degree first ordering
+
+%Register Allocation via Usage Counts, Freiburghouse CACM
+
+\citet{Palsberg:2007si} observe that many of the interference graphs
+that arise from Java programs in the JoeQ compiler are \emph{chordal},
+that is, every cycle with four or more edges has an edge which is not
+part of the cycle but which connects two vertices on the cycle. Such
+graphs can be optimally colored by the greedy algorithm with a vertex
+ordering determined by maximum cardinality search.
+
+In situations where compile time is of utmost importance, such as in
+just-in-time compilers, graph coloring algorithms can be too expensive
+and the linear scan of \citet{Poletto:1999uq} may be more appropriate.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
