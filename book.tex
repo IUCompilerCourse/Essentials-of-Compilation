@@ -2113,8 +2113,8 @@ programs.
 \section{Remove Complex Operands}
 \label{sec:remove-complex-opera-Rvar}
 
-The \code{remove-complex-opera*} pass compiles \LangVar{} programs into
-\LangVar{} programs in which the arguments of operations are atomic
+The \code{remove-complex-opera*} pass compiles \LangVar{} programs
+into a restricted form in which the arguments of operations are atomic
 expressions.  Put another way, this pass removes complex
 operands\index{complex operand}, such as the expression \code{(- 10)}
 in the program below. This is accomplished by introducing a new
@@ -2162,31 +2162,35 @@ R^{\dagger}_1  &::=& \PROGRAM{\code{'()}}{\Exp}
 
 Figure~\ref{fig:r1-anf-syntax} presents the grammar for the output of
 this pass, the language \LangVarANF{}. The only difference is that
-operator arguments are required to be atomic expressions.  In the
-literature, this is called \emph{administrative normal form}, or ANF
-for short~\citep{Danvy:1991fk,Flanagan:1993cg}.  \index{administrative
-  normal form} \index{ANF}
+operator arguments are restricted to be atomic expressions that are
+defined by the \Atm{} non-terminal. In particular, integer constants
+and variables are atomic. In the literature, restricting arguments to
+be atomic expressions is called \emph{administrative normal form}, or
+ANF for short~\citep{Danvy:1991fk,Flanagan:1993cg}.
+\index{administrative normal form} \index{ANF}
 
 We recommend implementing this pass with two mutually recursive
 functions, \code{rco-atom} and \code{rco-exp}. The idea is to apply
-\code{rco-atom} to subexpressions that are required to be atomic and
-to apply \code{rco-exp} to subexpressions that can be atomic or
-complex (see Figure~\ref{fig:r1-anf-syntax}).  Both functions take an
-\LangVar{} expression as input.  The \code{rco-exp} function returns an
-expression.  The \code{rco-atom} function returns two things: an
-atomic expression and alist mapping temporary variables to complex
-subexpressions. You can return multiple things from a function using
-Racket's \key{values} form and you can receive multiple things from a
-function call using the \key{define-values} form. If you are not
-familiar with these features, review the Racket documentation.  Also,
-the \href{https://docs.racket-lang.org/reference/for.html#%28form._%28%28lib._racket%2Fprivate%2Fbase..rkt%29._for%2Flists%29%29}{\code{for/lists}}
-form is useful for applying a function to each
-element of a list, in the case where the function returns multiple
-values.
-\index{for/lists}
+\code{rco-atom} to subexpressions that need to become atomic and to
+apply \code{rco-exp} to subexpressions that do not.  Both functions
+take an \LangVar{} expression as input.  The \code{rco-exp} function
+returns an expression.  The \code{rco-atom} function returns two
+things: an atomic expression and alist mapping temporary variables to
+complex subexpressions. You can return multiple things from a function
+using Racket's \key{values} form and you can receive multiple things
+from a function call using the \key{define-values} form. If you are
+not familiar with these features, review the Racket documentation.
+Also, the
+\href{https://docs.racket-lang.org/reference/for.html#%28form._%28%28lib._racket%2Fprivate%2Fbase..rkt%29._for%2Flists%29%29}{\code{for/lists}}
+  form is useful for applying a function to each element of a list, in
+  the case where the function returns multiple values.
+  \index{for/lists}
 
-The following shows the output of \code{rco-atom} on the expression
-\code{(- 10)} (using concrete syntax to be concise).
+Returning to the example program \code{(+ 52 (- 10))}, the
+subexpression \code{(- 10)} should be processed using the
+\code{rco-atom} function because it is an argument of the \code{+} and
+therefore needs to become atomic.  The output of \code{rco-atom}
+applied to \code{(- 10)} is as follows.
 
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
