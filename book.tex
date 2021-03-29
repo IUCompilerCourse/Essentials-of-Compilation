@@ -75,7 +75,18 @@
 \newcommand{\margincomment}[1]{}
 \fi
 
-\lstset{%
+\newcommand{\ocaml}[1]{{\color{blue}{#1}}}
+
+\newenvironment{ocamlx}{
+  \begin{color}{blue}
+}
+{
+  \end{color}
+}
+
+\definecolor{BLUE}{rgb}{0,0,1}  % no idea why we need this
+
+\lstdefinestyle{racket}{
 language=Lisp,
 basicstyle=\ttfamily\small,
 morekeywords={seq,assign,program,block,define,lambda,match,goto,if,else,then,struct,Integer,Boolean,Vector,Void,Any,while,begin,define,public,override,class},
@@ -85,6 +96,17 @@ columns=flexible,
 moredelim=[is][\color{red}]{~}{~},
 showstringspaces=false
 }
+  
+\lstset{style=racket}
+
+\lstdefinestyle{ocaml}{
+  language=[Objective]Caml,
+  basicstyle=\ttfamily\small\color{blue},
+  columns=flexible,
+  escapechar={},
+  showstringspaces=false
+}
+
 
 \newtheorem{theorem}{Theorem}
 \newtheorem{lemma}[theorem]{Lemma}
@@ -144,8 +166,12 @@ showstringspaces=false
   Ryan Scott \\
   Cameron Swords \\
   Michael M. Vitousek \\
-  Michael Vollmer 
-   }
+  Michael Vollmer \\
+  \\
+  \ocaml{OCaml version:} \\
+  \ocaml{Andrew Tolmach} \\
+  \ocaml{(with inspiration from a Haskell version by Ian Winter)}
+}
 
 \begin{document}
 
@@ -384,6 +410,32 @@ Bloomington, Indiana
 \chapter{Preliminaries}
 \label{ch:trees-recur}
 
+\begin{ocamlx}
+  Text in blue, like this, represents additions to the original book
+  text to support the use of OCaml rather than Racket as our compiler
+  implementation language.  The original text is never changed, so you
+  can see both the Racket and OCaml versions in parallel. The main
+  motivation for this is to save a lot of rote editing: the bulk of
+  the story being told in this book is substantially the same
+  regardless of implementation language, so most of what has been
+  written about the Racket version applies directly to OCaml
+  with just small mental adjustments between the syntaxes of the two
+  languages.  A secondary motivation is that it is sometimes easier to
+  see key underlying ideas when they are expressed in more than one
+  way.
+
+  In many respects, Racket and OCaml are very similar languages: they
+  both encourage a purely functional style of programming while also supporting
+  imperative programming, provide higher-order functions, use
+  garbage collection to guarantee memory safety, etc.  Indeed, the
+  ``back ends'' of Racket and OCaml implementations are nearly
+  interchangeable. By far the most fundamental difference between them is
+  that OCaml uses static typing, whereas Racket uses runtime typing.
+  The latter can provide useful flexibility, but the former has the
+  big advantage of providing compile-time feedback on type errors.
+  This is our main motivation for using OCaml.
+\end{ocamlx}
+
 In this chapter we review the basic tools that are needed to implement
 a compiler. Programs are typically input by a programmer as text,
 i.e., a sequence of characters. The program-as-text representation is
@@ -403,7 +455,10 @@ depending on the programming language used to write the compiler.
 %
 We use Racket's
 \href{https://docs.racket-lang.org/guide/define-struct.html}{\code{struct}}
-feature to represent ASTs (Section~\ref{sec:ast}). We use grammars to
+feature to represent ASTs (Section~\ref{sec:ast}).
+\ocaml{OCaml: we use \emph{variants} (also called algebraic data types) to
+  represent ASTs.}
+We use grammars to
 define the abstract syntax of programming languages
 (Section~\ref{sec:grammar}) and pattern matching to inspect individual
 nodes in an AST (Section~\ref{sec:pattern-matching}).  We use
@@ -411,13 +466,23 @@ recursive functions to construct and deconstruct ASTs
 (Section~\ref{sec:recursion}).  This chapter provides an brief
 introduction to these ideas.  \index{struct}
 
-\section{Abstract Syntax Trees and Racket Structures}
+\section{Abstract Syntax Trees and Racket Structures \ocaml{/ OCaml Variants}}
 \label{sec:ast}
 
 Compilers use abstract syntax trees to represent programs because they
 often need to ask questions like: for a given part of a program, what
 kind of language feature is it? What are its sub-parts? Consider the
-program on the left and its AST on the right. This program is an
+program on the left and its AST on the right.
+\begin{ocamlx}
+This program is
+  itself in Racket; in addition to using Racket as the compiler implementation
+  language, the original version of this book uses subsets of Racket as the
+  \emph{source} languages that we compile. In the OCaml version we will be using
+  ad-hoc source languages that look a lot like subsets of Racket, but sometimes
+  made simpler (because there is no particular advantage to matching the messier details
+  of Racket syntax). The code on the left will be valid in all of our source languages too.
+\end{ocamlx}
+This program is an
 addition operation and it has two sub-parts, a read operation and a
 negation. The negation has another sub-part, the integer constant
 \code{8}. By using a tree to represent the program, we can easily
@@ -540,6 +605,33 @@ whereas the addition operator has two children:
 \begin{lstlisting}
 (define ast1.1 (Prim '+ (list rd neg-eight)))
 \end{lstlisting}
+\begin{ocamlx}
+We define an OCaml variant type for ASTs, with a different constructor for each
+kind of node:
+\begin{lstlisting}[style=ocaml]
+type exp = 
+  Int of int  
+| Prim of primop * exp list
+\end{lstlisting}
+This definition depends on the definition of another variant type that enumerates the possible primops
+(in place of the single-quoted symbols used in Racket):
+\begin{lstlisting}[style=ocaml]
+type primop = 
+  Read
+| Neg
+| Add
+\end{lstlisting}
+To create an AST node for the integer 8, we write \code{Int 8}.
+To create an AST that negates
+the number 8, we write \code{Prim(Neg,[Int 8])}, and so on:
+\begin{lstlisting}[style=ocaml]
+let eight = Int 8
+let neg_eight = Prim(Neg,[eight])
+let rd = Prim(Read,[])
+let ast1_1 = Prim(Add,[rd,neg_eight])
+\end{lstlisting}
+Note that OCaml identifiers are more restricted in form than those of Racket; we will typically replace uses of dash (\code{-}), dot (\code{.}), etc. by underscores (\code{\_}).
+\end{ocamlx}
 
 We have made a design choice regarding the \code{Prim} structure.
 Instead of using one structure for many different operations
@@ -555,11 +647,26 @@ of the compiler the code for the different primitive operators is the
 same, so we might as well just write that code once, which is enabled
 by using a single structure.
 
+\begin{ocamlx}
+  We have made a similar design choice in OCaml. The corresponding
+  alternative would have been to define our AST type as
+\begin{lstlisting}[style=ocaml]
+type exp = 
+    Int of int  
+  | Read
+  | Add of exp * exp
+  | Neg of exp
+\end{lstlisting}
+Note that one advantage of using this alternative is that it would explicitly enforce
+that each primitive operator is given the correct number of arguments (its \emph{arity});
+this restriction is not captured in the list-based version.
+\end{ocamlx}
+
 When compiling a program such as \eqref{eq:arith-prog}, we need to
 know that the operation associated with the root node is addition and
 we need to be able to access its two children. Racket provides pattern
 matching to support these kinds of queries, as we see in
-Section~\ref{sec:pattern-matching}.
+Section~\ref{sec:pattern-matching}. \ocaml{So does OCaml.}
 
 In this book, we often write down the concrete syntax of a program
 even when we really have in mind the AST because the concrete syntax
@@ -585,6 +692,15 @@ As an example, we describe a small language, named \LangInt{}, that consists of
 integers and arithmetic operations.
 \index{grammar}
 
+\begin{ocamlx}
+  Using a grammar to describe abstract syntax is less useful in OCaml than in
+  Racket, because our variant type definition for ASTs already serves to specify
+  the legal forms of tree (except that it is overly flexible about the arity of
+  primops, as mentioned above). So don't worry too much about the details of
+  the AST grammar here---but do make sure you understand how the same ideas
+  are applied to \emph{concrete} grammars, below.
+\end{ocamlx}
+  
 The first grammar rule for the abstract syntax of \LangInt{} says that an
 instance of the \code{Int} structure is an expression:
 \begin{equation}
@@ -610,6 +726,10 @@ integers on a 64-bit machine. So an $\Int$ is a sequence of decimals
 ($0$ to $9$), possibly starting with $-$ (for negative integers), such
 that the sequence of decimals represent an integer in range $-2^{62}$
 to $2^{62}-1$.
+\ocaml{As it happens, OCaml's standard integer type
+  (\code{int}) is also 63 bits on a 64-bit machine. Initially, we 
+  will adopt the corresponding convention that $\Int$ is a 63-bit integer,
+  but soon we will move to full 64-bit integers.}
 
 The second grammar rule is the \texttt{read} operation that receives
 an input integer from the user of the program.
@@ -650,6 +770,10 @@ following AST is an $\Exp$.
 \end{minipage}
 \end{center}
 
+\begin{ocamlx}
+  The corresponding OCaml AST expression is \code{Prim(Neg,[Int 8])}.
+\end{ocamlx}
+
 The next grammar rule is for addition expressions:
 \begin{equation}
   \Exp ::= \ADD{\Exp}{\Exp} \label{eq:arith-add}
@@ -663,6 +787,7 @@ to show that
 (Prim '+ (list (Prim 'read '()) (Prim '- (list (Int 8)))))
 \end{lstlisting}
 is an $\Exp$ in the \LangInt{} language.
+\ocaml{\\ OCaml: \code{Prim(Add,[Prim(Read,[]);Prim(Neg,[Int 8])])}.}
 
 If you have an AST for which the above rules do not apply, then the
 AST is not in \LangInt{}. For example, the program \code{(- (read) (+ 8))}
@@ -683,6 +808,25 @@ The \code{Program} structure is defined as follows
 where \code{body} is an expression. In later chapters, the \code{info}
 part will be used to store auxiliary information but for now it is
 just the empty list.
+\begin{ocamlx}
+  In OCaml:
+  \begin{lstlisting}[style=ocaml]
+    type 'info rint_program = Program of 'info * exp
+  \end{lstlisting}
+  Again, we represent the structure as a variant type
+  (\code{rint\_program}), this time just with one constructor
+  (\code{Program)}.  We \emph{parameterize} \code{program} by a
+  \emph{type variable} \code{'info} (type variables are distinguished by having
+  a leading tick  mark).  This says that \code{rint\_program} is a family of types which can
+  be instantiated to represent programs holding a particular kind of auxiliary information.
+  For now, we'll just instantiate \code{'info}
+  with the \emph{unit} type, written \code{unit}, whose sole (boring)
+  value is written \code{()}.
+  \begin{lstlisting}[style=ocaml]
+    let p : unit rint_program = Program () body
+  \end{lstlisting}
+  Here the colon (\code{:}) introduces an explicit type annotation on \code{p}; it can be read ``has type.''
+\end{ocamlx}
 
 It is common to have many grammar rules with the same left-hand side
 but different right-hand sides, such as the rules for $\Exp$ in the
@@ -690,7 +834,8 @@ grammar of \LangInt{}. As a short-hand, a vertical bar can be used to
 combine several right-hand-sides into a single rule.
 
 We collect all of the grammar rules for the abstract syntax of \LangInt{}
-in Figure~\ref{fig:r0-syntax}. The concrete syntax for \LangInt{} is
+in Figure~\ref{fig:r0-syntax} \ocaml{along with the corresponding OCaml type definitions}.
+The concrete syntax for \LangInt{} is
 defined in Figure~\ref{fig:r0-concrete-syntax}.
 
 The \code{read-program} function provided in \code{utilities.rkt} of
@@ -699,7 +844,61 @@ characters in the concrete syntax of Racket) and parses it into an
 abstract syntax tree. See the description of \code{read-program} in
 Appendix~\ref{appendix:utilities} for more details.
 
+\begin{ocamlx}
+  As noted above, the concrete syntaxes we will use are similar to Racket's own syntax.
+  In particular, programs are described as \emph{S-expressions}. An S-expression can be
+  either an atom (an integer, symbol, or quoted string) or a list of S-expressions enclosed in
+  parentheses.  You can see that the concrete syntax for \LangInt{} is written as
+  S-expressions where the symbols used are \code{read},\code{-}, and \code{+}, and
+  a primitive operation invocation is described by a list whose first element is
+  the operation symbol and whose remaining elements (0 or more of them) are
+  S-expressions representing the arguments (which can themselves be lists).
+  All the source languages we consider in this book will be written as S-expressions in
+  a similar style;  the details of which symbols and shapes of list are allowed
+  will vary from language to language.
+  
+  To handle all this neatly in OCaml, we split the parsing of concrete
+  programs into two phases. First, the \code{parse} function provided
+  in \code{sexpr.ml} of the support code reads text from a file and
+  parses it into a generic S-expression data type.  (This code is a
+  bit complicated and messy, but you don't have to understand its
+  internals in order to use it.) Then, a source-language-specific
+  program is used to convert the S-expression into the abstract syntax
+  of that particular language. We will see later on that OCaml's pattern
+  matching facilities make it very easy to write such conversion
+  routines.  This is particularly true because the S-expression format
+  we use for our concrete source languages is already very close to an
+  abstract syntax, which means the conversion has very little work to
+  do.  For example, as you have seen, primitive operations are all
+  written in prefix, rather than infix, notation, so there is no need
+  to worry about issues like precedence and associativity of operators
+  in an expression like \code{(2 * 3 + 4)}: the S-expression syntax
+  will be either \code{(+ (* 2 3) 4)} or \code{(* 2 (+ 3 4))}, so
+  there is no possible ambiguity. The downside is that source programs
+  are a bit more tedious to write, and may sometimes seem to be drowning in
+  parentheses.
 
+  The OCaml representation of generic S-expressions is just another
+  variant type:
+  \begin{lstlisting}[style=ocaml]
+    type sexp =
+    | SList of sexp list
+            (* list of expressions delimited by parentheses *)
+    | SNum of Int64.t
+            (* 64-bit integers *)
+    | SSym of string
+            (* non-digit character sequence delimited by white space *)
+    | SString of string
+            (* arbitrary character sequence delimited by double quotes *)
+  \end{lstlisting}
+  The generic S-expression parser handles (nestable) comments delimited by
+  curly braces (\code{\{} and \code{\}}).  Symbols can contain any
+  non-digit, non-whitespace characters except parentheses, curly braces, and
+  the back tick (\code{\`}); this last exclusion is handy when we want to
+  generate internal names during compilation and be sure they don't clash
+  with a user-defined symbol.
+\end{ocamlx}
+  
 \begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
@@ -729,6 +928,19 @@ Appendix~\ref{appendix:utilities} for more details.
 \]
 \end{minipage}
 }
+
+\begin{minipage}{0.96\textwidth}
+\begin{lstlisting}[style=ocaml,frame=single]
+type primop = 
+   Read
+ | Neg
+ | Add
+type exp = 
+   Int of int  
+ | Prim of primop * exp list
+type 'info rint_program = Program of 'info * exp
+\end{lstlisting}
+\end{minipage}
 \caption{The abstract syntax of \LangInt{}.}
 \label{fig:r0-syntax}
 \end{figure}
@@ -775,11 +987,37 @@ The body of a match clause may contain arbitrary Racket code.  The
 pattern variables can be used in the scope of the body, such as
 \code{op} in \code{(print op)}.
 
+\begin{ocamlx}
+  Here is the OCaml version, which is quite similar:
+\begin{center}
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}[style=ocaml]
+match ast1_1 with
+| Prim(op,[child1;child2]) -> op
+\end{lstlisting}
+\end{minipage}
+\vrule
+\begin{minipage}{0.25\textwidth}
+\begin{lstlisting}[style=ocaml]
+
+   Add
+\end{lstlisting}
+\end{minipage}
+\end{center}
+\end{ocamlx}
+
 A \code{match} form may contain several clauses, as in the following
 function \code{leaf?} that recognizes when an \LangInt{} node is a leaf in
 the AST. The \code{match} proceeds through the clauses in order,
 checking whether the pattern can match the input AST. The body of the
-first clause that matches is executed. The output of \code{leaf?} for
+first clause that matches is executed.
+\begin{ocamlx}
+In fact, in OCaml, we will get a warning message about the code above, because the \code{match} only contains
+a clause for a {\tt Prim} with two children, not for other other possible forms of \code{exp}.
+Although in this particular instance, that's OK (because of the value of \code{ast1\_1}), in general
+it suggests a possible error. Getting warnings like this is one of the advantages of static typing.
+\end{ocamlx}
+The output of \code{leaf?} for
 several ASTs is shown on the right.
 \begin{center}
 \begin{minipage}{0.6\textwidth}
@@ -827,6 +1065,63 @@ right-hand side $\ADD{\Exp}{\Exp}$. When translating from grammars to
 patterns, replace non-terminals such as $\Exp$ with pattern variables
 of your choice (e.g. \code{e1} and \code{e2}).
 
+\begin{ocamlx}
+Here is the directly corresponding OCaml version.
+\begin{center}
+\begin{minipage}{0.6\textwidth}
+\begin{lstlisting}[style=ocaml]
+let is_leaf arith = 
+  match arith with
+  | Int n -> true
+  | Prim(Read,[]) -> true
+  | Prim(Neg,[e1]) -> false
+  | Prim(Add,[e1;e2]) -> false
+  | _ -> assert false
+  
+is_leaf (Prim(Read,[]))
+is_leaf (Prim(Neg,[Int 8]))
+is_leaf (Int 8)
+\end{lstlisting}
+\end{minipage}
+\vrule
+\begin{minipage}{0.25\textwidth}
+  \begin{lstlisting}[style=ocaml]
+
+
+
+
+    
+    
+    
+   true
+   false
+   true
+\end{lstlisting}
+\end{minipage}
+\end{center}
+
+The final clause uses a wildcard pattern {\tt \_}, which matches anything of type \code{exp},
+to cover the (ill-formed) cases where a primop is given the wrong number of arguments;
+otherwise, the compiler will again issue a warning that not all cases have been considered.
+The \code{assert false} causes OCaml execution to halt with an uncaught exception message.
+
+In this particular case, we can use wildcards to write a more idiomatic version of
+\code{is\_leaf} that doesn't require a catch-all case (and is also ``future-proof''
+against later additions to the \code{primop} type). We also make use of the following
+short-cut: a function that takes an argument $arg$ and then immediately performs
+a \code{match} over $arg$ can be written more concisely using the \code{function} keyword.
+
+\begin{center}
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}[style=ocaml]
+let is_leaf = function 
+  | Int _ -> true
+  | Prim(_,[]) -> true
+  | _ -> false
+\end{lstlisting}
+\end{minipage}
+\end{center}
+\end{ocamlx}
 
 \section{Recursive Functions}
 \label{sec:recursion}
@@ -920,6 +1215,79 @@ For example, the above function is subtly wrong:
 \lstinline{(Rint? (Program '() (Program '() (Int 3))))}
 returns true when it should return false.
 
+\begin{ocamlx}
+There is almost no point in writing OCaml analogs to \code{exp?} or \code{Rint?}, because static
+  typing guarantees that values claimed to be in type \code{exp} or \code{rint\_program} really are
+  (or the OCaml program will not pass the OCaml typechecker).  However, it is still worth
+  writing a function to check that primops are applied to the right number of arguments.
+  Here is an idiomatic way to do that:
+
+\begin{center}
+\begin{minipage}{0.85\textwidth}
+\begin{lstlisting}[style=ocaml]
+let arity = function 
+  | Read -> 0
+  | Neg -> 1
+  | Add -> 2    
+
+let rec check_exp = function 
+  | Int _ -> true
+  | Prim(op,args) ->
+      List.length args = arity op && check_exps args
+and check_exps = function
+  | [] -> true
+  | (exp::exps') -> check_exp exp && check_exps exps'
+
+let check_program (Program(_,e)) = check_exp e
+
+check_program (Program((),ast1_1))
+check_program (Program((),Prim(Neg,[Prim(Read,[]);
+                                    Prim(Plus,[Int 8])])))
+\end{lstlisting}
+\end{minipage}
+\vrule
+\begin{minipage}{0.1\textwidth}
+\begin{lstlisting}[style=ocaml]
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+   true
+
+   false
+\end{lstlisting}
+\end{minipage}
+\end{center}
+
+In the definition of \code{check\_program}, since the argument type \code{rint\_program}
+has only one constructor, we can write a pattern \code{Program(\_,e)} which matches that constructor directly in
+place of an argument name; this binds the variable(s) (here \code{e}) of the pattern in the body of the function.
+Note that \code{check\_exp} is declared to be recursive by using the \code{rec} keyword;
+in fact, \code{check\_exp} and \code{check\_exps} are \emph{mutually} recursive because
+their definitions are connected by the \code{and} keyword. \code{List.length} is a library
+function that returns the length of a list.  Actually, the library also has a handy higher-order
+function \code{List.for\_all} that applies a specified boolean-value function to a list and returns
+whether it is true on all elements.  Using that, we could rewrite the \code{Prim}
+clause of \code{check\_exp} as
+\begin{lstlisting}[style=ocaml]
+  | Prim(op,args) ->
+           List.length args = arity op && List.for_all check_exp args
+\end{lstlisting}
+and dispense with \code{check\_exps} altogether.  Being able to operate on entire lists
+uniformly like this is one of the payoffs for using a single generic \code{Prim} constructor.
+\end{ocamlx}
+  
 
 \section{Interpreters}
 \label{sec:interp-Rint}
@@ -938,7 +1306,7 @@ of structural recursion. The \texttt{interp-Rint} function is defined in
 Figure~\ref{fig:interp-Rint}. The body of the function is a match on the
 input program followed by a call to the \lstinline{interp-exp} helper
 function, which in turn has one match clause per grammar rule for
-\LangInt{} expressions.
+\LangInt{} expressions. \ocaml{The OCaml version is in Figure~\ref{fig:ocaml-interp-Rint}.}
 
 \begin{figure}[tp]
 \begin{lstlisting}
@@ -965,6 +1333,26 @@ function, which in turn has one match clause per grammar rule for
 \label{fig:interp-Rint}
 \end{figure}
 
+\begin{figure}[tp]
+\begin{lstlisting}[style=ocaml]
+let interp_exp exp =
+  match exp with
+  | Int n -> n
+  | Prim(Read,[]) -> read_int()
+  | Prim(Neg,[e]) -> - (interp_exp e)
+  | Prim(Add,[e1;e2]) ->  
+      (* must explicitly sequence evaluation order! *)
+      let v1 = interp_exp e1 in
+      let v2 = interp_exp e2 in
+      v1 + v2
+  | _ -> assert false (* arity mismatch *)
+  
+let interp_program (Program(_,e)) = interp_exp e
+\end{lstlisting}
+\caption{\ocaml{OCaml interpreter for the \LangInt{} language.}}
+\label{fig:ocaml-interp-Rint}
+\end{figure}
+
 Let us consider the result of interpreting a few \LangInt{} programs. The
 following program adds two integers.
 \begin{lstlisting}
@@ -979,6 +1367,12 @@ abstract syntax is:
 \begin{lstlisting}
 (Program '() (Prim '+ (list (Int 10) (Int 32))))
 \end{lstlisting}
+\begin{ocamlx}
+  Ocaml:
+\begin{lstlisting}[style=ocaml]
+Program((),Prim(Add,[Int 10; Int 32]))    
+\end{lstlisting}  
+\end{ocamlx}
 
 The next example demonstrates that expressions may be nested within
 each other, in this case nesting several additions and negations.
@@ -1016,6 +1410,11 @@ it is required to report that an error occurred. To signal an error,
 exit with a return code of \code{255}.  The interpreters in chapters
 \ref{ch:Rdyn} and \ref{ch:Rgrad} use
 \code{trapped-error}.
+\begin{ocamlx}
+  In OCaml, overflow does not cause a trap; instead values ``wrap around''
+  to produce results modulo $2^{64}$.  The result of this program is
+  \key{-1223372036854775816}.
+\end{ocamlx}
 
 %% This convention applies to the languages defined in this
 %% book, as a way to simplify the student's task of implementing them,
@@ -1023,7 +1422,8 @@ exit with a return code of \code{255}.  The interpreters in chapters
 %% 
 
 Moving on to the last feature of the \LangInt{} language, the \key{read}
-operation prompts the user of the program for an integer.  Recall that
+operation prompts the user of the program for an integer. \ocaml{The \code{read\_int}
+  function is in the standard library.} Recall that
 program \eqref{eq:arith-prog} performs a \key{read} and then subtracts
 \code{8}. So if we run
 \begin{lstlisting}
@@ -1120,6 +1520,34 @@ arguments are integers and if they are, perform the appropriate
 arithmetic.  Otherwise, they create an AST node for the arithmetic
 operation.
 
+\begin{ocamlx}
+  The corresponding OCaml code is in Figure~\ref{fig:ocaml-pe-arith}. In \code{pe\_add}, note
+  the syntax for matching over a pair of values simultaneously.
+
+\begin{figure}[tp]
+\begin{lstlisting}[style=ocaml]
+let pe_neg = function
+    Int n -> Int (-n)
+  | e -> Prim(Neg,[e])
+
+let pe_add e1 e2 = 
+  match e1,e2 with
+    Int n1,Int n2 -> Int (n1+n2)
+  | e1,e2 -> Prim(Add,[e1;e2])
+
+let rec pe_exp = function
+    Prim(Neg,[e]) -> pe_neg (pe_exp e)
+  | Prim(Add,[e1;e2]) -> pe_add (pe_exp e1) (pe_exp e2)
+  | e -> e
+
+let pe_program (Program(info,e)) = Program(info,pe_exp e)
+\end{lstlisting}
+\caption{\ocaml{An OCaml partial evaluator for \LangInt{}}.}
+\label{fig:ocaml-pe-arith}
+\end{figure}
+
+\end{ocamlx}
+
 To gain some confidence that the partial evaluator is correct, we can
 test whether it produces programs that get the same result as the
 input programs. That is, we can test whether it satisfies Diagram
@@ -1139,6 +1567,57 @@ Appendix~\ref{appendix:utilities}.\\
 \end{lstlisting}
 \end{minipage}
 
+\begin{ocamlx}
+  We can perform a similar kind of test in OCaml using a utility
+  function called \code{interp\_from\_string} which is in the support
+  code for this chapter (not yet in the Appendix).
+
+  Note, however, that comparing
+  results like this isn't a very satisfactory way of testing programs
+  that use \code{Read} anyhow, because it requires us to input the
+  same values twice, once for each execution, or the test will fail!
+  A more straightforward approach is to know what result value we
+  expect from each test program on a given set of input, and simply check
+  that the partially evaluated program still produces that result.
+  The support code also contains a simple driver that implements this approach.
+\end{ocamlx}
+
+\begin{ocamlx}
+{\bf Warmup Exercises}
+
+1. Extend the concrete language and implementation for \LangInt{} with an additional arity-2 primop that
+performs subtraction.  The concrete form for this is \code{(- $e_1$ $e_2$)} where
+$e_1$ and $e_2$ are expressions. Note that there are several ways to do this: you can add
+an additional primop \code{Sub} to the AST, and add new code to check and interpret it,
+or you can choose to ``de-sugar'' the new form into a combination of existing primops when
+converting S-expressions to ASTs. Either way, make sure that you understand why the concrete
+language remains unambiguous even though (a) we already have a unary negation operaror that is also written
+with \code{-}, and (b) unlike addition, subtraction is not an associative operator, i.e.
+$((a-b)-c$ is not generally the same thing as $(a-(b-c))$.
+
+2. Make some non-trivial improvement to the partial evaluator. This task is intentionally open-ended, but here
+are some suggestions, in increasing order of difficulty.
+\begin{itemize}
+\item 
+If you added a new primop for subtraction in part 1, add support for
+partially evaluating subtractions involving constants, analogous to what is already there
+for addition.
+\item
+  Add support for simplifying expressions
+  based on simple algebraic identities, e.g. $x + 0 = x$ for all $x$.
+\item Try to simplify expressions to
+  the point where they contain no more than one \code{Int} leaf expression (the remaining leaves should all be
+\code{Read}s). 
+\end{itemize}
+
+3. Change the AST, interpreter and (improved) partial evaluator for \LangInt{} so that they
+use true 64-bit integers throughout.
+(Currently, these are used in S-expressions in the front end, but everything else uses 63-bit integers instead.)
+This will bring our interpreter and partial evaluator in line with X86-64 machine code, our ultimate
+compilation target.
+The point of this exercise is to get you familiar with exploring an OCaml library, in this case \code{Int64},
+which is documented at \url{https://ocaml.org/releases/4.12/api/Int64.html}.
+\end{ocamlx}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1655,7 +2134,7 @@ conclusion:
 
 \begin{figure}[tbp]
 \centering
-\begin{tabular}{|r|l|} \hline
+\begin{tabular}{|r|l|} \hline 
 Position & Contents \\ \hline
 8(\key{\%rbp}) & return address \\
 0(\key{\%rbp}) & old \key{rbp} \\
@@ -3441,7 +3920,7 @@ saturation of a vertex, in Sudoku terms, is the set of numbers that
 are no longer available. In graph terminology, we have the following
 definition:
 \begin{equation*}
-  \mathrm{saturation}(u) = \{ c \;|\; \exists v. v \in \mathrm{neighbors}(u)
+  \mathrm{saturation}(u) = \{ c \mid \exists v. v \in \mathrm{neighbors}(u)
      \text{ and } \mathrm{color}(v) = c \}
 \end{equation*}
 where $\mathrm{neighbors}(u)$ is the set of vertices that share an
@@ -4501,7 +4980,7 @@ because Typed Racket expects the type of the argument to be of the
 form \code{(Listof T)} or \code{(Pairof T1 T2)}.
 
 The \LangIf{} language performs type checking during compilation like
-Typed Racket. In Chapter~\ref{ch:type-dynamic} we study the
+Typed Racket. In Chapter~\ref{ch:Rdyn} we study the
 alternative choice, that is, a dynamically typed language like Racket.
 The \LangIf{} language is a subset of Typed Racket; for some
 operations we are more restrictive, for example, rejecting
@@ -5840,7 +6319,7 @@ Add the following entry to the list of \code{passes} in
 \end{lstlisting}
 \end{exercise}
 
-\begin{figure}[tbp]
+the \begin{figure}[tbp]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (Rif) at (0,2)  {\large \LangIf{}};
 \node (Rif-2) at (3,2)  {\large \LangIf{}};
