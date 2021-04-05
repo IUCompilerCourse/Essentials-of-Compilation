@@ -2834,7 +2834,8 @@ followed by a unique integer and end with the file extension
 \key{.rkt}. \ocaml{OCaml: use extension \key{.r}.}
 %
 The \key{run-tests.rkt} script in the support code \ocaml{(\key{test\_files}
-  function in \code{Chapter2.ml})} checks whether the
+  function in \code{Chapter2.ml}, which is invoked by the \code{driver}
+  executable)} checks whether the
 output programs produce the same result as the input programs.  The
 script uses the \key{interp-tests} function
 (Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} \ocaml{(\key{test\_files}
@@ -2842,14 +2843,21 @@ script uses the \key{interp-tests} function
 your \key{uniquify} pass on the example programs.  The \code{passes}
 parameter of \key{interp-tests} is a list that should have one entry
 for each pass in your compiler.  For now, define \code{passes} to
-contain just one entry for \code{uniquify} as follows.
+contain just one entry for \code{uniquify} \ocaml{(plus the fixed initial pass)} as follows.
 \begin{lstlisting}
 (define passes 
   (list (list "uniquify" uniquify interp-Rvar type-check-Rvar)))
 \end{lstlisting}
-Run the \key{run-tests.rkt} script in the support code to check
+\begin{ocamlx}
+\begin{lstlisting}{style=ocaml}
+let passes = PCons(initial_pass,
+             PCons(Uniquify.pass,PNil))
+\end{lstlisting}
+\end{ocamlx}
+Run the \key{run-tests.rkt} script in the support code
+\ocaml{(the \key{driver} executable)} to check
 whether the output programs produce the same result as the input
-programs. \ocaml{XXXXXXX}  
+programs.
 \end{exercise}
 
 
@@ -2902,7 +2910,7 @@ R^{\dagger}_1  &::=& \PROGRAM{\code{'()}}{\Exp}
 \end{array}
 \]
 \end{minipage}
-}nnn
+}
 \caption{\LangVarANF{} is \LangVar{} in administrative normal form (ANF).}
 \label{fig:r1-anf-syntax}
 \end{figure}
@@ -3006,6 +3014,7 @@ Implement the \code{remove-complex-opera*} function in
   Be sure to include a checker that re-traverses the target AST to make sure that
   all primop arguments are indeed now atomic, and that we haven't broken any of the
   other invariants we expect to hold of \LangInt{} programs at this point.
+  Fill in the {\tt pass} definition appropriately.
 }
 %
 Create three new \LangInt{} programs that exercise the interesting
@@ -3017,14 +3026,28 @@ list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
 (list "remove-complex" remove-complex-opera* interp-Rvar type-check-Rvar)
 \end{lstlisting}
+\begin{ocamlx}
+  In \code{Chapter2.ml}, add an additional entry to the {\tt passes} list:
+\begin{lstlisting}[style=ocaml]
+let passes = 
+     PCons(initial_pass,
+     PCons(Uniquify.pass,
+     PCons(RemoveComplexOperands.pass, PNil)))
+\end{lstlisting}
+\end{ocamlx}
 While debugging your compiler, it is often useful to see the
 intermediate programs that are output from each pass. To print the
-intermeidate programs, place the following before the call to
+intermediate programs, place the following before the call to
 \code{interp-tests} in \code{run-tests.rkt}.
 \begin{lstlisting}
 (debug-level 1)  
 \end{lstlisting}
-\ocaml{XXXXX}
+\begin{ocamlx}
+  Adjust the assignment near the bottom of \code{Chapter2.ml}:
+  \begin{lstlisting}[style=ocaml]
+let _ = Util.debug_level := 2
+\end{lstlisting}
+\end{ocamlx}
 \end{exercise}
 
 
@@ -3157,7 +3180,7 @@ list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
 (list "explicate control" explicate-control interp-Cvar type-check-Cvar)  
 \end{lstlisting}
-\ocaml{XXXXX}
+\ocaml{Make the analogous change to the \code{passes} list in \code{Chapter2.ml}.}
 \end{exercise}
 
 \section{Select Instructions}
@@ -3261,7 +3284,11 @@ recursively and then append the resulting instructions.
 
 \begin{exercise}
 \normalfont Implement the \key{select-instructions} pass in
-\code{compiler.rkt}. Create three new example programs that are
+\code{compiler.rkt}. \ocaml{Fill out the \code{SelectInstructions} submodule
+  of \code{Chapter2.ml}. The checking field of this pass should invoke
+  \code{X86Int.CheckLabels.check\_program}, passing a list of externally
+  defined labels (just \code{["read\_int"]}).}
+Create three new example programs that are
 designed to exercise all of the interesting cases in this pass.
 %
 In the \code{run-tests.rkt} script, add the following entry to the
@@ -3269,7 +3296,7 @@ list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
 (list "instruction selection" select-instructions interp-pseudo-x86-0)
 \end{lstlisting}
-\ocaml{XXXXXX}
+\ocaml{Make the analogous change to the \code{passes} list in \code{Chapter2.ml}.}
 \end{exercise}
 
 
@@ -3332,7 +3359,7 @@ with stack locations.  As an aside, the \code{locals-types} entry is
 computed by \code{type-check-Cvar} in the support code, which installs
 it in the $\itm{info}$ field of the \code{CProgram} node, which should
 be propagated to the \code{X86Program} node.
-\ocaml{XXXXX}
+\ocaml{The locals sets is represented as a \code{unit Env.t}.}
 
 In the process of assigning variables to stack locations, it is
 convenient for you to compute and store the size of the frame (in
@@ -3340,20 +3367,23 @@ bytes) in the $\itm{info}$ field of the \key{X86Program} node, with
 the key \code{stack-space}, which is needed later to generate the
 conclusion of the \code{main} procedure. The x86-64 standard requires
 the frame size to be a multiple of 16 bytes.\index{frame}
+\ocaml{The \code{'pinfo} parameter should be instantiated with an \code{int}
+  representing the frame size.}
 
 \begin{exercise}\normalfont
 Implement the \key{assign-homes} pass in \code{compiler.rkt}, defining
 auxiliary functions for the non-terminals \Arg{}, \Instr{}, and
-\Block{}.  We recommend that the auxiliary functions take an extra
-parameter that is an alist mapping variable names to homes (stack
-locations for now).
+\Block{}. \ocaml{Fill in the definition of submodule \code{AssignHomes}.}
+We recommend that the auxiliary functions take an extra
+parameter that is an alist \ocaml{(\code{arg Env.t})} mapping variable names to homes (stack
+locations for now). \ocaml{Use the same checker as in the previous pass.}
 %
 In the \code{run-tests.rkt} script, add the following entry to the
 list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
 (list "assign homes" assign-homes interp-x86-0)
 \end{lstlisting}
-\ocaml{XXXX}
+\ocaml{Make the analogous change to the \code{passes} list in \code{Chapter2.ml}.}
 \end{exercise}
 
 
@@ -3451,8 +3481,13 @@ Uncomment the call to the \key{compiler-tests} function
 compiler by executing the generated x86 code. Compile the provided
 \key{runtime.c} file to \key{runtime.o} using \key{gcc}. Run the
 script to test your compiler.
-\ocaml{XXXXX}
-
+\ocaml{The OCaml version packages the process of emitting, assembling,
+  linking, and executing the assembly code as just another pass
+  (the \code{execute\_pass} defined in \code{Chapter2.ml}).
+  To emit code but not process it further, you can use the
+  \code{emit\_pass} instead; note that in this case, the test driver
+  should be configured not to compare initial and final values (since
+  there will be no useful final value).}
 \end{exercise}
 
 
