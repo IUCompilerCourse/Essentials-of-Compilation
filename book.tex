@@ -103,10 +103,9 @@ showstringspaces=false
   language=[Objective]Caml,
   basicstyle=\ttfamily\small\color{blue},
   columns=flexible,
-  escapechar={},
+  escapechar=~,
   showstringspaces=false
 }
-
 
 \newtheorem{theorem}{Theorem}
 \newtheorem{lemma}[theorem]{Lemma}
@@ -887,13 +886,15 @@ Appendix~\ref{appendix:utilities} for more details.
     | SNum of Int64.t
             (* 64-bit integers *)
     | SSym of string
-            (* non-digit character sequence delimited by white space *)
+            (* character sequence starting with non-digit,
+               delimited by white space *)
     | SString of string
             (* arbitrary character sequence delimited by double quotes *)
   \end{lstlisting}
   The generic S-expression parser handles (nestable) comments delimited by
-  curly braces (\code{\{} and \code{\}}).  Symbols can contain any
-  non-digit, non-whitespace characters except parentheses, curly braces, and
+  curly braces (\code{\{} and \code{\}}).  Symbols must start with a non-digit
+  character and can contain any
+  non-whitespace characters except parentheses, curly braces, and
   the back tick (\code{\`}); this last exclusion is handy when we want to
   generate internal names during compilation and be sure they don't clash
   with a user-defined symbol.
@@ -1641,19 +1642,30 @@ We hope to give enough hints that the well-prepared reader, together
 with a few friends, can implement a compiler from \LangVar{} to x86 in
 a couple weeks.  To give the reader a feeling for the scale of this
 first compiler, the instructor solution for the \LangVar{} compiler is
-approximately 500 lines of code.
+approximately 500 lines of code. \ocaml{For the OCaml-based course,
+  several pieces of the compiler will be provided for you, leaving enough
+  work for a week-long assignment. The instructor solution for
+  the tasks left to you is under 200 lines of code.
+  However, in return for not writing so much code,
+  you will need to \emph{read} more existing code.}
 
 \section{The \LangVar{} Language}
 \label{sec:s0}
 \index{variable}
 
 The \LangVar{} language extends the \LangInt{} language with variable
-definitions.  The concrete syntax of the \LangVar{} language is defined by
+definitions. The concrete syntax of the \LangVar{} language is defined by
 the grammar in Figure~\ref{fig:r1-concrete-syntax} and the abstract
-syntax is defined in Figure~\ref{fig:r1-syntax}.  The non-terminal
-\Var{} may be any Racket identifier. As in \LangInt{}, \key{read} is a
+syntax is defined in Figure~\ref{fig:r1-syntax}.  \ocaml{For the OCaml
+  version, we don't feel the need to match the syntax of Racket exactly,
+  so we can simplify the concrete syntax of \key{let} bindings.}   The non-terminal
+\Var{} may be any Racket identifier. \ocaml{For OCaml, it can be any S-expression symbol.}
+As in \LangInt{}, \key{read} is a
 nullary operator, \key{-} is a unary operator, and \key{+} is a binary
-operator.  Similar to \LangInt{}, the abstract syntax of \LangVar{} includes the
+operator.  \ocaml{We also add \key{-} as a binary subtraction operator in
+  the concrete syntax, but not in the abstract syntax: 
+  we will ``de-sugar'' substraction into a combination
+  of addition and negation.}Similar to \LangInt{}, the abstract syntax of \LangVar{} includes the
 \key{Program} struct to mark the top of the program.
 %% The $\itm{info}$
 %% field of the \key{Program} structure contains an \emph{association
@@ -1675,7 +1687,20 @@ exhibit several compilation techniques.
 \]
 \end{minipage}
 }
-\caption{The concrete syntax of \LangVar{}.}
+\begin{ocamlx}
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{rcl}
+  \Exp &::=& \Int \mid \CREAD{} \mid \CNEG{\Exp} \mid \CADD{\Exp}{\Exp} \mid \CSUB{\Exp}{\Exp}\\
+       &\mid& \Var \mid \code{(let $\Var$ $\Exp$ $\Exp$)}\\
+  \LangVar{} &::=& \Exp
+\end{array}
+\]
+\end{minipage}
+}
+\end{ocamlx}
+\caption{The concrete syntax of \LangVar{} \ocaml{in OCaml}.}
 \label{fig:r1-concrete-syntax}
 \end{figure}
 
@@ -1693,6 +1718,19 @@ exhibit several compilation techniques.
 \]
 \end{minipage}
 }
+\begin{lstlisting}[style=ocaml,frame=single]
+type primop = 
+   Read
+ | Neg
+ | Add
+type var = string
+type exp = 
+   Int of int64  
+ | Prim of primop * exp list
+ | Var of var
+ | Let of var * exp * exp
+type 'info program = Program of 'info * exp
+\end{lstlisting}
 \caption{The abstract syntax of \LangVar{}.}
 \label{fig:r1-syntax}
 \end{figure}
@@ -1705,10 +1743,16 @@ Figure~\ref{fig:r1-syntax}.  The concrete syntax for \key{let} is
 \begin{lstlisting}
 (let ([|$\itm{var}$| |$\itm{exp}$|]) |$\itm{exp}$|)
 \end{lstlisting}
+\begin{lstlisting}[style=ocaml]
+(let ~$\itm{var}$~ ~$\itm{exp}$~ ~$\itm{exp}$~)
+\end{lstlisting}
 For example, the following program initializes \code{x} to $32$ and then
 evaluates the body \code{(+ 10 x)}, producing $42$.
 \begin{lstlisting}
 (let ([x (+ 12 20)]) (+ 10 x))
+\end{lstlisting}
+\begin{lstlisting}[style=ocaml]
+(let x (+ 12 20) (+ 10 x))
 \end{lstlisting}
 When there are multiple \key{let}'s for the same variable, the closest
 enclosing \key{let} is used. That is, variable definitions overshadow
@@ -1716,6 +1760,9 @@ prior definitions. Consider the following program with two \key{let}'s
 that define variables named \code{x}. Can you figure out the result?
 \begin{lstlisting}
 (let ([x 32]) (+ (let ([x 10]) x) x))
+\end{lstlisting}
+\begin{lstlisting}[style=ocaml]
+(let x 32 (+ (let x 10 x) x))
 \end{lstlisting}
 For the purposes of depicting which variable uses correspond to which
 definitions, the following shows the \code{x}'s annotated with
@@ -1725,6 +1772,9 @@ program.
 \begin{lstlisting}
 (let ([x|$_1$| 32]) (+ (let ([x|$_2$| 10]) x|$_2$|) x|$_1$|))
 \end{lstlisting}
+\begin{lstlisting}[style=ocaml]
+(let x~$_1$~ 32 (+ (let x~$_2$~ 10 x~$_2$~) x~$_1$~))
+\end{lstlisting}
 The initializing expression is always evaluated before the body of the
 \key{let}, so in the following, the \key{read} for \code{x} is
 performed before the \key{read} for \code{y}. Given the input
@@ -1732,9 +1782,22 @@ $52$ then $10$, the following produces $42$ (not $-42$).
 \begin{lstlisting}
 (let ([x (read)]) (let ([y (read)]) (+ x (- y))))
 \end{lstlisting}
+\begin{lstlisting}[style=ocaml]
+(let x (read) (let y (read) (+ x (- y)))))
+\end{lstlisting}
 
 \subsection{Extensible Interpreters via Method Overriding}
 \label{sec:extensible-interp}
+
+\begin{ocamlx}
+  We are not going to bother with making our OCaml interpreters
+  extensible, although there are several mechanisms in OCaml that
+  we could use to acheive this. The languages involved here just
+  don't seem big enough to warrant the added complexity.
+  We will, however, break out the definition and interpretation of
+  primops into a separate module, so that this can be easily shared among
+  different languages.
+\end{ocamlx}
 
 To prepare for discussing the interpreter for \LangVar{}, we need to
 explain why we choose to implement the interpreter using
@@ -1885,10 +1948,16 @@ extensible way.
 \end{wrapfigure}
 
 Having justified the use of classes and methods to implement
-interpreters, we turn to the definitional interpreter for \LangVar{}
-in Figure~\ref{fig:interp-Rvar}. It is similar to the interpreter for
+interpreters \ocaml{(or not)}, we turn to the definitional interpreter for \LangVar{}
+in Figure~\ref{fig:interp-Rvar} \ocaml{(Figure~\ref{fig:interp-Rvar-ocaml})}.
+It is similar to the interpreter for
 \LangInt{} but adds two new \key{match} cases for variables and
-\key{let}.  For \key{let} we need a way to communicate the value bound
+\key{let}. \ocaml{Also, the code for performing primops has been split out
+  into a separate function. We rely on the fact that
+  \code{List.map} processes list elements from left to right to
+  enforce the intended order of evaluation of primop subexpressions.}
+
+For \key{let} we need a way to communicate the value bound
 to a variable to all the uses of the variable. To accomplish this, we
 maintain a mapping from variables to values. Throughout the compiler
 we often need to map variables to information about them. We refer to
@@ -1899,7 +1968,7 @@ these mappings as
 %
 For simplicity, we use an association list (alist) to represent the
 environment. The sidebar to the right gives a brief introduction to
-alists and the \code{racket/dict} package.  The \code{interp-exp}
+alists and the \code{racket/dict} package. The \code{interp-exp}
 function takes the current environment, \code{env}, as an extra
 parameter.  When the interpreter encounters a variable, it finds the
 corresponding value using the \code{dict-ref} function.  When the
@@ -1907,6 +1976,51 @@ interpreter encounters a \key{Let}, it evaluates the initializing
 expression, extends the environment with the result value bound to the
 variable, using \code{dict-set}, then evaluates the body of the
 \key{Let}.
+
+\begin{ocamlx}
+  In OCaml, we thread environments in the same way, but
+  it is convenient to represent environments using
+  the \code{Map} library module, which provides efficient
+  mappings from keys to values (using balanced binary trees,
+  although that is an implementation detail we don't need to
+  know about). \code{Map} is an example of a module that
+  is \emph{parameterized} by another module signature; this
+  is sometimes called a \emph{functor}.  Here we use \code{Map.Make}
+  to \emph{apply} the functor, thereby defining a module \code{Env} that provides operations
+  specialized to \code{string} keys (suitable for variables).
+  The type of environments is written \code{'a Env.t}; it is
+  parametric in the type \code{'a} of values stored in the map.
+  Here we will be using \LangVar{}
+  values, i.e. \code{int64}s, so the type is \code{int64 Env.t}.  
+  \code{Env.empty} represents an empty environment.
+  \code{Env.find $x$ $env$} returns the value associated with
+  variable $x$ in $env$ (throwing an exception if $x$ is not found). 
+  \code{Env.add $x$ $v$ $env$} produces a new environment
+  that is the same as $env$ except that variable $x$ is associated to
+  value $v$. Note that these operations are \emph{pure}; that is, they
+  do not mutate any environment.
+\end{ocamlx}
+
+\begin{ocamlx}
+  The OCaml code for \LangVar{} ASTs, concrete parsing and printing (for debug purposes),
+  and interpretation are in file \texttt{RVar.ml}, which also imports
+  from file \texttt{Primops.ml}.  These files also contain code for
+  static checking of \LangVar{} programs. The checker makes sure that
+  (i) every use of a variable is in the scope of a corresponding \code{let} binding;
+  and (ii) each primop is applied to the correct number of arguments.
+
+  Note that if a source program fails the checker for reason (i), this is a static user error
+  that should be reported as such. (Violations of (ii) in user programs
+  should be caught by the parser; parse errors are always reported as user errors.)
+  Your compiler should stop trying to process a file as soon as it reports a static user
+  error! (That's what the provided test driver will do.)
+
+  However, if a program initially passes
+  the checker but is subsequently transformed by the compiler and then
+  fails a re-check, this indicates that the problem is the compiler's fault.
+  In this case, the compiler itself should halt with a suitable error message.
+  The checker has a boolean flag to distinguish these cases.
+\end{ocamlx}
 
 \begin{figure}[tp]
 \begin{lstlisting}
@@ -1939,6 +2053,31 @@ variable, using \code{dict-set}, then evaluates the body of the
 \end{lstlisting}
 \caption{Interpreter for the \LangVar{} language.}
 \label{fig:interp-Rvar}
+\end{figure}
+\begin{figure}[tp]
+\begin{lstlisting}[style=ocaml]
+type value = int64
+  
+let interp_primop (op:primop) (args: value list) : value = 
+  match op,args with
+    Read,[] -> read_int()
+  | Neg,[v] -> Int64.neg v
+  | Add,[v1;v2] -> Int64.add v1 v2
+  | _,_ -> assert false (* arity mismatch *)
+
+module StringKey = struct type t = string let compare = String.compare end
+module Env = Map.Make(StringKey)
+
+let rec interp_exp (env:value Env.t) = function
+    Int n -> n
+  | Prim(op,args) -> interp_primop op (List.map (interp_exp env) args)
+  | Var x -> Env.find x env
+  | Let (x,e1,e2) -> interp_exp (Env.add x (interp_exp env e1) env) e2
+
+let interp_program (Program(_,e)) = interp_exp Env.empty e
+\end{lstlisting}
+\caption{\ocaml{Ocaml interpreter for the \LangVar{} language.}}
+\label{fig:interp-Rvar-ocaml}
 \end{figure}
 
 The goal for this chapter is to implement a compiler that translates
@@ -2002,7 +2141,8 @@ integer constant (called \emph{immediate value}\index{immediate
 \Arg &::=&  \key{\$}\Int \mid \key{\%}\Reg \mid \Int\key{(}\key{\%}\Reg\key{)}\\
 \Instr &::=& \key{addq} \; \Arg\key{,} \Arg \mid
       \key{subq} \; \Arg\key{,} \Arg \mid
-      \key{negq} \; \Arg \mid \key{movq} \; \Arg\key{,} \Arg \mid \\
+      \key{negq} \; \Arg \mid \\
+  &&  \key{movq} \; \Arg\key{,} \Arg \mid \ocaml{\key{movabsq} \; \Arg\key{,} \Arg \mid} \\
   &&  \key{callq} \; \mathit{label} \mid
       \key{pushq}\;\Arg \mid \key{popq}\;\Arg \mid \key{retq} \mid \key{jmp}\,\itm{label} \\
   && \itm{label}\key{:}\; \Instr \\
@@ -2062,8 +2202,10 @@ returning the integer in \key{rax} to the operating system. The
 operating system interprets this integer as the program's exit
 code. By convention, an exit code of 0 indicates that a program
 completed successfully, and all other exit codes indicate various
-errors. Nevertheless, in this book we return the result of the program
-as the exit code.
+errors. \ocaml{Also, exit codes are unsigned bytes, so they cannot accurately represent
+arbitrary \code{int64}s.} Nevertheless, in this book we return the result of the program
+as the exit code. \ocaml{(Incidentally, if you run a program at the unix shell
+  prompt, you can retrieve its exit code by typing \texttt{echo \$?} as the very next command.)}
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -2081,7 +2223,8 @@ The x86 assembly language varies in a couple ways depending on what
 operating system it is assembled in. The code examples shown here are
 correct on Linux and most Unix-like platforms, but when assembled on
 Mac OS X, labels like \key{main} must be prefixed with an underscore,
-as in \key{\_main}.
+as in \key{\_main}. \ocaml{There is a utility function \code{get\_ostype}
+provided in the \texttt{utils.ml} module provided with the support materials.}
 
 We exhibit the use of memory for storing intermediate results in the
 next example.  Figure~\ref{fig:p1-x86} lists an x86 program that is
@@ -2201,11 +2344,22 @@ organization becomes apparent in Chapter~\ref{ch:Rif} when we
 introduce conditional branching. The \code{Block} structure includes
 an $\itm{info}$ field that is not needed for this chapter, but becomes
 useful in Chapter~\ref{ch:register-allocation-Rvar}.  For now, the
-$\itm{info}$ field should contain an empty list. Also, regarding the
+$\itm{info}$ field should contain an empty list. \ocaml{The \code{'binfo}
+  type parameter should be instantiated with \code{unit}.}
+Also, regarding the
 abstract syntax for \code{callq}, the \code{Callq} struct includes an
 integer for representing the arity of the function, i.e., the number
 of arguments, which is helpful to know during register allocation
 (Chapter~\ref{ch:register-allocation-Rvar}).
+
+\begin{ocamlx}
+  The OCaml code for \LangXInt{} AST, printing, and checking is
+  in file \texttt{X86Int.ml}. Printing is used to produce \texttt{.s} files that
+  can be input to the system assembler; it can also be useful for debugging.
+  File \texttt{utils.ml} contains functions for invoking the assembler and linker and
+  running the resulting executables from inside OCaml; these are invoked
+  from the test drivers also defined in that file.
+\end{ocamlx}    
 
 \begin{figure}[tp]
 \fbox{
@@ -2218,8 +2372,9 @@ of arguments, which is helpful to know during register allocation
    \mid \DEREF{\Reg}{\Int} \\
 \Instr &::=& \BININSTR{\code{addq}}{\Arg}{\Arg} 
        \mid \BININSTR{\code{subq}}{\Arg}{\Arg} \\
+       &\mid& \UNIINSTR{\code{negq}}{\Arg}\\
        &\mid& \BININSTR{\code{movq}}{\Arg}{\Arg}
-       \mid \UNIINSTR{\code{negq}}{\Arg}\\
+       \ocaml{\mid \BININSTR{\code{movabsq}}{\Arg}{\Arg}} \\
        &\mid& \CALLQ{\itm{label}}{\itm{int}} \mid \RETQ{} 
        \mid \PUSHQ{\Arg} \mid \POPQ{\Arg} \mid \JMP{\itm{label}} \\
 \Block &::= & \BLOCK{\itm{info}}{\LP\Instr\ldots\RP} \\
@@ -2228,9 +2383,33 @@ of arguments, which is helpful to know during register allocation
 \]
 \end{minipage}
 }
-\caption{The abstract syntax of \LangXInt{} assembly.}
+\begin{lstlisting}[style=ocaml,frame=single]
+type reg =
+    RSP | RBP | RAX | RBX | RCX | RDX | RSI | RDI
+  | R8  | R9  | R10 | R11 | R12 | R13 | R14 | R15
+
+type label = string
+
+type arg =
+    Imm of int64  (* in most cases must actually be an int32 *)
+  | Reg of reg
+  | Deref of reg*int32
+  | Var of string (* a pseudo-argument for ~$\LangXVar{}$~ *)
+
+type instr =
+    Addq of arg*arg | Subq of arg*arg | Negq of arg 
+  | Movq of arg*arg | Movabsq of arg*arg | Callq of label*int 
+  | Retq | Pushq of arg | Popq of arg | Jmp of label
+
+type 'binfo block = Block of 'binfo * instr list
+
+type ('pinfo,'binfo) program =
+    Program of 'pinfo * (label * 'binfo block) list 
+\end{lstlisting}
+\caption{The abstract syntax of \LangXInt{} \ocaml{and \LangXVar{}} assembly.}
 \label{fig:x86-int-ast}
 \end{figure}
+
 
 \section{Planning the trip to x86 via the \LangCVar{} language}
 \label{sec:plan-s0-x86}
@@ -2246,7 +2425,8 @@ and x86 assembly? Here are some of the most important ones:
   arithmetic operations take two arguments and produce a new value.
   An x86 instruction may have at most one memory-accessing argument.
   Furthermore, some instructions place special restrictions on their
-  arguments.
+  arguments. \ocaml{For example, immediate operands are usually restricted
+    to fit in 32 bits (except for the \code{movabsq} instruction).}
 
 \item[(b)] An argument of an \LangVar{} operator can be a deeply-nested
   expression, whereas x86 instructions restrict their arguments to be
@@ -2327,7 +2507,7 @@ become local variables whose scope is the entire program, which would
 confuse variables with the same name.
 %
 We place \key{remove-complex-opera*} before \key{explicate-control}
-because the later removes the \key{let} form, but it is convenient to
+because the latter removes the \key{let} form, but it is convenient to
 use \key{let} in the output of \key{remove-complex-opera*}.
 %
 The ordering of \key{uniquify} with respect to
@@ -2407,7 +2587,10 @@ language~\citep{Kernighan:1988nx} in that it has separate syntactic
 categories for expressions and statements, so we name it \LangCVar{}.  The
 abstract syntax for \LangCVar{} is defined in Figure~\ref{fig:c0-syntax}.
 (The concrete syntax for \LangCVar{} is in the Appendix,
-Figure~\ref{fig:c0-concrete-syntax}.)
+Figure~\ref{fig:c0-concrete-syntax}. \ocaml{(This appendix is not quite accurate
+  for the OCaml version, but the details of the concrete syntax of
+  an IR like this don't matter much, since it will normally be used
+  only to dump out information when debugging; it won't be parsed.})
 %
 The \LangCVar{} language supports the same operators as \LangVar{} but
 the arguments of operators are restricted to atomic
@@ -2420,18 +2603,22 @@ assignment statements which can be executed in sequence using the
 expression that is the last one to execute within a function.
 
 A \LangCVar{} program consists of a control-flow graph represented as
-an alist mapping labels to tails. This is more general than necessary
+an alist mapping labels to tails \ocaml{(that is, a list of \code{(label*tail)} pairs)}.
+This is more general than necessary
 for the present chapter, as we do not yet introduce \key{goto} for
 jumping to labels, but it saves us from having to change the syntax in
 Chapter~\ref{ch:Rif}.  For now there will be just one label,
-\key{start}, and the whole program is its tail.
+\key{start}, and the whole program \ocaml{body} is its tail.
 %
 The $\itm{info}$ field of the \key{CProgram} form, after the
 \key{explicate-control} pass, contains a mapping from the symbol
 \key{locals} to a list of variables, that is, a list of all the
-variables used in the program. At the start of the program, these
+variables used in the program. \ocaml{It is represented as a \code{unit Env.t},
+a kind of degenerate map that effectively acts like a set.}
+At the start of the program, these
 variables are uninitialized; they become initialized on their first
 assignment.
+
 
 \begin{figure}[tbp]
 \fbox{
@@ -2448,12 +2635,38 @@ assignment.
 \]
 \end{minipage}
 }
+\begin{lstlisting}[style=ocaml,frame=single]
+type var = string
+
+type label = string
+
+type atm = 
+    Int of int64
+  | Var of var
+
+type exp =
+    Atom of atm
+  | Prim of primop * atm list
+
+type stmt =
+    Assign of var * exp
+
+type tail =
+    Return of exp
+  | Seq of stmt*tail
+
+type 'pinfo program = Program of 'pinfo * (label*tail) list
+\end{lstlisting}
 \caption{The abstract syntax of the \LangCVar{} intermediate language.}
 \label{fig:c0-syntax}
 \end{figure}
 
 The definitional interpreter for \LangCVar{} is in the support code,
 in the file \code{interp-Cvar.rkt}.
+\begin{ocamlx}
+  The OCaml code for \LangCVar{} AST, checking, printing (for debug purposes),
+  and interpretation is in file \texttt{CVar.ml}. 
+\end{ocamlx}
 
 \subsection{The \LangXVar{} dialect}
 
@@ -2461,7 +2674,23 @@ The \LangXVar{} language is the output of the pass
 \key{select-instructions}. It extends \LangXInt{} with an unbounded
 number of program-scope variables and removes the restrictions
 regarding instruction arguments.
-
+\begin{ocamlx}
+For simplicity, we treat \LangXInt{}  and \LangXVar{} as the same
+  language, defined in \texttt{X86Int.ml}. In particular, we allow \code{Var}
+  as one of the possible forms for an instruction argument (\code{arg}).
+  We provide two different check routines.
+  \begin{itemize}
+    \item \code{CheckLabels.check\_program}
+      just checks that all label
+      declarations are unique and that all jump targets are defined; this
+      is suitable for checking the code produced from the \key{select-instructions}
+      pass, which will use \code{Var} arguments freely.
+    \item 
+      \code{CheckArgs.check\_program} checks that all arguments are legal for the
+      actual X86-64 machine (in particular, that they are not \code{Var} arguments);
+      this is suitable for checking the output of the \key{patch-instr} pass.
+  \end{itemize}
+\end{ocamlx}
 
 \section{Uniquify Variables}
 \label{sec:uniquify-Rvar}
@@ -2488,6 +2717,24 @@ $\Rightarrow$
 \end{minipage}
 \end{tabular} \\
 %
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}[style=ocaml]
+(let x 32
+  (+ (let x 10 x) x))
+\end{lstlisting}
+\end{minipage}
+&
+\ocaml{$\Rightarrow$}
+&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}[style=ocaml]
+(let x.1 32
+  (+ (let x.2 10 x.2) x.1))
+\end{lstlisting}
+\end{minipage}
+\end{tabular} \\
+%
 The following is another example translation, this time of a program
 with a \key{let} nested inside the initializing expression of another
 \key{let}.\\
@@ -2510,20 +2757,21 @@ $\Rightarrow$
 \end{lstlisting}
 \end{minipage}
 \end{tabular}
-
+\ocaml{You can transliterate examples like this for yourself by now...}
 We recommend implementing \code{uniquify} by creating a structurally
 recursive function named \code{uniquify-exp} that mostly just copies
 an expression. However, when encountering a \key{let}, it should
 generate a unique name for the variable and associate the old name
-with the new name in an alist.\footnote{The Racket function
-  \code{gensym} is handy for generating unique variable names.} The
-\code{uniquify-exp} function needs to access this alist when it gets
+with the new name in an alist \ocaml{(Ocaml: \key{Env})}.\footnote{The Racket function
+\code{gensym} is handy for generating unique variable names. \ocaml{There is a similar
+function defined in \texttt{utils.ml}.}} The
+\code{uniquify-exp} function needs to access this alist \ocaml{(\key{Env})} when it gets
 to a variable reference, so we add a parameter to \code{uniquify-exp}
-for the alist.
+for the alist \ocaml{(\key{Env})} .
 
 The skeleton of the \code{uniquify-exp} function is shown in
 Figure~\ref{fig:uniquify-Rvar}.  The function is curried so that it is
-convenient to partially apply it to an alist and then apply it to
+convenient to partially apply it to an alist \ocaml{(\key{Env})} and then apply it to
 different expressions, as in the last case for primitive operations in
 Figure~\ref{fig:uniquify-Rvar}.  The
 %
@@ -2531,6 +2779,19 @@ Figure~\ref{fig:uniquify-Rvar}.  The
 %
 form of Racket is useful for transforming each element of a list to
 produce a new list.\index{for/list}
+\ocaml{The \code{List.map} function is similar.}
+
+\ocaml{In addition to writing the \code{uniquify} transformation, it is worthwhile 
+  to write a \emph{checker} to make sure that the result obeys any invariants we
+  expect to hold.  (Sometimes these invariants are baked into the abstract syntax
+  of the target, but that's not the case here.) Our checker should re-traverse the
+  result AST and make sure that no identifier is bound more than once.  It should also
+  re-run the \LangVar{} checker defined in module \code{RVar} to make sure that
+  all variables uses are in the scope of a binding (something we might easily have
+  messed up) and that we have not accidentally introduced a primop arity error (much
+  less likely, but still possible).
+}
+
 
 \begin{exercise}
 \normalfont % I don't like the italics for exercises. -Jeremy
@@ -2538,7 +2799,8 @@ produce a new list.\index{for/list}
 Complete the \code{uniquify} pass by filling in the blanks in
 Figure~\ref{fig:uniquify-Rvar}, that is, implement the cases for
 variables and for the \key{let} form in the file \code{compiler.rkt}
-in the support code.
+in the support code. \ocaml{This exercise is done for you, in the
+  \code{Uniquify} module of file \code{Chapter2.ml}.}
 \end{exercise}
 
 \begin{figure}[tbp]
@@ -2569,12 +2831,14 @@ parts of the \key{uniquify} pass, that is, the programs should include
 The five programs should be placed in the subdirectory named
 \key{tests} and the file names should start with \code{var\_test\_}
 followed by a unique integer and end with the file extension
-\key{.rkt}.
+\key{.rkt}. \ocaml{OCaml: use extension \key{.r}.}
 %
-The \key{run-tests.rkt} script in the support code checks whether the
+The \key{run-tests.rkt} script in the support code \ocaml{(\key{test\_files}
+  function in \code{Chapter2.ml})} checks whether the
 output programs produce the same result as the input programs.  The
 script uses the \key{interp-tests} function
-(Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to test
+(Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} \ocaml{(\key{test\_files}
+  function from \code{utils.ml})} to test
 your \key{uniquify} pass on the example programs.  The \code{passes}
 parameter of \key{interp-tests} is a list that should have one entry
 for each pass in your compiler.  For now, define \code{passes} to
@@ -2585,7 +2849,7 @@ contain just one entry for \code{uniquify} as follows.
 \end{lstlisting}
 Run the \key{run-tests.rkt} script in the support code to check
 whether the output programs produce the same result as the input
-programs.
+programs. \ocaml{XXXXXXX}  
 \end{exercise}
 
 
@@ -2619,7 +2883,11 @@ $\Rightarrow$
 \end{minipage}
 \end{tabular}
 
-
+\begin{ocamlx}
+We suggest generating temporary names that begin with a back-tick (\verb'`')
+since these are illegal as S-expression symbols, and so cannot conflict with existing
+user-defined names.
+\end{ocamlx}
 \begin{figure}[tp]
 \centering
 \fbox{
@@ -2628,13 +2896,13 @@ $\Rightarrow$
 \begin{array}{rcl}
 \Atm &::=& \INT{\Int} \mid \VAR{\Var} \\
 \Exp &::=& \Atm \mid \READ{} \\
-     &\mid& \NEG{\Atm} \mid \ADD{\Atm}{\Atm}  \\
+n     &\mid& \NEG{\Atm} \mid \ADD{\Atm}{\Atm}  \\
      &\mid&  \LET{\Var}{\Exp}{\Exp} \\
 R^{\dagger}_1  &::=& \PROGRAM{\code{'()}}{\Exp}
 \end{array}
 \]
 \end{minipage}
-}
+}nnn
 \caption{\LangVarANF{} is \LangVar{} in administrative normal form (ANF).}
 \label{fig:r1-anf-syntax}
 \end{figure}
@@ -2647,6 +2915,11 @@ and variables are atomic. In the literature, restricting arguments to
 be atomic expressions is called \emph{administrative normal form}, or
 ANF for short~\citep{Danvy:1991fk,Flanagan:1993cg}.
 \index{administrative normal form} \index{ANF}
+\ocaml{Actually, ANF
+  as defined in~\citep{Flanagan:1993cg}
+  refers to a more restricted form in which the defining expressions of
+  \code{let}s cannot themselves contain \code{lets}s. This essentially
+  corresponds to the \LangCVar{} language.}
 
 We recommend implementing this pass with two mutually recursive
 functions, \code{rco-atom} and \code{rco-exp}. The idea is to apply
@@ -2654,7 +2927,7 @@ functions, \code{rco-atom} and \code{rco-exp}. The idea is to apply
 apply \code{rco-exp} to subexpressions that do not.  Both functions
 take an \LangVar{} expression as input.  The \code{rco-exp} function
 returns an expression.  The \code{rco-atom} function returns two
-things: an atomic expression and alist mapping temporary variables to
+things: an atomic expression and alist \ocaml{(i.e. list of pairs)} mapping temporary variables to
 complex subexpressions. You can return multiple things from a function
 using Racket's \key{values} form and you can receive multiple things
 from a function call using the \key{define-values} form. If you are
@@ -2664,7 +2937,9 @@ Also, the
   form is useful for applying a function to each element of a list, in
   the case where the function returns multiple values.
   \index{for/lists}
-
+  \ocaml{OCaml: You can return multiple things from a function using a tuple
+    and binding the return value to a tuple pattern. Again, the \code{List.map}
+    function is handy.}
 Returning to the example program \code{(+ 52 (- 10))}, the
 subexpression \code{(- 10)} should be processed using the
 \code{rco-atom} function because it is an argument of the \code{+} and
@@ -2723,10 +2998,15 @@ produce the following output with unnecessary temporary variables.\\
 \end{lstlisting}
 \end{minipage}
 
+
 \begin{exercise}\normalfont
 %
 Implement the \code{remove-complex-opera*} function in
-\code{compiler.rkt}.
+\code{compiler.rkt}. \ocaml{Fill in the RemoveComplexOperations submodule in \code{Chapter2.ml}.
+  Be sure to include a checker that re-traverses the target AST to make sure that
+  all primop arguments are indeed now atomic, and that we haven't broken any of the
+  other invariants we expect to hold of \LangInt{} programs at this point.
+}
 %
 Create three new \LangInt{} programs that exercise the interesting
 code in the \code{remove-complex-opera*} pass (Following the same file
@@ -2744,6 +3024,7 @@ intermeidate programs, place the following before the call to
 \begin{lstlisting}
 (debug-level 1)  
 \end{lstlisting}
+\ocaml{XXXXX}
 \end{exercise}
 
 
@@ -2792,7 +3073,7 @@ start:
 \end{lstlisting}
 \end{minipage}
 \end{tabular}
-
+%
 \begin{figure}[tbp]
 \begin{lstlisting}
 (define (explicate-tail e)
@@ -2853,11 +3134,22 @@ output. The reader might be tempted to instead organize
 statements. We warn against that alternative because the
 accumulator-passing style is key to how we generate high-quality code
 for conditional expressions in Chapter~\ref{ch:Rif}.
+\begin{ocamlx}
+  Don't take this advice too seriously. Organize things in the cleanest way you
+  can find; it will always be  possible to adjust your approach in later chapters.
+\end{ocamlx}
 
 \begin{exercise}\normalfont
 %
 Implement the \code{explicate-control} function in
-\code{compiler.rkt}.  Create three new \LangInt{} programs that
+\code{compiler.rkt}.  \ocaml{Fill in the \code{ExplicateControl} submodule
+  of \code{Chapter2.ml} by implementing the \code{do\_program} function.
+  The checking field of this pass should invoke \code{CVar.check\_program},
+  which checks that the target code is properly bound (and also fills in
+  some information about the set of bound variables in the \code{'pinfo}
+  field of the program that will be useful in a later pass).}
+%
+Create three new \LangInt{} programs that
 exercise the code in \code{explicate-control}.
 %
 In the \code{run-tests.rkt} script, add the following entry to the
@@ -2865,6 +3157,7 @@ list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
 (list "explicate control" explicate-control interp-Cvar type-check-Cvar)  
 \end{lstlisting}
+\ocaml{XXXXX}
 \end{exercise}
 
 \section{Select Instructions}
@@ -2875,8 +3168,9 @@ In the \code{select-instructions} pass we begin the work of
 translating from \LangCVar{} to \LangXVar{}. The target language of
 this pass is a variant of x86 that still uses variables, so we add an
 AST node of the form $\VAR{\itm{var}}$ to the \Arg{} non-terminal of
-the \LangXInt{} abstract syntax (Figure~\ref{fig:x86-int-ast}).  We
-recommend implementing the \code{select-instructions} with
+the \LangXInt{} abstract syntax (Figure~\ref{fig:x86-int-ast}). \ocaml{Recall that
+  we use the same module to define \LangXInt{} and \LangXVar{}.}
+We recommend implementing the \code{select-instructions} with
 three auxiliary functions, one for each of the non-terminals of
 \LangCVar{}: $\Atm$, $\Stmt$, and $\Tail$.
 
@@ -2975,6 +3269,7 @@ list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
 (list "instruction selection" select-instructions interp-pseudo-x86-0)
 \end{lstlisting}
+\ocaml{XXXXXX}
 \end{exercise}
 
 
@@ -3037,6 +3332,7 @@ with stack locations.  As an aside, the \code{locals-types} entry is
 computed by \code{type-check-Cvar} in the support code, which installs
 it in the $\itm{info}$ field of the \code{CProgram} node, which should
 be propagated to the \code{X86Program} node.
+\ocaml{XXXXX}
 
 In the process of assigning variables to stack locations, it is
 convenient for you to compute and store the size of the frame (in
@@ -3057,6 +3353,7 @@ list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
 (list "assign homes" assign-homes interp-x86-0)
 \end{lstlisting}
+\ocaml{XXXX}
 \end{exercise}
 
 
@@ -3066,7 +3363,10 @@ list of \code{passes} and then run the script to test your compiler.
 The \code{patch-instructions} pass compiles from \LangXVar{} to
 \LangXInt{} by making sure that each instruction adheres to the
 restriction that at most one argument of an instruction may be a
-memory reference.
+memory reference. \ocaml{It also ensures that no immediate operand
+  to an ordinary instruction exceeds 32 bits, by introducing \code{movabsq}
+  instructions as needed. \code{movabsq} is the sole instruction that
+  allows a 64-bit immediate source operand; its destination must be a register.}
 
 We return to the following example.
 % var_test_20.rkt
@@ -3098,7 +3398,9 @@ from \key{rax} to the destination location, as follows.
 
 \begin{exercise}
 \normalfont Implement the \key{patch-instructions} pass in
-\code{compiler.rkt}. Create three new example programs that are
+\code{compiler.rkt}. \ocaml{This task has been done for you, in the \code{PatchInstructions} submodule
+of \code{Chapter2}.}
+Create three new example programs that are
 designed to exercise all of the interesting cases in this pass.
 %
 In the \code{run-tests.rkt} script, add the following entry to the
@@ -3116,7 +3418,8 @@ The last step of the compiler from \LangVar{} to x86 is to convert the
 \LangXInt{} AST (defined in Figure~\ref{fig:x86-int-ast}) to the
 string representation (defined in
 Figure~\ref{fig:x86-int-concrete}). The Racket \key{format} and
-\key{string-append} functions are useful in this regard. The main work
+\key{string-append} functions are useful in this regard. \ocaml{The \code{Printf}
+  library is useful here.} The main work
 that this step needs to perform is to create the \key{main} function
 and the standard instructions for its prelude and conclusion, as shown
 in Figure~\ref{fig:p1-x86} of Section~\ref{sec:x86}. You will need to
@@ -3128,10 +3431,14 @@ When running on Mac OS X, you compiler should prefix an underscore to
 labels like \key{main}. The Racket call \code{(system-type 'os)} is
 useful for determining which operating system the compiler is running
 on. It returns \code{'macosx}, \code{'unix}, or \code{'windows}.
+\ocaml{There is a similar utility function \code{get\_ostype}
+provided in the \texttt{utils.ml} module.}
 
 \begin{exercise}\normalfont
 %
 Implement the \key{print-x86} pass in \code{compiler.rkt}.
+\ocaml{This task has been done for you; the relevant printing
+  code is in module \code{X86Int}.}
 %
 In the \code{run-tests.rkt} script, add the following entry to the
 list of \code{passes} and then run the script to test your compiler.
@@ -3144,6 +3451,8 @@ Uncomment the call to the \key{compiler-tests} function
 compiler by executing the generated x86 code. Compile the provided
 \key{runtime.c} file to \key{runtime.o} using \key{gcc}. Run the
 script to test your compiler.
+\ocaml{XXXXX}
+
 \end{exercise}
 
 
