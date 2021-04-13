@@ -3726,7 +3726,9 @@ relatively slow. If \code{x} is not used many times, it may be better
 to assign \code{x} to a stack location in the first place. Or better
 yet, if we can arrange for \code{x} to be placed in a callee-saved
 register, then it won't need to be saved and restored during function
-calls.
+calls. \ocaml{(By the caller, that is. The callee might still need to save the
+  register, but only if it actually needs to make use of that register for
+  its own purposes.)}
 
 The approach that we recommend for variables that are in use during a
 function call is to either assign them to callee-saved registers or to
@@ -3736,6 +3738,19 @@ order 1) look for an available caller-saved register (to leave room
 for other variables in the callee-saved register), 2) look for a
 callee-saved register, and 3) spill the variable to the stack.
 
+\ocaml{To summarize all this in a slightly different way: our goal
+  is to assign variables to callee-save and caller-save
+  registers so as to minimize the chances that we actually need to
+  save and restore them at all!  We need to do this on a per-function basis,
+  by processing each caller independently without knowledge of
+  the callee's internals.  If a variable does does \emph{not}
+  need to be preserved across a call, it is best to put it in a
+  caller-save register, because we definitely know we won't actually
+  need to save and restore it.  If a variable \emph{does} need to be
+  preserved, it's best to put it in a callee-save register, because
+  there is a chance that the callee won't need to save and restore
+  it.}
+  
 It is straightforward to implement this approach in a graph coloring
 register allocator. First, we know which variables are in use during
 every function call because we compute that information for every
@@ -3883,15 +3898,40 @@ instruction sequence back to front.
 where $W(k)$ are the locations written to by instruction $I_k$ and
 $R(k)$ are the locations read by instruction $I_k$.
 
+\begin{ocamlx}
+\noindent\fbox{%
+  \parbox{\textwidth}{%
+    The OCaml \code{Set} module is described in the standard library.
+    Like the \code{Map} module, it is a functor that must be instantiated
+    on the type of set elements.  An appropriate definition for a module
+    \code{Locs} for repersenting sets of locations is at the top
+    of \code{Chapter3.ml}. 
+  }%
+}
+\end{ocamlx}
+
 There is a special case for \code{jmp} instructions.  The locations
 that are live before a \code{jmp} should be the locations in
 $L_{\mathtt{before}}$ at the target of the jump. So we recommend
-maintaining an alist named \code{label->live} that maps each label to
+maintaining an alist named \code{label->live} \ocaml{(or a \code{liveset Env.t})} that maps each label to
 the $L_{\mathtt{before}}$ for the first instruction in its block. For
 now the only \code{jmp} in a \LangXVar{} program is the one at the
 end, to the conclusion. (For example, see Figure~\ref{fig:reg-eg}.)
-The conclusion reads from \ttm{rax} and \ttm{rsp}, so the alist should
+The conclusion reads from \ttm{rax} {\ocaml{(in the sense that it is where
+    the caller will find the return value after \code{retq})} and \ttm{rsp} \ocaml{(both
+  explicitly and implicitly via \code{popq} and \code{retq})}, so the alist should
 map \code{conclusion} to the set $\{\ttm{rax},\ttm{rsp}\}$.
+\ocaml{Since the OCaml version treats the entry and exit sequences as explicit parts
+  of the program, we could actually calculate this by processing the \code{conclusion}
+  block, assuming that $\ttm{rax}$ and $\ttm{rsp}$ are live before \code{retq}.
+  There is also another jump, from the \code{main} entry sequence to
+  the \code{start} label, and in principle we could also calculate liveness for
+  the \code{main} block, though only after calculating $L_{\mathtt{before}}$ for the
+  first instruction of the \code{start} block (which, for \LangXVar{}, will
+  always turn out to be just $\{\ttm{rsp}\}$) . In practice, since we
+  already have assigned fixed registers to all the arguments in the \code{main}
+  and \code{conclusion} blocks, there is no need to calculate liveness for them, and
+  in fact we should avoid doing so.}
 
 Let us walk through the above example, applying these formulas
 starting with the instruction on line 5. We collect the answers in
@@ -3998,7 +4038,14 @@ L_{\mathsf{after}}(5)=  \emptyset
 \begin{exercise}\normalfont
 Implement the \code{uncover-live} pass. Store the sequence of
 live-after sets in the $\itm{info}$ field of the \code{Block}
-structure.
+structure. \ocaml{Put your implementation inside the
+  \code{UncoverLive} submodule in \code{Chapter3.ml} and
+  fill in the \code{pass} definition.
+  Instantiate the \code{'binfo} type
+  parameter with {\tt Locs.t list}, where {\tt Locs.t} is the
+  type of sets of locations. Only compute live-after sets for
+  the \code{"start"} block (not the \code{"main"} or \code{"conclusion"} blocks).
+  Do not attempt to do any extra checking on this pass.}
 %
 We recommend creating an auxiliary function that takes a list of
 instructions and an initial live-after set (typically empty) and
@@ -4205,7 +4252,21 @@ Implement the compiler pass named \code{build-interference} according
 to the algorithm suggested above. We recommend using the \code{graph}
 package to create and inspect the interference graph.  The output
 graph of this pass should be stored in the $\itm{info}$ field of the
-program, under the key \code{conflicts}.
+program, under the key \code{conflicts}. \ocaml{Put your
+  implementation in the \code{BuildInterferenceGraph} submodule
+  in \code{Chapter3.ml} and fill in the \code{pass} definition.
+  Use the provided
+  \code{Graph} library (in {\tt graph.ml}) to represent graphs. Note that these
+  are \emph{immutable} graphs. Suitable declarations for 
+  instantiating this graph package to a module \code{LocGraph} with a vertex type of locations
+  (\code{X86Int.arg}s) is in \code{Chapter3.ml}. 
+  The output of this pass should be stored
+  in the \code{'pinfo} field of the program, paired with the existing
+  piece of information, the environment enumerating the program's variables.
+  This pass should only change the \code{'pinfo}, not the program code.
+  The graph you build should only describe the \code{"start"} block
+  (not the \code{"main"} or \code{"conclusion"} blocks). Do not attempt
+to do any extra checking on this pass.}
 \end{exercise}
 
   
@@ -4668,6 +4729,56 @@ jmp conclusion
 %
 Implement the compiler pass \code{allocate-registers}.
 %
+\begin{ocamlx}
+  Put your solution in the \code{AllocateRegisters} submodule
+  of \code{Chapter3.ml}. 
+  The graph coloring part of this exercise has been
+  done for you. The \code{Graph} library defines a function
+
+  \code{color : coloring -> Graph.t -> coloring}
+
+\noindent
+  where \code{coloring} is a \code{Map} whose keys are vertices
+  and whose values are integer colors. The \code{color}
+  function takes a graph and an initial precoloring, which should be
+  used to pre-set negative colors for vertices that already represent
+  registers, including \code{rax}, \code{rsp}, and the
+  caller-save registers. It then colors the remaining
+  vertices with colors 0,1,$\ldots$, trying to assign the smallest
+  possible color to each vertex.  (The implementation of \code{color}
+  follows the general approach described in the book, but dispenses
+  with a priority queue.) The resulting coloring can be
+  printed out for debugging purposes using the \code{print\_coloring}
+  function.
+
+  The remaining tasks for you in this exercise are to compute
+  the precoloring, invoke the \code{color} function,
+  construct an assignment environment (mapping variable names to locations)
+  from the resulting coloring, and use this environment to map
+  variable arguments to registers and stack locations just as in
+  the \code{AssignHomes} pass in \code{Chapter2.ml}.
+  Your assignment construction should be parameterized by the reference
+  variable \code{max\_regs}, which says how many registers (0 to 13) to
+  use. Variables assigned to colors beyond this limit must be placed
+  in stack slots rather than registers. It can be very useful to try different values of this number when
+  debugging. The driver code (now in \code{driver.ml}) includes a flag to allow
+  the value of this variable to be set from the command line when testing.
+
+  You also need to compute the list of used callee-save registers; this should
+  then be passed to the function \code{X86Int.adjust\_entry\_exit}, which
+  will modify the \code{main} and \code{conclusion} blocks to include
+  code for spilling and reloading these registers.
+
+  The \code{'pinfo} field of the resulting program is an \code{int}
+  reperesnting the total size of the frame, including space for
+  any spilled callee-saves. Don't foret that the frame needs to
+  be a multiple of 16 bytes1
+  
+  We do not recommend that you attempt to do any extra checking on the output
+  of this pass.
+
+\end{ocamlx}
+%
 Create five programs that exercise all of the register allocation
 algorithm, including spilling variables to the stack.
 %
@@ -4675,6 +4786,10 @@ Replace \code{assign-homes} in the list of \code{passes} in the
 \code{run-tests.rkt} script with the three new passes:
 \code{uncover-live}, \code{build-interference}, and
 \code{allocate-registers}.
+%
+\ocaml{Make the analogous changes in the \code{pass} list. Note
+  that this list has been moved to {\tt driver.ml} to make it
+  easier to combine passes from different chapters.}
 %
 Temporarily remove the \code{print-x86} pass from the list of passes
 and the call to \code{compiler-tests}.
@@ -4736,7 +4851,10 @@ jmp conclusion
   
 \begin{exercise}\normalfont
 %
-Implement the \code{patch-instructions} compiler pass.
+  Implement the \code{patch-instructions} compiler pass.\ocaml{This
+    exercise has been done for you; the code is provided in \code{Chapter3.ml}
+    (only slightly different from the version in \code{Chapter2.ml}).}
+
 %
 Insert it after \code{allocate-registers} in the list of \code{passes}
 in the \code{run-tests.rkt} script.
@@ -4760,11 +4878,16 @@ of \code{X86Program} named \code{used-callee} that stores the set of
 callee-saved registers that were assigned to variables. The
 \code{print-x86} pass can then access this information to decide which
 callee-saved registers need to be saved and restored.
+\ocaml{Storing this information in the program
+  is not necessary in the OCaml version, because the spilling and
+  reloading code is inserted into the X86 program AST rather than being
+  added at printing time.}
 %
 When calculating the size of the frame to adjust the \code{rsp} in the
 prelude, make sure to take into account the space used for saving the
 callee-saved registers. Also, don't forget that the frame needs to be
-a multiple of 16 bytes!
+a multiple of 16 bytes! \ocaml{You do still need to compute this,
+  as part of the \code{AllocateRegisters} exercise.}
 
 An overview of all of the passes involved in register allocation is
 shown in Figure~\ref{fig:reg-alloc-passes}.
@@ -4800,6 +4923,8 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 
 \begin{exercise}\normalfont
 Update the \code{print-x86} pass as described in this section.
+\ocaml{This exercise has been done for you; the printing code is
+  in \code{X86Int} as before.}
 %
 In the \code{run-tests.rkt} script, reinstate \code{print-x86} in the
 list of passes and the call to \code{compiler-tests}.
