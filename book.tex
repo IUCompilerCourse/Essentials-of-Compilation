@@ -5493,7 +5493,7 @@ in Figure~\ref{fig:Rif-syntax}. The \LangIf{} language includes all of
 \code{\#f}, and the conditional \code{if} expression. We expand the
 operators to include
 \begin{enumerate}
-\item subtraction on integers,
+\item subtraction on integers \ocaml{OCaml version already had thes},
 \item the logical operators \key{and}, \key{or} and \key{not},
 \item the \key{eq?} operation for comparing two integers or two Booleans, and
 \item the \key{<}, \key{<=}, \key{>}, and \key{>=} operations for
@@ -5525,7 +5525,26 @@ Section~\ref{sec:type-check-Rif}.
 \]
 \end{minipage}
 }
-\caption{The concrete syntax of \LangIf{}, extending \LangVar{}
+\begin{ocamlx}
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{rcl}
+  \itm{bool} &::=& \key{\#t} \mid \key{\#f} \\  
+  \itm{cmp} &::= & \key{=} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=} \\
+  \Exp &::=& \gray{ \Int \mid \CREAD{} \mid \CNEG{\Exp} \mid \CADD{\Exp}{\Exp}   \mid \CSUB{\Exp}{\Exp}} \\
+     &\mid&  \gray{ \Var \mid \code{(let $\Var$ $\Exp$ $\Exp$)}}\\
+     &\mid& \itm{bool}
+      \mid (\key{and}\;\Exp\;\Exp) \mid (\key{or}\;\Exp\;\Exp)
+      \mid (\key{not}\;\Exp) \\
+      &\mid& (\itm{cmp}\;\Exp\;\Exp) \mid \CIF{\Exp}{\Exp}{\Exp} \\
+  \LangIf{} &::=& \Exp
+\end{array}
+\]
+\end{minipage}
+}
+\end{ocamlx}
+\caption{The concrete syntax of \LangIf{} \ocaml{for OCaml version}, extending \LangVar{} 
   (Figure~\ref{fig:r1-concrete-syntax}) with Booleans and conditionals.}
 \label{fig:Rif-concrete-syntax}
 \end{figure}
@@ -5548,13 +5567,29 @@ Section~\ref{sec:type-check-Rif}.
 \]
 \end{minipage}
 }
+\begin{minipage}{0.96\textwidth}
+\begin{lstlisting}[style=ocaml,frame=single]
+type cmp = Eq | Lt | Le | Gt | Ge 
+type primop =  Read | Neg | Add | Sub | And | Or | Not | Cmp of cmp
+type var = string
+type exp = 
+   Int of int64  
+ | Bool of bool
+ | Prim of primop * exp list
+ | Var of var
+ | Let of var * exp * exp
+ | If of exp * exp * exp 
+type 'info program = Program of 'info * exp
+\end{lstlisting}
+\end{minipage}
 \caption{The abstract syntax of \LangIf{}.}
 \label{fig:Rif-syntax}
 \end{figure}
 
 Figure~\ref{fig:interp-Rif} defines the interpreter for \LangIf{},
 which inherits from the interpreter for \LangVar{}
-(Figure~\ref{fig:interp-Rvar}). The literals \code{\#t} and \code{\#f}
+(Figure~\ref{fig:interp-Rvar}). \ocaml{The OCaml interpreter
+  can be found in \code{RIf.ml}.} The literals \code{\#t} and \code{\#f}
 evaluate to the corresponding Boolean values. The conditional
 expression $(\key{if}\, \itm{cnd}\,\itm{thn}\,\itm{els})$ evaluates
 \itm{cnd} and then either evaluates \itm{thn} or \itm{els} depending
@@ -5562,7 +5597,13 @@ on whether \itm{cnd} produced \code{\#t} or \code{\#f}. The logical
 operations \code{not} and \code{and} behave as you might expect, but
 note that the \code{and} operation is short-circuiting. That is, given
 the expression $(\key{and}\,e_1\,e_2)$, the expression $e_2$ is not
-evaluated if $e_1$ evaluates to \code{\#f}.
+evaluated if $e_1$ evaluates to \code{\#f}. \ocaml{Note also that
+  the \code{or} operation is \emph{not} short-circuiting; that is,
+  both operands are always evaluated. Having \code{and} and
+  \code{or} behave differently with respect to short-circuiting
+  would be bizarre in a production language, but here it gives
+  us an opportunity to compare the implementation of the two
+  styles of operators.}
 
 With the increase in the number of primitive operations, the
 interpreter would become repetitive without some care.  We refactor
@@ -5678,7 +5719,7 @@ class, shown in Figure~\ref{fig:type-check-Rvar}. The type checker for
 \LangIf{} is shown in Figure~\ref{fig:type-check-Rif} and it inherits
 from the type checker for \LangVar{}. These type checkers are in the
 files \code{type-check-Rvar.rkt} and \code{type-check-Rif.rkt} of the
-support code.
+support code. \ocaml{A single unified checker is in \code{RIf.ml}.}
 %
 Each type checker is a structurally recursive function over the AST.
 Given an input expression \code{e}, the type checker either signals an
@@ -5876,6 +5917,30 @@ to x86.
 \]
 \end{minipage}
 }
+\begin{minipage}{0.96\textwidth}
+
+\begin{lstlisting}[style=ocaml,frame=single]
+type cmp = Eq | Lt 
+type primop =  Read | Neg | Add | Not | Cmp of cmp
+type var = string
+type label = string
+type atm =
+    Int of int64
+  | Bool of bool
+  | Var of var 
+type exp =
+    Atom of atm 
+  | Prim of primop * atm list
+type stmt =
+    Assign of var * exp
+type tail =
+    Return of exp
+  | Seq of stmt*tail
+  | Goto of label
+  | IfStmt of cmp * atm * atm * label * label 
+type 'info program = Program of 'info * (label*tail) list
+\end{lstlisting}
+\end{minipage}
 \caption{The abstract syntax of \LangCIf{}, an extension of \LangCVar{}
   (Figure~\ref{fig:c0-syntax}).}
 \label{fig:c1-syntax}
@@ -5889,7 +5954,8 @@ operations, and the \key{if} expression, we need to delve further into
 the x86 language. Figures~\ref{fig:x86-1-concrete} and \ref{fig:x86-1}
 define the concrete and abstract syntax for the \LangXIf{} subset
 of x86, which includes instructions for logical operations,
-comparisons, and conditional jumps.
+comparisons, and conditional jumps. \ocaml{The OCaml concrete
+  syntax is in \code{X86If.ml}.}
 
 One challenge is that x86 does not provide an instruction that
 directly implements logical negation (\code{not} in \LangIf{} and
@@ -5932,6 +5998,7 @@ the first argument:
 \Instr &::=& \gray{ \key{addq} \; \Arg\key{,} \Arg \mid
       \key{subq} \; \Arg\key{,} \Arg \mid
       \key{negq} \; \Arg \mid \key{movq} \; \Arg\key{,} \Arg \mid } \\
+  && \ocaml{\key{movabsq} \; \Arg\key{,} \Arg \mid} \\
   &&  \gray{ \key{callq} \; \itm{label} \mid
       \key{pushq}\;\Arg \mid \key{popq}\;\Arg \mid \key{retq} \mid \key{jmp}\,\itm{label} } \\
   && \gray{ \itm{label}\key{:}\; \Instr }
@@ -5950,6 +6017,8 @@ the first argument:
 \caption{The concrete syntax of \LangXIf{}  (extends \LangXInt{} of Figure~\ref{fig:x86-int-concrete}).}
 \label{fig:x86-1-concrete}
 \end{figure}
+
+
 
 \begin{figure}[tp]
 \fbox{
@@ -6019,6 +6088,17 @@ the conditional jump instruction relies on the EFLAGS register, it is
 common for it to be immediately preceded by a \key{cmpq} instruction
 to set the EFLAGS register.
 
+\begin{ocamlx}
+  The EFLAGS register is affected not just by \code{cmpq}, but by almost
+  all the arithmetic and logical instructions.  Clever coders can sometimes
+  figure out how combine a test with an othewise useful operation.  But we
+  will always rely on  \code{cmpq} to set EFLAGS.  Moreover, we will always
+  place the \code{cmpq} immediately before the 
+  \code{set} or $\key{j}\itm{cc}$ instruction that relies on EFLAGS.
+  The interpreter provided for {\tt X86If} code assumes this, and
+  will fail if it tries to execute an isolated instance of one
+  of these instructions.
+\end{ocamlx}
 
 \section{Shrink the \LangIf{} Language}
 \label{sec:shrink-Rif}
@@ -6036,11 +6116,16 @@ and logical negation.
 \LP\key{let}~\LP\LS\key{tmp.1}~e_1\RS\RP~\LP\key{not}\;\LP\key{<}\;e_2\;\key{tmp.1})\RP\RP
 \]
 The \key{let} is needed in the above translation to ensure that
-expression $e_1$ is evaluated before $e_2$.
+expression $e_1$ is evaluated before $e_2$. \ocaml{However, such a \code{let}
+  should be inserted only if $e_1$ is not already a variable or integer.}
 
 By performing these translations in the front-end of the compiler, the
 later passes of the compiler do not need to deal with these operators,
-making the passes shorter.
+making the passes shorter. \ocaml{On the other hand, unlike the
+  syntactic desugaring we performed in the parser in an earlier chapter,
+  we wait to perform this shrinking pass until after typechecking; that way,
+  any type error messages will be in terms of the original program.
+}
 
 %% On the other hand, sometimes
 %% these translations make it more difficult to generate the most
@@ -6054,7 +6139,13 @@ Implement the pass \code{shrink} to remove subtraction, \key{and},
 \key{or}, \key{<=}, \key{>}, and \key{>=} from the language by
 translating them to other constructs in \LangIf{}.
 %
+\ocaml{Put your solution in the \code{Shrink} submodule of {\tt Chapter4.ml}.}
+%
 Create six test programs that involve these operators.
+%
+\ocaml{Make sure to include tests that confirm you have not altered
+  the order of evaluation of sub-expressions of these operators.
+  (Hint: use \code{read}s.)}
 %
 In the \code{run-tests.rkt} script, add the following entry for
 \code{shrink} to the list of passes (it should be the only pass at
@@ -6065,6 +6156,10 @@ this point).
 This instructs \code{interp-tests} to run the intepreter
 \code{interp-Rif} and the type checker \code{type-check-Rif} on the
 output of \code{shrink}.
+%
+\ocaml{You should consider writing an additional checking pass that
+  makes sure all the forbidden operators have really been removed,
+  in addition to invoking the standard \code{RIf} checker.}
 %
 Run the script to test your compiler on all the test programs.
 
@@ -6077,6 +6172,8 @@ Add cases to \code{uniquify-exp} to handle Boolean constants and
 \code{if} expressions.
 
 \begin{exercise}\normalfont
+  \ocaml{This exercise has been done for you, in submodule \code{Uniquify}
+    of \code{Chapter4.ml}.}
 Update the \code{uniquify-exp} for \LangIf{} and add the following
 entry to the list of \code{passes} in the \code{run-tests.rkt} script.
 \begin{lstlisting}
@@ -6126,6 +6223,8 @@ R^{\dagger}_2  &::=& \PROGRAM{\code{()}}{\Exp}
 
 
 \begin{exercise}\normalfont
+  \ocaml{This exercise has been done for you, in submodule \code{RemoveComplexOperands}
+    of \code{Chapter4.ml}.}
 %
 Add cases for Boolean constants and \code{if} to the \code{rco-atom}
 and \code{rco-exp} functions in \code{compiler.rkt}.
@@ -6223,6 +6322,11 @@ the following code.
 \end{center}
 Unfortunately, this approach duplicates the two branches from the
 outer \code{if} and a compiler must never duplicate code!
+\ocaml{That may be a bit too strong. Sometimes duplicating
+  small amounts of code may actually produce a program that runs faster.
+  But it fair to say that a compiler should never duplicate
+  an \emph{unbounded} amount of code, as might happen with
+  the transformation here.}
 
 We need a way to perform the above transformation but without
 duplicating code. That is, we need a way for different parts of a
@@ -6308,7 +6412,7 @@ block39:
 \end{tabular} 
 
 \caption{Translation from \LangIf{} to \LangCIf{}
-  via the \code{explicate-control}.}
+  via the \code{explicate-control}.\ocaml{Note that the RCO pass does \emph{not} pull out the conditions from the \code{if} expressions.}}
 \label{fig:explicate-control-s1-38}
 \end{figure}
 
@@ -6385,6 +6489,18 @@ for Boolean constants, the blocks \code{thn} and \code{els} may not
 get used at all and we don't want to prematurely add them to the
 control-flow graph if they end up being discarded.
 
+\ocaml{But this only happens quite rarely (when a \code{if}
+  tests a literal boolean value). Moreover, it is easy to forestall
+  this from happening by performing a partial-evaluation style pass
+  prior to \code{explicate-control}, or, alternatively, to 
+  clean up any generated but unused blocks after the fact. So I suggest ignoring
+  the whole lazy evaluation story in the remainder of this section.
+  Instead, design \code{explicate\_pred} to take as arguments
+  two \emph{labels} representing where to transfer control when
+  the test expression is true or fale.  It is the responsibility of
+  \emph{caller} of \code{explicate\_pred} to construct appropriate
+  blocks and pass their labels. }
+  
 The solution to this conundrum is to use \emph{lazy
   evaluation}\index{lazy evaluation}\citep{Friedman:1976aa} to delay
 adding the blocks to the control-flow graph until the points where we
@@ -6542,6 +6658,10 @@ Boolean constants and \key{if} to the \code{explicate-tail} and
 \code{explicate-assign}. Implement the auxiliary function
 \code{explicate-pred} for predicate contexts.
 %
+\ocaml{Put your code in the \code{ExplicateControl} submodule of
+  \code{Chapter4.ml}. It is recommended that you base your code
+  on the skeleton already in that file.}
+%
 Create test cases that exercise all of the new cases in the code for
 this pass.
 %
@@ -6649,6 +6769,9 @@ jmp |$\ell_2$|
 Expand your \code{select-instructions} pass to handle the new features
 of the \LangIf{} language.
 %
+\ocaml{Place your solution in the \code{SelectInstructions} submodule of
+  \code{Chapter4.ml}.}
+%
 Add the following entry to the list of \code{passes} in
 \code{run-tests.rkt}
 \begin{lstlisting}
@@ -6693,6 +6816,9 @@ before computing a topological order.
 Use the \code{tsort} and \code{transpose} functions of the Racket
 \code{graph} package to accomplish this.
 %
+\ocaml{Use the \code{topsort} and \code{transpose} functions of the
+  provided \code{Digraph} functor.}
+%
 As an aside, a topological ordering is only guaranteed to exist if the
 graph does not contain any cycles. That is indeed the case for the
 control-flow graphs that we generate from \LangIf{} programs.
@@ -6705,7 +6831,9 @@ control-flow graph. Do not use the \code{directed-graph} of the
 each pair of vertices, but a control-flow graph may have multiple
 edges between a pair of vertices. The \code{multigraph.rkt} file in
 the support code implements a graph representation that allows
-multiple edges between a pair of vertices.
+multiple edges between a pair of vertices. \ocaml{There is no
+  need for a multigraph for our purposes in this chapter. Just
+use the plain directed graphs in \code{digraph.ml}.}
 
 The next question is how to analyze jump instructions.  Recall that in
 Section~\ref{sec:liveness-analysis-Rvar} we maintain an alist named
@@ -6738,7 +6866,9 @@ new kinds of arguments and instructions in \LangXIfVar{}.
 \begin{exercise}\normalfont
 Update the \code{uncover-live} pass and implement the
 \code{uncover-live-CFG} auxiliary function to apply liveness analysis
-to the control-flow graph.  Add the following entry to the list of
+to the control-flow graph.
+\ocaml{This is in the \code{UncoverLive} submodule of \code{Chapter4.ml}.}
+Add the following entry to the list of
 \code{passes} in the \code{run-tests.rkt} script.
 \begin{lstlisting}
 (list "uncover-live" uncover-live interp-pseudo-x86-1)
@@ -6761,6 +6891,8 @@ similar to the \key{movq} instruction. See rule number 1 in
 Section~\ref{sec:build-interference}.
 
 \begin{exercise}\normalfont
+  \ocaml{This exercise has been done for you, in submodule \code{BuildInterference}
+    of \code{Chapter4.ml}.}
 Update the \code{build-interference} pass for \LangXIfVar{} and add the
 following entries to the list of \code{passes} in the
 \code{run-tests.rkt} script.
@@ -6786,6 +6918,8 @@ The second argument of the \key{movzbq} must be a register.
 There are no special restrictions on the jump instructions.
 
 \begin{exercise}\normalfont
+  \ocaml{This exercise has been done for you, in submodule \code{PatchInstructions}
+    of \code{Chapter4.ml}.}
 %
 Update \code{patch-instructions} pass for \LangXIfVar{}.
 %  
@@ -6912,7 +7046,7 @@ conclusion:
 \end{lstlisting}
 \end{minipage}
 \end{tabular}
-\caption{Example compilation of an \key{if} expression to x86.}
+\caption{Example compilation of an \key{if} expression to x86.\ocaml{(For some reason, all the callee-save registers are being saved, even though they are not used.)}}
 \label{fig:if-example-x86}
 \end{figure}
 
