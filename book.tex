@@ -99,21 +99,31 @@ Cambridge, Massachusetts\\
 London, England}
 
 \begin{copyrightpage}
-\textcopyright\ [YEAR] Massachusetts Institute of Technology
+  \textcopyright\ [2021] Jeremy G. Siek.  Available for free viewing
+  or personal downloading under the
+  \href{https://creativecommons.org/licenses/by-nc-nd/2.0/uk/}{CC-BY-NC-ND}
+  license.
+  
+  Copyright in this monograph has been licensed exclusively to The MIT
+  Press, \url{http://mitpress.mit.edu}, which will be releasing the final
+  version to the public in 2022. All inquiries regarding rights should
+  be addressed to The MIT Press, Rights and Permissions Department.
 
-All rights reserved. No part of this book may be reproduced in any
-form by any electronic or mechanical means (including photocopying,
-recording, or information storage and retrieval) without permission in
-writing from the publisher.
+%% \textcopyright\ [YEAR] Massachusetts Institute of Technology
 
-This book was set in LaTeX by Jeremy G. Siek. Printed and bound in the
-United States of America.
+%% All rights reserved. No part of this book may be reproduced in any
+%% form by any electronic or mechanical means (including photocopying,
+%% recording, or information storage and retrieval) without permission in
+%% writing from the publisher.
 
-Library of Congress Cataloging-in-Publication Data is available.
+%% This book was set in LaTeX by Jeremy G. Siek. Printed and bound in the
+%% United States of America.
 
-ISBN:
+%% Library of Congress Cataloging-in-Publication Data is available.
 
-10\quad9\quad8\quad7\quad6\quad5\quad4\quad3\quad2\quad1
+%% ISBN:
+
+%% 10\quad9\quad8\quad7\quad6\quad5\quad4\quad3\quad2\quad1
 \end{copyrightpage}
 
 \dedication{This book is dedicated to the programming language wonks
@@ -334,20 +344,22 @@ organization of the course made it difficult for students to
 understand the rationale for the compiler design. Ghuloum proposed the
 incremental approach~\citep{Ghuloum:2006bh}.
 
-We thank the many graduate students who served as teaching assistants
-for the compiler course at IU. In particular, we thank Andre
-Kuhlenschmidt for his work on the garbage collector, Michael Vollmer
-for his work on efficient tail calls, and Michael Vitousek for his
-help running the first offering of the incremental compiler course at
-IU.
+We thank the many students who served as teaching assistants for the
+compiler course at IU and made suggestions for improving the book
+including Carl Factora, Ryan Scott, and Cameron Swords. We especially
+thank Andre Kuhlenschmidt for his work on the garbage collector,
+Michael Vollmer for his work on efficient tail calls, and Michael
+Vitousek for his help running the first offering of the incremental
+compiler course at IU.
 
-We thank Bor-Yuh Chang, John Clements, Jay McCarthy, Joseph Near, Nate
-Nystrom, and Michael Wollowski for teaching courses based on early
-drafts of this book.
+We thank professors Bor-Yuh Chang, John Clements, Jay McCarthy, Joseph
+Near, Ryan Newton, Nate Nystrom, Andrew Tolmach, and Michael Wollowski
+for teaching courses based on early drafts of this book and for their
+invaluable feedback.
 
-We thank Ronald Garcia for being Jeremy's partner when they took the
-compiler course in the early 2000's and especially for finding the bug
-that sent the garbage collector on a wild goose chase!
+We thank Ronald Garcia helping Jeremy survive Dybvig's compiler course
+in the early 2000's and especially for finding the bug that sent the
+garbage collector on a wild goose chase!
 
 \mbox{}\\
 \noindent Jeremy G. Siek \\
@@ -2095,12 +2107,14 @@ in the program below. This is accomplished by introducing a new
 \key{let}-bound variable, binding the complex operand to the new
 variable, and then using the new variable in place of the complex
 operand, as shown in the output of \code{remove-complex-opera*} on the
-right.\\
+right.
+\begin{center}
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 % var_test_19.rkt
 \begin{lstlisting}
-(+ 52 (- 10))
+(let ([x (+ 42 (- 10))])
+  (+ x 10))
 \end{lstlisting}
 \end{minipage}
 &
@@ -2108,12 +2122,13 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(let ([tmp.1 (- 10)])
-  (+ 52 tmp.1))
+(let ([x (let ([tmp.1 (- 10)])
+            (+ 42 tmp.1))])
+   (+ x 10))
 \end{lstlisting}
 \end{minipage}
 \end{tabular}
-
+\end{center}
 
 \begin{figure}[tp]
 \centering
@@ -2139,8 +2154,8 @@ this pass, the language \LangVarANF{}. The only difference is that
 operator arguments are restricted to be atomic expressions that are
 defined by the \Atm{} non-terminal. In particular, integer constants
 and variables are atomic. In the literature, restricting arguments to
-be atomic expressions is called \emph{administrative normal form}, or
-ANF for short~\citep{Danvy:1991fk,Flanagan:1993cg}.
+be atomic expressions is one of the ideas in \emph{administrative
+normal form}, or ANF for short~\citep{Danvy:1991fk,Flanagan:1993cg}.
 \index{subject}{administrative normal form} \index{subject}{ANF}
 
 We recommend implementing this pass with two mutually recursive
@@ -2152,20 +2167,19 @@ returns an expression.  The \code{rco-atom} function returns two
 things: an atomic expression and an alist mapping temporary variables to
 complex subexpressions. You can return multiple things from a function
 using Racket's \key{values} form and you can receive multiple things
-from a function call using the \key{define-values} form. If you are
-not familiar with these features, review the Racket documentation.
+from a function call using the \key{define-values} form.
 Also, the
 \href{https://docs.racket-lang.org/reference/for.html#%28form._%28%28lib._racket%2Fprivate%2Fbase..rkt%29._for%2Flists%29%29}{\code{for/lists}}
   form is useful for applying a function to each element of a list, in
   the case where the function returns multiple values.
   \index{subject}{for/lists}
 
-Returning to the example program \code{(+ 52 (- 10))}, the
-subexpression \code{(- 10)} should be processed using the
+Returning to the example program with the expression \code{(+ 42 (-
+  10))}, the subexpression \code{(- 10)} should be processed using the
 \code{rco-atom} function because it is an argument of the \code{+} and
 therefore needs to become atomic.  The output of \code{rco-atom}
 applied to \code{(- 10)} is as follows.
-
+\begin{center}
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -2182,10 +2196,12 @@ tmp.1
 \end{lstlisting}
 \end{minipage}
 \end{tabular}
+\end{center}
 
-Take special care of programs such as the following one that binds a
+Take special care of programs such as the following that bind a
 variable to an atomic expression. You should leave such variable
-bindings unchanged, as shown in to the program on the right \\
+bindings unchanged, as shown in the program on the right \\
+\begin{center}
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 % var_test_20.rkt
@@ -2205,9 +2221,11 @@ $\Rightarrow$
     b))
 \end{lstlisting}
 \end{minipage}
-\end{tabular} \\
+\end{tabular} 
+\end{center}
 A careless implementation of \key{rco-exp} and \key{rco-atom} might
-produce the following output with unnecessary temporary variables.\\
+produce the following output with unnecessary temporary variables.
+\begin{center}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
 (let ([tmp.1 42])
@@ -2217,6 +2235,7 @@ produce the following output with unnecessary temporary variables.\\
         b))))
 \end{lstlisting}
 \end{minipage}
+\end{center}
 
 \begin{exercise}
 \normalfont
@@ -11841,7 +11860,7 @@ the \code{add1} function.
 \label{fig:gradual-map-vec}
 \end{figure}
 
-\section{Type Checking \LangGrad{}, Casts, and \LangCast{}}
+\section{Type Checking \LangGrad{} and \LangCast{}}
 \label{sec:gradual-type-check}
 
 The type checker for \LangGrad{} uses the \code{Any} type for missing
@@ -13524,7 +13543,11 @@ for the compilation of \LangPoly{}.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{chapappendix}[Appendix]
+\clearpage
+
+\appendix
+
+\chapter{Appendix}
 
 \section{Interpreters}
 \label{appendix:interp}
@@ -13848,15 +13871,10 @@ and \ref{fig:c3-concrete-syntax}, respectively.
 \label{fig:c3-concrete-syntax}
 \end{figure}
 
-\end{chapappendix}
 
-%\setcounter{chapter}{2}
-
-\clearpage
-
-\appendix
 
 \backmatter
+\addtocontents{toc}{\vspace{11pt}}
 
 %% \addtocontents{toc}{\vspace{11pt}}
 
