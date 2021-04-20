@@ -848,7 +848,7 @@ ItalicFont=SyntaxLTStd-Italic,
 \long\def\@makecaption#1#2{\vspace{\abovecaptionskip}%
 \fontsize{8\p@}{9.5\p@}\selectfont%
   \setbox\@tempboxa=\hbox{#1\ignorespaces\hspace{1em}\ignorespaces#2}%
-  {\sansbold{#1}}\par#2%
+  {\sansbold{#1}}\par\vspace{2pt}#2%
 }
 
 \long\def\@tablecaption#1#2{\fontsize{8\p@}{9\p@}\selectfont%
