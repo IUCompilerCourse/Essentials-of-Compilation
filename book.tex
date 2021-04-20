@@ -1976,47 +1976,34 @@ regarding instruction arguments.
 The \code{uniquify} pass compiles \LangVar{} programs into \LangVar{}
 programs in which every \key{let} binds a unique variable name. For
 example, the \code{uniquify} pass should translate the program on the
-left into the program on the right. \\
-\begin{tabular}{lll}
-\begin{minipage}{0.4\textwidth}
+left into the program on the right. 
+\begin{transformation}
 \begin{lstlisting}
 (let ([x 32])
   (+ (let ([x 10]) x) x))
 \end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.4\textwidth}
+\compilesto
 \begin{lstlisting}
 (let ([x.1 32])
   (+ (let ([x.2 10]) x.2) x.1))
 \end{lstlisting}
-\end{minipage}
-\end{tabular} \\
-%
+\end{transformation}
 The following is another example translation, this time of a program
 with a \key{let} nested inside the initializing expression of another
-\key{let}.\\
-\begin{tabular}{lll}
-\begin{minipage}{0.4\textwidth}
+\key{let}.
+\begin{transformation}
 \begin{lstlisting}
 (let ([x (let ([x 4])
             (+ x 1))])
   (+ x 2))
 \end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.4\textwidth}
+\compilesto
 \begin{lstlisting}
 (let ([x.2 (let ([x.1 4])
               (+ x.1 1))])
   (+ x.2 2))
 \end{lstlisting}
-\end{minipage}
-\end{tabular}
+\end{transformation}
 
 We recommend implementing \code{uniquify} by creating a structurally
 recursive function named \code{uniquify-exp} that mostly just copies
@@ -2257,20 +2244,15 @@ shown below. Recall that the right-hand-side of a \key{let} executes
 before its body, so the order of evaluation for this program is to
 assign \code{20} to \code{x.1}, \code{22} to \code{x.2}, and
 \code{(+ x.1 x.2)} to \code{y}, then return \code{y}. Indeed, the
-output of \code{explicate-control} makes this ordering explicit.\\
-\begin{tabular}{lll}
-\begin{minipage}{0.4\textwidth}
+output of \code{explicate-control} makes this ordering explicit.
+\begin{transformation}
 \begin{lstlisting}
 (let ([y (let ([x.1 20]) 
            (let ([x.2 22])
              (+ x.1 x.2)))])
  y)
 \end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.4\textwidth}
+\compilesto
 \begin{lstlisting}[language=C]
 start:
   x.1 = 20;
@@ -2278,8 +2260,7 @@ start:
   y = (+ x.1 x.2);
   return y;
 \end{lstlisting}
-\end{minipage}
-\end{tabular}
+\end{transformation}
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -2309,7 +2290,7 @@ start:
 
 The organization of this pass depends on the notion of tail position
 that we have alluded to earlier. Formally, \emph{tail
-  position}\index{subject}{tail position} in the context of \LangVar{} is
+  position}\index{subject}{tail position} for the language \LangVar{} is
 defined recursively by the following two rules.
 \begin{enumerate}
 \item In $\PROGRAM{\code{()}}{e}$, expression $e$ is in tail position.
@@ -2376,45 +2357,32 @@ Next we consider the cases for $\Stmt$, starting with arithmetic
 operations. For example, consider the addition operation. We can use
 the \key{addq} instruction, but it performs an in-place update.  So we
 could move $\itm{arg}_1$ into the left-hand side \itm{var} and then
-add $\itm{arg}_2$ to \itm{var}. \\
-\begin{tabular}{lll}
-\begin{minipage}{0.4\textwidth}
+add $\itm{arg}_2$ to \itm{var}. 
+\begin{transformation}
 \begin{lstlisting}
 |$\itm{var}$| = (+ |$\itm{arg}_1$| |$\itm{arg}_2$|);
 \end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.4\textwidth}
+\compilesto
 \begin{lstlisting}
 movq |$\itm{arg}_1$|, |$\itm{var}$|
 addq |$\itm{arg}_2$|, |$\itm{var}$|
 \end{lstlisting}
-\end{minipage}
-\end{tabular} \\
-%
+\end{transformation}
 There are also cases that require special care to avoid generating
 needlessly complicated code. For example, if one of the arguments of
 the addition is the same variable as the left-hand side of the
 assignment, then there is no need for the extra move instruction.  The
 assignment statement can be translated into a single \key{addq}
-instruction as follows.\\
-\begin{tabular}{lll}
-\begin{minipage}{0.4\textwidth}
+instruction as follows.
+\begin{transformation}
 \begin{lstlisting}
 |$\itm{var}$| = (+ |$\itm{arg}_1$| |$\itm{var}$|);
 \end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.4\textwidth}
+\compilesto
 \begin{lstlisting}
 addq |$\itm{arg}_1$|, |$\itm{var}$|
 \end{lstlisting}
-\end{minipage}
-\end{tabular}
+\end{transformation}
 
 The \key{read} operation does not have a direct counterpart in x86
 assembly, so we provide this functionality with the function
@@ -2428,23 +2396,17 @@ generated x86 assembly code, you need to compile \code{runtime.c} to
 generation, all you need to do is translate an assignment of
 \key{read} into a call to the \code{read\_int} function followed by a
 move from \code{rax} to the left-hand-side variable.  (Recall that the
-return value of a function goes into \code{rax}.)  \\
-\begin{tabular}{lll}
-\begin{minipage}{0.3\textwidth}
+return value of a function goes into \code{rax}.)  
+\begin{transformation}
 \begin{lstlisting}
 |$\itm{var}$| = (read);
 \end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.3\textwidth}
+\compilesto
 \begin{lstlisting}
 callq read_int
 movq %rax, |$\itm{var}$|
 \end{lstlisting}
-\end{minipage}
-\end{tabular} 
+\end{transformation}
 
 There are two cases for the $\Tail$ non-terminal: \key{Return} and
 \key{Seq}. Regarding \key{Return}, we recommend treating it as an
@@ -2491,9 +2453,8 @@ Section~\ref{sec:remove-complex-opera-Rvar}.
 The output of \code{select-instructions} is shown on the left and the
 output of \code{assign-homes} on the right.  In this example, we
 assign variable \code{a} to stack location \code{-8(\%rbp)} and
-variable \code{b} to location \code{-16(\%rbp)}.\\
-\begin{tabular}{l}
-  \begin{minipage}{0.4\textwidth}
+variable \code{b} to location \code{-16(\%rbp)}.
+\begin{transformation}
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 locals-types:
     a : Integer, b : Integer
@@ -2503,9 +2464,7 @@ start:
     movq b, %rax
     jmp conclusion
 \end{lstlisting}
-\end{minipage}
-{$\Rightarrow$}
-\begin{minipage}{0.4\textwidth}
+\compilesto
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 stack-space: 16
 start:
@@ -2514,8 +2473,7 @@ start:
     movq -16(%rbp), %rax
     jmp conclusion
 \end{lstlisting}
-\end{minipage}
-\end{tabular} 
+\end{transformation}
 
 The \code{locals-types} entry in the $\itm{info}$ of the
 \code{X86Program} node is an alist mapping all the variables in the
@@ -2556,13 +2514,15 @@ The \code{patch-instructions} pass compiles from \LangXVar{} to
 restriction that at most one argument of an instruction may be a
 memory reference.
 
-We return to the following example.
-% var_test_20.rkt
+We return to the following example.\\
+\begin{minipage}{0.5\textwidth}
+  % var_test_20.rkt
 \begin{lstlisting}
    (let ([a 42])
      (let ([b a])
        b))
 \end{lstlisting}
+\end{minipage}\\
 The \key{assign-homes} pass produces the following output
 for this program. \\
 \begin{minipage}{0.5\textwidth}
@@ -2678,12 +2638,12 @@ subexpression is a constant.
 \begin{array}{lcl}
   \itm{inert} &::=& \Var
     \mid \LP\key{read}\RP
-    \mid \LP\key{-} \;\Var\RP
-    \mid \LP\key{-} \;\LP\key{read}\RP\RP
-    \mid \LP\key{+} \; \itm{inert} \; \itm{inert}\RP\\
+    \mid \LP\key{-} ~\Var\RP
+    \mid \LP\key{-} ~\LP\key{read}\RP\RP
+    \mid \LP\key{+} ~ \itm{inert} ~ \itm{inert}\RP\\
     &\mid& \LP\key{let}~\LP\LS\Var~\itm{residual}\RS\RP~ \itm{residual} \RP \\  
   \itm{residual} &::=& \Int
-    \mid \LP\key{+}\; \Int\; \itm{inert}\RP
+    \mid \LP\key{+}~ \Int~ \itm{inert}\RP
     \mid \itm{inert} 
 \end{array}
 \]
