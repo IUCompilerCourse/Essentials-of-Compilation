@@ -10,7 +10,7 @@
 \usepackage{amsthm}
 \usepackage{amssymb}
 \usepackage{lmodern} % better typewriter font for code
-\usepackage{wrapfig}
+%\usepackage{wrapfig}
 \usepackage{multirow}
 \usepackage{tcolorbox}
 \usepackage{color}
@@ -1354,19 +1354,18 @@ it dispatches back to \code{interp-exp} in \LangIf{}, where the
 open recursion that we need to implement our interpreters in an
 extensible way.
 
-\newpage
 
 \subsection{Definitional Interpreter for \LangVar{}}
 
-\begin{wrapfigure}[26]{r}[0.9in]{0.55\textwidth}
+\begin{figure}[tp]
+%\begin{wrapfigure}[26]{r}[0.75in]{0.55\textwidth}
   \small
   \begin{tcolorbox}[title=Association Lists as Dictionaries]
   An \emph{association list} (alist) is a list of key-value pairs.
   For example, we can map people to their ages with an alist.
   \index{subject}{alist}\index{subject}{association list}
-  \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-  (define ages
-    '((jane . 25) (sam . 24) (kate . 45)))
+  \begin{lstlisting}[basicstyle=\ttfamily]
+  (define ages '((jane . 25) (sam . 24) (kate . 45)))
   \end{lstlisting}
   The \emph{dictionary} interface is for mapping keys to values.
   Every alist implements this interface.  \index{subject}{dictionary} The package
@@ -1385,12 +1384,15 @@ extensible way.
     creates a new alist in which the ages are incremented.
   \end{description}
   \vspace{-10pt}
-  \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+  \begin{lstlisting}[basicstyle=\ttfamily]
   (for/list ([(k v) (in-dict ages)])
     (cons k (add1 v)))
   \end{lstlisting}
 \end{tcolorbox}
-\end{wrapfigure}
+  %\end{wrapfigure}
+  \caption{Association lists implement the dictionary interface.}
+  \label{fig:alist}
+\end{figure}
 
 Having justified the use of classes and methods to implement
 interpreters, we turn to the definitional interpreter for \LangVar{}
@@ -1406,7 +1408,7 @@ these mappings as
     table}\index{subject}{symbol table}.}
 %
 For simplicity, we use an association list (alist) to represent the
-environment. The sidebar to the right gives a brief introduction to
+environment. Figure~\ref{fig:alist} gives a brief introduction to
 alists and the \code{racket/dict} package.  The \code{interp-exp}
 function takes the current environment, \code{env}, as an extra
 parameter.  When the interpreter encounters a variable, it finds the
@@ -2915,12 +2917,11 @@ conclusion:
   \label{fig:example-calling-conventions}
 \end{figure}
 
-\clearpage
+%\clearpage
 
 \section{Liveness Analysis}
 \label{sec:liveness-analysis-Rvar}
 \index{subject}{liveness analysis}
-
 
 The \code{uncover-live} pass performs \emph{liveness analysis}, that
 is, it discovers which variables are in-use in different regions of a
@@ -2948,30 +2949,40 @@ The answer is no because \code{a} is live from line 1 to 3 and
 line 2 is never used because it is overwritten (line 4) before the
 next read (line 5).
 
-\begin{wrapfigure}[19]{l}[0.9in]{0.55\textwidth}
-  \small
-  \begin{tcolorbox}[title=\href{https://docs.racket-lang.org/reference/sets.html}{The Racket Set Package}]
-    A \emph{set} is an unordered collection of elements without duplicates.
-    \index{subject}{set}
-  \begin{description}
-  \item[$\LP\code{set}\,v\,\ldots\RP$] constructs a set containing the specified elements.
-  \item[$\LP\code{set-union}\,set_1\,set_2\RP$] returns the union of the two sets.
-  \item[$\LP\code{set-subtract}\,set_1\,set_2\RP$] returns the difference of the two sets.
-  \item[$\LP\code{set-member?}\,set\,v\RP$] is element $v$ in $set$?
-  \item[$\LP\code{set-count}\,set\RP$] how many unique elements are in $set$?
-  \item[$\LP\code{set->list}\,set\RP$] converts the set to a list.
-  \end{description}
-  \end{tcolorbox}
-\end{wrapfigure}
-
 The live locations can be computed by traversing the instruction
 sequence back to front (i.e., backwards in execution order).  Let
 $I_1,\ldots, I_n$ be the instruction sequence. We write
 $L_{\mathsf{after}}(k)$ for the set of live locations after
 instruction $I_k$ and $L_{\mathsf{before}}(k)$ for the set of live
-locations before instruction $I_k$. The live locations after an
-instruction are always the same as the live locations before the next
-instruction.  \index{subject}{live-after} \index{subject}{live-before}
+locations before instruction $I_k$. We recommend represeting these
+sets with the Racket \code{set} data structure described in
+Figure~\ref{fig:set}.
+
+\begin{figure}[tp]
+%\begin{wrapfigure}[19]{l}[0.75in]{0.55\textwidth}
+  \small
+  \begin{tcolorbox}[title=\href{https://docs.racket-lang.org/reference/sets.html}{The Racket Set Package}]
+    A \emph{set} is an unordered collection of elements without duplicates.
+    Here are some of the operations defined on sets.
+    \index{subject}{set}
+  \begin{description}
+  \item[$\LP\code{set}~v~\ldots\RP$] constructs a set containing the specified elements.
+  \item[$\LP\code{set-union}~set_1~set_2\RP$] returns the union of the two sets.
+  \item[$\LP\code{set-subtract}~set_1~set_2\RP$] returns the set
+    difference of the two sets.
+  \item[$\LP\code{set-member?}~set~v\RP$] answers whether element $v$ is in $set$.
+  \item[$\LP\code{set-count}~set\RP$] returns the number of unique elements in $set$.
+  \item[$\LP\code{set->list}~set\RP$] converts $set$ to a list.
+  \end{description}
+  \end{tcolorbox}
+  %\end{wrapfigure}
+  \caption{The \code{set} data structure.}
+  \label{fig:set}
+\end{figure}
+
+The live locations after an instruction are always the same as the
+live locations before the next instruction.
+\index{subject}{live-after} \index{subject}{live-before}
 \begin{equation} \label{eq:live-after-before-next}
   L_{\mathsf{after}}(k) = L_{\mathsf{before}}(k+1)
 \end{equation}
@@ -3122,12 +3133,13 @@ called. (This is why the abstract syntax for \code{callq} includes the
 arity.)
 \end{exercise}
 
-\clearpage
+%\clearpage
 
 \section{Build the Interference Graph}
 \label{sec:build-interference}
 
-\begin{wrapfigure}[25]{r}[0.9in]{0.55\textwidth}
+\begin{figure}[tp]
+%\begin{wrapfigure}[23]{r}[0.75in]{0.55\textwidth}
   \small
   \begin{tcolorbox}[title=\href{https://docs.racket-lang.org/graph/index.html}{The Racket Graph Library}]
     A \emph{graph} is a collection of vertices and edges where each
@@ -3138,33 +3150,38 @@ arity.)
   \begin{description}
   %% We currently don't use directed graphs. We instead use
   %% directed multi-graphs. -Jeremy
-  %% \item[$\LP\code{directed-graph}\,\itm{edges}\RP$] constructs a
-  %%   directed graph from a list of edges. Each edge is a list
-  %%   containing the source and target vertex.
+  \item[$\LP\code{directed-graph}\,\itm{edges}\RP$] constructs a
+    directed graph from a list of edges. Each edge is a list
+    containing the source and target vertex.
   \item[$\LP\code{undirected-graph}\,\itm{edges}\RP$] constructs a
     undirected graph from a list of edges. Each edge is represented by
     a list containing two vertices.
   \item[$\LP\code{add-vertex!}\,\itm{graph}\,\itm{vertex}\RP$]
     inserts a vertex into the graph.
   \item[$\LP\code{add-edge!}\,\itm{graph}\,\itm{source}\,\itm{target}\RP$]
-    inserts an edge between the two vertices into the graph.
+    inserts an edge between the two vertices.
   \item[$\LP\code{in-neighbors}\,\itm{graph}\,\itm{vertex}\RP$]
-    returns a sequence of all the neighbors of the given vertex.
+    returns a sequence of vertices adjacent to the vertex.
   \item[$\LP\code{in-vertices}\,\itm{graph}\RP$]
-    returns a sequence of all the vertices in the graph.
+    returns a sequence of all vertices in the graph.
   \end{description}
 \end{tcolorbox}
-\end{wrapfigure}
+  %\end{wrapfigure}
+  \caption{The Racket \code{graph} package.}
+  \label{fig:graph}
+\end{figure}
 
 Based on the liveness analysis, we know where each location is live.
 However, during register allocation, we need to answer questions of
 the specific form: are locations $u$ and $v$ live at the same time?
 (And therefore cannot be assigned to the same register.)  To make this
 question more efficient to answer, we create an explicit data
-structure, an \emph{interference graph}\index{subject}{interference graph}.  An
-interference graph is an undirected graph that has an edge between two
-locations if they are live at the same time, that is, if they
-interfere with each other.
+structure, an \emph{interference graph}\index{subject}{interference
+  graph}.  An interference graph is an undirected graph that has an
+edge between two locations if they are live at the same time, that is,
+if they interfere with each other. We recommend using the Racket
+\code{graph} package (Figure~\ref{fig:graph}) to represent
+the interference graph.
 
 An obvious way to compute the interference graph is to look at the set
 of live locations between each instruction and the next and add an edge to the graph
@@ -3668,7 +3685,22 @@ In the last step of the algorithm, we color \code{x} with $1$.
 \end{tikzpicture}
 \]
 
-\begin{wrapfigure}[25]{r}[0.9in]{0.55\textwidth}
+We recommend creating an auxiliary function named \code{color-graph}
+that takes an interference graph and a list of all the variables in
+the program. This function should return a mapping of variables to
+their colors (represented as natural numbers). By creating this helper
+function, you will be able to reuse it in Chapter~\ref{ch:Rfun}
+when we add support for functions.
+
+To prioritize the processing of highly saturated nodes inside the
+\code{color-graph} function, we recommend using the priority queue
+data structure described in Figure~\ref{fig:priority-queue}. In
+addition, you will need to maintain a mapping from variables to their
+``handles'' in the priority queue so that you can notify the priority
+queue when their saturation changes.
+
+\begin{figure}[tp]
+%\begin{wrapfigure}[25]{r}[0.75in]{0.55\textwidth}
   \small
   \begin{tcolorbox}[title=Priority Queue]
     A \emph{priority queue} is a collection of items in which the
@@ -3693,21 +3725,10 @@ In the last step of the algorithm, we color \code{x} with $1$.
     associated with the given handle.
   \end{description}
 \end{tcolorbox}
-\end{wrapfigure}
-
-We recommend creating an auxiliary function named \code{color-graph}
-that takes an interference graph and a list of all the variables in
-the program. This function should return a mapping of variables to
-their colors (represented as natural numbers). By creating this helper
-function, you will be able to reuse it in Chapter~\ref{ch:Rfun}
-when we add support for functions.
-
-To prioritize the processing of highly saturated nodes inside the
-\code{color-graph} function, we recommend using the priority queue
-data structure (see the side bar on the right). In addition, you will
-need to maintain a mapping from variables to their ``handles'' in the
-priority queue so that you can notify the priority queue when their
-saturation changes.
+  %\end{wrapfigure}
+  \caption{The priority queue data structure.}
+  \label{fig:priority-queue}
+\end{figure}
 
 With the coloring complete, we finalize the assignment of variables to
 registers and stack locations. We map the first $k$ colors to the $k$
