@@ -11615,6 +11615,17 @@ for the compilation of \LangDyn{}.
 
 % TODO: multi-graph
 
+\begin{ocamlx}
+In this OCaml version of the course, we are studying this chapter
+  earlier than its numerical order would indicate. The book is focused on
+  compiling functional languages (such as Racket or OCaml themselves), but
+  most languages are more imperative in style, so it is important to
+  consider the impact of imperative features early on (beyond just the
+  \code{read} primitive that we started with). At this point in the book,
+  the source language has been expanded to include heap-allocated records,
+  functions (both top-level and lambdas), and dynamic typing---but we will ignore
+  those features and omit them from our implementation for now.
+\end{ocamlx}
 
 In this chapter we study two features that are the hallmarks of
 imperative programming languages: loops and assignments to local
@@ -11631,15 +11642,32 @@ computing the sum of the first five positive integers.
           (set! i (- i 1))))
       sum)))
 \end{lstlisting}
+\ocaml{OCaml version:}
+\begin{lstlisting}[style=ocaml]
+(let sum 0
+  (let i 5
+    (seq
+      (while (> i 0)
+        (seq
+          (:= sum (+ sum i))
+          (:= i (- i 1))))
+      sum)))
+\end{lstlisting}
 The \code{while} loop consists of a condition and a body.  
 %
-The \code{set!} consists of a variable and a right-hand-side expression.
+The \code{set!} \ocaml{(OCaml: \code{:=})} consists of a variable and a right-hand-side expression.
 %
-The primary purpose of both the \code{while} loop and \code{set!}  is
+The primary \ocaml{(indeed only)} purpose of both the \code{while} loop and \code{set!}  is
 to cause side effects, so it is convenient to also include in a
-language feature for sequencing side effects: the \code{begin}
+language feature for sequencing side effects: the \code{begin} \ocaml{(OCaml: \code{seq})}
 expression. It consists of one or more subexpressions that are
 evaluated left-to-right.
+\ocaml{All the subexpressions but the last are evaluated just for
+  their side effects; the value of the last subexpression becomes the value of the entire \code{seq}.
+  We also include an equivalent of the Racket \code{(void)} expression (introduced at the 
+  start of Chapter~\ref{ch:Rvec}), which we write simply as \code{()}. It is useful for writing
+  ``one-armed'' \code{if} expressions, e.g. \code{(if b (:= x 10) ())} sets {\tt x} if
+  {\tt b} is true, and does nothing at all if {\tt b} is false.}
 
 \section{The \LangLoop{} Language}
 
@@ -11673,7 +11701,32 @@ evaluated left-to-right.
 \]
 \end{minipage}
 }
-\caption{The concrete syntax of \LangLoop{}, extending \LangAny{} (Figure~\ref{fig:Rany-concrete-syntax}).}
+%
+\begin{ocamlx}
+\fbox{
+  \begin{minipage}{0.96\textwidth}
+    \small
+\[
+\begin{array}{rcl}
+  \gray{\itm{bool}} &::=& \gray{\key{\#t} \mid \key{\#f}} \\  
+  \gray{\itm{cmp}} &::= & \gray{\key{=} \mid \key{<} \mid \key{<=} \mid \key{>} \mid \key{>=}} \\
+  \Exp &::=& \gray{ \Int \mid \CREAD{} \mid \CNEG{\Exp} \mid \CADD{\Exp}{\Exp}   \mid \CSUB{\Exp}{\Exp}} \\
+     &\mid&  \gray{ \Var \mid \code{(let $\Var$ $\Exp$ $\Exp$)}}\\
+     &\mid& \gray{\itm{bool}
+      \mid (\key{and}\;\Exp\;\Exp) \mid (\key{or}\;\Exp\;\Exp)
+      \mid (\key{not}\;\Exp)} \\
+      &\mid& \gray{(\itm{cmp}\;\Exp\;\Exp) \mid \CIF{\Exp}{\Exp}{\Exp}} \\
+  &\mid& \code{()} \mid \code{(:= $\Var$ $\Exp$)} 
+  \mid \code{(seq \Exp\ldots \Exp)}
+  \mid \CWHILE{\Exp}{\Exp} \\
+  \LangLoop{} &::=& \Exp
+\end{array}
+\]
+  \end{minipage}
+}  
+\end{ocamlx}
+\caption{The concrete syntax of \LangLoop{}, extending \LangAny{} (Figure~\ref{fig:Rany-concrete-syntax}).
+\ocaml{The OCaml version extends \LangIf{} (Figure~\ref{fig:Rif-concrete-syntax}).}}
 \label{fig:Rwhile-concrete-syntax}
 \end{figure}
 
@@ -11699,7 +11752,24 @@ evaluated left-to-right.
 \]
 \end{minipage}
 }
-\caption{The abstract syntax of \LangLoop{}, extending \LangAny{} (Figure~\ref{fig:Rany-syntax}).}
+\begin{lstlisting}[style=ocaml,frame=single]
+type cmp = Eq | Lt | Le | Gt | Ge 
+type primop =  Read | Neg | Add | Sub | And | Or | Not | Cmp of cmp
+type var = string
+type exp = 
+   Int of int64  
+ | Bool of bool
+ | Prim of primop * exp list
+ | Var of var
+ | Let of var * exp * exp
+ | If of exp * exp * exp 
+ | Void
+ | Set of var * exp
+ | Seq of exp list * exp
+ | While of exp * exp
+type 'info program = Program of 'info * exp
+\end{lstlisting}
+\caption{The abstract syntax of \LangLoop{}, extending \LangAny{} (Figure~\ref{fig:Rany-syntax}) \ocaml{(OCaml: \LangIf{} (Figure~\ref{fig:Rif-syntax}))}}
 \label{fig:Rwhile-syntax}
 \end{figure}
 
@@ -11708,16 +11778,22 @@ Figure~\ref{fig:Rwhile-concrete-syntax} and its abstract syntax is defined
 in Figure~\ref{fig:Rwhile-syntax}.
 %
 The definitional interpreter for \LangLoop{} is shown in
-Figure~\ref{fig:interp-Rwhile}. We add three new cases for \code{SetBang},
+Figure~\ref{fig:interp-Rwhile}. \ocaml{The OCaml version is
+  in file \code{RWhile.ml}}. We add three new cases for \code{SetBang},
 \code{WhileLoop}, and \code{Begin} and we make changes to the cases
 for \code{Var}, \code{Let}, and \code{Apply} regarding variables. To
 support assignment to variables and to make their lifetimes indefinite
 (see the second example in Section~\ref{sec:assignment-scoping}), we
 box the value that is bound to each variable (in \code{Let}) and
 function parameter (in \code{Apply}). The case for \code{Var} unboxes
-the value.
+the value. \ocaml{Since we do not yet have first-class functions (lambdas)
+  in this language, the ``indefinite lifetimes'' motivation doesn't apply.
+  But it is still very convenient for the interpreter to box all variables.
+  In OCaml, this is done by using \code{ref} to create a boxed value;
+  the \code{!} operator retrieves the current value of the box and
+  \code{:=} updates the value in the box.}
 %
-Now to discuss the new cases. For \code{SetBang}, we lookup the
+Now to discuss the new cases. For \code{SetBang} \ocaml{(\code{:=})}, we lookup the
 variable in the environment to obtain a boxed value and then we change
 it using \code{set-box!} to the result of evaluating the right-hand
 side.  The result value of a \code{SetBang} is \code{void}.
@@ -11726,9 +11802,9 @@ For the \code{WhileLoop}, we repeatedly 1) evaluate the condition, and
 if the result is true, 2) evaluate the body.
 The result value of a \code{while} loop is also \code{void}.
 %
-Finally, the $\BEGIN{\itm{es}}{\itm{body}}$ expression evaluates the
+Finally, the $\BEGIN{\itm{es}}{\itm{body}}$ \ocaml{(\code{seq})} expression evaluates the
 subexpressions \itm{es} for their effects and then evaluates
-and returns the result from \itm{body}.
+and returns the result from \itm{body}. 
 
 
 \begin{figure}[tbp]
@@ -11760,12 +11836,26 @@ and returns the result from \itm{body}.
 \label{fig:interp-Rwhile}
 \end{figure}
 
-The type checker for \LangLoop{} is define in
-Figure~\ref{fig:type-check-Rwhile}.  For \code{SetBang}, the type of the
+The type checker for \LangLoop{} is define\ocaml{d} in
+Figure~\ref{fig:type-check-Rwhile} \ocaml{(OCaml: In file \code{RWhile.ml})}. For \code{SetBang}, the type of the
 variable and the right-hand-side must agree. The result type is
 \code{Void}. For the \code{WhileLoop}, the condition must be a
 \code{Boolean}. The result type is also \code{Void}.  For
 \code{Begin}, the result type is the type of its last subexpression.
+
+\begin{ocamlx}
+  For the OCaml version, we have added further typing restrictions surrounding
+  the use of \code{Void}-typed expressions, i.e. expressions evaluated only for
+  their side-effects. \code{Void}-typed expressions are prohibited as the right-hand sides of \code{let}s;
+  since \code{:=} never changes the type of a variable, this implies that variables always
+  have non-\code{Void} values. Also, no primitive operator allows \code{Void}-typed arguments;
+  in particular, the \code{=} operator allows only two integers or two booleans. And the return
+  value of the function must still be of type \code{Int} (hence not of type \code{Void}).  On the other
+  hand, the body of a \code{while} and all but the last subexpression of a \code{seq} are \emph{required}
+  to have type \code{Void}. This enforces a useful discipline on the \LangLoop{} programmer,
+  and also simplifies the task of the compiler by restricting the contexts in which various
+  expressions can appear. 
+\end{ocamlx}  
 
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
@@ -11807,16 +11897,17 @@ variable and the right-hand-side must agree. The result type is
 
   
 At first glance, the translation of these language features to x86
-seems straightforward because the \LangCFun{} intermediate language already
+seems straightforward because the \LangCFun{} \ocaml{(OCaml: \LangCIf{})} intermediate language already
 supports all of the ingredients that we need: assignment, \code{goto},
-conditional branching, and sequencing. However, there are two
+conditional branching, and sequencing. However, there are two 
 complications that arise which we discuss in the next two
-sections. After that we introduce one new compiler pass and the
+sections. \ocaml{Only one for us.} After that we introduce one new compiler pass and the
 changes necessary to the existing passes.
 
 \section{Assignment and Lexically Scoped Functions}
 \label{sec:assignment-scoping}
 
+\ocaml{This section is not relevant to the OCaml version, since we have no functions yet.}
 The addition of assignment raises a problem with our approach to
 implementing lexically-scoped functions. Consider the following
 example in which function \code{f} has a free variable \code{x} that
@@ -12098,7 +12189,10 @@ function \code{transfer} that applies the analysis to one block, the
 \code{bottom} and \code{join} operator for the lattice of abstract
 states.  The algorithm begins by creating the bottom mapping,
 represented by a hash table.  It then pushes all of the nodes in the
-control-flow graph onto the work list (a queue). The algorithm repeats
+control-flow graph onto the work list (a queue).
+\ocaml{(The order in which this is done does not matter for correctness,
+  but can have a major effect on efficiency; see below.)}
+The algorithm repeats
 the \code{while} loop as long as there are items in the work list. In
 each iteration, a node is popped from the work list and processed. The
 \code{input} for the node is computed by taking the join of the
@@ -12106,7 +12200,33 @@ abstract states of all the predecessor nodes. The \code{transfer}
 function is then applied to obtain the \code{output} abstract
 state. If the output differs from the previous state for this block,
 the mapping for this block is updated and its successor nodes are
-pushed onto the work list.
+pushed onto the work list. 
+
+\begin{ocamlx}
+  As stated in Figure~\ref{fig:generic-dataflow}, the algorithm solves \emph{forward} dataflow problems,
+  in which the abstract state at the beginning of a block is computed from
+  the abstract states at the end of its predecessor blocks.  Liveness
+  analysis is actually a \emph{backward} dataflow problem, in which the
+  abstract state (set of live variables) at the \emph{end} of a block
+  is computed from the abstract states at the \emph{beginning} of its
+  \emph{successor} blocks.  To use this algorithm on a backward problem,
+  it suffices simply to pass in the transpose of the CFG, so that
+  the roles of predecessor and successor are interchanged.
+
+  Although this algorithm is guaranteed to always converge to a least fixed
+  point (provided the lattice has only finitely-long ascending chains), it
+  can take many iterations to do so. For example, liveness analysis on a
+  function with $n$ variables and $b$ blocks can require $n\times b$ iterations
+  in the worst case! Fortunately, much better efficiency can usually be obtained
+  by a wise choice of work-list order. For a forward dataflow problem, it is
+  best to visit a block only after its predecessors have been visited;
+  a topological ordering of the CFG is the closest possible approximation
+  to this ideal, considering that there may be cycles in the graph.
+  (For a reverse dataflow problem, we want a topological ordering on the
+  transposed CFG.)  For liveness analysis, choosing this order reduces
+  the maximum number of iterations to the depth (longest acyclic path) of
+  the CFG plus a small constant.
+\end{ocamlx}
 
 \begin{figure}[tb]
 \begin{lstlisting}
@@ -12141,6 +12261,7 @@ pass and the significant changes to existing passes.
 \section{Convert Assignments}
 \label{sec:convert-assignments}
 
+\ocaml{OCaml version: We do not need this pass, because we have no lexically-scoped functions.}
 Recall that in Section~\ref{sec:assignment-scoping} we learned that
 the combination of assignments and lexically-scoped functions requires
 that we box those variables that are both assigned-to and that appear
@@ -12304,8 +12425,10 @@ function \code{f}.
 
 The three new language forms, \code{while}, \code{set!}, and
 \code{begin} are all complex expressions and their subexpressions are
-allowed to be complex.  Figure~\ref{fig:Rfun-anf-syntax} defines the
-output language \LangFunANF{} of this pass.
+allowed to be complex. \ocaml{The void expression \code{()} is an atom.}
+Figure~\ref{fig:Rfun-anf-syntax} defines the
+output language \LangFunANF{} of this pass. \ocaml{The OCaml version is
+  analogous.}
 
 \begin{figure}[tp]
 \centering
@@ -12371,8 +12494,15 @@ generate better code by taking this fact into account.
 
 The output language of \code{explicate-control} is \LangCLoop{}
 (Figure~\ref{fig:c7-syntax}), which is nearly identical to
-\LangCLam{}. The only syntactic difference is that \code{Call},
+\LangCLam{}.
+\ocaml{For the OCaml version, it suffices to reuse \LangCIf{}
+  (Figure~\ref{fig:c1-syntax}) (with a properly generalized type-checker
+  that can cope with arbitrary control flow graphs).}
+The only syntactic difference is that \code{Call},
 \code{vector-set!}, and \code{read} may also appear as statements.
+\ocaml{Of these features, we support only \code{read}, and we don't allow that
+  in a context where the result is thrown away. So there is no point in
+  extending $\Stmt$ as shown here.}
 The most significant difference between \LangCLam{} and \LangCLoop{}
 is that the control-flow graphs of the later may contain cycles.
 
@@ -12398,12 +12528,17 @@ is that the control-flow graphs of the later may contain cycles.
 \end{figure}
 
 The new auxiliary function \code{explicate-effect} takes an expression
-(in an effect position) and a promise of a continuation block. The
-function returns a promise for a $\Tail$ that includes the generated
+(in an effect position) and a promise of a continuation block. \ocaml{Again,
+  it is easier to just provide the block and not worry about laziness.}
+The function returns a promise for a $\Tail$ \ocaml{(just a $\Tail$)} that includes the generated
 code for the input expression followed by the continuation block.  If
 the expression is obviously pure, that is, never causes side effects,
 then the expression can be removed, so the result is just the
-continuation block.
+continuation block. \ocaml{This can almost never happen under our typing restrictions,
+  because only \code{Void}-typed expressions can appear in effect position,
+  and there are by nature almost all side-effecting.  However, the void
+  value \code{(()} \emph{is} pure, and can be used to construct larger pure
+  expressions of \code{Void} type.}
 %
 The $\WHILE{\itm{cnd}}{\itm{body}}$ expression is the most interesting
 case.  First, you will need a fresh label $\itm{loop}$ for the top of
@@ -12416,6 +12551,7 @@ the label \itm{loop}. The result for the whole \code{while} loop is a
 \code{goto} to the \itm{loop} label. Note that the loop should only be
 added to the control-flow graph if the loop is indeed used, which can
 be accomplished using \code{delay}.
+\ocaml{Again, the laziness is not really necessary.}
 
 The auxiliary functions for tail, assignment, and predicate positions
 need to be updated. The three new language forms, \code{while},
@@ -12432,7 +12568,8 @@ is, \code{Call}, \code{read}, and \code{vector-set!} may now appear as
 stand-alone statements instead of only appearing on the right-hand
 side of an assignment statement. The code generation is nearly
 identical; just leave off the instruction for moving the result into
-the left-hand side.
+the left-hand side. \ocaml{Since we are continuing to use \LangCIf{},
+  no changes to SelectInstructions are needed at all.}
 
 \section{Register Allocation}
 \label{sec:register-allocation-loop}
@@ -12449,14 +12586,16 @@ We recommend using the generic \code{analyze-dataflow} function that
 was presented at the end of Section~\ref{sec:dataflow-analysis} to
 perform liveness analysis, replacing the code in
 \code{uncover-live-CFG} that processed the basic blocks in topological
-order (Section~\ref{sec:liveness-analysis-Rif}).
+order (Section~\ref{sec:liveness-analysis-Rif}). \ocaml{This function
+  has been programmed for you, in file \code{dataflow.ml}.}
 
 The \code{analyze-dataflow} function has four parameters.
 \begin{enumerate}
 \item The first parameter \code{G} should be a directed graph from the
   \code{racket/graph} package (see the sidebar in
   Section~\ref{sec:build-interference}) that represents the
-  control-flow graph.
+  control-flow graph. \ocaml{Remember that it is necessary to
+    transpose the CFG for a backward dataflow problem.}
 \item The second parameter \code{transfer} is a function that applies
   liveness analysis to a basic block. It takes two parameters: the
   label for the block to analyze and the live-after set for that
