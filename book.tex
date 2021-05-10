@@ -7269,7 +7269,7 @@ blocks on several test programs.
   the root stack. \\ --Jeremy}
 
 In this chapter we study the implementation of mutable tuples, called
-vectors in Racket. This language feature is the first to use the
+vectors in Racket. \ocaml{We will call them tuples!} This language feature is the first to use the
 computer's \emph{heap}\index{heap} because the lifetime of a Racket
 tuple is indefinite, that is, a tuple lives forever from the
 programmer's viewpoint. Of course, from an implementer's viewpoint, it
@@ -7280,13 +7280,14 @@ no longer needed, which is why we also study \emph{garbage collection}
 Section~\ref{sec:r3} introduces the \LangVec{} language including its
 interpreter and type checker. The \LangVec{} language extends the \LangIf{}
 language of Chapter~\ref{ch:Rif} with vectors and Racket's
-\code{void} value. The reason for including the later is that the
+\code{void} value. \ocaml{We will use a language \LangTuple{} that is an extension of the \LangLoop{} language from Chapter 9, which already added the \code{Void} type and void value \code{()}.} The reason for including the later \ocaml{(latter)} is that the
 \code{vector-set!} operation returns a value of type
 \code{Void}\footnote{Racket's \code{Void} type corresponds to what is
   called the \code{Unit} type in the programming languages
   literature. Racket's \code{Void} type is inhabited by a single value
   \code{void} which corresponds to \code{unit} or \code{()} in the
   literature~\citep{Pierce:2002hj}.}.
+
 
 Section~\ref{sec:GC} describes a garbage collection algorithm based on
 copying live objects back and forth between two halves of the
@@ -7298,14 +7299,22 @@ Sections~\ref{sec:expose-allocation} through \ref{sec:print-x86-gc}
 discuss all the necessary changes and additions to the compiler
 passes, including a new compiler pass named \code{expose-allocation}.
 
-\section{The \LangVec{} Language}
+\section{The \LangVec{} \ocaml{(\LangTuple{})} Language}
 \label{sec:r3}
 
 Figure~\ref{fig:Rvec-concrete-syntax} defines the concrete syntax for
-\LangVec{} and Figure~\ref{fig:Rvec-syntax} defines the abstract syntax.  The
+\LangVec{} \ocaml{(\LangTuple{})} and Figure~\ref{fig:Rvec-syntax} defines the abstract syntax. The
 \LangVec{} language includes three new forms: \code{vector} for creating a
 tuple, \code{vector-ref} for reading an element of a tuple, and
-\code{vector-set!} for writing to an element of a tuple. The program
+\code{vector-set!} for writing to an element of a tuple.
+\ocaml{In \LangTuple{}, we write \code{\#} to create a tuple, \code{!\;$n$} to read
+  the $n$th element of a tuple and \code{:=\;$n$} to write the $n$th element of
+  a tuple. Note that \code{:=} is overloaded: \code{(:= $x$ $e$)} sets variable
+  $x$ to $e$ (as in \LangLoop{}), whereas \code{(:= $n$ $e_1$ $e_2$)} writes
+  the value of $e_2$ to the $n$th element of the tuple obtained by evaluating $e_1$. Notice too
+  that the integer indices in \code{!} and \code{:=} are static constants, \emph{not} expressions that
+  might vary at runtime.}
+The program
 in Figure~\ref{fig:vector-eg} shows the usage of tuples in Racket. We
 create a 3-tuple \code{t} and a 1-tuple that is stored at index $2$ of
 the 3-tuple, demonstrating that tuples are first-class values.  The
@@ -7313,6 +7322,25 @@ element at index $1$ of \code{t} is \code{\#t}, so the ``then'' branch
 of the \key{if} is taken.  The element at index $0$ of \code{t} is
 \code{40}, to which we add \code{2}, the element at index $0$ of the
 1-tuple. So the result of the program is \code{42}.
+
+\ocaml{The \LangTuple{} grammar also contains two other operations. \code{(:\;\Exp\;\Type)}
+  is a \emph{type ascription}: it can be read as ``\Exp\; has type \Type.''
+  These ascriptions are checked by the type-checker, but are ignored during 
+  evaluation of the source language.
+  We are including them in the language as a hack: certain passes need to know the
+  types of sub-expressions, and the type-checker selectively insert ascriptions to make
+  that information available. Ascriptions are legal in source programs, but are
+  only useful as a kind of documentation about the types the programmer expects.
+  The other operation is allocation, written \code{(\#\#\;\Int\;\Type)}. This
+  is a strictly internal operation that is produced by an intermediate pass
+  in the compiler and is \emph{not} permitted in source code (but may be seen
+  in debugging output). Both of these forms explicitly mention types,
+  so for the first time we give concrete syntax for \Type.  Note that the
+  type of a tuple is also written using \code{\#}, followed by a list of
+  the element types.  Finally, note that we do \emph{not} implement an
+  equivalent to the \code{vector-length} operator, which is pretty useless,
+  since the length of every tuple is already known statically (see more below).}
+
 
 \begin{figure}[tbp]
 \centering
@@ -7340,8 +7368,33 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
 \]
 \end{minipage}
 }
+\begin{ocamlx}
+\fbox{
+  \begin{minipage}{0.96\textwidth}
+    \small
+\[
+\begin{array}{rcl}
+  \Type &::=& \gray{\key{Integer} \mid \key{Boolean} \mid \key{Void}}
+    \mid \LP\key{\#}\;\Type\ldots\RP\\
+  \Exp &::=& \gray{ \Int \mid \CREAD{} \mid \CNEG{\Exp} \mid \CADD{\Exp}{\Exp}   \mid \CSUB{\Exp}{\Exp}} \\
+     &\mid&  \gray{ \Var \mid \code{(let $\Var$ $\Exp$ $\Exp$)}}\\
+     &\mid& \gray{\itm{bool}
+      \mid (\key{and}\;\Exp\;\Exp) \mid (\key{or}\;\Exp\;\Exp)
+      \mid (\key{not}\;\Exp)} \\
+      &\mid& \gray{(\itm{cmp}\;\Exp\;\Exp) \mid \CIF{\Exp}{\Exp}{\Exp}} \\
+  &\mid& \gray{\code{()} \mid \code{(:= $\Var$ $\Exp$)} 
+  \mid \code{(seq \Exp\ldots \Exp)}
+  \mid \CWHILE{\Exp}{\Exp}} \\
+  &\mid& \LP\key{\#}\;\Exp\ldots\RP \mid \LP\key{!}\;\Int\;\Exp\RP \mid \LP\key{:=}\;\Int\;\Exp\;\Exp\RP\\
+  &\mid& \LP\key{:}\;\Exp\;\Type\RP \mid \LP\key{\#\#}\;\Int\;\Type\RP\\
+  \LangTuple{} &::=& \Exp
+\end{array}
+\]
+  \end{minipage}
+}  
+\end{ocamlx}
 \caption{The concrete syntax of \LangVec{}, extending \LangIf{}
-  (Figure~\ref{fig:Rif-concrete-syntax}).}
+  (Figure~\ref{fig:Rif-concrete-syntax}). \ocaml{OCaml: The concrete syntax of \LangTuple{}, extending \LangLoop{} (Figure~\ref{fig:Rwhile-concrete-syntax}).}}
 \label{fig:Rvec-concrete-syntax}
 \end{figure}
 
@@ -7351,6 +7404,13 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
       (if (vector-ref t 1)
           (+ (vector-ref t 0)
              (vector-ref (vector-ref t 2) 0))
+          44))
+\end{lstlisting}
+\begin{lstlisting}[style=ocaml]
+    (let t (# 40 #t (# 2))
+      (if (! 1 t)
+          (+ (! 0 t)
+             (! 0 (! 2 t)))
           44))
 \end{lstlisting}
 \caption{Example program that creates tuples and reads from them.}
@@ -7376,7 +7436,28 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
 \]
 \end{minipage}
 }
-\caption{The abstract syntax of \LangVec{}.}
+\begin{lstlisting}[style=ocaml,frame=single]
+type typ = IntT | BoolT | VoidT | TupleT of typ list
+type cmp = Eq | Lt | Le | Gt | Ge 
+type primop =  Read | Neg | Add | Sub | And | Or | Not | Cmp of cmp
+            | GetField of int | SetField of int | Alloc of int * typ
+type var = string
+type exp = 
+   Int of int64  
+ | Bool of bool
+ | Prim of primop * exp list
+ | Var of var
+ | Let of var * exp * exp
+ | If of exp * exp * exp 
+ | Void
+ | Set of var * exp
+ | Seq of exp list * exp
+ | While of exp * exp
+ | Tuple of exp list
+ | HasType of exp * typ
+type 'info program = Program of 'info * exp
+\end{lstlisting}
+\caption{The abstract syntax of \LangVec{} \ocaml{\LangTuple{}}.}
 \label{fig:Rvec-syntax}
 \end{figure}
 
@@ -7400,11 +7481,19 @@ tuple from \code{t1}, so the result of this program is \code{42}.
       (vector-ref t1 0))))
 \end{lstlisting}
 \end{minipage}
+\begin{minipage}{0.96\textwidth}
+\begin{lstlisting}[style=ocaml]
+(let t1 (# 3 7)
+  (let t2 t1
+    (seq (:= 0 t2 42)
+         (! 0 t1))))
+\end{lstlisting}
+\end{minipage}
 \end{center}
 
 The next issue concerns the lifetime of tuples. Of course, they are
 created by the \code{vector} form, but when does their lifetime end?
-Notice that \LangVec{} does not include an operation for deleting
+Notice that \LangVec{} \ocaml{(\LangTuple{})} does not include an operation for deleting
 tuples. Furthermore, the lifetime of a tuple is not tied to any notion
 of static scoping. For example, the following program returns
 \code{42} even though the variable \code{w} goes out of scope prior to
@@ -7419,6 +7508,15 @@ the \code{vector-ref} that reads from the vector it was bound to.
     (+ x (vector-ref (vector-ref v 0) 0))))
 \end{lstlisting}
 \end{minipage}
+\begin{minipage}{0.96\textwidth}
+\begin{lstlisting}[style=ocaml]
+(let v (# (# 44))
+  (let x (let w (# 42)
+             (seq (:= 0 v w)
+                   0))
+    (+ x (! 0 (! 0 v)))))
+\end{lstlisting}
+\end{minipage}
 \end{center}
 
 From the perspective of programmer-observable behavior, tuples live
@@ -7426,17 +7524,22 @@ forever. Of course, if they really lived forever, then many programs
 would run out of memory.\footnote{The \LangVec{} language does not have
   looping or recursive functions, so it is nigh impossible to write a
   program in \LangVec{} that will run out of memory. However, we add
-  recursive functions in the next Chapter!} A Racket implementation
+  recursive functions in the next Chapter! \ocaml{We have already added loops.}} A Racket \ocaml{(and \LangVec{} or \LangTuple{})} implementation
 must therefore perform automatic garbage collection.
 
+
 Figure~\ref{fig:interp-Rvec} shows the definitional interpreter for the
-\LangVec{} language. We define the \code{vector}, \code{vector-length},
+\LangVec{} language. \ocaml{The OCaml version is in file \code{RTuple.ml}.} We define the \code{vector}, \code{vector-length},
 \code{vector-ref}, and \code{vector-set!} operations for \LangVec{} in
-terms of the corresponding operations in Racket. One subtle point is
+terms of the corresponding operations in Racket. \ocaml{In OCaml these are defined
+ in terms of operations on \code{array}s.} One subtle point is
 that the \code{vector-set!}  operation returns the \code{\#<void>}
 value. The \code{\#<void>} value can be passed around just like other
 values inside an \LangVec{} program and a \code{\#<void>} value can be
-compared for equality with another \code{\#<void>} value. However,
+compared for equality with another \code{\#<void>} value. \ocaml{This is not true
+  in our version; just as for the other Void-typed expressions in \LangLoop{}, our typing
+  rules require that \code{:=\;$n$} operations appear only in effectful positions, e.g. a non-final
+  position of a \code{seq}.} However,
 there are no other operations specific to the the \code{\#<void>}
 value in \LangVec{}. In contrast, Racket defines the \code{void?} predicate
 that returns \code{\#t} when applied to \code{\#<void>} and \code{\#f}
@@ -7479,13 +7582,13 @@ otherwise.
 \label{fig:interp-Rvec}
 \end{figure}
 
-Figure~\ref{fig:type-check-Rvec} shows the type checker for \LangVec{}, which
+Figure~\ref{fig:type-check-Rvec} \ocaml{(file \code{Rtuple.ml})} shows the type checker for \LangVec{}, which
 deserves some explanation. When allocating a vector, we need to know
 which elements of the vector are pointers (i.e. are also vectors). We
 can obtain this information during type checking. The type checker in
 Figure~\ref{fig:type-check-Rvec} not only computes the type of an
 expression, it also wraps every \key{vector} creation with the form
-$(\key{HasType}~e~T)$, where $T$ is the vector's type.
+$(\key{HasType}~e~T)$ \ocaml{(\key{:}~e~T)}, where $T$ is the vector's type.
 %
 To create the s-expression for the \code{Vector} type in
 Figure~\ref{fig:type-check-Rvec}, we use the
@@ -7493,6 +7596,14 @@ Figure~\ref{fig:type-check-Rvec}, we use the
   operator} \code{,@} to insert the list \code{t*} without its usual
 start and end parentheses.  \index{unquote-slicing}
 
+\ocaml{Tuples can be compared for equality, using reference rather than structural
+  equality, i.e. separately allocated tuples compare as different even if their
+  contents are the same field by field.  \LangTuple{} uses a stricter type check on equality than
+  \LangVec{}: only tuples of the same size amd element types can be compared. 
+  Tuples can have any size between 0 and 50, inclusive. The upper limit is
+  due to implementation considerations discussed later.  Zero-length tuples are
+  legal value, but of limited use (they are quite similar to the unit value \code{()},
+  except that each is separately allocated, so they can be used as unique labels).}
 
 \begin{figure}[tp]
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
@@ -7615,8 +7726,11 @@ element is a 2-tuple.  There are four tuples that are not reachable
 from the root set and therefore do not get copied into the ToSpace.
 
 The exact situation in Figure~\ref{fig:copying-collector} cannot be
-created by a well-typed program in \LangVec{} because it contains a
+created by a well-typed program in \LangVec{} \ocaml{(or \LangTuple{})} because it contains a
 cycle. However, creating cycles will be possible once we get to \LangAny{}.
+\ocaml{Our inability to construct a cycle in the heap in \LangTuple{}
+  is due to the type system, not the operational semantics. To see why,
+  try assigning a type to \code{a} in \code{(let a (\# 0) (:= 0 a a))}.}
 We design the garbage collector to deal with cycles to begin with so
 we will not need to revisit this issue.
 
@@ -7740,6 +7854,12 @@ example from Figure~\ref{fig:copying-collector} and contrasts it with
 the data layout using a root stack. The root stack contains the two
 pointers from the regular stack and also the pointer in the second
 register.
+\ocaml{Because our language still defines just one function, \code{main},
+  it may not be clear that the root stack (just like the regular stack)
+  is designed to be shared among all functions. This will
+  allow the collector to find all the roots from all the 
+  currently suspended functions (waiting to be returned to) as well as from
+  the current function.}
 
 \begin{figure}[tbp]
 \centering \includegraphics[width=0.60\textwidth]{figs/root-stack}
@@ -7759,10 +7879,13 @@ which corresponds to the direction of the x86 shifting instructions
 is dedicated to specifying which elements of the tuple are pointers,
 the part labeled ``pointer mask''. Within the pointer mask, a 1 bit
 indicates there is a pointer and a 0 bit indicates some other kind of
-data. The pointer mask starts at bit location 7. We have limited
+data. \ocaml{The least significant bit corresponds to the status of the
+  first tuple element, the next-least signficant to the second tuple element, and so on.
+The tag itself is not considered an element, and so does not get a corresponding bit.}
+The pointer mask starts at bit location 7. We have limited
 tuples to a maximum size of 50 elements, so we just need 50 bits for
 the pointer mask. The tag also contains two other pieces of
-information. The length of the tuple (number of elements) is stored in
+information. The length of the tuple (number of elements \ocaml{not including the tag itself}) is stored in
 bits location 1 through 6. Finally, the bit at location 0 indicates
 whether the tuple has yet to be copied to the ToSpace.  If the bit has
 value 1, then this tuple has not yet been copied.  If the bit has
@@ -7786,14 +7909,22 @@ interface to the garbage collector that is used by the compiler. The
 \code{initialize} function creates the FromSpace, ToSpace, and root
 stack and should be called in the prelude of the \code{main}
 function. The arguments of \code{initialize} are the root stack size
-and the heap size. Both need to be multiples of $64$ and $16384$ is a
-good choice for both.  The \code{initialize} function puts the address
+and the \ocaml{initial} heap size \ocaml{in bytes}. Both need to be multiples of $64$ \ocaml{$8$}} and $16384$ is a
+good choice for both.  \ocaml{Really, these choices are quite arbitrary! The root stack size
+  should be large enough to make sure that this stack does not overflow (because we will
+  live dangerously and not check for this). Since \LangTuple{} lacks recursion, this stack can never have more
+  than one entry for each static tuple creation in the program, so a few hundred slots should be plenty!
+  Our collector implementation automatically resizes the heap as needed, so the initial heap size
+  doesn't matter much, but it should be set small (say to 8 bytes; 0 is too small!) if you want to exercise
+  the collector as vigorously as possible.} 
+The \code{initialize} function puts the address
 of the beginning of the FromSpace into the global variable
 \code{free\_ptr}. The global variable \code{fromspace\_end} points to
 the address that is 1-past the last element of the FromSpace. (We use
 half-open intervals to represent chunks of
 memory~\citep{Dijkstra:1982aa}.)  The \code{rootstack\_begin} variable
-points to the first element of the root stack.
+points to the first element of the root stack. \ocaml{The value of \code{rootstack\_begin}
+is returned as the result of \code{initialize}.}
 
 As long as there is room left in the FromSpace, your generated code
 can allocate tuples simply by moving the \code{free\_ptr} forward.
@@ -7820,6 +7951,21 @@ succeed.
 \caption{The compiler's interface to the garbage collector.}
 \label{fig:gc-header}
 \end{figure}
+
+\begin{ocamlx}
+  For simplicity, we will package things slightly differently. Instead of
+  performing the heap limit check and allocation inline in the generated
+  code, you should instead invoke the \code{alloc} function provided in
+  \code{runtime.c}.  This function takes the top of the root stack,
+  the number of bytes to be allocated (including tag), and the tag value; 
+  it does the limit check, invokes \code{collect}
+  if necessary, writes the tag, and returns a pointer to the allocated bytes.
+  This approach has the advantage of hiding most details of allocation and collection from the
+  code generator. On the other hand, it is a lot less efficient than in-line
+  allocation, and thus would be inappropriate for a production compiler for
+  a heavily-allocating language (like Racket or OCaml!), although it might be
+  fine for a typical OO language like Java.
+\end{ocamlx}	
 
 %% \begin{exercise}
 %%   In the file \code{runtime.c} you will find the implementation of
@@ -7867,6 +8013,12 @@ references.
 (vector-ref (vector-ref (vector (vector 42)) 0) 0)
 \end{lstlisting}
 
+\begin{ocamlx}
+  \begin{lstlisting}
+    (! 0 (! 0 (# (# 42))))
+  \end{lstlisting}
+\end{ocamlx}
+
 \section{Shrink}
 \label{sec:shrink-Rvec}
 
@@ -7875,7 +8027,9 @@ into a smaller set of primitives. Because this pass comes after type
 checking, but before the passes that require the type information in
 the \code{HasType} AST nodes, the \code{shrink} pass must be modified
 to wrap \code{HasType} around each AST node that it generates.
-
+\ocaml{This is a mysterious statement, which I suspect is due to versions
+  shifting underneath this book. In any case, we have only put a \code{HasType} around
+each \code{Tuple} node. We just need to make sure that these are preserved.}
 
 \section{Expose Allocation}
 \label{sec:expose-allocation}
@@ -7889,7 +8043,8 @@ before \code{remove-complex-opera*} because the code generated by
 \code{expose-allocation} introduces new variables using \code{let},
 but \code{let} is gone after \code{explicate-control}.
 
-The output of \code{expose-allocation} is a language \LangAlloc{} that
+The output of \code{expose-allocation} is a language \LangAlloc{} \ocaml{(we remain
+  within the \LangTuple{} language)} that
 extends \LangVec{} with the three new forms that we use in the translation
 of the \code{vector} form.
 \[
@@ -7909,14 +8064,19 @@ The $T$ parameter is the type of the tuple: \code{(Vector $\Type_1 \ldots
   \Type_n$)} where $\Type_i$ is the type of the $i$th element in the
 tuple. The $(\key{global-value}\,\itm{name})$ form reads the value of
 a global variable, such as \code{free\_ptr}.
+\ocaml{Of these, we retain only an \code{Alloc} primop, written \code{\#\#}
+  in concrete syntax produced by debug output.  This operation includes the
+  heap limit checking and conditional call to the collector described in
+  Section~\ref{sec:organize-gz}. This pass should remove all \text{Tuple}
+  and \text{HasType} constructors.}
 
 In the following, we show the transformation for the \code{vector}
 form into 1) a sequence of let-bindings for the initializing
-expressions, 2) a conditional call to \code{collect}, 3) a call to
+expressions, 2) a conditional call to \code{collect} \ocaml{(not for us)}, 3) a call to
 \code{allocate}, and 4) the initialization of the vector. In the
-following, \itm{len} refers to the length of the vector and
+following, \itm{len} refers to the length of the vector \ocaml{(\emph{excluding} the tag)} and
 \itm{bytes} is how many total bytes need to be allocated for the
-vector, which is 8 for the tag plus \itm{len} times 8.
+vector \ocaml{(\emph{including} the tag)}, which is 8 for the tag plus \itm{len} times 8.
 \begin{lstlisting}
   (has-type (vector |$e_0 \ldots e_{n-1}$|) |\itm{type}|)
 |$\Longrightarrow$|
@@ -7931,11 +8091,27 @@ vector, which is 8 for the tag plus \itm{len} times 8.
      |$v$|) ... )))) ...)
 \end{lstlisting}
 In the above, we suppressed all of the \code{has-type} forms in the
-output for the sake of readability.  The placement of the initializing
+output for the sake of readability. \ocaml{(Again, this is mysterious; never mind.)} The placement of the initializing
 expressions $e_0,\ldots,e_{n-1}$ prior to the \code{allocate} and the
 sequence of \code{vector-set!} is important, as those expressions may
 trigger garbage collection and we cannot have an allocated but
 uninitialized tuple on the heap during a collection.
+
+\begin{ocamlx}
+  Here is our equivalent:
+\begin{lstlisting}
+  (: (# |$e_0 \ldots e_{n-1}$|) |\itm{type}|)
+|$\Longrightarrow$|
+  (let |$x_0$| |$e_0$| ... (let |$x_{n-1}$| |$e_{n-1}$|
+  (let |$v$| (## |\itm{len}| |\itm{type}|)
+  (seq (! |$0$| |$v$| |$x_0$|) ...
+       (! |$n-1$| |$v$| |$x_{n-1}$|)
+       |$v$|) ... )) ...)
+\end{lstlisting}
+Actually, we can (and should) do a little better than this: any $e_i$ that is already an atom can
+be used directly in the assignment without the need for defining a fresh variable $x_i$.  The
+parallels to RemoveComplexOperands should be obvious.
+\end{ocamlx}
 
 Figure~\ref{fig:expose-alloc-output} shows the output of the
 \code{expose-allocation} pass on our running example.
@@ -7975,6 +8151,21 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
   0)
  0)
 \end{lstlisting}
+\begin{lstlisting}[style=ocaml]
+(! 0 
+ (! 0 
+  (let `field.2 
+   (let `tuple.3 
+    (## 1 (# int)) 
+    (seq 
+       (:= 0 `tuple.3 42)
+       `tuple.3)) 
+   (let `tuple.1 
+    (## 1 (# (# int))) 
+    (seq 
+       (:= 0 `tuple.1 `field.2)
+      `tuple.1)))))
+\end{lstlisting}
 \caption{Output of the \code{expose-allocation} pass, minus
   all of the \code{has-type} forms.}
 \label{fig:expose-alloc-output}
@@ -7993,6 +8184,8 @@ should all be treated as complex operands.
 Figure~\ref{fig:Rvec-anf-syntax}
 shows the grammar for the output language \LangVecANF{} of this
 pass, which is \LangVec{} in administrative normal form.
+\ocaml{For us, there is nothing new to do here at all, since the
+  tuple primops are already treated as complex.}
 
 \begin{figure}[tp]
 \centering
@@ -8021,7 +8214,7 @@ R^{\dagger}_3  &::=& \gray{ \PROGRAM{\code{'()}}{\Exp} }
 \end{figure}
 
 
-\section{Explicate Control and the \LangCVec{} language}
+\section{Explicate Control and the \LangCVec{} \ocaml{\LangCTuple{}} language}
 \label{sec:explicate-control-r3}
 
 
@@ -8056,8 +8249,8 @@ R^{\dagger}_3  &::=& \gray{ \PROGRAM{\code{'()}}{\Exp} }
 \end{figure}
 
 The output of \code{explicate-control} is a program in the
-intermediate language \LangCVec{}, whose abstract syntax is defined in
-Figure~\ref{fig:c2-syntax}.  (The concrete syntax is defined in
+intermediate language \LangCVec{} \ocaml{(\LangCTuple{})}, whose abstract syntax is defined in
+Figure~\ref{fig:c2-syntax} \ocaml{(in file \code{CTuple.ml})}.  (The concrete syntax is defined in
 Figure~\ref{fig:c2-concrete-syntax} of the Appendix.)  The new forms
 of \LangCVec{} include the \key{allocate}, \key{vector-ref}, and
 \key{vector-set!}, and \key{global-value} expressions and the
@@ -8065,6 +8258,14 @@ of \LangCVec{} include the \key{allocate}, \key{vector-ref}, and
 these new forms much like the other expression forms that we've
 already encoutered.
 
+\ocaml{In \LangCTuple{}, the \key{GetField} and \key{Alloc} primops from
+  \LangTuple{} continue to be primops. But but \code{SetField} needs to be
+  turned into a new kind of side-effecting statement (\code{stmt}), as an alternative
+  to \code{Assign}.  
+  Also, note that there is an awkward case to deal with if a \code{GetField}
+  is used in a predicate position: we have to create a new temporary on the
+  fly to hold the fetched value and compare it \code{Bool true} just as for
+  (existing) variables.}
 
 \section{Select Instructions and the \LangXGlobal{} Language}
 \label{sec:select-instructions-gc}
@@ -8083,13 +8284,14 @@ were needed to compile tuples, including \code{Allocate},
 \code{void}. We compile \code{GlobalValue} to \code{Global} because
 the later has a different concrete syntax (see
 Figures~\ref{fig:x86-2-concrete} and \ref{fig:x86-2}).
-\index{x86}
+\index{x86}\ocaml{(We would have to translate it anyway, since
+two different OCaml datatypes are involved.)}
 
-The \code{vector-ref} and \code{vector-set!} forms translate into
+The \code{vector-ref} \ocaml{(\code{!\;$n$})} and \code{vector-set!} \ocaml{\code{(:=\;$n$)}} forms translate into
 \code{movq} instructions.  (The plus one in the offset is to get past
 the tag at the beginning of the tuple representation.)
 \begin{lstlisting}
-|$\itm{lhs}$| = (vector-ref |$\itm{vec}$| |$n$|);
+|$\itm{lhs}$| = (vector-ref |$\itm{vec}$| |$n$|); 
 |$\Longrightarrow$|
 movq |$\itm{vec}'$|, %r11
 movq |$8(n+1)$|(%r11), |$\itm{lhs'}$|
@@ -8100,11 +8302,16 @@ movq |$\itm{vec}'$|, %r11
 movq |$\itm{arg}'$|, |$8(n+1)$|(%r11)
 movq $0, |$\itm{lhs'}$|
 \end{lstlisting}
+\ocaml{Execept that for \code{:=\;$n$} we don't need the final \code{movq} because we don't bind a result for
+  this void-valued operation.}
 The $\itm{lhs}'$, $\itm{vec}'$, and $\itm{arg}'$ are obtained by
 translating $\itm{vec}$ and $\itm{arg}$ to x86.  The move of $\itm{vec}'$ to
 register \code{r11} ensures that offset expression
 \code{$-8(n+1)$(\%r11)} contains a register operand.  This requires
-removing \code{r11} from consideration by the register allocating.
+removing \code{r11} from consideration by the register allocating \ocaml{allocator}. 
+
+
+
 
 Why not use \code{rax} instead of \code{r11}? Suppose we instead used
 \code{rax}. Then the generated code for \code{vector-set!} would be
@@ -8126,6 +8333,9 @@ But the above sequence of instructions does not work because we're
 trying to use \code{rax} for two different values ($\itm{vec}'$ and
 $\itm{arg}'$) at the same time!
 
+\ocaml{The next two paragraphs are substantially different for us, because
+  we have a runtime system \code{alloc} function that incorporates the
+  actual allocation, invoking \code{collect} if necessary. See more below.}
 We compile the \code{allocate} form to operations on the
 \code{free\_ptr}, as shown below. The address in the \code{free\_ptr}
 is the next free address in the FromSpace, so we copy it into
@@ -8161,6 +8371,25 @@ available for use by the register allocator.
    callq collect
 \end{lstlisting}
 
+\begin{ocamlx}
+  For the OCaml version, we use the following translation:
+  
+\begin{color}{blue}
+\begin{lstlisting}
+   |$\itm{lhs}$| = (## |$\itm{len}$| (# |$\itm{type} \ldots$|));
+   |$\Longrightarrow$|
+   movq %r15, %rdi
+   movq $|$(\itm{len}+1)$|, %rsi
+   movq $|$\itm{tag}$|, %rdx
+   callq alloc
+   movq %rax, |$\itm{lhs}'$|
+\end{lstlisting}
+\end{color}
+
+Here $\itm{tag}$ is the tag value (refer to Figure~\ref{fig:tuple-rep}), which you can compute from $\itm{len}$ and
+the list of element $\itm{type}$s, using the OCaml \code{Int64} bit-wise operations. The first argument to \code{alloc}
+is the top of the root stack; see the previous paragraph about the use of \code{\%r15}.
+\end{ocamlx}
 
 
 \begin{figure}[tp]
@@ -8201,6 +8430,23 @@ The concrete and abstract syntax of the \LangXGlobal{} language is
 defined in Figures~\ref{fig:x86-2-concrete} and \ref{fig:x86-2}.  It
 differs from \LangXIf{} just in the addition of the form for global
 variables.
+\begin{ocamlx}
+We use \LangXAlloc{}, which doesn't differ from \LangXIf{} at all in
+  its syntax, but has a revised checker and interpreter that can handle the
+  richer code we are generating here.  In particular, the interpreter supports
+  the \code{alloc} function, allowing you to debug code at this level. Note
+  that the interpreter does \emph{not} include a collector, so you should
+  select a heap size that is large enough to allow tests to run to completion
+  without needing collection.  The relevant parameters are in
+  ref variables defined at the top of \code{X86Alloc.ml}.  These parameters
+  can be set by driver flags. 
+
+  There are some changes in how the entry and exit blocks get built, initially in
+  a dummy version and later in a correct one.  See comments in the \code{Chapter5.ml}
+  template code and the \code{X86Alloc.ml} code for more details.
+\end{ocamlx}
+
+
 %
 Figure~\ref{fig:select-instr-output-gc} shows the output of the
 \code{select-instructions} pass on the running example.
@@ -8269,6 +8515,35 @@ block40:
     callq 'collect
     jmp block38
 \end{lstlisting}
+\begin{lstlisting}[style=ocaml]
+	.globl _main
+_main:
+	jmp	_start
+_conclusion:
+	retq
+_start:
+	movq	%r15, %rdi
+	movq	$2, %rsi
+	movq	$3, %rdx
+	callq	_alloc
+	movq	%rax, `tuple.3
+	movq	`tuple.3, %r11
+	movq	$42, 8(%r11)
+	movq	`tuple.3, `field.2
+	movq	%r15, %rdi
+	movq	$2, %rsi
+	movq	$131, %rdx
+	callq	_alloc
+	movq	%rax, `tuple.1
+	movq	`tuple.1, %r11
+	movq	`field.2, 8(%r11)
+	movq	`tuple.1, `tmp.2
+	movq	`tmp.2, %r11
+	movq	8(%r11), `tmp.1
+	movq	`tmp.1, %r11
+	movq	8(%r11), %rax
+	jmp	_conclusion
+\end{lstlisting}
 \end{minipage}
 \caption{Output of the \code{select-instructions} pass.}
 \label{fig:select-instr-output-gc}
@@ -8330,6 +8605,8 @@ much like the regular stack in that we move the root stack pointer
 that the root stack grows up instead of down.  For the running
 example, there was just one spill so we increment \code{r15} by 8
 bytes. In the conclusion we decrement \code{r15} by 8 bytes.
+\ocaml{Out of sheer laziness, we don't check for possible overflow
+  of the root stack. A production system would need to do this.}
 
 One issue that deserves special care is that there may be a call to
 \code{collect} prior to the initializing assignments for all the
@@ -8426,6 +8703,53 @@ conclusion:
 	popq	%r13
 	popq	%rbp
 	retq
+\end{lstlisting}
+\end{minipage}
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize,style=ocaml]
+	.globl main
+_main:
+	pushq	%rbp
+	movq	%rsp, %rbp
+	subq	$0, %rsp
+	movq	$16384, %rsi
+	movq	$16384, %rdi
+	callq	_initialize
+	movq	%rax, %r15
+	movq	$0, 0(%r15)
+	addq	$8, %r15
+	jmp	_start
+_conclusion:
+	subq	$8, %r15
+	addq	$0, %rsp
+	popq	%rbp
+	retq
+\end{lstlisting}
+\end{minipage}
+\begin{minipage}[r]{0.45\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize,style=ocaml]
+_start:
+	movq	%r15, %rdi
+	movq	$2, %rsi
+	movq	$3, %rdx
+	callq	_alloc
+	movq	%rax, %rcx
+	movq	%rcx, %r11
+	movq	$42, 8(%r11)
+	movq	%rcx, -8(%r15)
+	movq	%r15, %rdi
+	movq	$2, %rsi
+	movq	$131, %rdx
+	callq	_alloc
+	movq	%rax, %rcx
+	movq	%rcx, %r11
+	movq	-8(%r15), %rax
+	movq	%rax, 8(%r11)
+	movq	%rcx, %r11
+	movq	8(%r11), %rcx
+	movq	%rcx, %r11
+	movq	8(%r11), %rax
+	jmp	_conclusion
 \end{lstlisting}
 \end{minipage}
 \caption{Output of the \code{print-x86} pass.}
