@@ -7374,7 +7374,7 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
     \small
 \[
 \begin{array}{rcl}
-  \Type &::=& \gray{\key{Integer} \mid \key{Boolean} \mid \key{Void}}
+  \Type &::=& \gray{\key{int} \mid \key{bool} \mid \key{void}}
     \mid \LP\key{\#}\;\Type\ldots\RP\\
   \Exp &::=& \gray{ \Int \mid \CREAD{} \mid \CNEG{\Exp} \mid \CADD{\Exp}{\Exp}   \mid \CSUB{\Exp}{\Exp}} \\
      &\mid&  \gray{ \Var \mid \code{(let $\Var$ $\Exp$ $\Exp$)}}\\
@@ -8982,7 +8982,7 @@ application\index{function application} is $(\Exp \; \Exp \ldots)$
 where the first expression must
 evaluate to a function and the rest are the arguments.
 The abstract syntax for function application is
-$\APPLY{\Exp}{\Exp\ldots}$.
+$\APPLY{\Exp}{\Exp\ldots}$. 
 
 %% The syntax for function application does not include an explicit
 %% keyword, which is error prone when using \code{match}. To alleviate
@@ -8998,11 +8998,11 @@ type, written
 \end{lstlisting}
 for a function whose $n$ parameters have the types $\Type_1$ through
 $\Type_n$ and whose return type is $\Type_r$. The main limitation of
-these functions (with respect to Racket functions) is that they are
+these functions (with respect to Racket \ocaml{(or, for that matter, OCaml or Haskell)} functions) is that they are
 not lexically scoped. That is, the only external entities that can be
 referenced from inside a function body are other globally-defined
 functions. The syntax of \LangFun{} prevents functions from being nested
-inside each other.
+inside each other. \ocaml{\LangFun{} is essentially similar to C with function pointers.}
 
 \begin{figure}[tp]
 \centering
@@ -9032,7 +9032,34 @@ inside each other.
 \]
 \end{minipage}
 }
-\caption{The concrete syntax of \LangFun{}, extending \LangVec{} (Figure~\ref{fig:Rvec-concrete-syntax}).}
+\begin{ocamlx}
+\fbox{
+  \begin{minipage}{0.96\textwidth}
+    \small
+\[
+\begin{array}{rcl}
+  \Type &::=& \gray{\key{int} \mid \key{bool} \mid \key{void}}
+    \mid \gray{\LP\key{\#}\;\Type\ldots\RP} \mid (\Type \ldots \; \key{->}\; \Type)\\
+  \Exp &::=& \gray{ \Int \mid \CREAD{} \mid \CNEG{\Exp} \mid \CADD{\Exp}{\Exp}   \mid \CSUB{\Exp}{\Exp}} \\
+     &\mid&  \gray{ \Var \mid \code{(let $\Var$ $\Exp$ $\Exp$)}}\\
+     &\mid& \gray{\itm{bool}
+      \mid (\key{and}\;\Exp\;\Exp) \mid (\key{or}\;\Exp\;\Exp)
+      \mid (\key{not}\;\Exp)} \\
+      &\mid& \gray{(\itm{cmp}\;\Exp\;\Exp) \mid \CIF{\Exp}{\Exp}{\Exp}} \\
+  &\mid& \gray{\code{()} \mid \code{(:= $\Var$ $\Exp$)} 
+  \mid \code{(seq \Exp\ldots \Exp)}
+  \mid \CWHILE{\Exp}{\Exp}} \\
+  &\mid& \gray{\LP\key{\#}\;\Exp\ldots\RP \mid \LP\key{!}\;\Int\;\Exp\RP \mid \LP\key{:=}\;\Int\;\Exp\;\Exp\RP}\\
+  &\mid& \gray{\LP\key{:}\;\Exp\;\Type\RP \mid \LP\key{\#\#}\;\Int\;\Type\RP}\\
+  &\mid& \LP\Exp \; \Exp \ldots\RP \mid \LP\key{\&}\;\Var\RP\\
+  \Def &::=& \LP\key{define}\;\Var\;\LP\Var\;\key{:}\;\Type\RP\;\ldots\RP\;\key{:}\;{\Type}\;{\Exp}\RP \\
+  \LangFun{} &::=& \Def \ldots \; \Exp
+\end{array}
+\]
+  \end{minipage}
+}  
+\end{ocamlx}
+\caption{The concrete syntax of \LangFun{}, extending \LangVec{} \ocaml{(\LangTuple{})} (Figure~\ref{fig:Rvec-concrete-syntax}).}
 \label{fig:Rfun-concrete-syntax}
 \end{figure}
 
@@ -9055,7 +9082,34 @@ inside each other.
 \]
 \end{minipage}
 }
-\caption{The abstract syntax of \LangFun{}, extending \LangVec{} (Figure~\ref{fig:Rvec-syntax}).}
+\begin{lstlisting}[style=ocaml,frame=single]
+type typ = IntT | BoolT | VoidT | TupleT of typ list
+         | FunT of typ list * typ
+type cmp = Eq | Lt | Le | Gt | Ge 
+type primop =  Read | Neg | Add | Sub | And | Or | Not | Cmp of cmp
+            | GetField of int | SetField of int | Alloc of int * typ
+type var = string
+type exp = 
+   Int of int64  
+ | Bool of bool
+ | Prim of primop * exp list
+ | Var of var
+ | Let of var * exp * exp
+ | If of exp * exp * exp 
+ | Void
+ | Set of var * exp
+ | Seq of exp list * exp
+ | While of exp * exp
+ | Tuple of exp list
+ | HasType of exp * typ
+ | Apply of exp * exp list
+ | FunRef of var
+type 'finfo func =
+   Func of var * (var * typ) list * typ * 'finfo * exp
+type ('pinfo,'finfo) program =
+   Program of 'pinfo * ('finfo func) list * exp option
+\end{lstlisting}
+\caption{The abstract syntax of \LangFun{}, extending \LangVec{} \ocaml{(\LangTuple{})} (Figure~\ref{fig:Rvec-syntax}).}
 \label{fig:Rfun-syntax}
 \end{figure}
 
@@ -9081,12 +9135,42 @@ The program applies
 
 (vector-ref (map-vec add1 (vector 0 41)) 1)
 \end{lstlisting}
+\begin{lstlisting}[style=ocaml]
+(define mapvec (f : (int -> int)) (v : (# int int)) : (# int int)
+  (#  (f (! 0 v)) (f (! 1 v)))
+
+(define add1 (x : int) : int 
+  (+ x 1))
+
+(! 1  (mapvec add1 (# 0 41)))
+\end{lstlisting}
 \caption{Example of using functions in \LangFun{}.}
 \label{fig:Rfun-function-example}
 \end{figure}
 
+\begin{ocamlx}
+  Note that the concrete syntax of \LangFun{} is a strict superset of our
+  earlier languages, since a program is allowed to have zero functions.
+  Functions are allowed to have zero arguments.
+  When writing concrete programs, be alert to the fact that there must be
+  spaces around each colon (\code{:}) and around the arrow (\code{->})
+  in function types. Also, although the parser will accept fairly arbitrary
+  character strings as function names (as does Racket), these will ultimately need to appear
+  as X86 assembly labels, which are fairly restricted in form (no dashes
+  or question marks, for example); if you stick to alphabetic names you should have no troubles.
+
+  There are two features of the \LangFun{} AST that are not intended for
+  use by user programs and are not accepted by the parser, but may
+  be displayed in debug output. The first is the \code{(\& \Var)} expression
+  form, which is generated internally by the type checker, as described below.
+  The second if that the top-level expression is optional; it must always
+  be present in source programs, but will be removed by the Shrink pass
+  (Section~\ref{sec:shrink-r4}).
+\end{ocamlx}
+
 The definitional interpreter for \LangFun{} is in
-Figure~\ref{fig:interp-Rfun}. The case for the \code{ProgramDefsExp} form is
+Figure~\ref{fig:interp-Rfun}. \ocaml{(The OCaml version is in file \code{RFun.ml}.)}
+The case for the \code{ProgramDefsExp} form is
 responsible for setting up the mutual recursion between the top-level
 function definitions. We use the classic back-patching \index{back-patching}
 approach that uses mutable variables and makes two passes over the function
@@ -9096,6 +9180,11 @@ definition. Note that the \code{lambda} value for each function is
 incomplete; it does not yet include the environment.  Once the
 top-level environment is constructed, we then iterate over it and
 update the \code{lambda} values to use the top-level environment.
+\ocaml{This complication is really not needed. In the OCaml version,
+  we do not associate environments with function values, but instead
+  use a single separate environment of (top-level) functions that is passed
+  down to the recursive evaluator, together with the usual environment for
+  local variables (which also holds function parameters).}
 
 \begin{figure}[tp]
 \begin{lstlisting}
@@ -9150,6 +9239,17 @@ update the \code{lambda} values to use the top-level environment.
 \margincomment{TODO: explain type checker}
 
 The type checker for \LangFun{} is is in Figure~\ref{fig:type-check-Rfun}.
+\ocaml{The OCaml version is in \code{RFun.ml}. Checking of function definitions and
+  applications is straightforward.  All functions must have distinct names, and
+  the parameters to each function must have distinct names.
+  Functions are limited to a maximum of six parameters, to simplify the implementation
+  (more on this in Section~\ref{sec:fun-x86}).
+  Also, functions are not permitted have a return type of
+  \code{Void}; this slightly simplifies the implementation while having minimal impact on
+  the language's expressiveness (since we have no printing or global variables).
+  As a by-product of checking, references to function names are turned into explicit
+  uses of the \code{(\&\;\Var)} operator; this has the same effect as the Reveal Functions
+  pass described in Section~\ref{sec:reveal-functions-r4}, and makes that pass unnecessary.}
 
 \begin{figure}[tp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
@@ -9242,17 +9342,22 @@ and where the \code{rip} would be at that moment and then changes
 \code{add1(\%rip)} to \code{$d$(\%rip)}, which at runtime will compute
 the address of \code{add1}.
 
-In Section~\ref{sec:x86} we used of the \code{callq} instruction to
+
+In Section~\ref{sec:x86} we used of \ocaml{[sic]} the \code{callq} instruction to
 jump to a function whose location is given by a label. To support
 function calls in this chapter we instead will be jumping to a
 function whose location is given by an address in a register, that is,
-we need to make an \emph{indirect function call}. The x86 syntax for
-this is a \code{callq} instruction but with an asterisk before the
+we need to make an \emph{indirect function call}.
+The x86 syntax for this is a \code{callq} instruction but with an asterisk before the
 register name.\index{indirect function call}
 \begin{lstlisting}
    callq *%rbx
 \end{lstlisting}
 
+\begin{ocamlx}
+We will improve on this scheme by using a combination of direct calls
+(when the target function is statically known) and indirect calls (when it is not).
+\end{ocamlx}
 
 \subsection{Calling Conventions}
 
@@ -9279,6 +9384,10 @@ frame of the caller for the rest of the arguments. However, to ease
 the implementation of efficient tail calls
 (Section~\ref{sec:tail-call}), we arrange never to need more than six
 arguments.
+%
+\ocaml{We'll do this by simply prohibiting functions with more than six
+  arguments from passing the type-checker; this is a useful simplification
+  even though we will not be implementing efficient tail calls.}
 %
 Also recall that the register \code{rax} is for the return value of
 the function.
@@ -9321,6 +9430,11 @@ the register allocator assigns a variable to a callee-saved register,
 then the prelude of the \code{main} function must save that register
 to the stack and the conclusion of \code{main} must restore it.  This
 recommendation now generalizes to all functions.
+%
+\ocaml{Warning: the code to do this in earlier versions of \code{X86*.ml}
+  was seriously broken (an off-by-one error), but since we weren't making
+  any function calls ourselves, it wasn't revealed by testing!  The code
+  in \code{X86Fun.ml} should be ok.}
 
 Also recall that the base pointer, register \code{rbp}, is used as a
 point-of-reference within a frame, so that each local variable can be
@@ -9392,6 +9506,7 @@ $-8(j+k)$(\key{\%rbp}) &  & local variable $k$ \\
 \subsection{Efficient Tail Calls}
 \label{sec:tail-call}
 
+
 In general, the amount of stack space used by a program is determined
 by the longest chain of nested function calls. That is, if function
 $f_1$ calls $f_2$, $f_2$ calls $f_3$, $\ldots$, and $f_{n-1}$ calls
@@ -9421,6 +9536,11 @@ use $O(1)$ stack space.  Functional languages like Racket typically
 rely heavily on recursive functions, so they typically guarantee that
 all tail calls will be optimized in this way.
 \index{frame}
+\ocaml{For simplicity, we will not implement the tail call optimization
+  described here. While functional languages often depend
+  on this optimization (Scheme and its dialects typically demand that
+  a conforming implementation perform it), imperative languages with loops
+  can be more flexible.}
 
 However, some care is needed with regards to argument passing in tail
 calls.  As mentioned above, for arguments beyond the sixth, the
@@ -9434,6 +9554,11 @@ target locations in the callee's frame might overlap with the sources
 for later arguments! We solve this problem by not using the stack for
 passing more than six arguments but instead using the heap, as we
 describe in the Section~\ref{sec:limit-functions-r4}.
+\ocaml{Since we won't do this tail-call optimization, we could
+  follow the convention of using space in the caller's frame for
+  passing arguments beyond the sixth one. But is is easer to just
+  prohibit functions with more than six arguments, which we do
+  in the typechecker.}
 
 As mentioned above, for a tail call we pop the caller's frame prior to
 making the tail call. The instructions for popping a frame are the
@@ -9473,7 +9598,8 @@ where $\itm{mainDef}$ is
 \begin{lstlisting}
 (Def 'main '() 'Integer '() |$\Exp'$|)
 \end{lstlisting}
-
+\ocaml{In OCaml, the Shrink pass does this by adding a new \code{main}
+definition and changing the top-level expression option to \code{None}.}
 
 \section{Reveal Functions and the \LangFunRef{} language}
 \label{sec:reveal-functions-r4}
@@ -9487,7 +9613,7 @@ address in a register.  Thus, it is a good idea to create a new pass
 that changes function references from just a symbol $f$ to
 $\FUNREF{f}$. This pass is named \code{reveal-functions} and the
 output language, \LangFunRef{}, is defined in Figure~\ref{fig:f1-syntax}.
-The concrete syntax for a function reference is $\CFUNREF{f}$.
+The concrete syntax for a function reference is $\CFUNREF{f}$ \ocaml{\code{(\&\;$f$)}}.
 
 \begin{figure}[tp]
 \centering
@@ -9517,10 +9643,16 @@ no local variables and functions that share the same name. On the
 other hand, \code{reveal-functions} needs to come before the
 \code{explicate-control} pass because that pass helps us compile
 \code{FunRef} forms into assignment statements.
+\ocaml{We choose instead to fold this transformation into the \LangFun{} type checker.
+  Performing it before \code{uniquify} is actually no problem, because
+  function names are already checked to be unique across the program
+  and they can never hide local variable names.}
 
 \section{Limit Functions}
 \label{sec:limit-functions-r4}
 
+\ocaml{We do not need this pass, since we simply limit the number of
+function parameters to a maximum of six in the type checker.}
 Recall that we wish to limit the number of function parameters to six
 so that we do not need to use the stack for argument passing, which
 makes it easier to implement efficient tail calls.  However, because
@@ -9576,14 +9708,20 @@ application will be translated to a sequence of instructions, so
 \code{Apply} must be classified as complex expression.
 On the other hand, the arguments of \code{Apply} should be
 atomic expressions.
+\ocaml{So far, same in OCaml.}
 %
 Regarding \code{FunRef}, as discussed above, the function label needs
 to be converted to an address using the \code{leaq} instruction. Thus,
 even though \code{FunRef} seems rather simple, it needs to be
 classified as a complex expression so that we generate an assignment
 statement with a left-hand side that can serve as the target of the
-\code{leaq}. Figure~\ref{fig:Rfun-anf-syntax} defines the
-output language \LangFunANF{} of this pass.
+\code{leaq}. \ocaml{It is actually easier to classify \code{FunRef}
+  as an atomic form.  The few places where we need to generate an
+  \code{leaq} are very stylized and can be recognized at the very
+  end of code generation, in Patch Instructions.}
+  Figure~\ref{fig:Rfun-anf-syntax} defines the
+  output language \LangFunANF{} of this pass.\ocaml{For us, \code{(FunRef$\;\Var$)}
+    should be an $\Atm$.}
 
 \begin{figure}[tp]
 \centering
@@ -9617,19 +9755,34 @@ R^{\dagger}_4  &::=& \gray{ \PROGRAMDEFS{\code{'()}}{\Def} }
 \label{sec:explicate-control-r4}
 
 Figure~\ref{fig:c3-syntax} defines the abstract syntax for \LangCFun{}, the
-output of \key{explicate-control}. (The concrete syntax is given in
+output of \key{explicate-control}. \ocaml{OCaml: In file \code{CFun.ml}.
+  Following the remarks in the previous sections, we make \code{(FunRef\;{\itm{label}})} an $\Atm$ rather than an $\Exp$,
+  and there is no \code{TailCall} form.}
+  (The concrete syntax is given in
 Figure~\ref{fig:c3-concrete-syntax} of the Appendix.) The auxiliary
 functions for assignment and tail contexts should be updated with
 cases for \code{Apply} and \code{FunRef} and the function for
 predicate context should be updated for \code{Apply} but not
-\code{FunRef}.  (A \code{FunRef} can't be a Boolean.)  In assignment
+\code{FunRef}.  (A \code{FunRef} can't be a Boolean.) \ocaml{The predicate
+context treatment of \code{Apply} will need to be handled similarly
+to \code{SetField} introduced in \LangTuple{}. Neither of the new forms
+should be added to the function for effectful contexts (a \code{FunRef}
+cannot have type Void, and our \LangFun{} type checker prohibits
+functions from having return type Void too).}
+In assignment
 and predicate contexts, \code{Apply} becomes \code{Call}, whereas in
-tail position \code{Apply} becomes \code{TailCall}.  We recommend
+tail position \code{Apply} becomes \code{TailCall}.  \ocaml{For us, \code{Apply}
+  becomes \code{Call} even in tail position.}
+
+We recommend
 defining a new auxiliary function for processing function definitions.
 This code is similar to the case for \code{Program} in \LangVec{}.  The
 top-level \code{explicate-control} function that handles the
 \code{ProgramDefs} form of \LangFun{} can then apply this new function to
-all the function definitions.
+all the function definitions. \ocaml{Note that the \LangCFun{} type checker
+  adds information about the variables of each function to the per-function
+  information field (just as in earlier languages this information was added
+  to the program information field).}
 
 
 \begin{figure}[tp]
@@ -9665,12 +9818,13 @@ all the function definitions.
 \end{figure}
 
 
-\section{Select Instructions and the \LangXIndCall{} Language}
+\section{Select Instructions and the \LangXIndCall{} \ocaml{(\LangXFun{})} Language}
 \label{sec:select-r4}
 \index{instruction selection}
 
-The output of select instructions is a program in the \LangXIndCall{}
-language, whose syntax is defined in Figure~\ref{fig:x86-3}.
+The output of select instructions is a program in the \LangXIndCall{} \ocaml{(\LangXFun{})}
+language, whose syntax is defined in Figure~\ref{fig:x86-3}.  \ocaml{The OCaml version is
+in \code{X86Fun.ml}. It does not have a $\Var \key{(\%rip)}$ or \key{tailjmp} form.}
 \index{x86}
 
 \begin{figure}[tp]
@@ -9738,6 +9892,10 @@ leaq (fun-ref |$f$|), |$\itm{lhs}'$|
 \end{lstlisting}
 \end{minipage}
 \end{tabular} \\
+\ocaml{We defer this transformation to the Patch Instructions phase. For now, there is
+  no need to treat \code{FunRef}s specially: simply generate
+  the usual \code{movq} instruction with \code{FunRef\;$f$} as the source argument.
+  The code you generate at this stage should not include \code{leaq} instructions.}
 
 Regarding function definitions, we need to remove the parameters and
 instead perform parameter passing using the conventions discussed in
@@ -9750,6 +9908,13 @@ from the argument passing registers to these local variables.
   |$\Rightarrow$|
   (Def |$f$| '() 'Integer |$\itm{info}'$| |$G'$|)
 \end{lstlisting}
+\begin{lstlisting}[style=ocaml]
+   CFun.Func(~$f$~,~$args$~,~$resty$~,~$vars$~,~$G$~) 
+   ~$\Rightarrow$~
+   X86Fun.Func(~$f$~,~$vars$~,~$G'$~)
+\end{lstlisting}
+  
+\ocaml{Note that we copy over the function $vars$ environment unchanged.}
 The $G'$ control-flow graph is the same as $G$ except that the
 \code{start} block is modified to add the instructions for moving from
 the argument registers to the parameter variables. So the \code{start}
@@ -9813,6 +9978,7 @@ the function, i.e., the number of parameters. That information is
 useful in the \code{uncover-live} pass for determining which
 argument-passing registers are potentially read during the call.
 
+\ocaml{This paragraph is irrelevant for us, since we are not optimizing tail calls.}
 For tail calls, the parameter passing is the same as non-tail calls:
 generate instructions to move the arguments into to the argument
 passing registers.  After that we need to pop the frame from the
@@ -9833,7 +9999,9 @@ can be compiled to an assignment to \code{rax} followed by a jump to
 have a starting block and conclusion for each function, but their
 labels need to be unique. We recommend prepending the function's name
 to \code{start} and \code{conclusion}, respectively, to obtain unique
-labels. (Alternatively, one could \code{gensym} labels for the start
+labels. \ocaml{The \code{dummy\_func\_entry\_exit} helper functions in \code{X86Fun.ml}
+  assume this convention and take the function name as a parameter.}
+(Alternatively, one could \code{gensym} labels for the start
 and conclusion and store them in the $\itm{info}$ field of the
 function definition.)
 
@@ -9850,6 +10018,9 @@ function definition.)
 %% kinds of AST nodes: \code{fun-ref}, \code{indirect-callq}, and
 %% \code{leaq}. 
 
+\ocaml{With the addition of function definitions, we perform liveness analysis
+separately on each function (not just once for the whole program).}
+
 The \code{IndirectCallq} instruction should be treated like
 \code{Callq} regarding its written locations $W$, in that they should
 include all the caller-saved registers. Recall that the reason for
@@ -9857,15 +10028,19 @@ that is to force call-live variables to be assigned to callee-saved
 registers or to be spilled to the stack.
 
 Regarding the set of read locations $R$ the arity field of
-\code{TailJmp} and \code{IndirectCallq} determines how many of the
+\code{TailJmp} \ocaml{(not for us)} and \code{IndirectCallq} determines how many of the
 argument-passing registers should be considered as read by those
-instructions.
+instructions. \ocaml{Don't forget that the target argument to \code{IndirectCallq}
+is itself a location that is read.}  
 
 \subsection{Build Interference Graph}
 \label{sec:build-interference-r4}
 
 With the addition of function definitions, we compute an interference
 graph for each function (not just one for the whole program).
+\ocaml{The generated interference graph is now attached as one
+  element of the per-function information field, rather than
+  the program information field.}
 
 Recall that in Section~\ref{sec:reg-alloc-gc} we discussed the need to
 spill vector-typed variables that are live during a call to the
@@ -9874,12 +10049,14 @@ need to revisit this issue. Many functions perform allocation and
 therefore have calls to the collector inside of them. Thus, we should
 not only spill a vector-typed variable when it is live during a call
 to \code{collect}, but we should spill the variable if it is live
-during any function call. Thus, in the \code{build-interference} pass,
+during any function call. \ocaml{Except for a call to a
+  known external function such as \code{read\_int}.}
+Thus, in the \code{build-interference} pass,
 we recommend adding interference edges between call-live vector-typed
 variables and the callee-saved registers (in addition to the usual
 addition of edges between call-live variables and the caller-saved
-registers).
-
+registers). \ocaml{Depending on how you coded your solution for \LangTuple{},
+  you may already be doing the right thing here.}
 
 \subsection{Allocate Registers}
 
@@ -9891,15 +10068,50 @@ Chapter~\ref{ch:register-allocation-Rvar}, except now register
 allocation is performed many times, once for each function definition,
 instead of just once for the whole program.
 
+\ocaml{The frame size and rootframe size information produced by this pass
+  now form the per-function information, rather than the per-program information.
+  The is also the right pass to replace the dummy entry and exit blocks by
+  the real ones generated by the \code{func\_entry\_exit} function in \code{X86Fun.ml}
+  The details of what these produce is described under ``Print x86'' below.}
 
 \section{Patch Instructions}
 
+\ocaml{This paragraph is not relevant to us.}
 In \code{patch-instructions}, you should deal with the x86
 idiosyncrasy that the destination argument of \code{leaq} must be a
 register. Additionally, you should ensure that the argument of
 \code{TailJmp} is \itm{rax}, our reserved register---this is to make
 code generation more convenient, because we trample many registers
 before the tail call (as explained in the next section).
+
+\begin{ocamlx}
+  In the Patch Instructions phase, we finally deal with the
+  fact that our X86 code has \code{FunRef} operands that need
+  to be translated into real machine-level mechanisms. If all
+  the previous passes have done their job, there
+  are just two places where these operands can appear.
+
+  \begin{enumerate}
+  \item As the target argument to an
+    \code{IndirectCallq} instruction.  In this case,
+    the indirect call can be converted to a simpler direct call.
+
+    \begin{lstlisting}[style=ocaml]
+      IndirectCallq(FunRef ~$f$~,~$ar$~)
+      ~$\Rightarrow$~
+      Callq(~$f$~,~$ar$~)
+    \end{lstlisting}
+
+  \item As the source argument of a \code{movq} instruction.
+    In this case, we must introduce an \code{leaq} instruction
+    with the \code{FunRef} as its source,
+    to compute the address of the function. If the destination
+    of the original \code{movq} is a register, we can use it
+    directly as the destination of the \code{leaq}; otherwise
+    use \code{\%rax} as an intermediate (\code{leaq} requires
+    its destination to be a register).
+  \end{enumerate}
+\end{ocamlx}
 
 \section{Print x86}
 
@@ -9911,6 +10123,7 @@ syntax.
   (IndirectCallq |\itm{arg}| |\itm{int}|) |$\Rightarrow$| callq *|\itm{arg}'|
 \end{lstlisting}
 
+\ocaml{This paragraph is irrelevant for us.}
 The \code{TailJmp} node requires a bit work. A straightforward
 translation of \code{TailJmp} would be \code{jmp *$\itm{arg}$}, but
 before the jump we need to pop the current frame. This sequence of
@@ -9957,7 +10170,10 @@ The conclusion of every function should do the following.
 \item Return to the caller with the \code{retq} instruction.
 \end{enumerate}
 
-
+\ocaml{All the work required here is already embedded in the
+  \code{func\_entry\_exit} function in \code{X86Fun.ml}. The blocks
+  it produces should be patched in during \code{AllocateRegisters}.}
+  
 \begin{exercise}\normalfont
 Expand your compiler to handle \LangFun{} as outlined in this chapter.
 Create 5 new programs that use functions, including examples that pass
@@ -10018,7 +10234,8 @@ previously created test programs.
 \end{figure}
 
 Figure~\ref{fig:Rfun-passes} gives an overview of the passes for
-compiling \LangFun{} to x86.
+compiling \LangFun{} to x86. \ocaml{We omit the passes called
+  \code{reveal-functions} and \code{limit-functions}.} 
 
 \section{An Example Translation}
 \label{sec:functions-example}
@@ -10026,6 +10243,8 @@ compiling \LangFun{} to x86.
 Figure~\ref{fig:add-fun} shows an example translation of a simple
 function in \LangFun{} to x86. The figure also includes the results of the
 \code{explicate-control} and \code{select-instructions} passes.
+\ocaml{The OCaml version in \ref{fig:add-fun-ocaml} does \emph{not} show the effect of tail-recursion
+  optimization nor of move-biasing in the register allocator.}
 
 \begin{figure}[htbp]
 \begin{tabular}{ll}
@@ -10122,6 +10341,106 @@ mainconclusion:
 \label{fig:add-fun}
 \end{figure}
 
+\begin{ocamlx}
+\begin{figure}[htbp]
+\begin{tabular}{ll}
+\begin{minipage}{0.5\textwidth}
+% s3_2.rkt
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize,style=ocaml]
+(define (add (x : int) (y : int) : int
+   (+ x y))
+(add 40 2)
+\end{lstlisting}
+$\Downarrow$
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize,style=ocaml]
+define main () : int 
+start:
+  return (call (& add) 40 2)
+define add ((x : int) (y : int)) : int 
+start:
+  return (+ x y)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize,style=ocaml]
+	.globl _main
+        .align 16  
+_main:
+	jmp	_mainstart
+_mainconclusion:
+	retq
+_mainstart:
+	movq	$40, %rdi
+	movq	$2, %rsi
+	callq	*_add(%rip)
+	movq	%rax, %rax
+	jmp	_mainconclusion
+	.globl _add
+        .align 16  
+_add:
+	jmp	_addstart
+_addconclusion:
+	retq
+_addstart:
+	movq	%rdi, x
+	movq	%rsi, y
+	movq	x, %rax
+	addq	y, %rax
+	jmp	_addconclusion
+\end{lstlisting}
+$\Downarrow$
+\end{minipage}
+\end{tabular}
+\begin{tabular}{ll}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize,style=ocaml]
+	.globl _main
+        .align 16  
+_main:
+	pushq	%rbp
+	movq	%rsp, %rbp
+	movq	$16384, %rsi
+	movq	$16384, %rdi
+	callq	_initialize
+	movq	%rax, %r15
+	jmp	_mainstart
+_mainconclusion:
+	popq	%rbp
+	retq
+_mainstart:
+	movq	$40, %rdi
+	movq	$2, %rsi
+	callq	_add
+	jmp	_mainconclusion
+\end{lstlisting}
+\end{minipage}
+&
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize,style=ocaml]
+	.globl _add
+        .align 16  
+_add:
+	pushq	%rbp
+	movq	%rsp, %rbp
+	jmp	_addstart
+_addconclusion:
+	popq	%rbp
+	retq
+_addstart:
+	movq	%rdi, %rdx
+	movq	%rsi, %rcx
+	movq	%rdx, %rax
+	addq	%rcx, %rax
+	jmp	_addconclusion
+\end{lstlisting}
+\end{minipage}
+\end{tabular}
+\caption{\ocaml{(OCaml) Example compilation of a simple function to x86.}}
+\label{fig:add-fun-ocaml}
+\end{figure}
+\end{ocamlx}
 
 % Challenge idea: inlining! (simple version)
 
