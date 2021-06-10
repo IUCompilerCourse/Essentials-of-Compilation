@@ -13,6 +13,11 @@
 \usepackage{multirow}
 \usepackage{tcolorbox}
 \usepackage{color}
+%\usepackage{ifthen}
+
+\def\edition{1}
+\def\racketEd{0}
+\def\pythonEd{1}
 
 \definecolor{lightgray}{gray}{1}
 \newcommand{\black}[1]{{\color{black} #1}}
@@ -308,7 +313,7 @@ Racket~\citep{Dybvig:1987aa,Abelson:1996uq,Friedman:1996aa,Felleisen:2001aa,Fell
   This edition of the book uses the \href{https://www.python.org/}{Python}
   both for the implementation of the compiler and for the input language, so the
 reader should be proficient with Python. There are many
-excellent resources for learning Python~\citep{}.
+excellent resources for learning Python~\citep{Lutz:2013vp,Barry:2016vj,Sweigart:2019vn,Matthes:2019vs}.
 }
 The support code for this book is in the \code{github} repository at
 the following URL:
@@ -375,7 +380,7 @@ invaluable feedback.
 
 We thank Ronald Garcia for helping Jeremy survive Dybvig's compiler
 course in the early 2000's and especially for finding the bug that
-sent the garbage collector on a wild goose chase!
+sent our garbage collector on a wild goose chase!
 
 \mbox{}\\
 \noindent Jeremy G. Siek \\
@@ -398,23 +403,35 @@ perform.\index{subject}{concrete syntax}\index{subject}{abstract syntax}\index{s
   syntax tree}\index{subject}{AST}\index{subject}{program}\index{subject}{parse} The translation
 from concrete syntax to abstract syntax is a process called
 \emph{parsing}~\citep{Aho:1986qf}. We do not cover the theory and
-implementation of parsing in this book. A parser is provided in the
-support code for translating from concrete to abstract syntax.
+implementation of parsing in this book.
+%
+\racket{A parser is provided in the support code for translating from
+  concrete to abstract syntax.}
+%
+\python{We use Python's \code{ast} module to translate from concrete
+  to abstract syntax.}
 
 ASTs can be represented in many different ways inside the compiler,
 depending on the programming language used to write the compiler.
 %
-We use Racket's
+\racket{We use Racket's
 \href{https://docs.racket-lang.org/guide/define-struct.html}{\code{struct}}
-feature to represent ASTs (Section~\ref{sec:ast}). We use grammars to
-define the abstract syntax of programming languages
+feature to represent ASTs (Section~\ref{sec:ast}).}
+%
+\python{We use Python classes and objects to represent ASTs, especially the
+  classes defined in the standard \code{ast} module for the Python
+  source language.}
+%
+We use grammars to define the abstract syntax of programming languages
 (Section~\ref{sec:grammar}) and pattern matching to inspect individual
 nodes in an AST (Section~\ref{sec:pattern-matching}).  We use
 recursive functions to construct and deconstruct ASTs
 (Section~\ref{sec:recursion}).  This chapter provides an brief
-introduction to these ideas.  \index{subject}{struct}
+introduction to these ideas.
+\racket{\index{subject}{struct}}
+\python{\index{subject}{class}\index{subject}{object}}
 
-\section{Abstract Syntax Trees and Racket Structures}
+\section{Abstract Syntax Trees}
 \label{sec:ast}
 
 Compilers use abstract syntax trees to represent programs because they
@@ -427,15 +444,22 @@ negation. The negation has another sub-part, the integer constant
 follow the links to go from one part of a program to its sub-parts.
 \begin{center}
 \begin{minipage}{0.4\textwidth}
+\if\edition\racketEd
 \begin{lstlisting}
 (+ (read) (- 8))
 \end{lstlisting}
+\fi
+\if\edition\pythonEd
+\begin{lstlisting}
+input_int() + -8
+\end{lstlisting}
+\fi
 \end{minipage}
 \begin{minipage}{0.4\textwidth}
 \begin{equation}
 \begin{tikzpicture}
  \node[draw, circle] (plus)  at (0 ,  0) {\key{+}};
- \node[draw, circle] (read)  at (-1, -1.5) {{\footnotesize\key{read}}};
+ \node[draw, circle] (read)  at (-1, -1.5) {{\if\edition\racketEd\footnotesize\key{read}\fi\if\edition\pythonEd\key{input}}};
  \node[draw, circle] (minus) at (1 , -1.5) {$\key{-}$};
  \node[draw, circle] (8)     at (1 , -3) {\key{8}};
 
