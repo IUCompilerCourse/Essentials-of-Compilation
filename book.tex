@@ -13,12 +13,26 @@
 \usepackage{multirow}
 \usepackage{tcolorbox}
 \usepackage{color}
+%\usepackage{ifthen}
 \usepackage{upquote}
+
 
 \definecolor{lightgray}{gray}{1}
 \newcommand{\black}[1]{{\color{black} #1}}
 %\newcommand{\gray}[1]{{\color{lightgray} #1}}
 \newcommand{\gray}[1]{{\color{gray} #1}}
+
+\def\racketEd{0}
+\def\pythonEd{1}
+\def\edition{0}
+
+% material that is specific to the Racket edition of the book
+\newcommand{\racket}[1]{{\if\edition\racketEd\color{olive}{#1}\fi}}
+% would like a command for: \if\edition\racketEd\color{olive}
+% and : \fi\color{black}
+
+% material that is specific to the Python edition of the book
+\newcommand{\python}[1]{{\if\edition\pythonEd\color{purple}{#1}\fi}}
 
 %% For multiple indices:
 \usepackage{multind}
@@ -37,6 +51,7 @@ columns=flexible,
 moredelim=[is][\color{red}]{~}{~},
 showstringspaces=false
 }
+
 
 %%% Any shortcut own defined macros place here
 %% sample of author macro:
@@ -258,8 +273,9 @@ Chapter~\ref{ch:Rwhile}. Figure~\ref{fig:chapter-dependences} depicts
 the dependencies between chapters.
 
 This book has also been used in compiler courses at California
-Polytechnic State University, Rose–Hulman Institute of Technology, and
-University of Massachusetts Lowell.
+Polytechnic State University, Portland State University, Rose–Hulman
+Institute of Technology, University of Massachusetts Lowell, and the
+University of Vermont.
 
 
 \begin{figure}[tp]
@@ -291,13 +307,21 @@ University of Massachusetts Lowell.
   \label{fig:chapter-dependences}
 \end{figure}
 
+\racket{
 We use the \href{https://racket-lang.org/}{Racket} language both for
 the implementation of the compiler and for the input language, so the
 reader should be proficient with Racket or Scheme. There are many
 excellent resources for learning Scheme and
-Racket~\citep{Dybvig:1987aa,Abelson:1996uq,Friedman:1996aa,Felleisen:2001aa,Felleisen:2013aa,Flatt:2014aa}. The
-support code for this book is in the \code{github} repository at the
-following URL:
+Racket~\citep{Dybvig:1987aa,Abelson:1996uq,Friedman:1996aa,Felleisen:2001aa,Felleisen:2013aa,Flatt:2014aa}.
+}
+\python{
+  This edition of the book uses the \href{https://www.python.org/}{Python}
+  both for the implementation of the compiler and for the input language, so the
+reader should be proficient with Python. There are many
+excellent resources for learning Python~\citep{Lutz:2013vp,Barry:2016vj,Sweigart:2019vn,Matthes:2019vs}.
+}
+The support code for this book is in the \code{github} repository at
+the following URL:
 \begin{center}\small
   \url{https://github.com/IUCompilerCourse/public-student-support-code}
 \end{center}
@@ -361,7 +385,7 @@ invaluable feedback.
 
 We thank Ronald Garcia for helping Jeremy survive Dybvig's compiler
 course in the early 2000's and especially for finding the bug that
-sent the garbage collector on a wild goose chase!
+sent our garbage collector on a wild goose chase!
 
 \mbox{}\\
 \noindent Jeremy G. Siek \\
@@ -384,23 +408,35 @@ perform.\index{subject}{concrete syntax}\index{subject}{abstract syntax}\index{s
   syntax tree}\index{subject}{AST}\index{subject}{program}\index{subject}{parse} The translation
 from concrete syntax to abstract syntax is a process called
 \emph{parsing}~\citep{Aho:1986qf}. We do not cover the theory and
-implementation of parsing in this book. A parser is provided in the
-support code for translating from concrete to abstract syntax.
+implementation of parsing in this book.
+%
+\racket{A parser is provided in the support code for translating from
+  concrete to abstract syntax.}
+%
+\python{We use Python's \code{ast} module to translate from concrete
+  to abstract syntax.}
 
 ASTs can be represented in many different ways inside the compiler,
 depending on the programming language used to write the compiler.
 %
-We use Racket's
+\racket{We use Racket's
 \href{https://docs.racket-lang.org/guide/define-struct.html}{\code{struct}}
-feature to represent ASTs (Section~\ref{sec:ast}). We use grammars to
-define the abstract syntax of programming languages
+feature to represent ASTs (Section~\ref{sec:ast}).}
+%
+\python{We use Python classes and objects to represent ASTs, especially the
+  classes defined in the standard \code{ast} module for the Python
+  source language.}
+%
+We use grammars to define the abstract syntax of programming languages
 (Section~\ref{sec:grammar}) and pattern matching to inspect individual
 nodes in an AST (Section~\ref{sec:pattern-matching}).  We use
 recursive functions to construct and deconstruct ASTs
 (Section~\ref{sec:recursion}).  This chapter provides an brief
-introduction to these ideas.  \index{subject}{struct}
+introduction to these ideas.
+\racket{\index{subject}{struct}}
+\python{\index{subject}{class}\index{subject}{object}}
 
-\section{Abstract Syntax Trees and Racket Structures}
+\section{Abstract Syntax Trees}
 \label{sec:ast}
 
 Compilers use abstract syntax trees to represent programs because they
@@ -413,17 +449,24 @@ negation. The negation has another sub-part, the integer constant
 follow the links to go from one part of a program to its sub-parts.
 \begin{center}
 \begin{minipage}{0.4\textwidth}
+\if\edition\racketEd
 \begin{lstlisting}
 (+ (read) (- 8))
 \end{lstlisting}
+\fi
+\if\edition\pythonEd
+\begin{lstlisting}
+input_int() + -8
+\end{lstlisting}
+\fi
 \end{minipage}
 \begin{minipage}{0.4\textwidth}
 \begin{equation}
 \begin{tikzpicture}
- \node[draw, circle] (plus)  at (0 ,  0) {\key{+}};
- \node[draw, circle] (read)  at (-1, -1.5) {{\footnotesize\key{read}}};
- \node[draw, circle] (minus) at (1 , -1.5) {$\key{-}$};
- \node[draw, circle] (8)     at (1 , -3) {\key{8}};
+ \node[draw] (plus)  at (0 ,  0) {\key{+}};
+ \node[draw] (read)  at (-1, -1.5) {{\if\edition\racketEd\footnotesize\key{read}\fi\if\edition\pythonEd\key{input\_int()}\fi}};
+ \node[draw] (minus) at (1 , -1.5) {$\key{-}$};
+ \node[draw] (8)     at (1 , -3) {\key{8}};
 
  \draw[->] (plus) to (read);
  \draw[->] (plus) to (minus);
@@ -434,7 +477,7 @@ follow the links to go from one part of a program to its sub-parts.
 \end{minipage}
 \end{center}
 We use the standard terminology for trees to describe ASTs: each
-circle above is called a \emph{node}. The arrows connect a node to its
+rectangle above is called a \emph{node}. The arrows connect a node to its
 \emph{children} (which are also nodes). The top-most node is the
 \emph{root}.  Every node except for the root has a \emph{parent} (the
 node it is the child of). If a node has no children, it is a
@@ -495,28 +538,30 @@ node it is the child of). If a node has no children, it is a
 %% In general, the Racket expression that follows the comma (splice)
 %% can be any expression that produces an S-expression.
 
-We define a Racket \code{struct} for each kind of node. For this
+{\if\edition\racketEd\color{olive}
+We define a Racket \code{struct} for each kind of node.  For this
 chapter we require just two kinds of nodes: one for integer constants
-and one for primitive operations. The following is the \code{struct}
+and one for primitive operations.  The following is the \code{struct}
 definition for integer constants.
 \begin{lstlisting}
 (struct Int (value))
 \end{lstlisting}
 An integer node includes just one thing: the integer value.
-To create an AST node for the integer $8$, we write \code{(Int 8)}.
+To create an AST node for the integer $8$, we write \INT{8}.
 \begin{lstlisting}
 (define eight (Int 8))
 \end{lstlisting}
-We say that the value created by \code{(Int 8)} is an
-\emph{instance} of the \code{Int} structure.
+We say that the value created by \INT{8} is an
+\emph{instance} of the
+\code{Int} structure.
 
 The following is the \code{struct} definition for primitive operations.
 \begin{lstlisting}
 (struct Prim (op args))
 \end{lstlisting}
-A primitive operation node includes an operator symbol \code{op}
-and a list of child \code{args}. For example, to create
-an AST that negates the number $8$, we write \code{(Prim '- (list eight))}.
+A primitive operation node includes an operator symbol \code{op} and a
+list of child \code{args}. For example, to create an AST that negates
+the number $8$, we write \code{(Prim '- (list eight))}.
 \begin{lstlisting}
 (define neg-eight (Prim '- (list eight)))
 \end{lstlisting}
@@ -543,11 +588,78 @@ The reason we choose to use just one structure is that in many parts
 of the compiler the code for the different primitive operators is the
 same, so we might as well just write that code once, which is enabled
 by using a single structure.
+\fi}
+
+{\if\edition\pythonEd\color{purple}
+We use a Python \code{class} for each kind of node.
+The following is the class definition for constants.
+\begin{lstlisting}
+class Constant:
+    def __init__(self, value):
+        self.value = value
+\end{lstlisting}
+An integer constant node includes just one thing: the integer value.
+To create an AST node for the integer $8$, we write \INT{8}.
+\begin{lstlisting}
+eight = Constant(8)
+\end{lstlisting}
+We say that the value created by \INT{8} is an
+\emph{instance} of the \code{Constant} class.
+
+The following is class definition for unary operators.
+\begin{lstlisting}
+class UnaryOp:
+    def __init__(self, op, operand):
+        self.op = op
+        self.operand = operand
+\end{lstlisting}
+The specific operation is specified by the \code{op} parameter.  For
+example, the class \code{USub} is for unary subtraction. (More unary
+operators are introduced in later chapters.) To create an AST that
+negates the number $8$, we write \NEG{\code{eight}}.
+\begin{lstlisting}
+neg_eight = UnaryOp(USub(), eight)
+\end{lstlisting}
+
+The call to the \code{input\_int} function is represented by the
+\code{Call} and \code{Name} classes.
+\begin{lstlisting}
+class Call:
+    def __init__(self, func, args):
+        self.func = func
+        self.args = args
+
+class Name:
+    def __init__(self, id):        
+        self.id = id
+\end{lstlisting}
+To create an AST node that calls \code{input\_int}, we write
+\begin{lstlisting}
+read = Call(Name('input_int'), [])
+\end{lstlisting}
+
+Finally, to represent the addition in \eqref{eq:arith-prog}, we use
+the \code{BinOp} class for binary operators.
+\begin{lstlisting}
+class BinOp:
+    def __init__(self, left, op, right):
+        self.op = op
+        self.left = left
+        self.right = right
+\end{lstlisting}
+Similar to \code{UnaryOp}, the specific operation is specified by the
+\code{op} parameter, which for now is just an instance of the
+\code{Add} class. So to create the AST node that adds negative eight
+to some user input, we write the following.
+\begin{lstlisting}
+ast1_1 = BinOp(read, Add(), neg_eight)
+\end{lstlisting}
+\fi}
 
 When compiling a program such as \eqref{eq:arith-prog}, we need to
 know that the operation associated with the root node is addition and
-we need to be able to access its two children. Racket provides pattern
-matching to support these kinds of queries, as we see in
+we need to be able to access its two children. \racket{Racket}\python{Python}
+provides pattern matching to support these kinds of queries, as we see in
 Section~\ref{sec:pattern-matching}.
 
 In this book, we often write down the concrete syntax of a program
@@ -611,20 +723,17 @@ node is also an $\Exp$.
 \begin{equation}
   \Exp ::= \NEG{\Exp}  \label{eq:arith-neg}
 \end{equation}
-Symbols in typewriter font such as \key{-} and \key{read} are
-\emph{terminal} symbols and must literally appear in the program for
-the rule to be applicable.
+Symbols in typewriter font are \emph{terminal} symbols and must
+literally appear in the program for the rule to be applicable.
 \index{subject}{terminal}
 
 We can apply these rules to categorize the ASTs that are in the
 \LangInt{} language. For example, by rule \eqref{eq:arith-int}
-\texttt{(Int 8)} is an $\Exp$, then by rule \eqref{eq:arith-neg} the
+\INT{8} is an $\Exp$, then by rule \eqref{eq:arith-neg} the
 following AST is an $\Exp$.
 \begin{center}
-\begin{minipage}{0.4\textwidth}
-\begin{lstlisting}
-(Prim '- (list (Int 8)))
-\end{lstlisting}
+\begin{minipage}{0.5\textwidth}
+\NEG{\INT{\code{8}}}
 \end{minipage}
 \begin{minipage}{0.25\textwidth}
 \begin{equation}
@@ -644,24 +753,38 @@ The next grammar rule is for addition expressions:
   \Exp ::= \ADD{\Exp}{\Exp} \label{eq:arith-add}
 \end{equation}
 We can now justify that the AST \eqref{eq:arith-prog} is an $\Exp$ in
-\LangInt{}.  We know that \lstinline{(Prim 'read '())} is an $\Exp$ by rule
-\eqref{eq:arith-read} and we have already categorized \code{(Prim '-
-  (list (Int 8)))} as an $\Exp$, so we apply rule \eqref{eq:arith-add}
+\LangInt{}.  We know that \READ{} is an $\Exp$ by rule
+\eqref{eq:arith-read} and we have already categorized
+\NEG{\INT{\code{8}}} as an $\Exp$, so we apply rule \eqref{eq:arith-add}
 to show that
-\begin{lstlisting}
-(Prim '+ (list (Prim 'read '()) (Prim '- (list (Int 8)))))
-\end{lstlisting}
+\[
+\ADD{\READ{}}{\NEG{\INT{\code{8}}}}
+\]
 is an $\Exp$ in the \LangInt{} language.
 
 If you have an AST for which the above rules do not apply, then the
-AST is not in \LangInt{}. For example, the program \code{(- (read) (+ 8))}
-is not in \LangInt{} because there are no rules for \code{+} with only one
-argument, nor for \key{-} with two arguments. Whenever we define a
-language with a grammar, the language only includes those programs
-that are justified by the rules.
+AST is not in \LangInt{}. For example, the program
+\racket{\code{(- (read) 8)}}
+\python{\code{input\_int() - 8}}
+is not in \LangInt{} because there are no rules for \key{-} with two arguments.
+Whenever we define a language with a grammar, the language only includes those
+programs that are justified by the rules.
 
-The last grammar rule for \LangInt{} states that there is a \code{Program}
-node to mark the top of the whole program:
+{\if\edition\pythonEd\color{purple}
+The language \LangInt{} includes a second non-terminal $\Stmt$ for statements.
+There is a statement for printing the value of an expression
+\[
+\Stmt{} ::= \PRINT{\Exp}
+\]
+and a statement that evaluates an expression but ignores the result.
+\[
+\Stmt{} ::= \EXPR{\Exp}
+\]
+\fi}
+
+{\if\edition\racketEd\color{olive}
+The last grammar rule for \LangInt{} states that there is a
+\code{Program} node to mark the top of the whole program:
 \[
   \LangInt{} ::= \PROGRAM{\code{'()}}{\Exp}
 \]
@@ -672,6 +795,25 @@ The \code{Program} structure is defined as follows
 where \code{body} is an expression. In later chapters, the \code{info}
 part will be used to store auxiliary information but for now it is
 just the empty list.
+\fi}
+
+{\if\edition\pythonEd\color{purple}
+The last grammar rule for \LangInt{} states that there is a
+\code{Module} node to mark the top of the whole program:
+\[
+  \LangInt{} ::= \PROGRAM{}{\Stmt^{*}}
+\]
+The asterisk symbol $*$ indicates a list of the preceding grammar item, in
+this case, a list of statments.
+%
+The \code{Module} class is defined as follows
+\begin{lstlisting}
+class Module:
+    def __init__(self, body):
+        self.body = body
+\end{lstlisting}
+where \code{body} is a list of statements.
+\fi}
 
 It is common to have many grammar rules with the same left-hand side
 but different right-hand sides, such as the rules for $\Exp$ in the
@@ -682,16 +824,21 @@ We collect all of the grammar rules for the abstract syntax of \LangInt{}
 in Figure~\ref{fig:r0-syntax}. The concrete syntax for \LangInt{} is
 defined in Figure~\ref{fig:r0-concrete-syntax}.
 
-The \code{read-program} function provided in \code{utilities.rkt} of
-the support code reads a program in from a file (the sequence of
-characters in the concrete syntax of Racket) and parses it into an
-abstract syntax tree. See the description of \code{read-program} in
-Appendix~\ref{appendix:utilities} for more details.
+\racket{The \code{read-program} function provided in
+  \code{utilities.rkt} of the support code reads a program in from a
+  file (the sequence of characters in the concrete syntax of Racket)
+  and parses it into an abstract syntax tree. See the description of
+  \code{read-program} in Appendix~\ref{appendix:utilities} for more
+  details.}
 
+\python{The \code{parse} function in Python's \code{ast} module
+  converts the concrete syntax (represented as a string) into an
+  abstract syntax tree.}
 
 \begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
+{\if\edition\racketEd\color{olive}    
 \[
 \begin{array}{rcl}
 \begin{array}{rcl}
@@ -700,6 +847,20 @@ Appendix~\ref{appendix:utilities} for more details.
 \end{array}
 \end{array}
 \]
+\fi}
+
+{\if\edition\pythonEd\color{purple}
+\[
+\begin{array}{rcl}
+\begin{array}{rcl}
+  \Exp &::=& \Int \mid \key{input\_int}\LP\RP \mid \key{-}\;\Exp \mid \Exp \; \key{+} \; \Exp\\
+  \Stmt &::=& \key{print}\LP \Exp \RP \mid \Exp\\
+  \LangInt{} &::=& \Stmt^{*}
+\end{array}
+\end{array}
+\]
+\fi}
+
 \end{minipage}
 }
 \caption{The concrete syntax of \LangInt{}.}
@@ -709,6 +870,7 @@ Appendix~\ref{appendix:utilities} for more details.
 \begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
+{\if\edition\racketEd\color{olive}
 \[
 \begin{array}{rcl}
 \Exp &::=& \INT{\Int} \mid \READ{} \mid \NEG{\Exp} \\
@@ -716,6 +878,18 @@ Appendix~\ref{appendix:utilities} for more details.
 \LangInt{}  &::=& \PROGRAM{\code{'()}}{\Exp}
 \end{array}
 \]
+\fi}
+
+{\if\edition\pythonEd\color{purple}
+\[
+\begin{array}{rcl}
+  \Exp{} &::=& \INT{\Int} \mid \READ{} \\
+      &\mid& \NEG{\Exp} \mid  \ADD{\Exp}{\Exp}  \\
+\Stmt{} &::=& \PRINT{\Exp} \mid \EXPR{\Exp} \\
+\LangInt{}  &::=& \PROGRAM{}{\Stmt^{*}}
+\end{array}
+\]
+\fi}
 \end{minipage}
 }
 \caption{The abstract syntax of \LangInt{}.}
@@ -1176,8 +1350,8 @@ exhibit several compilation techniques.
 \begin{minipage}{0.96\textwidth}
 \[
 \begin{array}{rcl}
-  \Exp &::=& \Int \mid \CREAD{} \mid \CNEG{\Exp} \mid \CADD{\Exp}{\Exp}\\
-       &\mid& \Var \mid \CLET{\Var}{\Exp}{\Exp} \\
+  \Exp &::=& \Int{} \mid \CREAD{} \mid \CNEG{\Exp} \mid \CADD{\Exp}{\Exp}\\
+       &\mid& \Var{} \mid \CLET{\Var}{\Exp}{\Exp} \\
   \LangVarM{} &::=& \Exp
 \end{array}
 \]
@@ -5147,7 +5321,7 @@ addition of \key{if} this get more interesting.
 
 As a motivating example, consider the following program that has an
 \key{if} expression nested in the predicate of another \key{if}.
-% cond_test_41.rkt
+% cond_test_41.rkt, if_lt_eq.py
 \begin{center}
 \begin{minipage}{0.96\textwidth}
 \begin{lstlisting}
@@ -5505,7 +5679,7 @@ The way in which the \code{shrink} pass transforms logical operations
 such as \code{and} and \code{or} can impact the quality of code
 generated by \code{explicate-control}. For example, consider the
 following program.
-% cond_test_21.rkt
+% cond_test_21.rkt, and_eq_input.py
 \begin{lstlisting}
 (if (and (eq? (read) 0) (eq? (read) 1))
     0
@@ -5838,7 +6012,7 @@ x86 assembly code.
 \begin{figure}[tbp]
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
-% cond_test_20.rkt
+% cond_test_20.rkt, eq_input.py
 \begin{lstlisting}
 (if (eq? (read) 1) 42 0)
 \end{lstlisting}
