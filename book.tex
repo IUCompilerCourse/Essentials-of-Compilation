@@ -23,7 +23,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{0}
+\def\edition{1}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd\color{olive}{#1}\fi}}
@@ -379,7 +379,7 @@ compiler course at IU.
 
 We thank professors Bor-Yuh Chang, John Clements, Jay McCarthy, Joseph
 Near, Ryan Newton, Nate Nystrom, Andrew Tolmach, and Michael Wollowski
-for teaching courses based on early drafts of this book and for their
+for teaching courses based on drafts of this book and for their
 invaluable feedback.
 
 We thank Ronald Garcia for helping Jeremy survive Dybvig's compiler
@@ -686,13 +686,13 @@ integers and arithmetic operations.
 \index{subject}{grammar}
 
 The first grammar rule for the abstract syntax of \LangInt{} says that an
-instance of the \code{Int} structure is an expression:
+instance of the \racket{\code{Int} structure}\python{\code{Constant} class} is an expression:
 \begin{equation}
 \Exp ::= \INT{\Int}  \label{eq:arith-int}
 \end{equation}
 %
-Each rule has a left-hand-side and a right-hand-side. The way to read
-a rule is that if you have an AST node that matches the
+Each rule has a left-hand-side and a right-hand-side.
+If you have an AST node that matches the
 right-hand-side, then you can categorize it according to the
 left-hand-side.
 %
@@ -700,19 +700,19 @@ A name such as $\Exp$ that is defined by the grammar rules is a
 \emph{non-terminal}.  \index{subject}{non-terminal}
 %
 The name $\Int$ is also a non-terminal, but instead of defining it
-with a grammar rule, we define it with the following explanation.  We
-make the simplifying design decision that all of the languages in this
-book only handle machine-representable integers.  On most modern
-machines this corresponds to integers represented with 64-bits, i.e.,
-the in range $-2^{63}$ to $2^{63}-1$.  We restrict this range further
-to match the Racket \texttt{fixnum} datatype, which allows 63-bit
-integers on a 64-bit machine. So an $\Int$ is a sequence of decimals
-($0$ to $9$), possibly starting with $-$ (for negative integers), such
-that the sequence of decimals represent an integer in range $-2^{62}$
-to $2^{62}-1$.
+with a grammar rule, we define it with the following explanation.  An
+$\Int$ is a sequence of decimals ($0$ to $9$), possibly starting with
+$-$ (for negative integers), such that the sequence of decimals
+represent an integer in range $-2^{62}$ to $2^{62}-1$.  This enables
+the representation of integers using 63 bits, which simplifies several
+aspects of compilation. \racket{Thus, these integers corresponds to
+  the Racket \texttt{fixnum} datatype on a 64-bit machine.}
+\python{In contrast, integers in Python have unlimited precision, but
+  the techniques need to handle unlimited precision fall outside the
+  scope of this book.}
 
-The second grammar rule is the \texttt{read} operation that receives
-an input integer from the user of the program.
+The second grammar rule is the \READOP{} operation that receives an
+input integer from the user of the program.
 \begin{equation}
   \Exp ::= \READ{} \label{eq:arith-read}
 \end{equation}
@@ -762,12 +762,11 @@ to show that
 is an $\Exp$ in the \LangInt{} language.
 
 If you have an AST for which the above rules do not apply, then the
-AST is not in \LangInt{}. For example, the program
-\racket{\code{(- (read) 8)}}
-\python{\code{input\_int() - 8}}
-is not in \LangInt{} because there are no rules for \key{-} with two arguments.
-Whenever we define a language with a grammar, the language only includes those
-programs that are justified by the rules.
+AST is not in \LangInt{}. For example, the program \racket{\code{(-
+    (read) 8)}} \python{\code{input\_int() - 8}} is not in \LangInt{}
+because there are no rules for the \key{-} operator with two
+arguments.  Whenever we define a language with a grammar, the language
+only includes those programs that are justified by the rules.
 
 {\if\edition\pythonEd\color{purple}
 The language \LangInt{} includes a second non-terminal $\Stmt$ for statements.
@@ -803,7 +802,7 @@ The last grammar rule for \LangInt{} states that there is a
   \LangInt{} ::= \PROGRAM{}{\Stmt^{*}}
 \]
 The asterisk symbol $*$ indicates a list of the preceding grammar item, in
-this case, a list of statments.
+this case, a list of statements.
 %
 The \code{Module} class is defined as follows
 \begin{lstlisting}
@@ -900,34 +899,39 @@ defined in Figure~\ref{fig:r0-concrete-syntax}.
 \label{sec:pattern-matching}
 
 As mentioned in Section~\ref{sec:ast}, compilers often need to access
-the parts of an AST node. Racket provides the \texttt{match} form to
-access the parts of a structure. Consider the following example and
-the output on the right. \index{subject}{match} \index{subject}{pattern matching}
+the parts of an AST node. \racket{Racket}\python{Python} provides the
+\texttt{match} feature to access the parts of a value.
+Consider the following example. \index{subject}{match} \index{subject}{pattern matching}
 \begin{center}
 \begin{minipage}{0.5\textwidth}
+{\if\edition\racketEd\color{olive}
 \begin{lstlisting}
 (match ast1.1
   [(Prim op (list child1 child2))
     (print op)])
 \end{lstlisting}
-\end{minipage}
-\vrule
-\begin{minipage}{0.25\textwidth}
+\fi}
+{\if\edition\pythonEd\color{purple}
 \begin{lstlisting}
-
-
-   '+
+match ast1_1:
+    case BinOp(child1, op, child2):
+        print(op)
 \end{lstlisting}
+\fi}  
 \end{minipage}
 \end{center}
-In the above example, the \texttt{match} form takes an AST
-\eqref{eq:arith-prog} and binds its parts to the three pattern
-variables \texttt{op}, \texttt{child1}, and \texttt{child2}, and then
-prints out the operator. In general, a match clause consists of a
-\emph{pattern} and a \emph{body}.\index{subject}{pattern} Patterns are
-recursively defined to be either a pattern variable, a structure name
-followed by a pattern for each of the structure's arguments, or an
-S-expression (symbols, lists, etc.).  (See Chapter 12 of The Racket
+
+{\if\edition\racketEd\color{olive}
+%
+In the above example, the \texttt{match} form checks whether the AST
+\eqref{eq:arith-prog} is a binary operator and binds its parts to the
+three pattern variables \texttt{op}, \texttt{child1}, and
+\texttt{child2}, and then prints out the operator. In general, a match
+clause consists of a \emph{pattern} and a
+\emph{body}.\index{subject}{pattern} Patterns are recursively defined
+to be either a pattern variable, a structure name followed by a
+pattern for each of the structure's arguments, or an S-expression
+(symbols, lists, etc.).  (See Chapter 12 of The Racket
 Guide\footnote{\url{https://docs.racket-lang.org/guide/match.html}}
 and Chapter 9 of The Racket
 Reference\footnote{\url{https://docs.racket-lang.org/reference/match.html}}
@@ -936,30 +940,73 @@ for a complete description of \code{match}.)
 The body of a match clause may contain arbitrary Racket code.  The
 pattern variables can be used in the scope of the body, such as
 \code{op} in \code{(print op)}.
+%
+\fi}
+%
+%
+{\if\edition\pythonEd\color{purple}
+%  
+In the above example, the \texttt{match} form checks whether the AST
+\eqref{eq:arith-prog} is a binary operator and binds its parts to the
+three pattern variables \texttt{child1}, \texttt{op}, and
+\texttt{child2}, and then prints out the operator. In general, each
+\code{case} consists of a \emph{pattern} and a
+\emph{body}.\index{subject}{pattern} Patterns are recursively defined
+to be either a pattern variable, a class name followed by a pattern
+for each of its constructor's arguments, or other literals such as
+strings, lists, etc.
+%
+The body of each \code{case} may contain arbitrary Python code. The
+pattern variables can be used in the body, such as \code{op} in
+\code{print(op)}.
+%
+\fi}
+
 
 A \code{match} form may contain several clauses, as in the following
-function \code{leaf?} that recognizes when an \LangInt{} node is a leaf in
+function \code{leaf} that recognizes when an \LangInt{} node is a leaf in
 the AST. The \code{match} proceeds through the clauses in order,
 checking whether the pattern can match the input AST. The body of the
-first clause that matches is executed. The output of \code{leaf?} for
+first clause that matches is executed. The output of \code{leaf} for
 several ASTs is shown on the right.
 \begin{center}
 \begin{minipage}{0.6\textwidth}
+{\if\edition\racketEd\color{olive}
 \begin{lstlisting}
-(define (leaf? arith)
+(define (leaf arith)
   (match arith
     [(Int n) #t]
     [(Prim 'read '()) #t]
     [(Prim '- (list e1)) #f]
     [(Prim '+ (list e1 e2)) #f]))
 
-(leaf? (Prim 'read '()))
-(leaf? (Prim '- (list (Int 8))))
-(leaf? (Int 8))
+(leaf (Prim 'read '()))
+(leaf (Prim '- (list (Int 8))))
+(leaf (Int 8))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+def leaf(arith):
+    match arith:
+        case Constant(n):
+            return True
+        case Call(Name('input_int'), []):
+            return True
+        case UnaryOp(USub(), e1):
+            return False
+        case BinOp(e1, Add(), e2):
+            return False
+
+print(leaf(Call(Name('input_int'), [])))
+print(leaf(UnaryOp(USub(), eight)))
+print(leaf(Constant(8)))
+\end{lstlisting}
+\fi}
 \end{minipage}
 \vrule
 \begin{minipage}{0.25\textwidth}
+{\if\edition\racketEd\color{olive}  
   \begin{lstlisting}
 
 
@@ -972,19 +1019,34 @@ several ASTs is shown on the right.
    #f
    #t
 \end{lstlisting}
+  \fi}
+{\if\edition\pythonEd\color{purple}
+  \begin{lstlisting}
+
+
+
+
+
+
+    
+   True
+   False
+   True
+\end{lstlisting}
+\fi}
 \end{minipage}
 \end{center}
 
 When writing a \code{match}, we refer to the grammar definition to
 identify which non-terminal we are expecting to match against, then we
-make sure that 1) we have one clause for each alternative of that
-non-terminal and 2) that the pattern in each clause corresponds to the
+make sure that 1) we have one \racket{clause}\python{case} for each alternative of that
+non-terminal and 2) that the pattern in each \racket{clause}\python{case} corresponds to the
 corresponding right-hand side of a grammar rule. For the \code{match}
-in the \code{leaf?} function, we refer to the grammar for \LangInt{} in
+in the \code{leaf} function, we refer to the grammar for \LangInt{} in
 Figure~\ref{fig:r0-syntax}. The $\Exp$ non-terminal has 4
-alternatives, so the \code{match} has 4 clauses.  The pattern in each
-clause corresponds to the right-hand side of a grammar rule. For
-example, the pattern \code{(Prim '+ (list e1 e2))} corresponds to the
+alternatives, so the \code{match} has 4 \racket{clauses}\python{cases}.
+The pattern in each \racket{clause}\python{case} corresponds to the right-hand side
+of a grammar rule. For example, the pattern \ADD{\code{e1}}{\code{e2}} corresponds to the
 right-hand side $\ADD{\Exp}{\Exp}$. When translating from grammars to
 patterns, replace non-terminals such as $\Exp$ with pattern variables
 of your choice (e.g. \code{e1} and \code{e2}).
@@ -997,17 +1059,18 @@ of your choice (e.g. \code{e1} and \code{e2}).
 Programs are inherently recursive. For example, an \LangInt{} expression is
 often made of smaller expressions. Thus, the natural way to process an
 entire program is with a recursive function.  As a first example of
-such a recursive function, we define \texttt{exp?} below, which takes
+such a recursive function, we define \texttt{exp} below, which takes
 an arbitrary value and determines whether or not it is an \LangInt{}
 expression.
 %
 We say that a function is defined by \emph{structural recursion} when
-it is defined using a sequence of match clauses that correspond to a
-grammar, and the body of each clause makes a recursive call on each
+it is defined using a sequence of match \racket{clauses}\python{cases}
+that correspond to a grammar, and the body of each \racket{clause}\python{case}
+makes a recursive call on each
 child node.\footnote{This principle of structuring code according to
   the data definition is advocated in the book \emph{How to Design
     Programs} \url{https://htdp.org/2020-8-1/Book/index.html}.}.
-Below we also define a second function, named \code{Rint?}, that
+Below we also define a second function, named \code{Rint}, that
 determines whether an AST is an \LangInt{} program.  In general we can
 expect to write one recursive function to handle each non-terminal in
 a grammar.\index{subject}{structural recursion}
@@ -1015,22 +1078,22 @@ a grammar.\index{subject}{structural recursion}
 \begin{center}
 \begin{minipage}{0.7\textwidth}
 \begin{lstlisting}
-(define (exp? ast)
+(define (exp ast)
   (match ast
     [(Int n) #t]
     [(Prim 'read '()) #t]
-    [(Prim '- (list e)) (exp? e)]
+    [(Prim '- (list e)) (exp e)]
     [(Prim '+ (list e1 e2))
-      (and (exp? e1) (exp? e2))]
+      (and (exp e1) (exp e2))]
     [else #f]))
 
-(define (Rint? ast)
+(define (Rint ast)
   (match ast
-    [(Program '() e) (exp? e)]
+    [(Program '() e) (exp e)]
     [else #f]))
 
-(Rint? (Program '() ast1.1)
-(Rint? (Program '()
+(Rint (Program '() ast1.1)
+(Rint (Program '()
        (Prim '- (list (Prim 'read '())
                       (Prim '+ (list (Num 8)))))))
 \end{lstlisting}
@@ -1058,29 +1121,29 @@ a grammar.\index{subject}{structural recursion}
 \end{center}
 
 
-You may be tempted to merge the two functions into one, like this:
-\begin{center}
-\begin{minipage}{0.5\textwidth}
-\begin{lstlisting}
-(define (Rint? ast)
-  (match ast
-    [(Int n) #t]
-    [(Prim 'read '()) #t]
-    [(Prim '- (list e)) (Rint? e)]
-    [(Prim '+ (list e1 e2)) (and (Rint? e1) (Rint? e2))]
-    [(Program '() e) (Rint? e)]
-    [else #f]))
-\end{lstlisting}
-\end{minipage}
-\end{center}
-%
-Sometimes such a trick will save a few lines of code, especially when
-it comes to the \code{Program} wrapper.  Yet this style is generally
-\emph{not} recommended because it can get you into trouble.
-%
-For example, the above function is subtly wrong:
-\lstinline{(Rint? (Program '() (Program '() (Int 3))))}
-returns true when it should return false.
+%% You may be tempted to merge the two functions into one, like this:
+%% \begin{center}
+%% \begin{minipage}{0.5\textwidth}
+%% \begin{lstlisting}
+%% (define (Rint ast)
+%%   (match ast
+%%     [(Int n) #t]
+%%     [(Prim 'read '()) #t]
+%%     [(Prim '- (list e)) (Rint e)]
+%%     [(Prim '+ (list e1 e2)) (and (Rint e1) (Rint e2))]
+%%     [(Program '() e) (Rint e)]
+%%     [else #f]))
+%% \end{lstlisting}
+%% \end{minipage}
+%% \end{center}
+%% %
+%% Sometimes such a trick will save a few lines of code, especially when
+%% it comes to the \code{Program} wrapper.  Yet this style is generally
+%% \emph{not} recommended because it can get you into trouble.
+%% %
+%% For example, the above function is subtly wrong:
+%% \lstinline{(Rint (Program '() (Program '() (Int 3))))}
+%% returns true when it should return false.
 
 
 \section{Interpreters}
