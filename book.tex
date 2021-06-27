@@ -23,7 +23,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{1}
+\def\edition{0}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd\color{olive}{#1}\fi}}
@@ -1454,73 +1454,137 @@ program that do not depend on any inputs, a process known as
 \emph{partial evaluation}~\citep{Jones:1993uq}.
 \index{subject}{partial evaluation}
 For example, given the following program
+{\if\edition\racketEd\color{olive}
 \begin{lstlisting}
 (+ (read) (- (+ 5 3)))
 \end{lstlisting}
-our compiler will translate it into the program
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+print input_int() + -(5 + 3)    
+\end{lstlisting}
+\fi}
+\noindent our compiler translates it into the program
+{\if\edition\racketEd\color{olive}
 \begin{lstlisting}
 (+ (read) -8)
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+print input_int() + -8
+\end{lstlisting}
+\fi}
 
 Figure~\ref{fig:pe-arith} gives the code for a simple partial
 evaluator for the \LangInt{} language. The output of the partial evaluator
 is an \LangInt{} program. In Figure~\ref{fig:pe-arith}, the structural
-recursion over $\Exp$ is captured in the \code{pe-exp} function
+recursion over $\Exp$ is captured in the \code{pe\_exp} function
 whereas the code for partially evaluating the negation and addition
 operations is factored into two separate helper functions:
-\code{pe-neg} and \code{pe-add}. The input to these helper
+\code{pe\_neg} and \code{pe\_add}. The input to these helper
 functions is the output of partially evaluating the children.
-
-\begin{figure}[tp]
-\begin{lstlisting}
-(define (pe-neg r)
-  (match r
-    [(Int n) (Int (fx- 0 n))]
-    [else (Prim '- (list r))]))
-
-(define (pe-add r1 r2)
-  (match* (r1 r2)
-    [((Int n1) (Int n2)) (Int (fx+ n1 n2))]
-    [(_ _) (Prim '+ (list r1 r2))]))
-
-(define (pe-exp e)
-  (match e
-    [(Int n) (Int n)]
-    [(Prim 'read '()) (Prim 'read '())]
-    [(Prim '- (list e1)) (pe-neg (pe-exp e1))]
-    [(Prim '+ (list e1 e2)) (pe-add (pe-exp e1) (pe-exp e2))]))
-
-(define (pe-Rint p)
-  (match p
-    [(Program '() e) (Program '() (pe-exp e))]))
-\end{lstlisting}
-\caption{A partial evaluator for \LangInt{}.}
-\label{fig:pe-arith}
-\end{figure}
-
-The \texttt{pe-neg} and \texttt{pe-add} functions check whether their
+The \code{pe\_neg} and \code{pe\_add} functions check whether their
 arguments are integers and if they are, perform the appropriate
 arithmetic.  Otherwise, they create an AST node for the arithmetic
 operation.
 
+\begin{figure}[tp]
+{\if\edition\racketEd\color{olive}
+\begin{lstlisting}
+(define (pe_neg r)
+  (match r
+    [(Int n) (Int (fx- 0 n))]
+    [else (Prim '- (list r))]))
+
+(define (pe_add r1 r2)
+  (match* (r1 r2)
+    [((Int n1) (Int n2)) (Int (fx+ n1 n2))]
+    [(_ _) (Prim '+ (list r1 r2))]))
+
+(define (pe_exp e)
+  (match e
+    [(Int n) (Int n)]
+    [(Prim 'read '()) (Prim 'read '())]
+    [(Prim '- (list e1)) (pe_neg (pe_exp e1))]
+    [(Prim '+ (list e1 e2)) (pe_add (pe_exp e1) (pe_exp e2))]))
+
+(define (pe_Rint p)
+  (match p
+    [(Program '() e) (Program '() (pe_exp e))]))
+\end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+def pe_neg(r):
+  match r:
+    case Constant(n):
+      return Constant(-n)
+    case _:
+      return UnaryOp(USub(), r)
+  
+def pe_add(r1, r2):
+  match (r1, r2):
+    case (Constant(n1), Constant(n2)):
+      return Constant(n1 + n2)
+    case _:
+      return BinOp(r1, Add(), r2)
+
+def pe_exp(e):
+  match e:
+    case BinOp(left, Add(), right):
+      l = pe_exp(left)
+      r = pe_exp(right)
+      return pe_add(l, r)
+    case UnaryOp(USub(), v):
+      return pe_neg(pe_exp(v))
+    case Constant(value):
+      return e
+    case Call(Name('input_int'), []):
+      return e            
+
+def pe_stmt(s):
+  match s:
+    case Expr(Call(Name('print'), [arg])):
+      return Expr(Call(Name('print'), [pe_exp(arg)]))
+    case Expr(value):
+      return Expr(pe_exp(value))
+
+def pe_Pint(p):
+  match p:
+    case Module(body):
+      new_body = [pe_stmt(s) for s in body]
+      return Module(new_body)
+\end{lstlisting}
+\fi}
+\caption{A partial evaluator for \LangInt{}.}
+\label{fig:pe-arith}
+\end{figure}
+
+
 To gain some confidence that the partial evaluator is correct, we can
 test whether it produces programs that get the same result as the
 input programs. That is, we can test whether it satisfies Diagram
-\ref{eq:compile-correct}. The following code runs the partial
-evaluator on several examples and tests the output program.  The
-\texttt{parse-program} and \texttt{assert} functions are defined in
+\ref{eq:compile-correct}.
+%
+{\if\edition\racketEd\color{olive}
+The following code runs the partial evaluator on several examples and
+tests the output program.  The \texttt{parse-program} and
+\texttt{assert} functions are defined in
 Appendix~\ref{appendix:utilities}.\\
 \begin{minipage}{1.0\textwidth}
 \begin{lstlisting}
-(define (test-pe p)
-  (assert "testing pe-Rint"
-     (equal? (interp_Rint p) (interp_Rint (pe-Rint p)))))
+(define (test_pe p)
+  (assert "testing pe_Rint"
+     (equal? (interp_Rint p) (interp_Rint (pe_Rint p)))))
 
-(test-pe (parse-program `(program () (+ 10 (- (+ 5 3))))))
-(test-pe (parse-program `(program () (+ 1 (+ 3 1)))))
-(test-pe (parse-program `(program () (- (+ 3 (- 5))))))
+(test_pe (parse-program `(program () (+ 10 (- (+ 5 3))))))
+(test_pe (parse-program `(program () (+ 1 (+ 3 1)))))
+(test_pe (parse-program `(program () (- (+ 3 (- 5))))))
 \end{lstlisting}
 \end{minipage}
+\fi}
+% TODO: python version of testing the PE
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Integers and Variables}
@@ -3007,7 +3071,7 @@ Adapt the partial evaluator from Section~\ref{sec:partial-evaluation}
 (Figure~\ref{fig:pe-arith}) so that it applies to \LangVar{} programs
 instead of \LangInt{} programs. Recall that \LangVar{} adds \key{let} binding
 and variables to the \LangInt{} language, so you will need to add cases for
-them in the \code{pe-exp} function. Once complete, add the partial
+them in the \code{pe\_exp} function. Once complete, add the partial
 evaluation pass to the front of your compiler and make sure that your
 compiler still passes all of the tests.
 \end{exercise}
@@ -3024,7 +3088,7 @@ arithmetic. For example, your partial evaluator should translate
 \code{(+ 1 (+ (read) 1))} \qquad \text{into} \qquad
 \code{(+ 2 (read))}
 \]
-To accomplish this, the \code{pe-exp} function should produce output
+To accomplish this, the \code{pe\_exp} function should produce output
 in the form of the $\itm{residual}$ non-terminal of the following
 grammar. The idea is that when processing an addition expression, we
 can always produce either 1) an integer constant, 2) an addition
