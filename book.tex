@@ -23,7 +23,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{0}
+\def\edition{1}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd\color{olive}{#1}\fi}}
@@ -839,10 +839,8 @@ defined in Figure~\ref{fig:r0-concrete-syntax}.
 {\if\edition\racketEd\color{olive}    
 \[
 \begin{array}{rcl}
-\begin{array}{rcl}
   \Exp &::=& \Int \mid \LP\key{read}\RP \mid \LP\key{-}\;\Exp\RP \mid \LP\key{+} \; \Exp\;\Exp\RP\\
   \LangInt{} &::=& \Exp
-\end{array}
 \end{array}
 \]
 \fi}
@@ -850,11 +848,9 @@ defined in Figure~\ref{fig:r0-concrete-syntax}.
 {\if\edition\pythonEd\color{purple}
 \[
 \begin{array}{rcl}
-\begin{array}{rcl}
   \Exp &::=& \Int \mid \key{input\_int}\LP\RP \mid \key{-}\;\Exp \mid \Exp \; \key{+} \; \Exp\\
   \Stmt &::=& \key{print}\LP \Exp \RP \mid \Exp\\
   \LangInt{} &::=& \Stmt^{*}
-\end{array}
 \end{array}
 \]
 \fi}
@@ -1533,9 +1529,7 @@ def pe_add(r1, r2):
 def pe_exp(e):
   match e:
     case BinOp(left, Add(), right):
-      l = pe_exp(left)
-      r = pe_exp(right)
-      return pe_add(l, r)
+      return pe_add(pe_exp(left), pe_exp(right))
     case UnaryOp(USub(), v):
       return pe_neg(pe_exp(v))
     case Constant(value):
@@ -1590,7 +1584,8 @@ Appendix~\ref{appendix:utilities}.\\
 \chapter{Integers and Variables}
 \label{ch:Rvar}
 
-This chapter is about compiling a subset of Racket to x86-64 assembly
+This chapter is about compiling a subset of \racket{Racket}\python{Python}
+to x86-64 assembly
 code~\citep{Intel:2015aa}. The subset, named \LangVar{}, includes
 integer arithmetic and local variable binding.  We often refer to
 x86-64 simply as x86.  The chapter begins with a description of the
@@ -1607,20 +1602,22 @@ We hope to give enough hints that the well-prepared reader, together
 with a few friends, can implement a compiler from \LangVar{} to x86 in
 a couple weeks.  To give the reader a feeling for the scale of this
 first compiler, the instructor solution for the \LangVar{} compiler is
-approximately 500 lines of code.
+approximately \racket{500}\python{300} lines of code.
 
 \section{The \LangVar{} Language}
 \label{sec:s0}
 \index{subject}{variable}
 
-The \LangVar{} language extends the \LangInt{} language with variable
-definitions.  The concrete syntax of the \LangVar{} language is defined by
-the grammar in Figure~\ref{fig:Rvar-concrete-syntax} and the abstract
-syntax is defined in Figure~\ref{fig:Rvar-syntax}.  The non-terminal
-\Var{} may be any Racket identifier. As in \LangInt{}, \key{read} is a
-nullary operator, \key{-} is a unary operator, and \key{+} is a binary
-operator.  Similar to \LangInt{}, the abstract syntax of \LangVar{} includes the
-\key{Program} struct to mark the top of the program.
+The \LangVar{} language extends the \LangInt{} language with
+variables.  The concrete syntax of the \LangVar{} language is defined
+by the grammar in Figure~\ref{fig:Rvar-concrete-syntax} and the
+abstract syntax is defined in Figure~\ref{fig:Rvar-syntax}.  The
+non-terminal \Var{} may be any Racket identifier. As in \LangInt{},
+\key{read} is a nullary operator, \key{-} is a unary operator, and
+\key{+} is a binary operator.  Similar to \LangInt{}, the abstract
+syntax of \LangVar{} includes the \racket{\key{Program}
+  struct}\python{\key{Module} instance} to mark the top of the
+program.
 %% The $\itm{info}$
 %% field of the \key{Program} structure contains an \emph{association
 %%   list} (a list of key-value pairs) that is used to communicate
@@ -1632,6 +1629,7 @@ exhibit several compilation techniques.
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
+{\if\edition\racketEd\color{olive}
 \[
 \begin{array}{rcl}
   \Exp &::=& \Int{} \mid \CREAD{} \mid \CNEG{\Exp} \mid \CADD{\Exp}{\Exp}\\
@@ -1639,6 +1637,16 @@ exhibit several compilation techniques.
   \LangVarM{} &::=& \Exp
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd\color{purple}
+\[
+\begin{array}{rcl}
+  \Exp &::=& \Int \mid \key{input\_int}\LP\RP \mid \key{-}\;\Exp \mid \Exp \; \key{+} \; \Exp \mid \Var{} \\
+  \Stmt &::=& \key{print}\LP \Exp \RP \mid \Exp \mid \Var\mathop{\key{=}}\Exp\\
+  \LangVarM{} &::=& \Stmt^{*}
+\end{array}
+\]
+\fi}
 \end{minipage}
 }
 \caption{The concrete syntax of \LangVar{}.}
@@ -1649,6 +1657,7 @@ exhibit several compilation techniques.
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
+{\if\edition\racketEd\color{olive}
 \[
 \begin{array}{rcl}
 \Exp &::=& \INT{\Int} \mid \READ{} \\
@@ -1657,12 +1666,25 @@ exhibit several compilation techniques.
 \LangVarM{} &::=& \PROGRAM{\code{'()}}{\Exp}
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd\color{purple}
+\[
+\begin{array}{rcl}
+\Exp{} &::=& \INT{\Int} \mid \READ{} \\
+       &\mid& \NEG{\Exp} \mid  \ADD{\Exp}{\Exp} \mid \VAR{\Var{}} \\
+\Stmt{} &::=& \PRINT{\Exp} \mid \EXPR{\Exp} \\
+        &\mid& \ASSIGN{\VAR{\Var}}{\Exp}\\
+\LangInt{}  &::=& \PROGRAM{}{\Stmt^{*}}
+\end{array}
+\]
+\fi}
 \end{minipage}
 }
 \caption{The abstract syntax of \LangVar{}.}
 \label{fig:Rvar-syntax}
 \end{figure}
 
+{\if\edition\racketEd\color{olive}
 Let us dive further into the syntax and semantics of the \LangVar{}
 language.  The \key{let} feature defines a variable for use within its
 body and initializes the variable with the value of an expression.
@@ -1676,6 +1698,26 @@ evaluates the body \code{(+ 10 x)}, producing $42$.
 \begin{lstlisting}
 (let ([x (+ 12 20)]) (+ 10 x))
 \end{lstlisting}
+\fi}
+%
+{\if\edition\pythonEd\color{purple}
+The \LangVar{} language adds variables and the assignment statement
+to \LangInt{}.  The assignment statement defines a variable for use by
+later statements and initializes the variable with the value of an expression.
+The abstract syntax for assignment is defined in
+Figure~\ref{fig:Rvar-syntax}.  The concrete syntax for assignment is
+\begin{lstlisting}
+|$\itm{var}$| = |$\itm{exp}$|
+\end{lstlisting}
+For example, the following program initializes \code{x} to $32$ and then
+prints the result of \code{10 + x}, producing $42$.
+\begin{lstlisting}
+x = 12 + 20
+print(10 + x)
+\end{lstlisting}
+\fi}
+
+{\if\edition\racketEd\color{olive}
 When there are multiple \key{let}'s for the same variable, the closest
 enclosing \key{let} is used. That is, variable definitions overshadow
 prior definitions. Consider the following program with two \key{let}'s
@@ -1698,6 +1740,7 @@ $52$ then $10$, the following produces $42$ (not $-42$).
 \begin{lstlisting}
 (let ([x (read)]) (let ([y (read)]) (+ x (- y))))
 \end{lstlisting}
+\fi}
 
 \subsection{Extensible Interpreters via Method Overriding}
 \label{sec:extensible-interp}
@@ -1708,7 +1751,7 @@ object-oriented programming, that is, as a collection of methods
 inside of a class. Throughout this book we define many interpreters,
 one for each of the languages that we study. Because each language
 builds on the prior one, there is a lot of commonality between these
-interpreters. We want to write down those common parts just once
+interpreters. We want to write down the common parts just once
 instead of many times. A naive approach would be to have, for example,
 the interpreter for \LangIf{} handle all of the new features in that
 language and then have a default case that dispatches to the
