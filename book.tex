@@ -1757,39 +1757,76 @@ the interpreter for \LangIf{} handle all of the new features in that
 language and then have a default case that dispatches to the
 interpreter for \LangVar{}. The following code sketches this idea.
 \begin{center}
-  \begin{minipage}{0.45\textwidth}
+{\if\edition\racketEd\color{olive}  
+\begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-(define (interp-Rvar e)
+(define (interp_Rvar_exp e)
   (match e
-    [(Prim '- (list e))
-     (fx- 0 (interp-Rvar e))]
+    [(Prim '- (list e1))
+     (fx- 0 (interp_Rvar_exp e1))]
     ...))
 \end{lstlisting}
 \end{minipage}
 \begin{minipage}{0.45\textwidth}
   \begin{lstlisting}
-(define (interp-Rif e)
+(define (interp_Rif_exp e)
   (match e
     [(If cnd thn els)
-     (match (interp-Rif cnd)
-       [#t (interp-Rif thn)]
-       [#f (interp-Rif els)])]
+     (match (interp_Rif_exp cnd)
+       [#t (interp_Rif_exp thn)]
+       [#f (interp_Rif_exp els)])]
     ...
-    [else (interp-Rvar e)]))    
+    [else (interp_Rvar_exp e)]))    
 \end{lstlisting}
 \end{minipage}
+\fi}
+
+{\if\edition\pythonEd\color{purple}
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+def interp_Rvar_exp(e):
+  match e:
+    case UnaryOp(USub(), e1):
+       return - interp_Rvar_exp(e1)
+    ...
+\end{lstlisting}
+\end{minipage}
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+def interp_Rif_exp(e):
+  match e:
+    case IfExp(cnd, thn, els):
+      match interp_Rif_exp(cnd):
+        case True:
+          return interp_Rif_exp(thn)
+        case False:
+          return interp_Rif_exp(els)
+    ...
+    case _:
+      return interp_Rvar_exp(e)
+\end{lstlisting}
+\end{minipage}
+\fi}
 \end{center}
 The problem with this approach is that it does not handle situations
-in which an \LangIf{} feature, like \code{If}, is nested inside an \LangVar{}
-feature, like the \code{-} operator, as in the following program.
+in which an \LangIf{} feature, such as a conditional expression, is
+nested inside an \LangVar{} feature, like the \code{-} operator, as in
+the following program.
+{\if\edition\racketEd\color{olive}  
 \begin{lstlisting}
 (Prim '- (list (If (Bool #t) (Int 42) (Int 0))))
 \end{lstlisting}
-If we invoke \code{interp-Rif} on this program, it dispatches to
-\code{interp-Rvar} to handle the \code{-} operator, but then it
-recurisvely calls \code{interp-Rvar} again on the argument of \code{-},
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+print(-(42 if True else 0))
+\end{lstlisting}
+\fi}
+If we invoke \code{interp\_Rif\_exp} on this program, it dispatches to
+\code{interp\_Rvar\_exp} to handle the \code{-} operator, but then it
+recurisvely calls \code{interp\_Rvar\_exp} again on the argument of \code{-},
 which is an \code{If}.  But there is no case for \code{If} in
-\code{interp-Rvar}, so we get an error!
+\code{interp\_Rvar\_exp}, so we get an error!
 
 To make our interpreters extensible we need something called
 \emph{open recursion}\index{subject}{open recursion}, where the tying of the
@@ -1797,17 +1834,20 @@ recursive knot is delayed to when the functions are
 composed. Object-oriented languages provide open recursion with the
 late-binding of overridden methods\index{subject}{method overriding}. The
 following code sketches this idea for interpreting \LangVar{} and
-\LangIf{} using the
+\LangIf{} using
+\racket{the
 \href{https://docs.racket-lang.org/guide/classes.html}{\code{class}}
-\index{subject}{class} feature of Racket.  We define one class for each
+\index{subject}{class} feature of Racket}
+\python{a Python \code{class} definition}.  We define one class for each
 language and define a method for interpreting expressions inside each
 class. The class for \LangIf{} inherits from the class for \LangVar{}
-and the method \code{interp-exp} in \LangIf{} overrides the
-\code{interp-exp} in \LangVar{}. Note that the default case of
-\code{interp-exp} in \LangIf{} uses \code{super} to invoke
-\code{interp-exp}, and because \LangIf{} inherits from \LangVar{},
-that dispatches to the \code{interp-exp} in \LangVar{}.
+and the method \code{interp\_exp} in \LangIf{} overrides the
+\code{interp\_exp} in \LangVar{}. Note that the default case of
+\code{interp\_exp} in \LangIf{} uses \code{super} to invoke
+\code{interp\_exp}, and because \LangIf{} inherits from \LangVar{},
+that dispatches to the \code{interp\_exp} in \LangVar{}.
 \begin{center}
+{\if\edition\racketEd\color{olive}  
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
 (define interp-Rvar-class
@@ -1836,21 +1876,66 @@ that dispatches to the \code{interp-exp} in \LangVar{}.
   ))
 \end{lstlisting}
 \end{minipage}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+class InterpRvar:
+  def interp_exp(e):
+     match e:
+       case UnaryOp(USub(), e1):
+         return -self.interp_exp(e1)
+       ...
+  ...
+\end{lstlisting}
+\end{minipage}
+\begin{minipage}{0.45\textwidth}
+  \begin{lstlisting}
+def InterpRif(InterpRVar):
+  def interp_exp(e):
+    match e:
+      case IfExp(cnd, thn, els):
+        match self.interp_exp(cnd):
+          case True:
+            return self.interp_exp(thn)
+          case False:
+            return self.interp_exp(els)
+      ...
+      case _:
+        return super().interp_exp(e)
+  ...
+\end{lstlisting}
+\end{minipage}
+\fi}
 \end{center}
 Getting back to the troublesome example, repeated here:
+{\if\edition\racketEd\color{olive}  
 \begin{lstlisting}
 (define e0 (Prim '- (list (If (Bool #t) (Int 42) (Int 0)))))
 \end{lstlisting}
-We can invoke the \code{interp-exp} method for \LangIf{} on this
-expression by creating an object of the \LangIf{} class and sending it the
-\code{interp-exp} method with the argument \code{e0}.
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+-(42 if True else 0)
+\end{lstlisting}
+\fi}
+\noindent We can invoke the \code{interp\_exp} method for \LangIf{} on this
+expression, call it \code{e0}, by creating an object of the \LangIf{} class
+and calling the \code{interp\_exp} method.
+{\if\edition\racketEd\color{olive}
 \begin{lstlisting}
 (send (new interp-Rif-class) interp-exp e0)
 \end{lstlisting}
-The default case of \code{interp-exp} in \LangIf{} handles it by
-dispatching to the \code{interp-exp} method in \LangVar{}, which
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+InterpRif().interp_exp(e0)
+\end{lstlisting}
+\fi}
+\noindent The default case of \code{interp\_exp} in \LangIf{} handles it by
+dispatching to the \code{interp\_exp} method in \LangVar{}, which
 handles the \code{-} operator. But then for the recursive method call,
-it dispatches back to \code{interp-exp} in \LangIf{}, where the
+it dispatches back to \code{interp\_exp} in \LangIf{}, where the
 \code{If} is handled correctly. Thus, method overriding gives us the
 open recursion that we need to implement our interpreters in an
 extensible way.
@@ -1858,6 +1943,7 @@ extensible way.
 
 \subsection{Definitional Interpreter for \LangVar{}}
 
+{\if\edition\racketEd\color{olive}
 \begin{figure}[tp]
 %\begin{wrapfigure}[26]{r}[0.75in]{0.55\textwidth}
   \small
@@ -1894,60 +1980,105 @@ extensible way.
   \caption{Association lists implement the dictionary interface.}
   \label{fig:alist}
 \end{figure}
+\fi}
 
 Having justified the use of classes and methods to implement
 interpreters, we turn to the definitional interpreter for \LangVar{}
 in Figure~\ref{fig:interp-Rvar}. It is similar to the interpreter for
 \LangInt{} but adds two new \key{match} cases for variables and
-\key{let}.  For \key{let} we need a way to communicate the value bound
-to a variable to all the uses of the variable. To accomplish this, we
-maintain a mapping from variables to values. Throughout the compiler
-we often need to map variables to information about them. We refer to
-these mappings as
-\emph{environments}\index{subject}{environment}.\footnote{Another common term
-  for environment in the compiler literature is \emph{symbol
-    table}\index{subject}{symbol table}.}
+\racket{\key{let}}\python{assignment}. For
+\racket{\key{let}}\python{assignment} we need a way to communicate the
+value bound to a variable to all the uses of the variable. To
+accomplish this, we maintain a mapping from variables to
+values. Throughout the compiler we often need to map variables to
+information about them. We refer to these mappings as
+\emph{environments}\index{subject}{environment}.\footnote{Another
+common term for environment in the compiler literature is \emph{symbol
+table}\index{subject}{symbol table}.}
 %
-For simplicity, we use an association list (alist) to represent the
-environment. Figure~\ref{fig:alist} gives a brief introduction to
-alists and the \code{racket/dict} package.  The \code{interp-exp}
-function takes the current environment, \code{env}, as an extra
-parameter.  When the interpreter encounters a variable, it finds the
-corresponding value using the \code{dict-ref} function.  When the
-interpreter encounters a \key{Let}, it evaluates the initializing
-expression, extends the environment with the result value bound to the
-variable, using \code{dict-set}, then evaluates the body of the
-\key{Let}.
+For simplicity, we use \racket{an association list
+  (alist)}\python{dictionary} to represent the
+environment. \racket{Figure~\ref{fig:alist} gives a brief introduction
+  to alists and the \code{racket/dict} package.}  The
+\code{interp\_exp} function takes the current environment, \code{env},
+as an extra parameter.  When the interpreter encounters a variable, it
+looks up the corresponding value in the dictionary.
+%
+\racket{When the interpreter encounters a \key{Let}, it evaluates the
+  initializing expression, extends the environment with the result
+  value bound to the variable, using \code{dict-set}, then evaluates
+  the body of the \key{Let}.}
+%
+\python{When the interpreter encounters an assignment, it evaluates
+  the initializing expression and then associates the resulting value
+  with the variable in the environment.}
 
 \begin{figure}[tp]
+{\if\edition\racketEd\color{olive}  
 \begin{lstlisting}
 (define interp-Rvar-class
   (class object%
     (super-new)
     
-    (define/public ((interp-exp env) e)
+    (define/public ((interp_exp env) e)
       (match e
         [(Int n) n]
         [(Prim 'read '())
          (define r (read))
          (cond [(fixnum? r) r]
-               [else (error 'interp-exp "expected an integer" r)])]
-        [(Prim '- (list e)) (fx- 0 ((interp-exp env) e))]
+               [else (error 'interp_exp "expected an integer" r)])]
+        [(Prim '- (list e)) (fx- 0 ((interp_exp env) e))]
         [(Prim '+ (list e1 e2))
-         (fx+ ((interp-exp env) e1) ((interp-exp env) e2))]
+         (fx+ ((interp_exp env) e1) ((interp_exp env) e2))]
         [(Var x) (dict-ref env x)]
         [(Let x e body)
-         (define new-env (dict-set env x ((interp-exp env) e)))
-         ((interp-exp new-env) body)]))
+         (define new-env (dict-set env x ((interp_exp env) e)))
+         ((interp_exp new-env) body)]))
 
     (define/public (interp-program p)
       (match p
-        [(Program '() e) ((interp-exp '()) e)]))
+        [(Program '() e) ((interp_exp '()) e)]))
     ))
 
 (define (interp-Rvar p)
   (send (new interp-Rvar-class) interp-program p))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+class InterpPvar:
+  def interp_exp(self, e, env):
+    match e:
+      case BinOp(left, Add(), right):
+        l = self.interp_exp(left, env)
+        r = self.interp_exp(right, env)
+        return l + r
+      case UnaryOp(USub(), v):
+        return - self.interp_exp(v, env)
+      case Name(id):
+        return env[id]
+      case Constant(value):
+        return value
+      case Call(Name('input_int'), []):
+        return int(input())            
+
+  def interp_stmt(self, s, env):
+    match s:
+      case Assign([lhs], value):
+        env[lhs.id] = self.interp_exp(value, env)
+      case Expr(Call(Name('print'), [arg])):
+        print(self.interp_exp(arg, env))
+      case Expr(value):
+        self.interp_exp(value, env)
+
+  def interp_Pvar(self, p):
+    match p:
+      case Module(body):
+        env = {}
+        for s in body:
+          self.interp_stmt(s, env)
+\end{lstlisting}
+\fi}
 \caption{Interpreter for the \LangVar{} language.}
 \label{fig:interp-Rvar}
 \end{figure}
@@ -1955,7 +2086,7 @@ variable, using \code{dict-set}, then evaluates the body of the
 The goal for this chapter is to implement a compiler that translates
 any program $P_1$ written in the \LangVar{} language into an x86 assembly
 program $P_2$ such that $P_2$ exhibits the same behavior when run on a
-computer as the $P_1$ program interpreted by \code{interp-Rvar}.  That
+computer as the $P_1$ program interpreted by \code{interp\_Rvar}.  That
 is, they output the same integer $n$. We depict this correctness
 criteria in the following diagram.
 \[
@@ -1965,8 +2096,8 @@ criteria in the following diagram.
  \node (o)  at (4, -2) {$n$};
 
  \path[->] (p1) edge [above] node {\footnotesize compile} (p2);
- \path[->] (p1) edge [left]  node {\footnotesize\code{interp-Rvar}} (o);
- \path[->] (p2) edge [right] node {\footnotesize\code{interp-x86int}} (o);
+ \path[->] (p1) edge [left]  node {\footnotesize\code{interp\_Rvar}} (o);
+ \path[->] (p2) edge [right] node {\footnotesize\code{interp\_x86int}} (o);
 \end{tikzpicture}
 \]
 In the next section we introduce the \LangXInt{} subset of x86 that
