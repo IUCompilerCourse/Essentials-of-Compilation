@@ -2465,30 +2465,31 @@ recursive function per non-terminal in the grammar of the input
 language of the pass.  \index{subject}{intermediate language}
 
 \begin{description}
-\item[\key{select-instructions}] handles the difference between
+\item[\key{select\_instructions}] handles the difference between
   \LangVar{} operations and x86 instructions. This pass converts each
   \LangVar{} operation to a short sequence of instructions that
   accomplishes the same task.
 
-\item[\key{remove-complex-opera*}] ensures that each subexpression of
-  a primitive operation is a variable or integer, that is, an
-  \emph{atomic} expression. We refer to non-atomic expressions as
-  \emph{complex}.  This pass introduces temporary variables to hold
-  the results of complex subexpressions.\index{subject}{atomic
+\item[\key{remove\_complex\_operands}] ensures that each subexpression
+  of a primitive operation or function call is a variable or integer,
+  that is, an \emph{atomic} expression. We refer to non-atomic
+  expressions as \emph{complex}.  This pass introduces temporary
+  variables to hold the results of complex
+  subexpressions.\index{subject}{atomic
     expression}\index{subject}{complex expression}%
   \footnote{The subexpressions of an operation are often called
     operators and operands which explains the presence of
     \code{opera*} in the name of this pass.}
   
 {\if\edition\racketEd\color{olive}
-\item[\key{explicate-control}] makes the execution order of the
+\item[\key{explicate\_control}] makes the execution order of the
   program explicit. It convert the abstract syntax tree representation
   into a control-flow graph in which each node contains a sequence of
   statements and the edges between nodes say which nodes contain jumps
   to other nodes.
 \fi}
 
-\item[\key{assign-homes}] replaces the variables in \LangVar{} with
+\item[\key{assign\_homes}] replaces the variables in \LangVar{} with
   registers or stack locations in x86.
 
 {\if\edition\racketEd\color{olive}
@@ -2504,35 +2505,34 @@ efficient code, etc.) so oftentimes trial-and-error is
 involved. Nevertheless, we can try to plan ahead and make educated
 choices regarding the ordering.
 
-What should be the ordering of \key{explicate-control} with respect to
+\racket{What should be the ordering of \key{explicate\_control} with respect to
 \key{uniquify}? The \key{uniquify} pass should come first because
-\key{explicate-control} changes all the \key{let}-bound variables to
+\key{explicate\_control} changes all the \key{let}-bound variables to
 become local variables whose scope is the entire program, which would
-confuse variables with the same name.
+confuse variables with the same name.}
 %
-We place \key{remove-complex-opera*} before \key{explicate-control}
+\racket{We place \key{remove\_complex\_opera*} before \key{explicate\_control}
 because the later removes the \key{let} form, but it is convenient to
-use \key{let} in the output of \key{remove-complex-opera*}.
+use \key{let} in the output of \key{remove\_complex\_opera*}.}
 %
-The ordering of \key{uniquify} with respect to
-\key{remove-complex-opera*} does not matter so we arbitrarily choose
-\key{uniquify} to come first.
+\racket{The ordering of \key{uniquify} with respect to
+\key{remove\_complex\_opera*} does not matter so we arbitrarily choose
+\key{uniquify} to come first.}
 
-Last, we consider \key{select-instructions} and \key{assign-homes}.
-These two passes are intertwined. In Chapter~\ref{ch:Rfun} we
-learn that, in x86, registers are used for passing arguments to
-functions and it is preferable to assign parameters to their
-corresponding registers. On the other hand, by selecting instructions
-first we may run into a dead end in \key{assign-homes}. Recall that
-only one argument of an x86 instruction may be a memory access but
-\key{assign-homes} might fail to assign even one of them to a
-register.
+The \key{select\_instructions} and \key{assign\_homes}.  passes are
+intertwined. In Chapter~\ref{ch:Rfun} we learn that, in x86, registers
+are used for passing arguments to functions and it is preferable to
+assign parameters to their corresponding registers. On the other hand,
+by selecting instructions first we may run into a dead end in
+\key{assign\_homes}. Recall that only one argument of an x86
+instruction may be a memory access but \key{assign\_homes} might fail
+to assign even one of them to a register.
 %
 A sophisticated approach is to iteratively repeat the two passes until
 a solution is found. However, to reduce implementation complexity we
-recommend a simpler approach in which \key{select-instructions} comes
-first, followed by the \key{assign-homes}, then a third pass named
-\key{patch-instructions} that uses a reserved register to fix
+recommend a simpler approach in which \key{select\_instructions} comes
+first, followed by the \key{assign\_homes}, then a third pass named
+\key{patch\_instructions} that uses a reserved register to fix
 outstanding problems.
 
 \begin{figure}[tbp]
@@ -2550,12 +2550,12 @@ outstanding problems.
 \node (x86-5) at (12,-2) {\large \LangXInt{}};
 
 \path[->,bend left=15] (Rvar) edge [above] node {\ttfamily\footnotesize uniquify} (Rvar-2);
-\path[->,bend left=15] (Rvar-2) edge [above] node {\ttfamily\footnotesize remove-complex.} (Rvar-3);
-\path[->,bend left=15] (Rvar-3) edge [right] node {\ttfamily\footnotesize explicate-control} (Cvar-2);
-\path[->,bend right=15] (Cvar-2) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
-\path[->,bend left=15] (x86-2) edge [above] node {\ttfamily\footnotesize assign-homes} (x86-3);
-\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize print-x86} (x86-5);
+\path[->,bend left=15] (Rvar-2) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Rvar-3);
+\path[->,bend left=15] (Rvar-3) edge [right] node {\ttfamily\footnotesize explicate\_control} (Cvar-2);
+\path[->,bend right=15] (Cvar-2) edge [left] node {\ttfamily\footnotesize select\_instr.} (x86-2);
+\path[->,bend left=15] (x86-2) edge [above] node {\ttfamily\footnotesize assign\_homes} (x86-3);
+\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch\_instr.} (x86-4);
+\path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize print\_x86} (x86-5);
 \end{tikzpicture}
 \fi}
 
@@ -2568,11 +2568,11 @@ outstanding problems.
 \node (x86-3) at (9,0) {\large \LangXInt{}};
 \node (x86-4) at (12,0) {\large \LangXInt{}};
 
-\path[->,bend left=15] (Rvar) edge [above] node {\ttfamily\footnotesize remove-complex.} (Rvar-2);
-\path[->,bend right=15] (Rvar-2) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-1);
-\path[->,bend left=15] (x86-1) edge [above] node {\ttfamily\footnotesize assign-homes} (x86-2);
-\path[->,bend left=15] (x86-2) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-3);
-\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize print-x86} (x86-4);
+\path[->,bend left=15] (Rvar) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Rvar-2);
+\path[->,bend right=15] (Rvar-2) edge [left] node {\ttfamily\footnotesize select\_instr.} (x86-1);
+\path[->,bend left=15] (x86-1) edge [above] node {\ttfamily\footnotesize assign\_homes} (x86-2);
+\path[->,bend left=15] (x86-2) edge [above] node {\ttfamily\footnotesize patch\_instr.} (x86-3);
+\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize print\_x86} (x86-4);
 \end{tikzpicture}
 \fi}  
 \caption{Diagram of the passes for compiling \LangVar{}. }
@@ -2581,7 +2581,7 @@ outstanding problems.
 
 Figure~\ref{fig:Rvar-passes} presents the ordering of the compiler
 passes and identifies the input and output language of each pass.  The
-last pass, \key{print-x86}, converts from the abstract syntax of
+last pass, \key{print\_x86}, converts from the abstract syntax of
 \LangXInt{} to the concrete syntax.
 %
 \racket{In the following two sections we discuss the \LangCVar{}
@@ -2668,7 +2668,7 @@ in the file \code{interp-Cvar.rkt}.
 \section{The \LangXVar{} dialect}
 
 The \LangXVar{} language is the output of the pass
-\key{select-instructions}. It extends \LangXInt{} with an unbounded
+\key{select\_instructions}. It extends \LangXInt{} with an unbounded
 number of program-scope variables and removes the restrictions
 regarding instruction arguments.
 
@@ -2791,14 +2791,15 @@ programs.
 \section{Remove Complex Operands}
 \label{sec:remove-complex-opera-Rvar}
 
-The \code{remove-complex-opera*} pass compiles \LangVar{} programs
+The \code{remove\_complex\_operands} pass compiles \LangVar{} programs
 into a restricted form in which the arguments of operations are atomic
 expressions.  Put another way, this pass removes complex
-operands\index{subject}{complex operand}, such as the expression \code{(- 10)}
+operands\index{subject}{complex operand}, such as the expression
+\racket{\code{(- 10)}}\python{\code{-10}}
 in the program below. This is accomplished by introducing a new
-\key{let}-bound variable, binding the complex operand to the new
+temporary variable, assigning the complex operand to the new
 variable, and then using the new variable in place of the complex
-operand, as shown in the output of \code{remove-complex-opera*} on the
+operand, as shown in the output of \code{remove\_complex\_operands} on the
 right.
 {\if\edition\racketEd\color{olive}
 \begin{transformation}
@@ -2818,12 +2819,12 @@ right.
 {\if\edition\pythonEd\color{purple}
 \begin{transformation}  
 \begin{lstlisting}
-x = 42 + (- 10)
+x = 42 + -10
 print(x + 10)
 \end{lstlisting}
 \compilesto
 \begin{lstlisting}
-tmp_0 = - 10
+tmp_0 = -10
 x = 42 + tmp_0
 tmp_1 = x + 10
 print(tmp_1)
@@ -2875,8 +2876,7 @@ be atomic expressions is one of the ideas in \emph{administrative
 normal form}, or ANF for short~\citep{Danvy:1991fk,Flanagan:1993cg}.
 \index{subject}{administrative normal form} \index{subject}{ANF}
 
-\python{UNDER CONSTRUCTION}
-
+{\if\edition\racketEd\color{olive}
 We recommend implementing this pass with two mutually recursive
 functions, \code{rco\_atom} and \code{rco\_exp}. The idea is to apply
 \code{rco\_atom} to subexpressions that need to become atomic and to
@@ -2892,7 +2892,20 @@ Also, the
   form is useful for applying a function to each element of a list, in
   the case where the function returns multiple values.
   \index{subject}{for/lists}
+\fi}
+%
+{\if\edition\pythonEd\color{purple}
+%
+We recommend implementing this pass with an auxiliary method named
+\code{rco\_exp} with two parameters: an \LangVar{} expression and a
+Boolean that specifies whether the expression needs to become atomic
+or not.  The \code{rco\_exp} method should return a pair consisting of
+the new expression and a list of pairs, associating new temporary
+variables with their initializing expressions.
+%
+\fi}
 
+{\if\edition\racketEd\color{olive}
 Returning to the example program with the expression \code{(+ 42 (-
   10))}, the subexpression \code{(- 10)} should be processed using the
 \code{rco\_atom} function because it is an argument of the \code{+} and
@@ -2908,10 +2921,36 @@ tmp.1
 ((tmp.1 . (- 10)))
 \end{lstlisting}
 \end{transformation}
+\fi}
+%
+{\if\edition\pythonEd\color{purple}
+%
+Returning to the example program with the expression \code{42 + -10},
+the subexpression \code{-10} should be processed using the
+\code{rco\_exp} function with \code{True} as the second argument
+because \code{-10} is an argument of the \code{+} operator and
+therefore needs to become atomic.  The output of \code{rco\_exp}
+applied to \code{-10} is as follows.
+\begin{transformation}
+\begin{lstlisting}
+  -10
+\end{lstlisting}
+\compilesto
+\begin{lstlisting}
+tmp_1
+[(tmp_1, -10)]
+\end{lstlisting}
+\end{transformation}
+%  
+\fi}
 
-Take special care of programs such as the following that bind a
-variable to an atomic expression. You should leave such variable
-bindings unchanged, as shown in the program on the right \\
+Take special care of programs such as the following that \racket{bind
+  a variable to an atomic expression}\python{assign an atomic
+  expression to a variable}. You should leave such \racket{variable
+  bindings}\python{assignments} unchanged, as shown in the program on
+the right\\
+%
+{\if\edition\racketEd\color{olive}
 \begin{transformation}
 % var_test_20.rkt
 \begin{lstlisting}
@@ -2926,10 +2965,28 @@ bindings unchanged, as shown in the program on the right \\
     b))
 \end{lstlisting}
 \end{transformation}
-A careless implementation of \key{rco\_exp} and \key{rco\_atom} might
-produce the following output with unnecessary temporary variables.
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{transformation}
+\begin{lstlisting}
+a = 42
+b = a
+print(b)
+\end{lstlisting}
+\compilesto
+\begin{lstlisting}
+a = 42
+b = a
+print(b)
+\end{lstlisting}
+\end{transformation}
+\fi}
+
+A careless implementation might produce the following output with
+unnecessary temporary variables.
 \begin{center}
 \begin{minipage}{0.4\textwidth}
+{\if\edition\racketEd\color{olive}
 \begin{lstlisting}
 (let ([tmp.1 42])
   (let ([a tmp.1])
@@ -2937,11 +2994,22 @@ produce the following output with unnecessary temporary variables.
       (let ([b tmp.2])
         b))))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+tmp_1 = 42
+a = tmp_1
+tmp_2 = a
+b = tmp_2
+print(b)
+\end{lstlisting}
+\fi}
 \end{minipage}
 \end{center}
 
 \begin{exercise}
-\normalfont
+  \normalfont
+{\if\edition\racketEd\color{olive}  
 Implement the \code{remove-complex-opera*} function in
 \code{compiler.rkt}.
 %
@@ -2958,7 +3026,46 @@ While debugging your compiler, it is often useful to see the
 intermediate programs that are output from each pass. To print the
 intermediate programs, place \lstinline{(debug-level 1)} before the call to
 \code{interp-tests} in \code{run-tests.rkt}.
+\fi}
+%
+{\if\edition\pythonEd\color{purple}
+  Implement the \code{remove\_complex\_operands} function in
+  \code{compiler.py}, creating auxiliary functions for each
+  non-terminal in the grammar, i.e., \code{rco\_exp}
+  and \code{rco\_stmt}.
+\fi}  
 \end{exercise}
+
+{\if\edition\pythonEd\color{purple}
+\begin{exercise}
+\normalfont % I don't like the italics for exercises. -Jeremy
+\label{ex:Rvar}
+
+Create five \LangVar{} programs that exercise the most interesting
+parts of the Remove Complex Operands pass.  The five programs should
+be placed in the subdirectory named \key{tests} and the file names
+should start with \code{var\_test\_} followed by a unique integer and
+end with the file extension \key{.py}.
+% TODO: come up with passes infrastructure for Python -Jeremy
+%% The \key{run-tests.rkt} script in the support code checks whether the
+%% output programs produce the same result as the input programs.  The
+%% script uses the \key{interp-tests} function
+%% (Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to test
+%% your \key{uniquify} pass on the example programs.  The \code{passes}
+%% parameter of \key{interp-tests} is a list that should have one entry
+%% for each pass in your compiler.  For now, define \code{passes} to
+%% contain just one entry for \code{uniquify} as shown below.
+%% \begin{lstlisting}
+%% (define passes 
+%%   (list (list "uniquify" uniquify interp-Rvar type-check-Rvar)))
+%% \end{lstlisting}
+Run the \key{run-tests.py} script in the support code to check
+whether the output programs produce the same result as the input
+programs.
+\end{exercise}
+
+\fi}
+
 
 {\if\edition\racketEd\color{olive}  
 \section{Explicate Control}
@@ -3079,28 +3186,40 @@ list of \code{passes} and then run the script to test your compiler.
 \label{sec:select-Rvar}
 \index{subject}{instruction selection}
 
-In the \code{select-instructions} pass we begin the work of
-translating from \LangCVar{} to \LangXVar{}. The target language of
-this pass is a variant of x86 that still uses variables, so we add an
-AST node of the form $\VAR{\itm{var}}$ to the \Arg{} non-terminal of
-the \LangXInt{} abstract syntax (Figure~\ref{fig:x86-int-ast}).  We
-recommend implementing the \code{select-instructions} with
-three auxiliary functions, one for each of the non-terminals of
-\LangCVar{}: $\Atm$, $\Stmt$, and $\Tail$.
+In the \code{select\_instructions} pass we begin the work of
+translating \racket{from \LangCVar{}} to \LangXVar{}. The target
+language of this pass is a variant of x86 that still uses variables,
+so we add an AST node of the form $\VAR{\itm{var}}$ to the \Arg{}
+non-terminal of the \LangXInt{} abstract syntax
+(Figure~\ref{fig:x86-int-ast}).
+\racket{We recommend implementing the
+\code{select\_instructions} with three auxiliary functions, one for
+each of the non-terminals of \LangCVar{}: $\Atm$, $\Stmt$, and
+$\Tail$.}
+\python{We recommend implementing an auxiliary function
+  named \code{select\_stmt} for the $\Stmt$ non-terminal.}
 
+\racket{
 The cases for $\Atm$ are straightforward; variables stay
-the same and integer constants are changed to immediates:
-$\INT{n}$ changes to $\IMM{n}$.
+the same and integer constants change to immediates:
+$\INT{n}$ changes to $\IMM{n}$.}
 
-Next we consider the cases for $\Stmt$, starting with arithmetic
-operations. For example, consider the addition operation. We can use
-the \key{addq} instruction, but it performs an in-place update.  So we
-could move $\itm{arg}_1$ into the left-hand side \itm{var} and then
-add $\itm{arg}_2$ to \itm{var}. 
+We consider the cases for the $\Stmt$ non-terminal, starting with
+arithmetic operations. For example, consider the addition
+operation. We can use the \key{addq} instruction, but it performs an
+in-place update.  So we could move $\itm{arg}_1$ into the left-hand
+side \itm{var} and then add $\itm{arg}_2$ to \itm{var}.
 \begin{transformation}
+{\if\edition\racketEd\color{olive}    
 \begin{lstlisting}
 |$\itm{var}$| = (+ |$\itm{arg}_1$| |$\itm{arg}_2$|);
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+|$\itm{var}$| = |$\itm{arg}_1$| + |$\itm{arg}_2$|
+\end{lstlisting}
+\fi}
 \compilesto
 \begin{lstlisting}
 movq |$\itm{arg}_1$|, |$\itm{var}$|
@@ -3114,9 +3233,16 @@ assignment, then there is no need for the extra move instruction.  The
 assignment statement can be translated into a single \key{addq}
 instruction as follows.
 \begin{transformation}
+{\if\edition\racketEd\color{olive}
 \begin{lstlisting}
 |$\itm{var}$| = (+ |$\itm{arg}_1$| |$\itm{var}$|);
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+|$\itm{var}$| = |$\itm{arg}_1$| + |$\itm{var}$|
+\end{lstlisting}
+\fi}    
 \compilesto
 \begin{lstlisting}
 addq |$\itm{arg}_1$|, |$\itm{var}$|
@@ -3137,9 +3263,16 @@ generation, all you need to do is translate an assignment of
 move from \code{rax} to the left-hand-side variable.  (Recall that the
 return value of a function goes into \code{rax}.)  
 \begin{transformation}
+{\if\edition\racketEd\color{olive}  
 \begin{lstlisting}
 |$\itm{var}$| = (read);
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+|$\itm{var}$| = input_int();
+\end{lstlisting}
+\fi}
 \compilesto
 \begin{lstlisting}
 callq read_int
@@ -3147,15 +3280,19 @@ movq %rax, |$\itm{var}$|
 \end{lstlisting}
 \end{transformation}
 
+{\if\edition\racketEd\color{olive}
 There are two cases for the $\Tail$ non-terminal: \key{Return} and
 \key{Seq}. Regarding \key{Return}, we recommend treating it as an
 assignment to the \key{rax} register followed by a jump to the
 conclusion of the program (so the conclusion needs to be labeled).
 For $\SEQ{s}{t}$, you can translate the statement $s$ and tail $t$
 recursively and then append the resulting instructions.
+\fi}
 
 \begin{exercise}
-\normalfont Implement the \key{select-instructions} pass in
+  \normalfont
+{\if\edition\racketEd\color{olive}
+Implement the \key{select-instructions} pass in
 \code{compiler.rkt}. Create three new example programs that are
 designed to exercise all of the interesting cases in this pass.
 %
@@ -3164,13 +3301,22 @@ list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
 (list "instruction selection" select-instructions interp-pseudo-x86-0)
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+Implement the \key{select\_instructions} pass in
+\code{compiler.py}. Create three new example programs that are
+designed to exercise all of the interesting cases in this pass.
+Run the \code{run-tests.py} script to to check
+whether the output programs produce the same result as the input
+programs.
+\fi}
 \end{exercise}
 
 
 \section{Assign Homes}
 \label{sec:assign-Rvar}
 
-The \key{assign-homes} pass compiles \LangXVar{} programs to
+The \key{assign\_homes} pass compiles \LangXVar{} programs to
 \LangXVar{} programs that no longer use program variables.
 Thus, the \key{assign-homes} pass is responsible for placing all of
 the program variables in registers or on the stack. For runtime
@@ -3184,19 +3330,26 @@ Chapter~\ref{ch:register-allocation-Rvar}.
 Consider again the following \LangVar{} program from
 Section~\ref{sec:remove-complex-opera-Rvar}.
 % var_test_20.rkt
+{\if\edition\racketEd\color{olive}
 \begin{lstlisting}
 (let ([a 42])
   (let ([b a])
     b))
 \end{lstlisting}
-The output of \code{select-instructions} is shown on the left and the
-output of \code{assign-homes} on the right.  In this example, we
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+a = 42
+b = a
+print(b)
+\end{lstlisting}
+\fi}
+The output of \code{select\_instructions} is shown on the left and the
+output of \code{assign\_homes} on the right.  In this example, we
 assign variable \code{a} to stack location \code{-8(\%rbp)} and
 variable \code{b} to location \code{-16(\%rbp)}.
 \begin{transformation}
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-locals-types:
-    a : Integer, b : Integer
 start: 
     movq $42, a
     movq a, b
@@ -3204,8 +3357,8 @@ start:
     jmp conclusion
 \end{lstlisting}
 \compilesto
+%stack-space: 16
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-stack-space: 16
 start:
     movq $42, -8(%rbp)
     movq -8(%rbp), -16(%rbp)
@@ -3214,41 +3367,56 @@ start:
 \end{lstlisting}
 \end{transformation}
 
-The \code{locals-types} entry in the $\itm{info}$ of the
+\racket{The \code{locals-types} entry in the $\itm{info}$ of the
 \code{X86Program} node is an alist mapping all the variables in the
 program to their types (for now just \code{Integer}).  The
-\code{assign-homes} pass should replace all uses of those variables
+\code{assign\_homes} pass should replace all uses of those variables
 with stack locations.  As an aside, the \code{locals-types} entry is
 computed by \code{type-check-Cvar} in the support code, which installs
 it in the $\itm{info}$ field of the \code{CProgram} node, which should
-be propagated to the \code{X86Program} node.
+be propagated to the \code{X86Program} node.}
+%
+\python{The \code{assign\_homes} pass should replace all uses of
+  variables with stack locations.}
 
 In the process of assigning variables to stack locations, it is
 convenient for you to compute and store the size of the frame (in
-bytes) in the $\itm{info}$ field of the \key{X86Program} node, with
-the key \code{stack-space}, which is needed later to generate the
-conclusion of the \code{main} procedure. The x86-64 standard requires
-the frame size to be a multiple of 16 bytes.\index{subject}{frame}
+bytes) in%
+\racket{the $\itm{info}$ field of the \key{X86Program} node, with the key \code{stack-space}}
+%
+\python{the field \code{stack\_space} of the \key{X86Program} node},
+which is needed later to generate the conclusion of the \code{main}
+procedure. The x86-64 standard requires the frame size to be a
+multiple of 16 bytes.\index{subject}{frame}
+
+% TODO: store the number of variables instead? -Jeremy
 
 \begin{exercise}\normalfont
-Implement the \key{assign-homes} pass in \code{compiler.rkt}, defining
+Implement the \key{assign\_homes} pass in
+\racket{\code{compiler.rkt}}\python{\code{compiler.py}}, defining
 auxiliary functions for the non-terminals \Arg{}, \Instr{}, and
 \Block{}.  We recommend that the auxiliary functions take an extra
-parameter that is an alist mapping variable names to homes (stack
-locations for now).
+parameter that maps variable names to homes (stack locations for now).
 %
+{\if\edition\racketEd\color{olive}
 In the \code{run-tests.rkt} script, add the following entry to the
 list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
 (list "assign homes" assign-homes interp-x86-0)
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+Run the \code{run-tests.py} script to to check
+whether the output programs produce the same result as the input
+programs.
+\fi}
 \end{exercise}
 
 
 \section{Patch Instructions}
 \label{sec:patch-s0}
 
-The \code{patch-instructions} pass compiles from \LangXVar{} to
+The \code{patch\_instructions} pass compiles from \LangXVar{} to
 \LangXInt{} by making sure that each instruction adheres to the
 restriction that at most one argument of an instruction may be a
 memory reference.
@@ -3256,23 +3424,38 @@ memory reference.
 We return to the following example.\\
 \begin{minipage}{0.5\textwidth}
   % var_test_20.rkt
+{\if\edition\racketEd\color{olive}
 \begin{lstlisting}
    (let ([a 42])
      (let ([b a])
        b))
 \end{lstlisting}
-\end{minipage}\\
-The \key{assign-homes} pass produces the following output
-for this program. \\
-\begin{minipage}{0.5\textwidth}
+\fi}
+{\if\edition\pythonEd\color{purple}
 \begin{lstlisting}
-stack-space: 16
-start:
+a = 42
+b = a
+print(b)
+\end{lstlisting}
+\fi}
+\end{minipage}\\
+The \key{assign\_homes} pass produces the following translation. \\
+\begin{minipage}{0.5\textwidth}
+{\if\edition\racketEd\color{olive}
+\begin{lstlisting}
     movq $42, -8(%rbp)
     movq -8(%rbp), -16(%rbp)
     movq -16(%rbp), %rax
-    jmp conclusion
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+movq 42, -8(%rbp)
+movq -8(%rbp), -16(%rbp)
+movq -16(%rbp), %rdi
+callq print_int
+\end{lstlisting}
+\fi}
 \end{minipage}\\
 The second \key{movq} instruction is problematic because both
 arguments are stack locations. We suggest fixing this problem by
@@ -3284,15 +3467,23 @@ from \key{rax} to the destination location, as follows.
 \end{lstlisting}
 
 \begin{exercise}
-\normalfont Implement the \key{patch-instructions} pass in
-\code{compiler.rkt}. Create three new example programs that are
+\normalfont Implement the \key{patch\_instructions} pass in
+\racket{\code{compiler.rkt}}\python{\code{compiler.py}}.
+Create three new example programs that are
 designed to exercise all of the interesting cases in this pass.
 %
+{\if\edition\racketEd\color{olive}
 In the \code{run-tests.rkt} script, add the following entry to the
 list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
 (list "patch instructions" patch-instructions interp-x86-0)
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+Run the \code{run-tests.py} script to to check
+whether the output programs produce the same result as the input
+programs.
+\fi}
 \end{exercise}
 
 
@@ -3302,24 +3493,28 @@ list of \code{passes} and then run the script to test your compiler.
 The last step of the compiler from \LangVar{} to x86 is to convert the
 \LangXInt{} AST (defined in Figure~\ref{fig:x86-int-ast}) to the
 string representation (defined in
-Figure~\ref{fig:x86-int-concrete}). The Racket \key{format} and
-\key{string-append} functions are useful in this regard. The main work
+Figure~\ref{fig:x86-int-concrete}). \racket{The Racket \key{format} and
+\key{string-append} functions are useful in this regard.} The main work
 that this step needs to perform is to create the \key{main} function
 and the standard instructions for its prelude and conclusion, as shown
 in Figure~\ref{fig:p1-x86} of Section~\ref{sec:x86}. You will need to
 know the amount of space needed for the stack frame, which you can
-obtain from the \code{stack-space} entry in the $\itm{info}$ field of
-the \key{X86Program} node.
+obtain from the \racket{\code{stack-space} entry in the $\itm{info}$ field}
+\python{\code{stack\_space} field}
+of the \key{X86Program} node.
 
-When running on Mac OS X, you compiler should prefix an underscore to
-labels like \key{main}. The Racket call \code{(system-type 'os)} is
+When running on Mac OS X, your compiler should prefix an underscore to
+labels like \key{main}. \racket{The Racket call \code{(system-type 'os)} is
 useful for determining which operating system the compiler is running
-on. It returns \code{'macosx}, \code{'unix}, or \code{'windows}.
+on. It returns \code{'macosx}, \code{'unix}, or \code{'windows}.}
+\python{The Python \code{platform} library includes a \code{system()} function
+that returns \code{'Linux'}, \code{'Windows'}, or \code{'Darwin'} (for Mac).}
 
 \begin{exercise}\normalfont
 %
-Implement the \key{print-x86} pass in \code{compiler.rkt}.
+Implement the \key{print\_x86} pass in \racket{\code{compiler.rkt}}\python{\code{compiler.py}}.
 %
+{\if\edition\racketEd\color{olive}
 In the \code{run-tests.rkt} script, add the following entry to the
 list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
@@ -3331,6 +3526,13 @@ Uncomment the call to the \key{compiler-tests} function
 compiler by executing the generated x86 code. Compile the provided
 \key{runtime.c} file to \key{runtime.o} using \key{gcc}. Run the
 script to test your compiler.
+\fi}
+{\if\edition\pythonEd\color{purple}
+Run the \code{run-tests.py} script to to check
+whether the output programs produce the same result as the input
+programs.
+\fi}
+
 \end{exercise}
 
 
@@ -3347,9 +3549,10 @@ introduced in Section~\ref{sec:partial-evaluation}.
   
 Adapt the partial evaluator from Section~\ref{sec:partial-evaluation}
 (Figure~\ref{fig:pe-arith}) so that it applies to \LangVar{} programs
-instead of \LangInt{} programs. Recall that \LangVar{} adds \key{let} binding
+instead of \LangInt{} programs. Recall that \LangVar{} adds
+\racket{\key{let} binding}\python{assignment}
 and variables to the \LangInt{} language, so you will need to add cases for
-them in the \code{pe\_exp} function. Once complete, add the partial
+them in the \code{pe\_exp} \racket{function}\python{and \code{pe\_stmt functions}}. Once complete, add the partial
 evaluation pass to the front of your compiler and make sure that your
 compiler still passes all of the tests.
 \end{exercise}
@@ -3359,13 +3562,21 @@ The next exercise builds on Exercise~\ref{ex:pe-Rvar}.
 \begin{exercise}
 \normalfont
 
-Improve on the partial evaluator by replacing the \code{pe-neg} and
-\code{pe-add} auxiliary functions with functions that know more about
+Improve on the partial evaluator by replacing the \code{pe\_neg} and
+\code{pe\_add} auxiliary functions with functions that know more about
 arithmetic. For example, your partial evaluator should translate
+{\if\edition\racketEd\color{olive}
 \[
 \code{(+ 1 (+ (read) 1))} \qquad \text{into} \qquad
 \code{(+ 2 (read))}
 \]
+\fi}
+{\if\edition\pythonEd\color{purple}
+\[
+\code{1 + (input\_int() + 1)} \qquad \text{into} \qquad
+\code{2 + input\_int()}
+\]
+\fi}
 To accomplish this, the \code{pe\_exp} function should produce output
 in the form of the $\itm{residual}$ non-terminal of the following
 grammar. The idea is that when processing an addition expression, we
@@ -3373,6 +3584,7 @@ can always produce either 1) an integer constant, 2) an addition
 expression with an integer constant on the left-hand side but not the
 right-hand side, or 3) or an addition expression in which neither
 subexpression is a constant.
+{\if\edition\racketEd\color{olive}
 \[
 \begin{array}{lcl}
   \itm{inert} &::=& \Var
@@ -3386,7 +3598,22 @@ subexpression is a constant.
     \MID \itm{inert} 
 \end{array}
 \]
-The \code{pe-add} and \code{pe-neg} functions may assume that their
+\fi}
+{\if\edition\pythonEd\color{purple}
+\[
+\begin{array}{lcl}
+  \itm{inert} &::=& \Var
+    \MID \key{input\_int}\LP\RP
+    \MID \key{-} \Var
+    \MID \key{-} \key{input\_int}\LP\RP
+    \MID \itm{inert} ~ \key{+} ~ \itm{inert}\\
+  \itm{residual} &::=& \Int
+    \MID \LP\key{+}~ \Int~ \itm{inert}\RP
+    \MID \itm{inert} 
+\end{array}
+\]
+\fi}
+The \code{pe\_add} and \code{pe\_neg} functions may assume that their
 inputs are $\itm{residual}$ expressions and they should return
 $\itm{residual}$ expressions.  Once the improvements are complete,
 make sure that your compiler still passes all of the tests.  After
@@ -5755,6 +5982,10 @@ to set the EFLAGS register.
 
 \section{Shrink the \LangIf{} Language}
 \label{sec:shrink-Rif}
+
+% TODO: consider dropping the shrinking of there operations where
+% it hurts the generated x86 code, such as >, <, -, etc.
+% (suggestion from Andrew Tolmach).
 
 The \LangIf{} language includes several operators that are easily
 expressible with other operators. For example, subtraction is
