@@ -6109,56 +6109,82 @@ and the linear scan of \citet{Poletto:1999uq} may be more appropriate.
 The \LangInt{} and \LangVar{} languages only have a single kind of
 value, integers. In this chapter we add a second kind of value, the
 Booleans, to create the \LangIf{} language. The Boolean values
-\emph{true} and \emph{false} are written \key{\#t} and \key{\#f}
-respectively in Racket.  The \LangIf{} language includes several
-operations that involve Booleans (\key{and}, \key{not}, \key{eq?},
-\key{<}, etc.) and the conditional \key{if} expression. With the
+\emph{true} and \emph{false} are written \racket{\key{\#t}}\python{\key{True}}
+and \racket{\key{\#f}}\python{\key{False}}
+respectively in \racket{Racket}\python{Python}.
+The \LangIf{} language includes several
+operations that involve Booleans (\key{and}, \key{not}, \racket{\key{eq?}}\python{==}, \key{<}, etc.) and the conditional \key{if} expression. With the
 addition of \key{if}, programs can have non-trivial control flow which
-impacts \code{explicate-control} and liveness analysis. Also, because
+\racket{impacts \code{explicate\_control} and liveness analysis}
+\python{impacts liveness analysis and motivates a new pass named
+  \code{explicate\_control}}. Also, because
 we now have two kinds of values, we need to handle programs that apply
 an operation to the wrong kind of value, such as \code{(not 1)}.
 
 There are two language design options for such situations.  One option
 is to signal an error and the other is to provide a wider
-interpretation of the operation. The Racket language uses a mixture of
-these two options, depending on the operation and the kind of
-value. For example, the result of \code{(not 1)} in Racket is
-\code{\#f} because Racket treats non-zero integers as if they were
-\code{\#t}. On the other hand, \code{(car 1)} results in a run-time
-error in Racket because \code{car} expects a pair.
+interpretation of the operation. \racket{The Racket
+  language}\python{Python} uses a mixture of these two options,
+depending on the operation and the kind of value. For example, the
+result of \racket{\code{(not 1)}}\python{\code{not 1}} is
+\racket{\code{\#f}}\python{False} because \racket{Racket}\python{Python}
+treats non-zero integers as if they were \racket{\code{\#t}}\python{\code{True}}.
+%
+\racket{On the other hand, \code{(car 1)} results in a run-time error
+  in Racket because \code{car} expects a pair.}
+%
+\python{On the other hand, \code{1[0]} results in a run-time error
+  in Python because an ``\code{int} object is not subscriptable''.}
 
-Typed Racket makes similar design choices as Racket, except much of
-the error detection happens at compile time instead of run time. Typed
-Racket accepts and runs \code{(not 1)}, producing \code{\#f}. But in
-the case of \code{(car 1)}, Typed Racket reports a compile-time error
-because Typed Racket expects the type of the argument to be of the
-form \code{(Listof T)} or \code{(Pairof T1 T2)}.
+\racket{Typed Racket}\python{The MyPy type checker} makes similar
+design choices as \racket{Racket}\python{Python}, except much of the
+error detection happens at compile time instead of run
+time\python{~\citep{Lehtosalo2021:MyPy}}. \racket{Typed Racket}\python{MyPy}
+accepts \racket{\code{(not 1)}}\python{\code{not 1}}. But in the case
+of \racket{\code{(car 1)}}\python{\code{1[0]}}, \racket{Typed
+  Racket}\python{MyPy} reports a compile-time error
+%
+\racket{because Racket expects the type of the argument to be of the form
+  \code{(Listof T)} or \code{(Pairof T1 T2)}.}
+%
+\python{stating that a ``value of type \code{int} is not indexable''.}
 
 The \LangIf{} language performs type checking during compilation like
-Typed Racket. In Chapter~\ref{ch:type-dynamic} we study the
-alternative choice, that is, a dynamically typed language like Racket.
-The \LangIf{} language is a subset of Typed Racket; for some
-operations we are more restrictive, for example, rejecting
-\code{(not 1)}.
+\racket{Typed Racket}\python{MyPy}. In Chapter~\ref{ch:Rdyn} we study the
+alternative choice, that is, a dynamically typed language like
+\racket{Racket}\python{Python}.
+The \LangIf{} language is a subset of \racket{Typed Racket}\python{MyPy};
+for some operations we are more restrictive, for example, rejecting
+\racket{\code{(not 1)}}\python{\code{not 1}}.
 
 This chapter is organized as follows.  We begin by defining the syntax
 and interpreter for the \LangIf{} language
 (Section~\ref{sec:lang-if}). We then introduce the idea of type
 checking and build a type checker for \LangIf{}
-(Section~\ref{sec:type-check-Rif}). To compile \LangIf{} we need to
-enlarge the intermediate language \LangCVar{} into \LangCIf{}
-(Section~\ref{sec:Cif}) and \LangXInt{} into \LangXIf{}
-(Section~\ref{sec:x86-if}). The remaining sections of this chapter
-discuss how our compiler passes change to accommodate Booleans and
-conditional control flow. There is one new pass, named \code{shrink},
-that translates some operators into others, thereby reducing the
-number of operators that need to be handled in later passes.  The
-largest changes occur in \code{explicate-control}, to translate
-\code{if} expressions into control-flow graphs
-(Section~\ref{sec:explicate-control-Rif}).  Regarding register
-allocation, the liveness analysis now has multiple basic blocks to
-process and there is the interesting question of how to handle
-conditional jumps.
+(Section~\ref{sec:type-check-Rif}).
+%
+\racket{To compile \LangIf{} we need to enlarge the intermediate
+  language \LangCVar{} into \LangCIf{} (Section~\ref{sec:Cif}) and
+  \LangXInt{} into \LangXIf{} (Section~\ref{sec:x86-if}).}
+%
+The remaining sections of this chapter discuss how our compiler passes
+change to accommodate Booleans and conditional control flow. There is
+one new pass, named \code{shrink}, that translates some operators into
+others, thereby reducing the number of operators that need to be
+handled in later passes.
+%
+\racket{The largest changes occur in \code{explicate\_control}, to
+  translate \code{if} expressions into control-flow graphs
+  (Section~\ref{sec:explicate-control-Rif}).}
+%
+\python{The largest addition is a new pass named
+  \code{explicate\_control} that translates \code{if} expressions and
+  statements into control-flow graphs
+  (Section~\ref{sec:explicate-control-Rif}).}
+%
+Regarding register allocation, liveness analysis now has multiple
+basic blocks to process and there is the interesting question of how
+to handle conditional jumps.
 
 
 \section{The \LangIf{} Language}
