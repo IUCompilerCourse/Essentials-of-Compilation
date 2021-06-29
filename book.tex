@@ -1996,8 +1996,8 @@ information about them. We refer to these mappings as
 common term for environment in the compiler literature is \emph{symbol
 table}\index{subject}{symbol table}.}
 %
-For simplicity, we use \racket{an association list
-  (alist)}\python{dictionary} to represent the
+We use \racket{an association list
+  (alist)}\python{\href{https://docs.python.org/3.10/library/stdtypes.html\#mapping-types-dict}{dictionary}} to represent the
 environment. \racket{Figure~\ref{fig:alist} gives a brief introduction
   to alists and the \code{racket/dict} package.}  The
 \code{interp\_exp} function takes the current environment, \code{env},
@@ -2570,9 +2570,9 @@ outstanding problems.
 
 \path[->,bend left=15] (Rvar) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Rvar-2);
 \path[->,bend right=15] (Rvar-2) edge [left] node {\ttfamily\footnotesize select\_instr.} (x86-1);
-\path[->,bend left=15] (x86-1) edge [above] node {\ttfamily\footnotesize assign\_homes} (x86-2);
+\path[->,bend right=15] (x86-1) edge [below] node {\ttfamily\footnotesize assign\_homes} (x86-2);
 \path[->,bend left=15] (x86-2) edge [above] node {\ttfamily\footnotesize patch\_instr.} (x86-3);
-\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize print\_x86} (x86-4);
+\path[->,bend right=15] (x86-3) edge [below] node {\ttfamily\footnotesize print\_x86} (x86-4);
 \end{tikzpicture}
 \fi}  
 \caption{Diagram of the passes for compiling \LangVar{}. }
@@ -3639,6 +3639,7 @@ in the x86 assembly language but it still uses variables.
 \begin{minipage}{0.45\textwidth}
 Example \LangVar{} program:
 % var_test_28.rkt
+{\if\edition\racketEd\color{olive}
 \begin{lstlisting}
 (let ([v 1])
   (let ([w 42])
@@ -3647,9 +3648,21 @@ Example \LangVar{} program:
 	(let ([z (+ x w)])
 	  (+ z (- y)))))))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+v = 1
+w = 42
+x = v + 7
+y = x
+z = x + w
+print(z + (- y))
+\end{lstlisting}
+\fi}
 \end{minipage}
 \begin{minipage}{0.45\textwidth}
 After instruction selection:
+{\if\edition\racketEd\color{olive}
 \begin{lstlisting}
 locals-types:
     x : Integer, y : Integer,
@@ -3669,6 +3682,24 @@ start:
     addq t, %rax
     jmp conclusion
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+movq $1, v
+movq $42, w
+movq v, x
+addq $7, x
+movq x, y
+movq x, z
+addq w, z
+movq y, tmp_0
+negq tmp_0
+movq z, tmp_1
+addq tmp_0, tmp_1
+movq tmp_1, %rdi
+callq print_int
+\end{lstlisting}
+\fi}
 \end{minipage}
 \caption{A running example for register allocation.}
 \label{fig:reg-eg}
@@ -3834,23 +3865,33 @@ The prelude then pushes \code{rbx} to the stack because 1) \code{rbx}
 is a callee-saved register and 2) \code{rbx} is assigned to a variable
 (\code{x}). The other callee-saved registers are not saved in the
 prelude because they are not used. The prelude subtracts 8 bytes from
-the \code{rsp} to make it 16-byte aligned and then jumps to the
-\code{start} block. Shifting attention to the \code{conclusion}, we
-see that \code{rbx} is restored from the stack with a \code{popq}
-instruction.  \index{subject}{prelude}\index{subject}{conclusion}
+the \code{rsp} to make it 16-byte aligned. Shifting attention to the
+conclusion, we see that \code{rbx} is restored from the stack with a
+\code{popq} instruction.
+\index{subject}{prelude}\index{subject}{conclusion}
 
 \begin{figure}[tp]
 \begin{minipage}{0.45\textwidth}
 Example \LangVar{} program:
 %var_test_14.rkt
+{\if\edition\racketEd\color{olive}
 \begin{lstlisting}
 (let ([x (read)])
   (let ([y (read)])
     (+ (+ x y) 42)))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+x = input_int()
+y = input_int()
+print((x + y) + 42)
+\end{lstlisting}
+\fi}
 \end{minipage}
 \begin{minipage}{0.45\textwidth}
 Generated x86 assembly:
+{\if\edition\racketEd\color{olive}
 \begin{lstlisting}
 start:
 	callq	read_int
@@ -3875,6 +3916,31 @@ conclusion:
 	popq	%rbp
 	retq
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+	.globl main
+main:
+	pushq %rbp
+	movq %rsp, %rbp
+	pushq %rbx
+	subq $8, %rsp
+	callq read_int
+	movq %rax, %rbx
+	callq read_int
+	movq %rax, %rcx
+	movq %rbx, %rdx
+	addq %rcx, %rdx
+	movq %rdx, %rcx
+	addq $42, %rcx
+	movq %rcx, %rdi
+	callq print_int
+	addq $8, %rsp
+	popq %rbx
+	popq %rbp
+	retq
+\end{lstlisting}
+\fi}
 \end{minipage}
 \caption{An example with function calls.}
   \label{fig:example-calling-conventions}
@@ -3886,7 +3952,8 @@ conclusion:
 \label{sec:liveness-analysis-Rvar}
 \index{subject}{liveness analysis}
 
-The \code{uncover-live} pass performs \emph{liveness analysis}, that
+The \code{uncover\_live} \racket{pass}\python{function}
+performs \emph{liveness analysis}, that
 is, it discovers which variables are in-use in different regions of a
 program.
 %
@@ -3917,10 +3984,15 @@ sequence back to front (i.e., backwards in execution order).  Let
 $I_1,\ldots, I_n$ be the instruction sequence. We write
 $L_{\mathsf{after}}(k)$ for the set of live locations after
 instruction $I_k$ and $L_{\mathsf{before}}(k)$ for the set of live
-locations before instruction $I_k$. We recommend represeting these
+locations before instruction $I_k$.
+\racket{We recommend representing these
 sets with the Racket \code{set} data structure described in
-Figure~\ref{fig:set}.
+Figure~\ref{fig:set}.}
+\python{We recommend representing these sets with the Python
+  \href{https://docs.python.org/3.10/library/stdtypes.html\#set-types-set-frozenset}{\code{set}}
+data structure.}
 
+{\if\edition\racketEd\color{olive}
 \begin{figure}[tp]
 %\begin{wrapfigure}[19]{l}[0.75in]{0.55\textwidth}
   \small
@@ -3942,6 +4014,7 @@ Figure~\ref{fig:set}.
   \caption{The \code{set} data structure.}
   \label{fig:set}
 \end{figure}
+\fi}
 
 The live locations after an instruction are always the same as the
 live locations before the next instruction.
@@ -3962,6 +4035,7 @@ instruction sequence back to front.
 where $W(k)$ are the locations written to by instruction $I_k$ and
 $R(k)$ are the locations read by instruction $I_k$.
 
+{\if\edition\racketEd\color{olive}
 There is a special case for \code{jmp} instructions.  The locations
 that are live before a \code{jmp} should be the locations in
 $L_{\mathtt{before}}$ at the target of the jump. So we recommend
@@ -3971,6 +4045,7 @@ now the only \code{jmp} in a \LangXVar{} program is the one at the
 end, to the conclusion. (For example, see Figure~\ref{fig:reg-eg}.)
 The conclusion reads from \ttm{rax} and \ttm{rsp}, so the alist should
 map \code{conclusion} to the set $\{\ttm{rax},\ttm{rsp}\}$.
+\fi}
 
 Let us walk through the above example, applying these formulas
 starting with the instruction on line 5. We collect the answers in
@@ -4042,6 +4117,7 @@ L_{\mathsf{after}}(5)=  \emptyset
 \begin{figure}[tp]
 \hspace{20pt}
 \begin{minipage}{0.45\textwidth}
+{\if\edition\racketEd\color{olive}
 \begin{lstlisting}
                        |$\{\ttm{rsp}\}$|    
     movq $1, v
@@ -4068,6 +4144,37 @@ L_{\mathsf{after}}(5)=  \emptyset
                        |$\{\ttm{rax},\ttm{rsp}\}$|
     jmp conclusion
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+  movq $1, v
+                      |$\{\ttm{v}\}$|
+  movq $42, w
+                      |$\{\ttm{w}, \ttm{v}\}$|
+  movq v, x
+                      |$\{\ttm{w}, \ttm{x}\}$|
+  addq $7, x
+                      |$\{\ttm{w}, \ttm{x}\}$|
+  movq x, y
+                      |$\{\ttm{w}, \ttm{x}, \ttm{y}\}$|
+  movq x, z
+                      |$\{\ttm{w}, \ttm{y}, \ttm{z}\}$|
+  addq w, z
+                      |$\{\ttm{y}, \ttm{z}\}$|        
+  movq y, tmp_0
+                      |$\{\ttm{tmp\_0}, \ttm{z}\}$|
+  negq tmp_0
+                      |$\{\ttm{tmp\_0}, \ttm{z}\}$|
+  movq z, tmp_1
+                      |$\{\ttm{tmp\_0}, \ttm{tmp\_1}\}$|
+  addq tmp_0, tmp_1
+                      |$\{\ttm{tmp\_1}\}$|
+  movq tmp_1, %rdi
+                       |$\{\ttm{rdi}\}$|
+  callq print_int
+                       |$\{\}$|
+\end{lstlisting}
+\fi}
 \end{minipage}
 
 \caption{The running example annotated with live-after sets.}
@@ -4075,15 +4182,19 @@ L_{\mathsf{after}}(5)=  \emptyset
 \end{figure}
 
 \begin{exercise}\normalfont
-Implement the \code{uncover-live} pass. Store the sequence of
-live-after sets in the $\itm{info}$ field of the \code{Block}
-structure.
+  Implement the \code{uncover\_live} \racket{pass}\python{function}.
+  %
+\racket{Store the sequence of live-after sets in the $\itm{info}$
+  field of the \code{Block} structure.}
 %
-We recommend creating an auxiliary function that takes a list of
-instructions and an initial live-after set (typically empty) and
-returns the list of live-after sets.
+\python{Return a dictionary that maps each instruction to its
+  live-after set.}
 %
-We also recommend creating auxiliary functions to 1) compute the set
+\racket{We recommend creating an auxiliary function that takes a list
+  of instructions and an initial live-after set (typically empty) and
+  returns the list of live-after sets.}
+%
+We recommend creating auxiliary functions to 1) compute the set
 of locations that appear in an \Arg{}, 2) compute the locations read
 by an instruction (the $R$ function), and 3) the locations written by
 an instruction (the $W$ function). The \code{callq} instruction should
@@ -4101,6 +4212,7 @@ arity.)
 \section{Build the Interference Graph}
 \label{sec:build-interference}
 
+{\if\edition\racketEd\color{olive}
 \begin{figure}[tp]
 %\begin{wrapfigure}[23]{r}[0.75in]{0.55\textwidth}
   \small
@@ -4133,6 +4245,7 @@ arity.)
   \caption{The Racket \code{graph} package.}
   \label{fig:graph}
 \end{figure}
+\fi}
 
 Based on the liveness analysis, we know where each location is live.
 However, during register allocation, we need to answer questions of
@@ -4142,18 +4255,22 @@ question more efficient to answer, we create an explicit data
 structure, an \emph{interference graph}\index{subject}{interference
   graph}.  An interference graph is an undirected graph that has an
 edge between two locations if they are live at the same time, that is,
-if they interfere with each other. We recommend using the Racket
-\code{graph} package (Figure~\ref{fig:graph}) to represent
-the interference graph.
+if they interfere with each other.
+%
+\racket{We recommend using the Racket \code{graph} package
+  (Figure~\ref{fig:graph}) to represent the interference graph.}
+%
+\python{We provide implementations of directed and undirected graph
+  data structures in the file \code{graph.py} of the support code.}
 
-An obvious way to compute the interference graph is to look at the set
-of live locations between each instruction and the next and add an edge to the graph
-for every pair of variables in the same set.  This approach is less
-than ideal for two reasons. First, it can be expensive because it
-takes $O(n^2)$ time to consider at every pair in a set of $n$ live
-locations. Second, in the special case where two locations hold the
-same value (because one was assigned to the other), they can be live
-at the same time without interfering with each other.
+A straightforward way to compute the interference graph is to look at
+the set of live locations between each instruction and the next and
+add an edge to the graph for every pair of variables in the same set.
+This approach is less than ideal for two reasons. First, it can be
+expensive because it takes $O(n^2)$ time to consider at every pair in
+a set of $n$ live locations. Second, in the special case where two
+locations hold the same value (because one was assigned to the other),
+they can be live at the same time without interfering with each other.
 
 A better way to compute the interference graph is to focus on
 writes~\citep{Appel:2003fk}. The writes performed by an instruction
@@ -4186,25 +4303,42 @@ matches the source. So we have the following two rules.
 
 Working from the top to bottom of Figure~\ref{fig:live-eg}, we apply
 the above rules to each instruction. We highlight a few of the
-instructions.  The first instruction is \lstinline{movq $1, v} and the
-live-after set is $\{\ttm{v},\ttm{rsp}\}$. Rule 1 applies, so \code{v}
-interferes with \code{rsp}.
+instructions.  \racket{The first instruction is \lstinline{movq $1, v}
+  and the live-after set is $\{\ttm{v},\ttm{rsp}\}$. Rule 1 applies,
+  so \code{v} interferes with \code{rsp}.}
 %
-The fourth instruction is \lstinline{addq $7, x} and the live-after
-set is $\{\ttm{w},\ttm{x},\ttm{rsp}\}$. Rule 2 applies so $\ttm{x}$
-interferes with \ttm{w} and \ttm{rsp}.
+\python{The first instruction is \lstinline{movq $1, v} and the
+  live-after set is $\{\ttm{v}\}$. Rule 1 applies but there is
+  no interference because $\ttm{v}$ is the destination of the move.}
 %
-The next instruction is \lstinline{movq x, y} and the live-after set
-is $\{\ttm{w},\ttm{x},\ttm{y},\ttm{rsp}\}$. Rule 1 applies, so \ttm{y}
-interferes with \ttm{w} and \ttm{rsp} but not \ttm{x} because \ttm{x}
-is the source of the move and therefore \ttm{x} and \ttm{y} hold the
-same value. Figure~\ref{fig:interference-results} lists the
-interference results for all of the instructions and the resulting
-interference graph is shown in Figure~\ref{fig:interfere}.
+\racket{The fourth instruction is \lstinline{addq $7, x} and the
+  live-after set is $\{\ttm{w},\ttm{x},\ttm{rsp}\}$. Rule 2 applies so
+  $\ttm{x}$ interferes with \ttm{w} and \ttm{rsp}.}
+%
+\python{The fourth instruction is \lstinline{addq $7, x} and the
+  live-after set is $\{\ttm{w},\ttm{x}\}$. Rule 2 applies so
+  $\ttm{x}$ interferes with \ttm{w}.}
+%
+\racket{The next instruction is \lstinline{movq x, y} and the
+  live-after set is $\{\ttm{w},\ttm{x},\ttm{y},\ttm{rsp}\}$. Rule 1
+  applies, so \ttm{y} interferes with \ttm{w} and \ttm{rsp} but not
+  \ttm{x} because \ttm{x} is the source of the move and therefore
+  \ttm{x} and \ttm{y} hold the same value.}
+%
+\python{The next instruction is \lstinline{movq x, y} and the
+  live-after set is $\{\ttm{w},\ttm{x},\ttm{y}\}$. Rule 1
+  applies, so \ttm{y} interferes with \ttm{w} but not
+  \ttm{x} because \ttm{x} is the source of the move and therefore
+  \ttm{x} and \ttm{y} hold the same value.}
+%
+Figure~\ref{fig:interference-results} lists the interference results
+for all of the instructions and the resulting interference graph is
+shown in Figure~\ref{fig:interfere}.
 
 
 \begin{figure}[tbp]
-\begin{quote}
+  \begin{quote}
+{\if\edition\racketEd\color{olive}    
 \begin{tabular}{ll}
 \lstinline!movq $1, v!& \ttm{v} interferes with \ttm{rsp},\\
 \lstinline!movq $42, w!& \ttm{w} interferes with \ttm{v} and \ttm{rsp},\\
@@ -4219,6 +4353,24 @@ interference graph is shown in Figure~\ref{fig:interfere}.
 \lstinline!addq t, %rax! & \ttm{rax} interferes with \ttm{rsp}. \\
 \lstinline!jmp conclusion!& no interference.
 \end{tabular}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{tabular}{ll}
+\lstinline!movq $1, v!& no interference\\
+\lstinline!movq $42, w!& \ttm{w} interferes with \ttm{v}\\
+\lstinline!movq v, x!& \ttm{x} interferes with \ttm{w}\\
+\lstinline!addq $7, x!& \ttm{x} interferes with \ttm{w}\\
+\lstinline!movq x, y!& \ttm{y} interferes with \ttm{w} but not \ttm{x}\\
+\lstinline!movq x, z!& \ttm{z} interferes with \ttm{w} and \ttm{y}\\
+\lstinline!addq w, z!& \ttm{z} interferes with \ttm{y} \\
+\lstinline!movq y, tmp_0!& \ttm{t} interferes with \ttm{z} \\
+\lstinline!negq tmp_0!& \ttm{t} interferes with \ttm{z} \\
+\lstinline!movq z, tmp_1! & \ttm{tmp\_0} interferes with \ttm{tmp\_1} \\
+\lstinline!addq tmp_0, tmp_1! & no interference\\
+\lstinline!movq tmp_1, %rdi! & no interference \\
+\lstinline!callq print_int!& no interference.
+\end{tabular}
+\fi}
 \end{quote}
 \caption{Interference results for the running example.}
 \label{fig:interference-results}
@@ -4227,6 +4379,7 @@ interference graph is shown in Figure~\ref{fig:interfere}.
 
 \begin{figure}[tbp]
 \large
+{\if\edition\racketEd\color{olive}      
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (rax) at (0,0) {$\ttm{rax}$};
@@ -4256,6 +4409,28 @@ interference graph is shown in Figure~\ref{fig:interfere}.
 \draw (rax) to (rsp);
 \end{tikzpicture}
 \]
+\fi}
+{\if\edition\pythonEd\color{purple}
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (t0) at (0,2) {$\ttm{tmp\_0}$};
+\node (t1) at (0,0) {$\ttm{tmp\_1}$};
+\node (z) at (3,2)  {$\ttm{z}$};
+\node (x) at (6,2)  {$\ttm{x}$};
+\node (y) at (3,0)  {$\ttm{y}$};
+\node (w) at (6,0)  {$\ttm{w}$};
+\node (v) at (9,0)  {$\ttm{v}$};
+
+\draw (t0) to (t1);
+\draw (t0) to (z);
+\draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (w);
+\draw (v) to (w);
+\end{tikzpicture}
+\]
+\fi}
 \caption{The interference graph of the example program.}
 \label{fig:interfere}
 \end{figure}
@@ -4286,11 +4461,15 @@ interference graph is shown in Figure~\ref{fig:interfere}.
 %% Racket's \key{set}, which is also a hash table.
 
 \begin{exercise}\normalfont
-Implement the compiler pass named \code{build-interference} according
-to the algorithm suggested above. We recommend using the \code{graph}
-package to create and inspect the interference graph.  The output
-graph of this pass should be stored in the $\itm{info}$ field of the
-program, under the key \code{conflicts}.
+\racket{Implement the compiler pass named \code{build\_interference} according
+to the algorithm suggested above. We recommend using the Racket
+  \code{graph} package to create and inspect the interference graph.
+The output graph of this pass should be stored in the $\itm{info}$ field of
+the program, under the key \code{conflicts}.}
+%
+\python{Implement a function named \code{build\_interference}
+  according to the algorithm suggested above that
+  returns the interference graph.}
 \end{exercise}
 
   
@@ -4352,10 +4531,10 @@ saturation of a vertex, in Sudoku terms, is the set of numbers that
 are no longer available. In graph terminology, we have the following
 definition:
 \begin{equation*}
-  \mathrm{saturation}(u) = \{ c \;|\; \exists v. v \in \mathrm{neighbors}(u)
+  \mathrm{saturation}(u) = \{ c \;|\; \exists v. v \in \mathrm{adjacent}(u)
      \text{ and } \mathrm{color}(v) = c \}
 \end{equation*}
-where $\mathrm{neighbors}(u)$ is the set of vertices that share an
+where $\mathrm{adjacent}(u)$ is the set of vertices that share an
 edge with $u$.
 
 Using the Pencil Marks technique leads to a simple strategy for
@@ -4367,9 +4546,10 @@ great.  If not, backtrack and choose the next possibility.  One good
 thing about Pencil Marks is that it reduces the degree of branching in
 the search tree. Nevertheless, backtracking can be terribly time
 consuming. One way to reduce the amount of backtracking is to use the
-most-constrained-first heuristic. That is, when choosing a square,
-always choose one with the fewest possibilities left (the vertex with
-the highest saturation).  The idea is that choosing highly constrained
+most-constrained-first heuristic (aka. minimum remaining
+values)~\citep{Russell2003}.  That is, when choosing a square, always
+choose one with the fewest possibilities left (the vertex with the
+highest saturation).  The idea is that choosing highly constrained
 squares earlier rather than later is better because later on there may
 not be any possibilities left in the highly saturated squares.
 
@@ -4383,8 +4563,9 @@ Figure~\ref{fig:satur-algo} gives the pseudo-code for a simple greedy
 algorithm for register allocation based on saturation and the
 most-constrained-first heuristic. It is roughly equivalent to the
 DSATUR
-algorithm~\citep{Brelaz:1979eu,Gebremedhin:1999fk,Omari:2006uq}.  Just
-as in Sudoku, the algorithm represents colors with integers. The
+algorithm~\citep{Brelaz:1979eu}.
+%,Gebremedhin:1999fk,Omari:2006uq
+Just as in Sudoku, the algorithm represents colors with integers. The
 integers $0$ through $k-1$ correspond to the $k$ registers that we use
 for register allocation. The integers $k$ and larger correspond to
 stack locations. The registers that are not used for register
@@ -4424,6 +4605,7 @@ while |$W \neq \emptyset$| do
   \label{fig:satur-algo}
 \end{figure}
 
+{\if\edition\racketEd\color{olive}      
 With the DSATUR algorithm in hand, let us return to the running
 example and consider how to color the interference graph in
 Figure~\ref{fig:interfere}.
@@ -4495,8 +4677,8 @@ and \ttm{rsp} because they interfere with $\ttm{t}$.
 \draw (rax) to (rsp);
 \end{tikzpicture}
 \]
-We repeat the process, selecting the next maximally saturated vertex,
-which is \code{z}, and color it with the first available number, which
+We repeat the process, selecting a maximally saturated vertex,
+choosing is \code{z}, and color it with the first available number, which
 is $1$. We add $1$ to the saturation for the neighboring vertices
 \code{t}, \code{y}, \code{w}, and \code{rsp}.
 \[
@@ -4647,8 +4829,193 @@ In the last step of the algorithm, we color \code{x} with $1$.
 \draw (rax) to (rsp);
 \end{tikzpicture}
 \]
+So we obtain the following coloring:
+\[
+\{
+\ttm{rax} \mapsto -1,
+\ttm{rsp} \mapsto -2,
+\ttm{t} \mapsto 0,
+\ttm{z} \mapsto 1,
+\ttm{x} \mapsto 1,
+\ttm{y} \mapsto 2,
+\ttm{w} \mapsto 0,
+\ttm{v} \mapsto 1
+\}
+\]
+\fi}
+%
+{\if\edition\pythonEd\color{purple}
+%
+With the DSATUR algorithm in hand, let us return to the running
+example and consider how to color the interference graph in
+Figure~\ref{fig:interfere}. We annotate each variable node with a dash
+to indicate that it has not yet been assigned a color. The saturation
+sets are also shown for each node; all of them start as the empty set.
+(We do not include the register nodes in the graph below because there
+were no interference edges involving registers in this program, but in
+general there can be.)
+%
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (t0) at (0,2) {$\ttm{tmp\_0}: -, \{\}$};
+\node (t1) at (0,0) {$\ttm{tmp\_1}: -, \{\}$};
+\node (z) at (3,2)  {$\ttm{z}: -, \{\}$};
+\node (x) at (6,2)  {$\ttm{x}: -, \{\}$};
+\node (y) at (3,0)  {$\ttm{y}: -, \{\}$};
+\node (w) at (6,0)  {$\ttm{w}: -, \{\}$};
+\node (v) at (9,0)  {$\ttm{v}: -, \{\}$};
 
-We recommend creating an auxiliary function named \code{color-graph}
+\draw (t0) to (t1);
+\draw (t0) to (z);
+\draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (w);
+\draw (v) to (w);
+\end{tikzpicture}
+\]
+The algorithm says to select a maximally saturated vertex. So we pick
+$\ttm{tmp\_0}$ and color it with the first available integer, which is
+$0$. We mark $0$ as no longer available for $\ttm{tmp\_1}$ and $\ttm{z}$
+because they interfere with $\ttm{tmp\_0}$.
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (t0) at (0,2) {$\ttm{tmp\_0}: 0, \{\}$};
+\node (t1) at (0,0) {$\ttm{tmp\_1}: -, \{0\}$};
+\node (z) at (3,2)  {$\ttm{z}: -, \{0\}$};
+\node (x) at (6,2)  {$\ttm{x}: -, \{\}$};
+\node (y) at (3,0)  {$\ttm{y}: -, \{\}$};
+\node (w) at (6,0)  {$\ttm{w}: -, \{\}$};
+\node (v) at (9,0)  {$\ttm{v}: -, \{\}$};
+
+\draw (t0) to (t1);
+\draw (t0) to (z);
+\draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (w);
+\draw (v) to (w);
+\end{tikzpicture}
+\]
+We repeat the process, selecting a maximally saturated vertex,
+choosing \code{z}, and color it with the first available number, which
+is $1$. We add $1$ to the saturation for the neighboring vertices
+\code{tmp\_0}, \code{y}, and \code{w}.
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (t0) at (0,2) {$\ttm{tmp\_0}: 0, \{1\}$};
+\node (t1) at (0,0) {$\ttm{tmp\_1}: -, \{0\}$};
+\node (z) at (3,2)  {$\ttm{z}: 1, \{0\}$};
+\node (x) at (6,2)  {$\ttm{x}: -, \{\}$};
+\node (y) at (3,0)  {$\ttm{y}: -, \{1\}$};
+\node (w) at (6,0)  {$\ttm{w}: -, \{1\}$};
+\node (v) at (9,0)  {$\ttm{v}: -, \{\}$};
+
+\draw (t0) to (t1);
+\draw (t0) to (z);
+\draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (w);
+\draw (v) to (w);
+\end{tikzpicture}
+\]
+The most saturated vertices are now \code{tmp\_1}, \code{w}, and
+\code{y}. We color \code{w} with the first available color, which
+is $0$.
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (t0) at (0,2) {$\ttm{tmp\_0}: 0, \{1\}$};
+\node (t1) at (0,0) {$\ttm{tmp\_1}: -, \{0\}$};
+\node (z) at (3,2)  {$\ttm{z}: 1, \{0\}$};
+\node (x) at (6,2)  {$\ttm{x}: -, \{0\}$};
+\node (y) at (3,0)  {$\ttm{y}: -, \{0,1\}$};
+\node (w) at (6,0)  {$\ttm{w}: 0, \{1\}$};
+\node (v) at (9,0)  {$\ttm{v}: -, \{0\}$};
+
+\draw (t0) to (t1);
+\draw (t0) to (z);
+\draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (w);
+\draw (v) to (w);
+\end{tikzpicture}
+\]
+Now \code{y} is the most saturated, so we color it with $2$.
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (t0) at (0,2) {$\ttm{tmp\_0}: 0, \{1\}$};
+\node (t1) at (0,0) {$\ttm{tmp\_1}: -, \{0\}$};
+\node (z) at (3,2)  {$\ttm{z}: 1, \{0,2\}$};
+\node (x) at (6,2)  {$\ttm{x}: -, \{0\}$};
+\node (y) at (3,0)  {$\ttm{y}: 2, \{0,1\}$};
+\node (w) at (6,0)  {$\ttm{w}: 0, \{1,2\}$};
+\node (v) at (9,0)  {$\ttm{v}: -, \{0\}$};
+
+\draw (t0) to (t1);
+\draw (t0) to (z);
+\draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (w);
+\draw (v) to (w);
+\end{tikzpicture}
+\]
+Now \code{tmp\_1}, \code{x}, and \code{v} are equally saturated.
+We choose to color \code{v} with $1$.
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (t0) at (0,2) {$\ttm{tmp\_0}: 0, \{1\}$};
+\node (t1) at (0,0) {$\ttm{tmp\_1}: -, \{0\}$};
+\node (z) at (3,2)  {$\ttm{z}: 1, \{0,2\}$};
+\node (x) at (6,2)  {$\ttm{x}: -, \{0\}$};
+\node (y) at (3,0)  {$\ttm{y}: 2, \{0,1\}$};
+\node (w) at (6,0)  {$\ttm{w}: 0, \{1,2\}$};
+\node (v) at (9,0)  {$\ttm{v}: 1, \{0\}$};
+
+\draw (t0) to (t1);
+\draw (t0) to (z);
+\draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (w);
+\draw (v) to (w);
+\end{tikzpicture}
+\]
+We color the remaining two variables, \code{tmp\_1} and \code{x}, with $1$.
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (t0) at (0,2) {$\ttm{tmp\_0}: 0, \{1\}$};
+\node (t1) at (0,0) {$\ttm{tmp\_1}: 1, \{0\}$};
+\node (z) at (3,2)  {$\ttm{z}: 1, \{0,2\}$};
+\node (x) at (6,2)  {$\ttm{x}: 1, \{0\}$};
+\node (y) at (3,0)  {$\ttm{y}: 2, \{0,1\}$};
+\node (w) at (6,0)  {$\ttm{w}: 0, \{1,2\}$};
+\node (v) at (9,0)  {$\ttm{v}: 1, \{0\}$};
+
+\draw (t0) to (t1);
+\draw (t0) to (z);
+\draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (w);
+\draw (v) to (w);
+\end{tikzpicture}
+\]
+So we obtain the following coloring:
+\[
+\{ \ttm{tmp\_0} \mapsto  0, 
+   \ttm{tmp\_1} \mapsto  1, 
+   \ttm{z} \mapsto  1,
+   \ttm{x} \mapsto  1,
+   \ttm{y} \mapsto  2,
+   \ttm{w} \mapsto  0, 
+   \ttm{v} \mapsto  1 \}
+\]
+\fi}
+
+We recommend creating an auxiliary function named \code{color\_graph}
 that takes an interference graph and a list of all the variables in
 the program. This function should return a mapping of variables to
 their colors (represented as natural numbers). By creating this helper
@@ -4656,12 +5023,13 @@ function, you will be able to reuse it in Chapter~\ref{ch:Rfun}
 when we add support for functions.
 
 To prioritize the processing of highly saturated nodes inside the
-\code{color-graph} function, we recommend using the priority queue
-data structure described in Figure~\ref{fig:priority-queue}. In
+\code{color\_graph} function, we recommend using the priority queue
+data structure \racket{described in Figure~\ref{fig:priority-queue}}\python{in the file \code{priority\_queue.py} of the support code}. \racket{In
 addition, you will need to maintain a mapping from variables to their
 ``handles'' in the priority queue so that you can notify the priority
-queue when their saturation changes.
+queue when their saturation changes.}
 
+{\if\edition\racketEd\color{olive}      
 \begin{figure}[tp]
 %\begin{wrapfigure}[25]{r}[0.75in]{0.55\textwidth}
   \small
@@ -4692,6 +5060,7 @@ queue when their saturation changes.
   \caption{The priority queue data structure.}
   \label{fig:priority-queue}
 \end{figure}
+\fi}
 
 With the coloring complete, we finalize the assignment of variables to
 registers and stack locations. We map the first $k$ colors to the $k$
@@ -4704,6 +5073,7 @@ locations.
 \]
 Composing this mapping with the coloring, we arrive at the following
 assignment of variables to locations.
+{\if\edition\racketEd\color{olive}      
 \begin{gather*}
   \{ \ttm{v} \mapsto \key{-8(\%rbp)}, \,
      \ttm{w} \mapsto \key{\%rcx},  \,
@@ -4712,14 +5082,27 @@ assignment of variables to locations.
      \ttm{z} \mapsto \key{-8(\%rbp)}, \,
      \ttm{t} \mapsto \key{\%rcx} \}
 \end{gather*}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{gather*}
+  \{ \ttm{v} \mapsto \key{-8(\%rbp)},  \,
+     \ttm{w} \mapsto \key{\%rcx}, \,
+     \ttm{x} \mapsto \key{-8(\%rbp)}, \,
+     \ttm{y} \mapsto \key{-16(\%rbp)}, \\
+     \ttm{z} \mapsto \key{-8(\%rbp)}, \,
+     \ttm{tmp\_0} \mapsto \key{\%rcx}, \,
+     \ttm{tmp\_1} \mapsto \key{-8(\%rbp)} \}
+\end{gather*}
+\fi}
 
-Adapt the code from the \code{assign-homes} pass
+Adapt the code from the \code{assign\_homes} pass
 (Section~\ref{sec:assign-Rvar}) to replace the variables with their
 assigned location. Applying the above assignment to our running
 example, on the left, yields the program on the right.
 % why frame size of 32? -JGS
 \begin{center}
-  \begin{minipage}{0.3\textwidth}
+{\if\edition\racketEd\color{olive}      
+\begin{minipage}{0.3\textwidth}
 \begin{lstlisting}
 movq $1, v
 movq $42, w
@@ -4752,24 +5135,65 @@ addq %rcx, %rax
 jmp conclusion
 \end{lstlisting}
 \end{minipage}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{minipage}{0.3\textwidth}
+\begin{lstlisting}
+movq $1, v
+movq $42, w
+movq v, x
+addq $7, x
+movq x, y
+movq x, z
+addq w, z
+movq y, tmp_0
+negq tmp_0
+movq z, tmp_1
+addq tmp_0, tmp_1
+movq tmp_1, %rdi
+callq print_int
+\end{lstlisting}
+\end{minipage}
+$\Rightarrow\qquad$
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+movq $1, -8(%rbp)
+movq $42, %rcx
+movq -8(%rbp), -8(%rbp)
+addq $7, -8(%rbp)
+movq -8(%rbp), -16(%rbp)
+movq -8(%rbp), -8(%rbp)
+addq %rcx, -8(%rbp)
+movq -16(%rbp), %rcx
+negq %rcx
+movq -8(%rbp), -8(%rbp)
+addq %rcx, -8(%rbp)
+movq -8(%rbp), %rdi
+callq print_int    
+\end{lstlisting}
+\end{minipage}
+\fi}
 \end{center}
 
 \begin{exercise}\normalfont
 %
-Implement the compiler pass \code{allocate-registers}.
+Implement the compiler pass \code{allocate\_registers}.
 %
 Create five programs that exercise all of the register allocation
 algorithm, including spilling variables to the stack.
 %
-Replace \code{assign-homes} in the list of \code{passes} in the
+\racket{Replace \code{assign\_homes} in the list of \code{passes} in the
 \code{run-tests.rkt} script with the three new passes:
-\code{uncover-live}, \code{build-interference}, and
-\code{allocate-registers}.
+\code{uncover\_live}, \code{build\_interference}, and
+\code{allocate\_registers}.
 %
-Temporarily remove the \code{print-x86} pass from the list of passes
+Temporarily remove the \code{print\_x86} pass from the list of passes
 and the call to \code{compiler-tests}.
-%
 Run the script to test the register allocator.
+}
+%
+\python{Run the \code{run-tests.py} script to to check whether the
+  output programs produce the same result as the input programs.}
 \end{exercise}
 
 
@@ -4778,19 +5202,22 @@ Run the script to test the register allocator.
 
 The remaining step in the compilation to x86 is to ensure that the
 instructions have at most one argument that is a memory access.
-In the running example, the instruction \code{movq -8(\%rbp), -16(\%rbp)}
-is problematic. The fix is to first move \code{-8(\%rbp)}
-into \code{rax} and then move \code{rax} into \code{-16(\%rbp)}.
 %
-The two moves from \code{-8(\%rbp)} to \code{-8(\%rbp)} are also
-problematic, but they can be fixed by simply deleting them. In
-general, we recommend deleting all the trivial moves whose source and
-destination are the same location.
+In the running example, the instruction \code{movq -8(\%rbp),
+    -16(\%rbp)} is problematic. Recall from Section~\ref{sec:patch-s0}
+  that the fix is to first move \code{-8(\%rbp)} into \code{rax} and
+  then move \code{rax} into \code{-16(\%rbp)}.
 %
-The following is the output of \code{patch-instructions} on the
+The moves from \code{-8(\%rbp)} to \code{-8(\%rbp)} are also
+problematic, but it can simply be deleted. In general, we recommend
+deleting all the trivial moves whose source and destination are the
+same location.
+%
+The following is the output of \code{patch\_instructions} on the
 running example.
 \begin{center}
-  \begin{minipage}{0.4\textwidth}
+{\if\edition\racketEd\color{olive}      
+\begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
 movq $1, -8(%rbp)
 movq $42, %rcx
@@ -4822,16 +5249,52 @@ addq %rcx, %rax
 jmp conclusion
 \end{lstlisting}
 \end{minipage}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+movq $1, -8(%rbp)
+movq $42, %rcx
+movq -8(%rbp), -8(%rbp)
+addq $7, -8(%rbp)
+movq -8(%rbp), -16(%rbp)
+movq -8(%rbp), -8(%rbp)
+addq %rcx, -8(%rbp)
+movq -16(%rbp), %rcx
+negq %rcx
+movq -8(%rbp), -8(%rbp)
+addq %rcx, -8(%rbp)
+movq -8(%rbp), %rdi
+callq print_int    
+\end{lstlisting}
+\end{minipage}
+$\Rightarrow\qquad$
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+movq $1, -8(%rbp)
+movq $42, %rcx
+addq $7, -8(%rbp)
+movq -8(%rbp), %rax
+movq %rax, -16(%rbp)
+addq %rcx, -8(%rbp)
+movq -16(%rbp), %rcx
+negq %rcx
+addq %rcx, -8(%rbp)
+movq -8(%rbp), %rdi
+callq print_int    
+\end{lstlisting}
+\end{minipage}
+\fi}
 \end{center}
-  
+
 \begin{exercise}\normalfont
 %
-Implement the \code{patch-instructions} compiler pass.
+Update the \code{patch\_instructions} compiler pass to delete trivial moves.
 %
-Insert it after \code{allocate-registers} in the list of \code{passes}
-in the \code{run-tests.rkt} script.
+%Insert it after \code{allocate\_registers} in the list of \code{passes}
+%in the \code{run-tests.rkt} script.
 %
-Run the script to test the \code{patch-instructions} pass.
+Run the script to test the \code{patch\_instructions} pass.
 \end{exercise}
 
 
@@ -4840,15 +5303,21 @@ Run the script to test the \code{patch-instructions} pass.
 \index{subject}{calling conventions}
 \index{subject}{prelude}\index{subject}{conclusion}
 
-Recall that the \code{print-x86} pass generates the prelude and
+Recall that the \code{print\_x86} pass generates the prelude and
 conclusion instructions to satisfy the x86 calling conventions
 (Section~\ref{sec:calling-conventions}). With the addition of the
 register allocator, the callee-saved registers used by the register
 allocator must be saved in the prelude and restored in the conclusion.
-In the \code{allocate-registers} pass, add an entry to the \itm{info}
-of \code{X86Program} named \code{used-callee} that stores the set of
+In the \code{allocate\_registers} pass,
+%
+\racket{add an entry to the \itm{info}
+  of \code{X86Program} named \code{used\_callee}}
+%
+\python{add a field named \code{used\_callee} to the \code{X86Program} AST node}
+%
+that stores the set of
 callee-saved registers that were assigned to variables. The
-\code{print-x86} pass can then access this information to decide which
+\code{print\_x86} pass can then access this information to decide which
 callee-saved registers need to be saved and restored.
 %
 When calculating the size of the frame to adjust the \code{rsp} in the
@@ -4860,6 +5329,7 @@ An overview of all of the passes involved in register allocation is
 shown in Figure~\ref{fig:reg-alloc-passes}.
 
 \begin{figure}[tbp]
+{\if\edition\racketEd\color{olive}      
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (Rvar) at (0,2)  {\large \LangVar{}};
 \node (Rvar-2) at (3,2)  {\large \LangVar{}};
@@ -4875,24 +5345,42 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \node (x86-2-2) at (6,-4)  {\large \LangXVar{}};
 
 \path[->,bend left=15] (Rvar) edge [above] node {\ttfamily\footnotesize uniquify} (Rvar-2);
-\path[->,bend left=15] (Rvar-2) edge [above] node {\ttfamily\footnotesize remove-complex.} (Rvar-3);
-\path[->,bend left=15] (Rvar-3) edge [right] node {\ttfamily\footnotesize explicate-control} (Cvar-1);
-\path[->,bend right=15] (Cvar-1) edge [left] node {\ttfamily\footnotesize select-instr.} (x86-2);
-\path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize uncover-live} (x86-2-1);
-\path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build-inter.} (x86-2-2);
-\path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate-reg.} (x86-3);
-\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print-x86} (x86-5);
+\path[->,bend left=15] (Rvar-2) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Rvar-3);
+\path[->,bend left=15] (Rvar-3) edge [right] node {\ttfamily\footnotesize explicate\_control} (Cvar-1);
+\path[->,bend right=15] (Cvar-1) edge [left] node {\ttfamily\footnotesize select\_instr.} (x86-2);
+\path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize uncover\_live} (x86-2-1);
+\path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build\_inter.} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate\_reg.} (x86-3);
+\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch\_instr.} (x86-4);
+\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print\_x86} (x86-5);
 \end{tikzpicture}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (Rvar-1) at (0,2)  {\large \LangVar{}};
+\node (Rvar-2) at (3,2)  {\large \LangVar{}};
+\node (x86-1) at (3,0)  {\large \LangXVar{}};
+\node (x86-2) at (6,0)  {\large \LangXVar{}};
+\node (x86-3) at (9,0) {\large \LangXInt{}};
+\node (x86-4) at (11,0) {\large \LangXInt{}};
+
+\path[->,bend left=15] (Rvar-1) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Rvar-2);
+\path[->,bend right=15] (Rvar-2) edge [left] node {\ttfamily\footnotesize select\_instr.} (x86-1);
+\path[->,bend right=15] (x86-1) edge [below] node {\ttfamily\footnotesize allocate\_reg.} (x86-2);
+\path[->,bend left=15] (x86-2) edge [above] node {\ttfamily\footnotesize patch\_instr.} (x86-3);
+\path[->,bend right=15] (x86-3) edge [below] node {\ttfamily\footnotesize print\_x86} (x86-4);
+\end{tikzpicture}
+\fi}
 \caption{Diagram of the passes for \LangVar{} with register allocation.}
 \label{fig:reg-alloc-passes}
 \end{figure}
 
 \begin{exercise}\normalfont
-Update the \code{print-x86} pass as described in this section.
+Update the \code{print\_x86} pass as described in this section.
 %
-In the \code{run-tests.rkt} script, reinstate \code{print-x86} in the
-list of passes and the call to \code{compiler-tests}.
+\racket{
+In the \code{run-tests.rkt} script, reinstate \code{print\_x86} in the
+list of passes and the call to \code{compiler-tests}.}
 %
 Run the script to test the complete compiler for \LangVar{} that
 performs register allocation.
@@ -4906,6 +5394,7 @@ This section describes an enhancement to the register allocator for
 students looking for an extra challenge or who have a deeper interest
 in register allocation.
 
+{\if\edition\racketEd\color{olive}      
 To motivate the need for move biasing we return to the running example
 but this time use all of the general purpose registers.  So we have
 the following mapping of color numbers to registers.
@@ -4956,11 +5445,24 @@ if we had put \key{t}, \key{v}, \key{x}, and \key{y} into the same
 register, we could instead remove three \key{movq} instructions.  We
 can accomplish this by taking into account which variables appear in
 \key{movq} instructions with which other variables.
+\fi}
+
+{\if\edition\pythonEd\color{purple}
+%
+To motivate the need for move biasing we return to the running example
+and recall that Section~\ref{sec:patch-instructions} we were able to
+remove three trivial move instructions from the running
+example. However, we could remove another trivial move if we were able
+to allocate \code{y} and \code{tmp\_0} to the same register.  \fi}
 
 We say that two variables $p$ and $q$ are \emph{move
   related}\index{subject}{move related} if they participate together in a
 \key{movq} instruction, that is, \key{movq} $p$\key{,} $q$ or
-\key{movq} $q$\key{,} $p$. When the register allocator chooses a color
+\key{movq} $q$\key{,} $p$. When deciding which variable to
+color next, when there are multiple variables with the same
+saturation, prefer variables that can be assigned the same
+color as a move related variable that has already been colored.
+Furthermore,  when the register allocator chooses a color
 for a variable, it should prefer a color that has already been used
 for a move-related variable (assuming that they do not interfere). Of
 course, this preference should not override the preference for
@@ -4971,6 +5473,7 @@ stack locations.
 We recommend representing the move relationships in a graph, similar
 to how we represented interference.  The following is the \emph{move
   graph} for our running example.
+{\if\edition\racketEd\color{olive}      
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (rax) at (0,0) {$\ttm{rax}$};
@@ -4988,7 +5491,29 @@ to how we represented interference.  The following is the \emph{move
 \draw (y) to (t);
 \end{tikzpicture}
 \]
+\fi}
+%
+{\if\edition\pythonEd\color{purple}
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (t0) at (0,2) {$\ttm{tmp\_0}$};
+\node (t1) at (0,0) {$\ttm{tmp\_1}$};
+\node (z) at (3,2)  {$\ttm{z}$};
+\node (x) at (6,2)  {$\ttm{x}$};
+\node (y) at (3,0)  {$\ttm{y}$};
+\node (w) at (6,0)  {$\ttm{w}$};
+\node (v) at (9,0)  {$\ttm{v}$};
 
+\draw (y) to (t0);
+\draw (z) to (x);
+\draw (z) to (t1);
+\draw (x) to (y);
+\draw (x) to (v);
+\end{tikzpicture}
+\]
+\fi}
+
+{\if\edition\racketEd\color{olive}
 Now we replay the graph coloring, pausing to see the coloring of
 \code{y}. Recall the following configuration. The most saturated vertices
 were \code{w} and \code{y}.
@@ -5113,8 +5638,100 @@ At this point, vertices \code{x} and \code{v} are most saturated, but
 \draw (rax) to (rsp);
 \end{tikzpicture}
 \]
+\fi}
+%
+{\if\edition\pythonEd\color{purple}
+Now we replay the graph coloring, pausing before the coloring of
+\code{w}. Recall the following configuration. The most saturated vertices
+were \code{tmp\_1}, \code{w}, and \code{y}.
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (t0) at (0,2) {$\ttm{tmp\_0}: 0, \{1\}$};
+\node (t1) at (0,0) {$\ttm{tmp\_1}: -, \{0\}$};
+\node (z) at (3,2)  {$\ttm{z}: 1, \{0\}$};
+\node (x) at (6,2)  {$\ttm{x}: -, \{\}$};
+\node (y) at (3,0)  {$\ttm{y}: -, \{1\}$};
+\node (w) at (6,0)  {$\ttm{w}: -, \{1\}$};
+\node (v) at (9,0)  {$\ttm{v}: -, \{\}$};
+
+\draw (t0) to (t1);
+\draw (t0) to (z);
+\draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (w);
+\draw (v) to (w);
+\end{tikzpicture}
+\]
+We have arbitrarily chosen to color \code{w} instead of \code{tmp\_1}
+or \code{y}, but note that \code{w} is not move related to any
+variables, wheras \code{y} and \code{tmp\_1} are move related to
+\code{tmp\_0} and \code{z}, respectively. If we instead choose
+\code{y} and color it $0$, we can delete another move instruction.
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (t0) at (0,2) {$\ttm{tmp\_0}: 0, \{1\}$};
+\node (t1) at (0,0) {$\ttm{tmp\_1}: -, \{0\}$};
+\node (z) at (3,2)  {$\ttm{z}: 1, \{0\}$};
+\node (x) at (6,2)  {$\ttm{x}: -, \{\}$};
+\node (y) at (3,0)  {$\ttm{y}: 0, \{1\}$};
+\node (w) at (6,0)  {$\ttm{w}: -, \{0,1\}$};
+\node (v) at (9,0)  {$\ttm{v}: -, \{\}$};
+
+\draw (t0) to (t1);
+\draw (t0) to (z);
+\draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (w);
+\draw (v) to (w);
+\end{tikzpicture}
+\]
+Now \code{w} is the most saturated, so we color it $2$.
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (t0) at (0,2) {$\ttm{tmp\_0}: 0, \{1\}$};
+\node (t1) at (0,0) {$\ttm{tmp\_1}: -, \{0\}$};
+\node (z) at (3,2)  {$\ttm{z}: 1, \{0\}$};
+\node (x) at (6,2)  {$\ttm{x}: -, \{2\}$};
+\node (y) at (3,0)  {$\ttm{y}: 0, \{1,2\}$};
+\node (w) at (6,0)  {$\ttm{w}: 2, \{0,1\}$};
+\node (v) at (9,0)  {$\ttm{v}: -, \{2\}$};
+
+\draw (t0) to (t1);
+\draw (t0) to (z);
+\draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (w);
+\draw (v) to (w);
+\end{tikzpicture}
+\]
+To finish the coloring, \code{x} and \code{v} get $0$ and
+\code{tmp\_1} gets $1$.
+\[
+\begin{tikzpicture}[baseline=(current  bounding  box.center)]
+\node (t0) at (0,2) {$\ttm{tmp\_0}: 0, \{1\}$};
+\node (t1) at (0,0) {$\ttm{tmp\_1}: 1, \{0\}$};
+\node (z) at (3,2)  {$\ttm{z}: 1, \{0\}$};
+\node (x) at (6,2)  {$\ttm{x}: 0, \{2\}$};
+\node (y) at (3,0)  {$\ttm{y}: 0, \{1,2\}$};
+\node (w) at (6,0)  {$\ttm{w}: 2, \{0,1\}$};
+\node (v) at (9,0)  {$\ttm{v}: 0, \{2\}$};
+
+\draw (t0) to (t1);
+\draw (t0) to (z);
+\draw (z) to (y);
+\draw (z) to (w);
+\draw (x) to (w);
+\draw (y) to (w);
+\draw (v) to (w);
+\end{tikzpicture}
+\]
+\fi}
 
 So we have the following assignment of variables to registers.
+{\if\edition\racketEd\color{olive}
 \begin{gather*}
   \{ \ttm{v} \mapsto \key{\%rcx}, \,
      \ttm{w} \mapsto \key{\%rsi}, \,
@@ -5123,11 +5740,23 @@ So we have the following assignment of variables to registers.
      \ttm{z} \mapsto \key{\%rdx}, \,
      \ttm{t} \mapsto \key{\%rcx} \}
 \end{gather*}
-
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{gather*}
+  \{ \ttm{v} \mapsto \key{\%rcx}, \,
+     \ttm{w} \mapsto \key{-16(\%rbp)}, \,
+     \ttm{x} \mapsto \key{\%rcx}, \,
+     \ttm{y} \mapsto \key{\%rcx}, \\
+     \ttm{z} \mapsto \key{-8(\%rbp)}, \,
+     \ttm{tmp\_0} \mapsto \key{\%rcx}, \,
+     \ttm{tmp\_1} \mapsto \key{-8(\%rbp)} \}
+\end{gather*}
+\fi}
 We apply this register assignment to the running example, on the left,
-to obtain the code in the middle.  The \code{patch-instructions} then
-removes the three trivial moves to obtain the code on the right.
+to obtain the code in the middle.  The \code{patch\_instructions} then
+deletes the trivial moves to obtain the code on the right.
 
+{\if\edition\racketEd\color{olive}
 \begin{minipage}{0.25\textwidth}
 \begin{lstlisting}
 movq $1, v
@@ -5175,9 +5804,62 @@ addq %rcx, %rax
 jmp conclusion
 \end{lstlisting}
 \end{minipage}
+\fi}
+
+{\if\edition\pythonEd\color{purple}
+\begin{minipage}{0.25\textwidth}
+\begin{lstlisting}
+movq $1, v
+movq $42, w
+movq v, x
+addq $7, x
+movq x, y
+movq x, z
+addq w, z
+movq y, tmp_0
+negq tmp_0
+movq z, tmp_1
+addq tmp_0, tmp_1
+movq tmp_1, %rdi
+callq _print_int\end{lstlisting}
+\end{minipage}
+$\Rightarrow\qquad$
+\begin{minipage}{0.25\textwidth}
+\begin{lstlisting}
+movq $1, %rcx
+movq $42, -16(%rbp)
+movq %rcx, %rcx
+addq $7, %rcx
+movq %rcx, %rcx
+movq %rcx, -8(%rbp)
+addq -16(%rbp), -8(%rbp)
+movq %rcx, %rcx
+negq %rcx
+movq -8(%rbp), -8(%rbp)
+addq %rcx, -8(%rbp)
+movq -8(%rbp), %rdi
+callq _print_int
+\end{lstlisting}
+\end{minipage}
+$\Rightarrow\qquad$
+\begin{minipage}{0.25\textwidth}
+\begin{lstlisting}
+movq $1, %rcx
+movq $42, -16(%rbp)
+addq $7, %rcx
+movq %rcx, -8(%rbp)
+movq -16(%rbp), %rax
+addq %rax, -8(%rbp)
+negq %rcx
+addq %rcx, -8(%rbp)
+movq -8(%rbp), %rdi
+callq print_int
+\end{lstlisting}
+\end{minipage}
+\fi}
 
 \begin{exercise}\normalfont
-Change your implementation of \code{allocate-registers} to take move
+Change your implementation of \code{allocate\_registers} to take move
 biasing into account. Create two new tests that include at least one
 opportunity for move biasing and visually inspect the output x86
 programs to make sure that your move biasing is working properly. Make
@@ -5189,6 +5871,8 @@ sure that your compiler still passes all of the tests.
 
 %% \subsection{Output of the Running Example}
 %% \label{sec:reg-alloc-output}
+
+UNDER CONSTRUCTION
 
 Figure~\ref{fig:running-example-x86} shows the x86 code generated for
 the running example (Figure~\ref{fig:reg-eg}) with register allocation
@@ -5333,8 +6017,8 @@ ordering up-front, prior to assigning colors. The algorithm of
 \citet{Chaitin:1981vl} should be considered offline because the vertex
 ordering does not depend on the colors assigned, so the algorithm
 could be split into two phases.  Other orderings are possible. For
-example, \citet{Chow:1984ys} order variables according an estimate of
-runtime cost.
+example, \citet{Chow:1984ys} order variables according to an estimate
+of runtime cost.
 
 An \emph{online} greedy coloring algorithm uses information about the
 current assignment of colors to influence the order in which the
@@ -6700,7 +7384,7 @@ or written-to ($W$) by an instruction need to be updated to handle the
 new kinds of arguments and instructions in \LangXIfVar{}.
 
 \begin{exercise}\normalfont
-Update the \code{uncover-live} pass and implement the
+Update the \code{uncover\_live} \racket{pass}\python{function} and implement the
 \code{uncover-live-CFG} auxiliary function to apply liveness analysis
 to the control-flow graph.  Add the following entry to the list of
 \code{passes} in the \code{run-tests.rkt} script.
@@ -7671,7 +8355,7 @@ compiler passes. We introduce a new compiler pass named
 \code{expose-allocation}. We make
 significant changes to \code{select-instructions},
 \code{build-interference}, \code{allocate-registers}, and
-\code{print-x86} and make minor changes in several more passes.  The
+\code{print\_x86} and make minor changes in several more passes.  The
 following program will serve as our running example.  It creates two
 tuples, one nested inside the other. Both tuples have length one. The
 program accesses the element in the inner tuple tuple via two vector
@@ -8137,7 +8821,7 @@ stack.
 \index{subject}{prelude}\index{subject}{conclusion}
 
 Figure~\ref{fig:print-x86-output-gc} shows the output of the
-\code{print-x86} pass on the running example. In the prelude and
+\code{print\_x86} pass on the running example. In the prelude and
 conclusion of the \code{main} function, we treat the root stack very
 much like the regular stack in that we move the root stack pointer
 (\code{r15}) to make room for the spills to the root stack, except
@@ -8242,7 +8926,7 @@ conclusion:
 	retq
 \end{lstlisting}
 \end{minipage}
-\caption{Output of the \code{print-x86} pass.}
+\caption{Output of the \code{print\_x86} pass.}
 \label{fig:print-x86-output-gc}
 \end{figure}
 
@@ -8533,7 +9217,7 @@ inside each other.
     \small
 \[
 \begin{array}{lcl}
-\Exp &::=& \gray{ \INT{\Int} \VAR{\Var} \MID \LET{\Var}{\Exp}{\Exp} } \\
+\Exp &::=& \gray{ \INT{\Int} \MID \VAR{\Var} \MID \LET{\Var}{\Exp}{\Exp} } \\
      &\MID& \gray{ \PRIM{\itm{op}}{\Exp\ldots} }\\
      &\MID& \gray{ \BOOL{\itm{bool}} 
       \MID \IF{\Exp}{\Exp}{\Exp} } \\
@@ -8919,9 +9603,9 @@ frame for passing arguments. However, this option is also problematic
 because the caller and callee's frame overlap in memory.  As we begin
 to copy the arguments from their sources in the caller's frame, the
 target locations in the callee's frame might overlap with the sources
-for later arguments! We solve this problem by not using the stack for
-passing more than six arguments but instead using the heap, as we
-describe in the Section~\ref{sec:limit-functions-r4}.
+for later arguments! We solve this problem by using the heap instead
+of the stack for passing more than six arguments, as we describe in
+the Section~\ref{sec:limit-functions-r4}.
 
 As mentioned above, for a tail call we pop the caller's frame prior to
 making the tail call. The instructions for popping a frame are the
@@ -9391,7 +10075,7 @@ before the tail call (as explained in the next section).
 
 \section{Print x86}
 
-For the \code{print-x86} pass, the cases for \code{FunRef} and
+For the \code{print\_x86} pass, the cases for \code{FunRef} and
 \code{IndirectCallq} are straightforward: output their concrete
 syntax.
 \begin{lstlisting}
