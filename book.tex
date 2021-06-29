@@ -5375,6 +5375,108 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \label{fig:reg-alloc-passes}
 \end{figure}
 
+Figure~\ref{fig:running-example-x86} shows the x86 code generated for
+the running example (Figure~\ref{fig:reg-eg}). To demonstrate both the
+use of registers and the stack, we have limited the register allocator
+to use just two registers: \code{rbx} and \code{rcx}.  In the
+prelude\index{subject}{prelude} of the \code{main} function, we push
+\code{rbx} onto the stack because it is a callee-saved register and it
+was assigned to variable by the register allocator.  We subtract
+\code{8} from the \code{rsp} at the end of the prelude to reserve
+space for the one spilled variable.  After that subtraction, the
+\code{rsp} is aligned to 16 bytes.
+
+Moving on to the program proper, we see how the registers were
+allocated.
+%
+\racket{Variables \code{v}, \code{x}, and \code{y} were assigned to
+  \code{rbx} and variable \code{z} was assigned to \code{rcx}.}
+%
+\python{Variables \code{v}, \code{x}, \code{y}, and \code{tmp\_0}
+  were assigned to \code{rcx} and variables \code{w} and \code{tmp\_1}
+  were assigned to \code{rbx}.}
+%
+Variable \racket{\code{w}}\python{\code{z}} was spilled to the stack
+location \code{-16(\%rbp)}.  Recall that the prelude saved the
+callee-save register \code{rbx} onto the stack. The spilled variables
+must be placed lower on the stack than the saved callee-save
+registers, so in this case \racket{\code{w}}\python{z} is placed at
+\code{-16(\%rbp)}.
+
+In the conclusion\index{subject}{conclusion}, we undo the work that was
+done in the prelude. We move the stack pointer up by \code{8} bytes
+(the room for spilled variables), then we pop the old values of
+\code{rbx} and \code{rbp} (callee-saved registers), and finish with
+\code{retq} to return control to the operating system.
+
+  
+\begin{figure}[tbp]
+  % var_test_28.rkt
+  % (use-minimal-set-of-registers! #t)
+  % and only rbx rcx
+% tmp 0 rbx
+% z 1  rcx
+% y 0  rbx
+% w 2  16(%rbp)
+% v 0  rbx
+% x 0  rbx
+{\if\edition\racketEd\color{olive}
+\begin{lstlisting}
+start:
+	movq	$1, %rbx
+	movq	$42, -16(%rbp)
+	addq	$7, %rbx
+	movq	%rbx, %rcx
+	addq	-16(%rbp), %rcx
+	negq	%rbx
+	movq	%rcx, %rax
+	addq	%rbx, %rax
+	jmp conclusion
+
+	.globl main
+main:
+	pushq	%rbp
+	movq	%rsp, %rbp
+	pushq	%rbx
+	subq	$8, %rsp
+	jmp start
+        
+conclusion:
+	addq	$8, %rsp
+	popq	%rbx
+	popq	%rbp
+	retq
+\end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+%{v: %rcx, x: %rcx, z: -16(%rbp), w: %rbx, tmp_1: %rbx, y: %rcx, tmp_0: %rcx}  
+\begin{lstlisting}
+	.globl main
+main:
+	pushq %rbp
+	movq %rsp, %rbp
+	pushq %rbx
+	subq $8, %rsp
+	movq $1, %rcx
+	movq $42, %rbx
+	addq $7, %rcx
+	movq %rcx, -16(%rbp)
+	addq %rbx, -16(%rbp)
+	negq %rcx
+	movq -16(%rbp), %rbx
+	addq %rcx, %rbx
+	movq %rbx, %rdi
+	callq print_int
+	addq $8, %rsp
+	popq %rbx
+	popq %rbp
+	retq
+\end{lstlisting}
+\fi}
+\caption{The x86 output from the running example (Figure~\ref{fig:reg-eg}).}
+\label{fig:running-example-x86}
+\end{figure}
+
 \begin{exercise}\normalfont
 Update the \code{print\_x86} pass as described in this section.
 %
@@ -5872,74 +5974,6 @@ sure that your compiler still passes all of the tests.
 %% \subsection{Output of the Running Example}
 %% \label{sec:reg-alloc-output}
 
-UNDER CONSTRUCTION
-
-Figure~\ref{fig:running-example-x86} shows the x86 code generated for
-the running example (Figure~\ref{fig:reg-eg}) with register allocation
-and move biasing. To demonstrate both the use of registers and the
-stack, we have limited the register allocator to use just two
-registers: \code{rbx} and \code{rcx}.  In the prelude\index{subject}{prelude}
-of the \code{main} function, we push \code{rbx} onto the stack because
-it is a callee-saved register and it was assigned to variable by the
-register allocator.  We subtract \code{8} from the \code{rsp} at the
-end of the prelude to reserve space for the one spilled variable.
-After that subtraction, the \code{rsp} is aligned to 16 bytes.
-
-Moving on the the \code{start} block, we see how the registers were
-allocated. Variables \code{v}, \code{x}, and \code{y} were assigned to
-\code{rbx} and variable \code{z} was assigned to \code{rcx}.  Variable
-\code{w} was spilled to the stack location \code{-16(\%rbp)}.  Recall
-that the prelude saved the callee-save register \code{rbx} onto the
-stack. The spilled variables must be placed lower on the stack than
-the saved callee-save registers, so in this case \code{w} is placed at
-\code{-16(\%rbp)}.
-
-In the \code{conclusion}\index{subject}{conclusion}, we undo the work that was
-done in the prelude. We move the stack pointer up by \code{8} bytes
-(the room for spilled variables), then we pop the old values of
-\code{rbx} and \code{rbp} (callee-saved registers), and finish with
-\code{retq} to return control to the operating system.
-
-  
-\begin{figure}[tbp]
-  % var_test_28.rkt
-  % (use-minimal-set-of-registers! #t)
-  % and only rbx rcx
-% tmp 0 rbx
-% z 1  rcx
-% y 0  rbx
-% w 2  16(%rbp)
-% v 0  rbx
-% x 0  rbx
-\begin{lstlisting}
-start:
-	movq	$1, %rbx
-	movq	$42, -16(%rbp)
-	addq	$7, %rbx
-	movq	%rbx, %rcx
-	addq	-16(%rbp), %rcx
-	negq	%rbx
-	movq	%rcx, %rax
-	addq	%rbx, %rax
-	jmp conclusion
-
-	.globl main
-main:
-	pushq	%rbp
-	movq	%rsp, %rbp
-	pushq	%rbx
-	subq	$8, %rsp
-	jmp start
-        
-conclusion:
-	addq	$8, %rsp
-	popq	%rbx
-	popq	%rbp
-	retq
-\end{lstlisting}
-\caption{The x86 output from the running example (Figure~\ref{fig:reg-eg}).}
-\label{fig:running-example-x86}
-\end{figure}
 
 % challenge: prioritize variables based on execution frequencies
 %   and the number of uses of a variable
