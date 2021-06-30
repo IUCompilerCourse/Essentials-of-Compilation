@@ -2062,21 +2062,24 @@ class InterpPvar:
       case Call(Name('input_int'), []):
         return int(input())            
 
-  def interp_stmt(self, s, env):
-    match s:
+  def interp_stmts(self, ss, env):
+    if len(ss) == 0:
+      return
+    match ss[0]:
       case Assign([lhs], value):
         env[lhs.id] = self.interp_exp(value, env)
+        return self.interp_stmts(ss[1:], env)
       case Expr(Call(Name('print'), [arg])):
-        print(self.interp_exp(arg, env))
+        print(self.interp_exp(arg, env), end='')
+        return self.interp_stmts(ss[1:], env)
       case Expr(value):
         self.interp_exp(value, env)
+        return self.interp_stmts(ss[1:], env)
 
-  def interp_Pvar(self, p):
+  def interp_P(self, p):
     match p:
       case Module(body):
-        env = {}
-        for s in body:
-          self.interp_stmt(s, env)
+        self.interp_stmts(body, {})
 \end{lstlisting}
 \fi}
 \caption{Interpreter for the \LangVar{} language.}
