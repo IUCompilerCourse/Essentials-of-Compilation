@@ -6109,12 +6109,11 @@ and the linear scan of \citet{Poletto:1999uq} may be more appropriate.
 The \LangInt{} and \LangVar{} languages only have a single kind of
 value, integers. In this chapter we add a second kind of value, the
 Booleans, to create the \LangIf{} language. The Boolean values
-\emph{true} and \emph{false} are written \racket{\key{\#t}}\python{\key{True}}
-and \racket{\key{\#f}}\python{\key{False}}
+\emph{true} and \emph{false} are written \TRUE{} and \FALSE{}
 respectively in \racket{Racket}\python{Python}.
 The \LangIf{} language includes several
-operations that involve Booleans (\key{and}, \key{not}, \racket{\key{eq?}}\python{==}, \key{<}, etc.) and the conditional \key{if} expression. With the
-addition of \key{if}, programs can have non-trivial control flow which
+operations that involve Booleans (\key{and}, \key{not}, \racket{\key{eq?}}\python{==}, \key{<}, etc.) and the \key{if} expression \python{and statement}.
+With the addition of \key{if}, programs can have non-trivial control flow which
 \racket{impacts \code{explicate\_control} and liveness analysis}
 \python{impacts liveness analysis and motivates a new pass named
   \code{explicate\_control}}. Also, because
@@ -6169,7 +6168,7 @@ checking and build a type checker for \LangIf{}
 %
 The remaining sections of this chapter discuss how our compiler passes
 change to accommodate Booleans and conditional control flow. There is
-one new pass, named \code{shrink}, that translates some operators into
+a new pass, named \code{shrink}, that translates some operators into
 others, thereby reducing the number of operators that need to be
 handled in later passes.
 %
@@ -6193,30 +6192,33 @@ to handle conditional jumps.
 The concrete syntax of the \LangIf{} language is defined in
 Figure~\ref{fig:Rif-concrete-syntax} and the abstract syntax is defined
 in Figure~\ref{fig:Rif-syntax}. The \LangIf{} language includes all of
-\LangVar{} (shown in gray), the Boolean literals \code{\#t} and
-\code{\#f}, and the conditional \code{if} expression. We expand the
+\LangVar{}\racket{(shown in gray)}, the Boolean literals \TRUE{} and
+\FALSE{}, and the \code{if} expression \python{and statement}. We expand the
 operators to include
 \begin{enumerate}
 \item subtraction on integers,
 \item the logical operators \key{and}, \key{or} and \key{not},
-\item the \key{eq?} operation for comparing two integers or two Booleans, and
+\item the \racket{\key{eq?} operation}\python{\key{==} and \key{!=} operations}
+  for comparing two integers or two Booleans for equality, and
 \item the \key{<}, \key{<=}, \key{>}, and \key{>=} operations for
   comparing integers.
 \end{enumerate}
-We reorganize the abstract syntax for the primitive operations in
-Figure~\ref{fig:Rif-syntax}, using only one grammar rule for all of
-them. This means that the grammar no longer checks whether the arity
-of an operators matches the number of arguments. That responsibility
-is moved to the type checker for \LangIf{}, which we introduce in
-Section~\ref{sec:type-check-Rif}.
+
+\racket{We reorganize the abstract syntax for the primitive
+  operations in Figure~\ref{fig:Rif-syntax}, using only one grammar
+  rule for all of them. This means that the grammar no longer checks
+  whether the arity of an operators matches the number of
+  arguments. That responsibility is moved to the type checker for
+  \LangIf{}, which we introduce in Section~\ref{sec:type-check-Rif}.}
 
 \begin{figure}[tp]
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
+{\if\edition\racketEd\color{olive}    
 \[
 \begin{array}{lcl}
-  \itm{bool} &::=& \key{\#t} \MID \key{\#f} \\  
+  \itm{bool} &::=& \TRUE \MID \FALSE \\  
   \itm{cmp} &::= & \key{eq?} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=} \\
   \Exp &::=& \gray{ \Int \MID \CREAD{} \MID \CNEG{\Exp} \MID \CADD{\Exp}{\Exp} }  \MID \CSUB{\Exp}{\Exp} \\
      &\MID&  \gray{ \Var \MID \CLET{\Var}{\Exp}{\Exp} } \\
@@ -6227,6 +6229,20 @@ Section~\ref{sec:type-check-Rif}.
   \LangIfM{} &::=& \Exp
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd\color{purple}
+\[
+\begin{array}{rcl}
+  \itm{binop} &::= & \key{+} \MID \key{-} \MID \key{==} \MID \key{!=} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=} \\
+  \itm{uniop} &::= & \key{-} \MID \key{not} \\
+  \Exp &::=& \Int \MID \key{input\_int}\LP\RP \MID \itm{uniop}\;\Exp \MID \Exp \; \itm{binop} \; \Exp \MID \Var{} \\
+  &\MID&  \TRUE \MID \FALSE \MID \Exp\;\key{if}\;\Exp\;\key{else}\;\Exp\\
+  \Stmt &::=& \key{print}\LP \Exp \RP \MID \Exp \MID \Var\mathop{\key{=}}\Exp
+      \MID \key{if}\; \Exp \;\key{:}\; \Stmt^{+} \;\key{else:}\; \Stmt^{+}\\
+  \LangVarM{} &::=& \Stmt^{*}
+\end{array}
+\]
+\fi}
 \end{minipage}
 }
 \caption{The concrete syntax of \LangIf{}, extending \LangVar{}
@@ -6238,6 +6254,7 @@ Section~\ref{sec:type-check-Rif}.
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
+{\if\edition\racketEd\color{olive}    
 \[
 \begin{array}{lcl}
   \itm{bool} &::=& \code{\#t} \MID \code{\#f} \\
@@ -6250,6 +6267,27 @@ Section~\ref{sec:type-check-Rif}.
   \LangIfM{} &::=& \PROGRAM{\code{'()}}{\Exp}
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd\color{purple}
+\[
+\begin{array}{lcl}
+\itm{binop} &::=& \code{Add()} \MID \code{Sub()} \\
+\itm{uniop} &::=& \code{USub()} \MID \code{Not()} \\
+\itm{bool} &::=& \code{True} \MID \code{False} \\
+\itm{boolop} &::=& \code{And()} \MID \code{Or()} \\
+\itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \\
+\Exp &::=& \INT{\Int} \MID \READ{} \MID \VAR{\Var} \\
+     &\MID& \BINOP{\Exp}{\itm{binop}}{\Exp}
+     \MID \UNIOP{\itm{uniop}}{\Exp}\\
+     &\MID& \CMP{\Exp}{\itm{cmp}}{\Exp} 
+     \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp}\\
+     &\MID& \BOOL{\itm{bool}} \MID \IF{\Exp}{\Exp}{\Exp} \\
+\Stmt{} &::=& \PRINT{\Exp} \MID \EXPR{\Exp} \\
+        &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{*}}{\Stmt^{*}}\\
+\LangIfM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
+\end{array}
+\]
+\fi}
 \end{minipage}
 }
 \caption{The abstract syntax of \LangIf{}.}
