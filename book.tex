@@ -7520,21 +7520,114 @@ following paragraphs we discuss specific cases in the
 {\if\edition\pythonEd\color{purple}
 %
 We recommend implementing \code{explicate\_control} using four
-auxiliary functions:
+auxiliary functions which we discuss in the following paragraphs.
 \begin{description}
-\item[\code{explicate\_pred}] generates code for expressions
-  that appear in the condition of an \code{if}.
-\item[\code{explicate\_assign}] generates code for exprssions
-  that appear on the right-hand side of an assignment.
 \item[\code{explicate\_exp}] generates code for expressions in all
   other contexts.
+\item[\code{explicate\_assign}] generates code for exprssions
+  that appear on the right-hand side of an assignment.
+\item[\code{explicate\_pred}] generates code for expressions
+  that appear in the condition of an \code{if}.
 \item[\code{explicate\_stmt}] generates code for statements.
 \end{description}
-  
+These four functions should incrementally build up the dictionary of
+basic blocks. The following auxiliary function can be used to create a
+new basic block from a list of statements. It returns a \code{goto}
+statement that jumps to the new basic block.
+\begin{lstlisting}
+def create_block(stmts, basic_blocks):
+    label = label_name(generate_name('block'))
+    basic_blocks[label] = stmts
+    return Goto(label)
+\end{lstlisting}
+Figure~\ref{fig:explicate-control-Rif} provides a skeleton for the
+\code{explicate\_control} pass.
+
+The \code{explicate\_exp} function has three parameters: 1) the
+expression to be compiled, 2) the already-compiled code for this
+expression's \emph{continuation}, that is, the code that should
+execute after this expression, and 3) the dictionary of generated
+basic blocks. The output of \code{explicate\_exp} is a list of
+\LangCIf{} statements.
+%
+The only kind of expression in \LangIf{} that is not in \LangCIf{} is
+the \code{if} expression, so that must be translated into something
+else.  The two branches should be translated using
+\code{explicate\_exp} and the condition expression should be
+translated using \code{explicate\_pred}.  All other expressions can be
+translated into a statment using \code{Expr}.
+
+The \code{explicate\_assign} function has four parameters: 1) the
+right-hand-side of the assignment, 2) the left-hand-side of the
+assignment (the variable), 3) the continuation, and 4) the dictionary
+of basic blocks. When the right-hand-side is an \code{if} expression,
+there is some work to there. The two branches should be translated
+using \code{explicate\_assign} and the condition expression should be
+translated using \code{explicate\_pred}.  Otherwise we can simply
+generate an assignment statement with the given left and right-hand
+sides.
+
+\begin{figure}[tbp]
+\begin{lstlisting}
+def explicate_exp(e, cont, basic_blocks):
+    match e:
+        case IfExp(test, body, orelse):
+            ...
+        case _:
+            return [Expr(e)] + cont
+
+def explicate_assign(rhs, lhs, cont, basic_blocks):
+    match rhs:
+        case IfExp(test, body, orelse):
+            ...
+        case _:
+            return [Assign([lhs], rhs)] + cont
+
+def explicate_pred(cnd, thn, els, basic_blocks):
+    match cnd:
+        case Compare(left, [op], [right]):
+            goto_thn = create_block(thn, basic_blocks)
+            goto_els = create_block(els, basic_blocks)
+            return [If(cnd, [goto_thn], [goto_els])]
+        case Constant(True):
+            return thn;
+        case Constant(False):
+            return els;
+        case UnaryOp(Not(), operand):
+            ...
+        case IfExp(test, body, orelse):
+            ...
+        case _:
+            return [If(Compare(cnd, [Eq()], [Constant(False)]),
+                       [create_block(els, basic_blocks)],
+                       [create_block(thn, basic_blocks)])]
+
+def explicate_stmt(s, cont, basic_blocks):
+    match s:
+        case Assign([lhs], rhs):
+            return explicate_assign(rhs, lhs, cont, basic_blocks)
+        case Expr(value):
+            return explicate_exp(value, cont, basic_blocks)
+        case If(test, body, orelse):
+            ...
+
+def explicate_control(p):
+    match p:
+        case Module(body):
+            new_body = [Return(Constant(0))]
+            basic_blocks = {}
+            for s in reversed(body):
+                new_body = explicate_stmt(s, new_body, basic_blocks)
+            basic_blocks[label_name('start')] = new_body
+            return CProgram(basic_blocks)
+\end{lstlisting}
+\caption{Skeleton for the \code{explicate\_control} pass.}
+\label{fig:explicate-control-Rif}
+\end{figure}
 \fi}
 
-UNDER CONSTRUCTION
 
+{\if\edition\racketEd\color{olive}        
 \begin{figure}[tbp]
 \begin{lstlisting}
 (define (explicate-pred cnd thn els)
@@ -7552,87 +7645,49 @@ UNDER CONSTRUCTION
 \caption{Skeleton for the \key{explicate-pred} auxiliary function.}
 \label{fig:explicate-pred}
 \end{figure}
+\fi}
 
-The skeleton for the \code{explicate-pred} function is given in
-Figure~\ref{fig:explicate-pred}. It has a case for every expression
-that can have type \code{Boolean}.  We detail a few cases here and
-leave the rest for the reader. The input to this function is an
-expression and two blocks, \code{thn} and \code{els}, for the two
-branches of the enclosing \key{if}.
+\racket{The skeleton for the \code{explicate\_pred} function is given
+  in Figure~\ref{fig:explicate-pred}. It has a case for every
+  expression that can have type \code{Boolean}.  We detail a few cases
+  here and leave the rest for the reader. The input to this function
+  is an expression and two blocks, \code{thn} and \code{els}, for the
+  two branches of the enclosing \key{if}.}
 %
-Consider the case for Boolean constants in
-Figure~\ref{fig:explicate-pred}.  We perform a kind of partial
-evaluation\index{subject}{partial evaluation} and output either the \code{thn}
-or \code{els} branch depending on whether the constant is true or
-false. This case demonstrates that we sometimes discard the \code{thn}
-or \code{els} blocks that are input to \code{explicate-pred}.
+\python{The \code{explicate\_pred} function has four parameters: 1)
+  the condition expession, 2) the generated code for the ``then''
+  branch, 3) the generated code for the ``else'' branch, and 4) the
+  dictionary of basic blocks.}
+%
+Consider the case for comparison operators. We translate the
+comparison to an \code{if} statement whose branches are \code{goto}
+statements created by applying \code{create\_block} to the \code{thn}
+and \code{els} branches.
+%
+Next consider the case for Boolean constants. We perform a kind of
+partial evaluation\index{subject}{partial evaluation} and output
+either the \code{thn} or \code{els} branch depending on whether the
+constant is \TRUE{} or \FALSE{}. This case demonstrates that we
+sometimes discard the \code{thn} or \code{els} blocks that are input
+to \code{explicate\_pred}.
+%
+The case for \key{if} expressions in \code{explicate\_pred} is
+particularly illuminating because it deals with the challenges we
+discussed above regarding nested \key{if} expressions
+(Figure~\ref{fig:explicate-control-s1-38}).  The
+\racket{\lstinline{thn^}}\python{\code{body}} and
+\racket{\lstinline{els^}}\python{\code{orlese}} branches of the
+\key{if} inherit their context from the current one, that is,
+predicate context. So you should recursively apply
+\code{explicate\_pred} to the
+\racket{\lstinline{thn^}}\python{\code{body}} and
+\racket{\lstinline{els^}}\python{\code{orelse}} branches. For both of
+those recursive calls, pass \code{thn} and \code{els} as the extra
+parameters. Thus, \code{thn} and \code{els} may get used twice, once
+inside each recursive call. As discussed above, to avoid duplicating
+code, we need to add them to the dictionary of basic blocks so that we
+can instead refer to them by name and execute them with a \key{goto}.
 
-The case for \key{if} in \code{explicate-pred} is particularly
-illuminating because it deals with the challenges we discussed above
-regarding nested \key{if} expressions
-(Figure~\ref{fig:explicate-control-s1-38}).  The \lstinline{thn^} and
-\lstinline{els^} branches of the \key{if} inherit their context from
-the current one, that is, predicate context. So you should recursively
-apply \code{explicate-pred} to the \lstinline{thn^} and
-\lstinline{els^} branches. For both of those recursive calls, pass
-\code{thn} and \code{els} as the extra parameters. Thus, \code{thn}
-and \code{els} may get used twice, once inside each recursive call. As
-discussed above, to avoid duplicating code, we need to add them to the
-control-flow graph so that we can instead refer to them by name and
-execute them with a \key{goto}. However, as we saw in the cases above
-for Boolean constants, the blocks \code{thn} and \code{els} may not
-get used at all and we don't want to prematurely add them to the
-control-flow graph if they end up being discarded.
-
-The solution to this conundrum is to use \emph{lazy
-  evaluation}\index{subject}{lazy evaluation}\citep{Friedman:1976aa} to delay
-adding the blocks to the control-flow graph until the points where we
-know they will be used. Racket provides support for lazy evaluation
-with the
-\href{https://docs.racket-lang.org/reference/Delayed_Evaluation.html}{\code{racket/promise}}
-package. The expression \key{(delay} $e_1 \ldots e_n$\key{)}
-\index{subject}{delay} creates a \emph{promise}\index{subject}{promise} in which the
-evaluation of the expressions is postponed. When \key{(force}
-$p$\key{)}\index{subject}{force} is applied to a promise $p$ for the first
-time, the expressions $e_1 \ldots e_n$ are evaluated and the result of
-$e_n$ is cached in the promise and returned. If \code{force} is
-applied again to the same promise, then the cached result is returned.
-If \code{force} is applied to an argument that is not a promise,
-\code{force} simply returns the argument.
-
-We use lazy evaluation for the input and output blocks of the
-functions \code{explicate-pred} and \code{explicate-assign} and for
-the output block of \code{explicate-tail}. So instead of taking and
-returning blocks, they take and return promises. Furthermore, when we
-come to a situation in which we a block might be used more than once,
-as in the case for \code{if} in \code{explicate-pred}, we transform
-the promise into a new promise that will add the block to the
-control-flow graph and return a \code{goto}.  The following auxiliary
-function named \code{block->goto} accomplishes this task. It begins
-with \code{delay} to create a promise. When forced, this promise will
-force the original promise. If that returns a \code{goto} (because the
-block was already added to the control-flow graph), then we return the
-\code{goto}. Otherwise we add the block to the control-flow graph with
-another auxiliary function named \code{add-node}. That function
-returns the label for the new block, which we use to create a
-\code{goto}.
-\begin{lstlisting}
-(define (block->goto block)
-  (delay
-    (define b (force block))
-    (match b
-      [(Goto label) (Goto label)]
-      [else (Goto (add-node b))])))
-\end{lstlisting}
-
-Returning to the discussion of \code{explicate-pred}
-(Figure~\ref{fig:explicate-pred}), consider the case for comparison
-operators. This is one of the base cases of the recursive function so
-we translate the comparison to an \code{if} statement. We apply
-\code{block->goto} to \code{thn} and \code{els} to obtain two promises
-that will add then to the control-flow graph, which we can immediately
-\code{force} to obtain the two goto's that form the branches of the
-\code{if} statement.
 
 %% Getting back to the case for \code{if} in \code{explicate-pred}, we
 %% make the recursive calls to \code{explicate-pred} on the ``then'' and
@@ -7648,14 +7703,14 @@ that will add then to the control-flow graph, which we can immediately
 %% B_5
 %% \]
 
-The \code{explicate-tail} and \code{explicate-assign} functions need
+\racket{The \code{explicate-tail} and \code{explicate-assign} functions need
 additional cases for Boolean constants and \key{if}.
 %
 In the cases for \code{if}, the two branches inherit the current
 context, so in \code{explicate-tail} they are in tail position and in
 \code{explicate-assign} they are in assignment position. The
 \code{cont} parameter of \code{explicate-assign} is used in both
-recursive calls, so make sure to use \code{block->goto} on it.
+recursive calls, so make sure to use \code{block->goto} on it.}
 
 %% In the case for \code{if} in \code{explicate-tail}, the two branches
 %% inherit the current context, so they are in tail position. Thus, the
@@ -7702,7 +7757,7 @@ recursive calls, so make sure to use \code{block->goto} on it.
 %% \]
 %% This completes the description of \code{explicate\_control} for \LangIf{}.
 
-
+{\if\edition\racketEd\color{olive}
 The way in which the \code{shrink} pass transforms logical operations
 such as \code{and} and \code{or} can impact the quality of code
 generated by \code{explicate\_control}. For example, consider the
@@ -7734,21 +7789,27 @@ block39:
     return 42;
 \end{lstlisting}
 \end{center}
+\fi}
 
 \begin{exercise}\normalfont
+\racket{
 Implement the pass \code{explicate\_control} by adding the cases for
 Boolean constants and \key{if} to the \code{explicate-tail} and
 \code{explicate-assign}. Implement the auxiliary function
-\code{explicate-pred} for predicate contexts.
+\code{explicate-pred} for predicate contexts.}
+\python{Implement \code{explicate\_control} pass with its
+four auxiliary functions.}
 %
 Create test cases that exercise all of the new cases in the code for
 this pass.
 %
+{\if\edition\racketEd\color{olive}
 Add the following entry to the list of \code{passes} in
 \code{run-tests.rkt} and then run this script to test your compiler.
 \begin{lstlisting}
 (list "explicate-control" explicate-control interp-Cif type-check-Cif)
 \end{lstlisting}
+\fi}
 
 \end{exercise}
 
@@ -7757,17 +7818,21 @@ Add the following entry to the list of \code{passes} in
 \label{sec:select-Rif}
 \index{subject}{instruction selection}
 
-The \code{select-instructions} pass translate \LangCIf{} to
-\LangXIfVar{}. Recall that we implement this pass using three
-auxiliary functions, one for each of the non-terminals $\Atm$,
-$\Stmt$, and $\Tail$.
+The \code{select\_instructions} pass translates \LangCIf{} to
+\LangXIfVar{}.
+%
+\racket{Recall that we implement this pass using three auxiliary
+  functions, one for each of the non-terminals $\Atm$, $\Stmt$, and
+  $\Tail$.}
+
+UNDER CONSTRUCTION
 
 For $\Atm$, we have new cases for the Booleans.  We take the usual
 approach of encoding them as integers, with true as 1 and false as 0.
 \[
-\key{\#t} \Rightarrow \key{1}
+\TRUE{} \Rightarrow \key{1}
 \qquad
-\key{\#f} \Rightarrow \key{0}
+\FALSE{} \Rightarrow \key{0}
 \]
 
 For $\Stmt$, we discuss a couple cases.  The \code{not} operation can
@@ -8116,8 +8181,57 @@ conclusion:
 \end{figure}
 
 
-\section{Challenge: Remove Jumps}
+\section{Challenge: Optimize and Remove Jumps}
 \label{sec:opt-jumps}
+
+UNDER CONSTRUCTION
+
+However, as we saw in the cases above for Boolean constants, the
+blocks \code{thn} and \code{els} may not get used at all and we don't
+want to prematurely add them to the control-flow graph if they end up
+being discarded.
+
+The solution to this conundrum is to use \emph{lazy
+  evaluation}\index{subject}{lazy evaluation}\citep{Friedman:1976aa} to delay
+adding the blocks to the control-flow graph until the points where we
+know they will be used. Racket provides support for lazy evaluation
+with the
+\href{https://docs.racket-lang.org/reference/Delayed_Evaluation.html}{\code{racket/promise}}
+package. The expression \key{(delay} $e_1 \ldots e_n$\key{)}
+\index{subject}{delay} creates a \emph{promise}\index{subject}{promise} in which the
+evaluation of the expressions is postponed. When \key{(force}
+$p$\key{)}\index{subject}{force} is applied to a promise $p$ for the first
+time, the expressions $e_1 \ldots e_n$ are evaluated and the result of
+$e_n$ is cached in the promise and returned. If \code{force} is
+applied again to the same promise, then the cached result is returned.
+If \code{force} is applied to an argument that is not a promise,
+\code{force} simply returns the argument.
+
+We use lazy evaluation for the input and output blocks of the
+functions \code{explicate-pred} and \code{explicate-assign} and for
+the output block of \code{explicate-tail}. So instead of taking and
+returning blocks, they take and return promises. Furthermore, when we
+come to a situation in which we a block might be used more than once,
+as in the case for \code{if} in \code{explicate-pred}, we transform
+the promise into a new promise that will add the block to the
+control-flow graph and return a \code{goto}.  The following auxiliary
+function named \code{block->goto} accomplishes this task. It begins
+with \code{delay} to create a promise. When forced, this promise will
+force the original promise. If that returns a \code{goto} (because the
+block was already added to the control-flow graph), then we return the
+\code{goto}. Otherwise we add the block to the control-flow graph with
+another auxiliary function named \code{add-node}. That function
+returns the label for the new block, which we use to create a
+\code{goto}.
+\begin{lstlisting}
+(define (block->goto block)
+  (delay
+    (define b (force block))
+    (match b
+      [(Goto label) (Goto label)]
+      [else (Goto (add-node b))])))
+\end{lstlisting}
+
 
 %% Recall that in the example output of \code{explicate\_control} in
 %% Figure~\ref{fig:explicate-control-s1-38}, \code{block57} through
