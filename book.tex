@@ -2614,7 +2614,7 @@ of each of the compiler passes in Figure~\ref{fig:Rvar-passes}.
 %% output of the later is a subset of \LangVar{} named \LangVarANF{}
 %% (Section~\ref{sec:remove-complex-opera-Rvar}).
 %% %
-%% The output of \key{explicate-control} is in an intermediate language
+%% The output of \code{explicate\_control} is in an intermediate language
 %% \LangCVar{} designed to make the order of evaluation explicit in its
 %% syntax, which we introduce in the next section. The
 %% \key{select-instruction} pass translates from \LangCVar{} to
@@ -2626,7 +2626,7 @@ of each of the compiler passes in Figure~\ref{fig:Rvar-passes}.
 {\if\edition\racketEd\color{olive}  
 \subsection{The \LangCVar{} Intermediate Language}
 
-The output of \key{explicate-control} is similar to the $C$
+The output of \code{explicate\_control} is similar to the $C$
 language~\citep{Kernighan:1988nx} in that it has separate syntactic
 categories for expressions and statements, so we name it \LangCVar{}.  The
 abstract syntax for \LangCVar{} is defined in Figure~\ref{fig:c0-syntax}.
@@ -2651,7 +2651,7 @@ Chapter~\ref{ch:Rif}.  For now there will be just one label,
 \key{start}, and the whole program is its tail.
 %
 The $\itm{info}$ field of the \key{CProgram} form, after the
-\key{explicate-control} pass, contains a mapping from the symbol
+\code{explicate\_control} pass, contains a mapping from the symbol
 \key{locals} to a list of variables, that is, a list of all the
 variables used in the program. At the start of the program, these
 variables are uninitialized; they become initialized on their first
@@ -3026,11 +3026,11 @@ print(b)
 \begin{exercise}
   \normalfont
 {\if\edition\racketEd\color{olive}  
-Implement the \code{remove-complex-opera*} function in
+Implement the \code{remove\_complex\_operands} function in
 \code{compiler.rkt}.
 %
 Create three new \LangVar{} programs that exercise the interesting
-code in the \code{remove-complex-opera*} pass.  Follow the guidelines
+code in the \code{remove\_complex\_operands} pass.  Follow the guidelines
 regarding file names described in Exercise~\ref{ex:Rvar}.
 %
 In the \code{run-tests.rkt} script, add the following entry to the
@@ -3087,7 +3087,7 @@ programs.
 \section{Explicate Control}
 \label{sec:explicate-control-Rvar}
 
-The \code{explicate-control} pass compiles \LangVar{} programs into \LangCVar{}
+The \code{explicate\_control} pass compiles \LangVar{} programs into \LangCVar{}
 programs that make the order of execution explicit in their
 syntax. For now this amounts to flattening \key{let} constructs into a
 sequence of assignment statements. For example, consider the following
@@ -3101,12 +3101,12 @@ sequence of assignment statements. For example, consider the following
 \end{lstlisting}
 \end{minipage}\\
 %
-The output of the previous pass and of \code{explicate-control} is
+The output of the previous pass and of \code{explicate\_control} is
 shown below. Recall that the right-hand-side of a \key{let} executes
 before its body, so the order of evaluation for this program is to
 assign \code{20} to \code{x.1}, \code{22} to \code{x.2}, and
 \code{(+ x.1 x.2)} to \code{y}, then return \code{y}. Indeed, the
-output of \code{explicate-control} makes this ordering explicit.
+output of \code{explicate\_control} makes this ordering explicit.
 \begin{transformation}
 \begin{lstlisting}
 (let ([y (let ([x.1 20]) 
@@ -3146,7 +3146,7 @@ start:
   (match p
     [(Program info body) ___]))
 \end{lstlisting}
-\caption{Skeleton for the \key{explicate-control} pass.}
+\caption{Skeleton for the \code{explicate\_control} pass.}
 \label{fig:explicate-control-Rvar}
 \end{figure}
 
@@ -3162,7 +3162,7 @@ that we have alluded to earlier.
 \end{enumerate}
 \end{definition}
 
-We recommend implementing \code{explicate-control} using two mutually
+We recommend implementing \code{explicate\_control} using two mutually
 recursive functions, \code{explicate-tail} and
 \code{explicate-assign}, as suggested in the skeleton code in
 Figure~\ref{fig:explicate-control-Rvar}.  The \code{explicate-tail}
@@ -3186,9 +3186,9 @@ high-quality code for conditional expressions in Chapter~\ref{ch:Rif}.
 
 \begin{exercise}\normalfont
 %
-Implement the \code{explicate-control} function in
+Implement the \code{explicate\_control} function in
 \code{compiler.rkt}.  Create three new \LangInt{} programs that
-exercise the code in \code{explicate-control}.
+exercise the code in \code{explicate\_control}.
 %
 In the \code{run-tests.rkt} script, add the following entry to the
 list of \code{passes} and then run the script to test your compiler.
@@ -6866,16 +6866,20 @@ expected.
 
 {\if\edition\pythonEd\color{purple}
 
-The output of \key{explicate\_control} is similar to the $C$
-language~\citep{Kernighan:1988nx} in that it has labels and \code{goto}
-statements, so we name it \LangCIf{}.  The abstract syntax for
-\LangCIf{} is defined in Figure~\ref{fig:c1-syntax}.  (The concrete
-syntax for \LangCIf{} is in the Appendix,
+The output of \key{explicate\_control} is a language similar to the
+$C$ language~\citep{Kernighan:1988nx} in that it has labels and
+\code{goto} statements, so we name it \LangCIf{}.  The abstract syntax
+for \LangCIf{} is defined in Figure~\ref{fig:c1-syntax}.  (The
+concrete syntax for \LangCIf{} is in the Appendix,
 Figure~\ref{fig:c1-concrete-syntax}.)
 %
 The \LangCIf{} language supports the same operators as \LangIf{} but
 the arguments of operators are restricted to atomic
-expressions. 
+expressions. The \LangCIf{} language does not include
+\code{if} expressions and the \code{if} statements are restricted:
+the condition must be a comparison
+and the two branches may only contain \code{goto} statements.
+(These restrictions make them easy to translate to x86.)
 %
 Also, a \LangCIf{} program consists of a dictionary mapping labels to
 lists of statements, instead of simply being a list of statements.
@@ -7084,43 +7088,55 @@ register, it is common for it to be immediately preceded by a
 \section{Shrink the \LangIf{} Language}
 \label{sec:shrink-Rif}
 
-% TODO: consider dropping the shrinking of there operations where
-% it hurts the generated x86 code, such as >, <, -, etc.
-% (suggestion from Andrew Tolmach).
-
-The \LangIf{} language includes several operators that are easily
-expressible with other operators. For example, subtraction is
-expressible using addition and negation.
-\[
- \key{(-}\; e_1 \; e_2\key{)} \quad \Rightarrow \quad \LP\key{+} \; e_1 \; \LP\key{-} \; e_2\RP\RP
-\]
-Several of the comparison operations are expressible using less-than
-and logical negation.
-\[
-\LP\key{<=}\; e_1 \; e_2\RP \quad \Rightarrow \quad
-\LP\key{let}~\LP\LS\key{tmp.1}~e_1\RS\RP~\LP\key{not}\;\LP\key{<}\;e_2\;\key{tmp.1})\RP\RP
-\]
-The \key{let} is needed in the above translation to ensure that
-expression $e_1$ is evaluated before $e_2$.
-
+The \LangIf{} language includes several features that are easily
+expressible with other features. For example, \code{and} and \code{or}
+are expressible using \code{if} as follows.
+\begin{align*}
+  \CAND{e_1}{e_2} & \quad \Rightarrow \quad \CIF{e_1}{e_2}{\FALSE{}}\\
+  \COR{e_1}{e_2} & \quad \Rightarrow \quad \CIF{e_1}{\TRUE{}}{e_2}
+\end{align*}
 By performing these translations in the front-end of the compiler, the
-later passes of the compiler do not need to deal with these operators,
+later passes of the compiler do not need to deal with these features,
 making the passes shorter.
 
-%% On the other hand, sometimes
-%% these translations make it more difficult to generate the most
-%% efficient code with respect to the number of instructions. However,
+%% For example, subtraction is
+%% expressible using addition and negation.
+%% \[
+%%  \key{(-}\; e_1 \; e_2\key{)} \quad \Rightarrow \quad \LP\key{+} \; e_1 \; \LP\key{-} \; e_2\RP\RP
+%% \]
+%% Several of the comparison operations are expressible using less-than
+%% and logical negation.
+%% \[
+%% \LP\key{<=}\; e_1 \; e_2\RP \quad \Rightarrow \quad
+%% \LP\key{let}~\LP\LS\key{tmp.1}~e_1\RS\RP~\LP\key{not}\;\LP\key{<}\;e_2\;\key{tmp.1})\RP\RP
+%% \]
+%% The \key{let} is needed in the above translation to ensure that
+%% expression $e_1$ is evaluated before $e_2$.
+
+On the other hand, sometimes translations reduce the efficiency of the
+generated code by increasing the number of instructions. For example,
+expressing subtraction in terms of negation
+\[
+\CBINOP{\key{-}}{e_1}{e_2} \quad \Rightarrow \quad
+  \CBINOP{\key{+}}{e_1}{ \CUNIOP{\key{-}}{e_2} }
+\]
+produces code with two x86 instructions (\code{negq} and \code{addq})
+instead of just one (\code{subq}).
+
+
+%% However,
 %% these differences typically do not affect the number of accesses to
 %% memory, which is the primary factor that determines execution time on
 %% modern computer architectures.
 
 \begin{exercise}\normalfont
-Implement the pass \code{shrink} to remove subtraction, \key{and},
-\key{or}, \key{<=}, \key{>}, and \key{>=} from the language by
-translating them to other constructs in \LangIf{}.
 %
-Create six test programs that involve these operators.
+Implement the pass \code{shrink} to remove \key{and} and \key{or} from
+the language by translating them to other constructs in \LangIf{}.
 %
+Create four test programs that involve these operators.
+%
+{\if\edition\racketEd\color{olive}    
 In the \code{run-tests.rkt} script, add the following entry for
 \code{shrink} to the list of passes (it should be the only pass at
 this point).
@@ -7130,10 +7146,12 @@ this point).
 This instructs \code{interp-tests} to run the intepreter
 \code{interp\_Rif} and the type checker \code{type-check-Rif} on the
 output of \code{shrink}.
+\fi}
 %
 Run the script to test your compiler on all the test programs.
-
 \end{exercise}
+
+{\if\edition\racketEd\color{olive}    
 
 \section{Uniquify Variables}
 \label{sec:uniquify-Rif}
@@ -7150,28 +7168,32 @@ entry to the list of \code{passes} in the \code{run-tests.rkt} script.
 Run the script to test your compiler.
 \end{exercise}
 
+\fi}
+
 \section{Remove Complex Operands}
 \label{sec:remove-complex-opera-Rif}
 
 The output language for this pass is \LangIfANF{}
 (Figure~\ref{fig:Rif-anf-syntax}), the administrative normal form of
-\LangIf{}.  The \code{Bool} form is an atomic expressions but
-\code{If} is not.  All three sub-expressions of an \code{If} are
-allowed to be complex expressions but the operands of \code{not} and
-the comparisons must be atoms.
+\LangIf{}.  A Boolean constant is an atomic expressions but the
+\code{if} expression is not.
+All three sub-expressions of an
+\code{if} are allowed to be complex expressions but the operands of
+\code{not} and the comparisons must be atomic.
 
-Add cases for \code{Bool} and \code{If} to the \code{rco\_exp} and
-\code{rco\_atom} functions according to whether the output needs to be
-\Exp{} or \Atm{} as specified in the grammar for \LangIfANF{}.
-Regarding \code{If}, it is particularly important to \textbf{not}
-replace its condition with a temporary variable because that would
-interfere with the generation of high-quality output in the
-\code{explicate-control} pass.
+Add cases for Boolean constants, \python{comparisons,} and \code{if}
+expressions to the \code{rco\_exp} and \code{rco\_atom} functions
+according to whether the output needs to be \Exp{} or \Atm{} as
+specified in the grammar for \LangIfANF{}.  Regarding \code{if}, it is
+particularly important to \textbf{not} replace its condition with a
+temporary variable because that would interfere with the generation of
+high-quality output in the \code{explicate\_control} pass.
 
 \begin{figure}[tp]
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
+{\if\edition\racketEd\color{olive}    
 \[
 \begin{array}{rcl}
 \Atm &::=& \gray{ \INT{\Int} \MID \VAR{\Var} } \MID \BOOL{\itm{bool}}\\
@@ -7180,9 +7202,23 @@ interfere with the generation of high-quality output in the
      &\MID& \gray{ \LET{\Var}{\Exp}{\Exp} } \\
      &\MID& \UNIOP{\key{not}}{\Atm} \\
       &\MID& \BINOP{\itm{cmp}}{\Atm}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} \\
-R^{\dagger}_2  &::=& \PROGRAM{\code{()}}{\Exp}
+R^{\mathsf{ANF}}_{\mathsf{if}}  &::=& \PROGRAM{\code{()}}{\Exp}
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd\color{purple}
+\[
+\begin{array}{rcl}
+\Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}}\\
+\Exp &::=& \Atm \MID \READ{} \\
+  &\MID& \BINOP{\itm{binop}}{\Atm}{\Atm} \MID \UNIOP{\key{uniop}}{\Atm} \\
+  &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} \\
+\Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
+        &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{*}}{\Stmt^{*}}\\
+P^{\mathsf{ANF}}_{\mathsf{if}}  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
+\end{array}
+\]
+\fi}
 \end{minipage}
 }
 \caption{\LangIfANF{} is \LangIf{} in administrative normal form (ANF).}
@@ -7209,15 +7245,20 @@ list of \code{passes} and then run the script to test your compiler.
 \section{Explicate Control}
 \label{sec:explicate-control-Rif}
 
-Recall that the purpose of \code{explicate-control} is to make the
-order of evaluation explicit in the syntax of the program.  With the
-addition of \key{if} this get more interesting.
+\racket{Recall that the purpose of \code{explicate\_control} is to
+  make the order of evaluation explicit in the syntax of the program.
+  With the addition of \key{if} this get more interesting.}
+%
+The main challenge is that the condition of an \key{if} can be an
+arbitrary expression in \LangIf{} whereas in \LangCIf{} the condition
+must be a comparison.
 
 As a motivating example, consider the following program that has an
-\key{if} expression nested in the predicate of another \key{if}.
+\key{if} expression nested in the condition of another \key{if}.
 % cond_test_41.rkt, if_lt_eq.py
 \begin{center}
 \begin{minipage}{0.96\textwidth}
+{\if\edition\racketEd\color{olive}        
 \begin{lstlisting}
 (let ([x (read)])
   (let ([y (read)])
@@ -7225,25 +7266,33 @@ As a motivating example, consider the following program that has an
         (+ y 2)
         (+ y 10))))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+x = input_int()
+y = input_int()
+print(y + 2 if (x == 0 if x < 1 else x == 2) else y + 10)
+\end{lstlisting}
+\fi}
 \end{minipage}
 \end{center}
 %
-The naive way to compile \key{if} and the comparison would be to
-handle each of them in isolation, regardless of their context.  Each
-comparison would be translated into a \key{cmpq} instruction followed
-by a couple instructions to move the result from the EFLAGS register
-into a general purpose register or stack location. Each \key{if} would
-be translated into a \key{cmpq} instruction followed by a conditional
-jump. The generated code for the inner \key{if} in the above example
-would be as follows.
+The naive way to compile \key{if} and the comparison operations would
+be to handle each of them in isolation, regardless of their context.
+Each comparison would be translated into a \key{cmpq} instruction
+followed by a couple instructions to move the result from the EFLAGS
+register into a general purpose register or stack location. Each
+\key{if} would be translated into a \key{cmpq} instruction followed by
+a conditional jump. The generated code for the inner \key{if} in the
+above example would be as follows.
 \begin{center}
 \begin{minipage}{0.96\textwidth}
 \begin{lstlisting}
     ...
-    cmpq $1, x          ;; (< x 1)
+    cmpq $1, x
     setl %al
     movzbq %al, tmp
-    cmpq $1, tmp        ;; (if ...)
+    cmpq $1, tmp
     je then_branch_1
     jmp else_branch_1
     ...
@@ -7253,7 +7302,7 @@ would be as follows.
 However, if we take context into account we can do better and reduce
 the use of \key{cmpq} instructions for accessing the EFLAG register.
 
-Our goal will be compile \key{if} expressions so that the relevant
+Our goal will be to compile \key{if} expressions so that the relevant
 comparison instruction appears directly before the conditional jump.
 For example, we want to generate the following code for the inner
 \code{if}.
@@ -7273,6 +7322,7 @@ One way to achieve this is to reorganize the code at the level of
 the following code.
 \begin{center}
 \begin{minipage}{0.96\textwidth}
+{\if\edition\racketEd\color{olive}        
 \begin{lstlisting}
 (let ([x (read)])
   (let ([y (read)])
@@ -7284,6 +7334,16 @@ the following code.
         (+ y 2)
         (+ y 10)))))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+x = input_int()
+y = intput_int()
+print(((y + 2) if x == 0 else (y + 10)) \
+      if (x < 1) \
+      else ((y + 2) if (x == 2) else (y + 10)))
+\end{lstlisting}
+\fi}
 \end{minipage}
 \end{center}
 Unfortunately, this approach duplicates the two branches from the
@@ -7291,53 +7351,57 @@ outer \code{if} and a compiler must never duplicate code!
 
 We need a way to perform the above transformation but without
 duplicating code. That is, we need a way for different parts of a
-program to refer to the same piece of code. At the level of x86
-assembly this is straightforward because we can label the code for
-each branch and insert jumps in all the places that need to execute
-the branch. In our intermediate language, we need to move away from
-abstract syntax \emph{trees} and instead use \emph{graphs}. In
-particular, we use a standard program representation called a
-\emph{control flow graph} (CFG), due to Frances Elizabeth
-\citet{Allen:1970uq}.  \index{subject}{control-flow graph} Each vertex is a
-labeled sequence of code, called a \emph{basic block}, and each edge
-represents a jump to another block. The \key{CProgram} construct of
-\LangCVar{} and \LangCIf{} contains a control flow graph represented
-as an alist mapping labels to basic blocks. Each basic block is
-represented by the $\Tail$ non-terminal.
+program to refer to the same piece of code.
+%
+Put another way, we need to move away from abstract syntax
+\emph{trees} and instead use \emph{graphs}.
+%
+At the level of x86 assembly this is straightforward because we can
+label the code for each branch and insert jumps in all the places that
+need to execute the branch.
+%
+Likewise, our language \LangCIf{} provides the ability to label a
+sequence of code and to jump to a label via \code{goto}.
+%
+%% In particular, we use a standard program representation called a
+%% \emph{control flow graph} (CFG), due to Frances Elizabeth
+%% \citet{Allen:1970uq}.  \index{subject}{control-flow graph} Each vertex
+%% is a labeled sequence of code, called a \emph{basic block}, and each
+%% edge represents a jump to another block.
+%
+In particular, the \key{CProgram} construct contains \racket{an
+  alist}\python{a dictionary} mapping labels to \emph{basic blocks}. Each
+basic block is \racket{represented by  the $\Tail$ non-terminal}
+\python{a list of statements}.
 
 Figure~\ref{fig:explicate-control-s1-38} shows the output of the
-\code{remove-complex-opera*} pass and then the
-\code{explicate-control} pass on the example program. We walk through
+\code{remove\_complex\_operands} pass and then the
+\code{explicate\_control} pass on the example program. We walk through
 the output program and then discuss the algorithm.
 %
 Following the order of evaluation in the output of
-\code{remove-complex-opera*}, we first have two calls to \code{(read)}
-and then the comparison \lstinline{(< x 1)} in the predicate of the
-inner \key{if}.  In the output of \code{explicate-control}, in the
+\code{remove\_complex\_operands}, we first have two calls to \CREAD{}
+and then the comparison \racket{\code{(< x 1)}}\python{\code{x < 1}}
+in the predicate of the inner \key{if}.  In the output of
+\code{explicate\_control}, in the
 block labeled \code{start}, is two assignment statements followed by a
 \code{if} statement that branches to \code{block40} or
 \code{block41}. The blocks associated with those labels contain the
-translations of the code \lstinline{(eq? x 0)} and \lstinline{(eq? x 2)},
+translations of the code \racket{\code{(eq? x 0)}}\python{\code{x == 0}}
+and \racket{\code{(eq? x 2)}}\python{\code{x == 2}},
 respectively.  In particular, we start \code{block40} with the
-comparison \lstinline{(eq? x 0)} and then branch to \code{block38} or
+comparison \racket{\code{(eq? x 0)}}\python{\code{x == 0}}
+and then branch to \code{block38} or
 \code{block39}, the two branches of the outer \key{if}, i.e.,
-\lstinline{(+ y 2)} and \lstinline{(+ y 10)}. The story for
-\code{block41} is similar.
+\code{\code{(+ y 2)}}\python{\code{y + 2}} and
+\racket{\code{(+ y 10)}}\python{\code{y + 10}}.
+The story for \code{block41} is similar.
 
 \begin{figure}[tbp]
+{\if\edition\racketEd\color{olive}        
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 % cond_test_41.rkt
-\begin{lstlisting}
-(let ([x (read)])
-   (let ([y (read)])
-      (if (if (< x 1)
-             (eq? x 0)
-             (eq? x 2))
-         (+ y 2)
-         (+ y 10))))
-\end{lstlisting}
-\hspace{40pt}$\Downarrow$
 \begin{lstlisting}
 (let ([x (read)])
    (let ([y (read)])
@@ -7371,13 +7435,62 @@ block39:
 \end{lstlisting}
 \end{minipage}
 \end{tabular} 
-
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+% cond_test_41.rkt
+\begin{lstlisting}
+x = input_int()
+y = input_int()
+print(y + 2             \
+      if (x == 0        \
+          if x < 1      \
+          else x == 2) \
+      else y + 10)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.55\textwidth}
+\begin{lstlisting}
+start:
+    x = input_int()
+    y = input_int()
+    if x < 1:
+        goto block_8
+    else:
+        goto block_9
+block_8:
+    if x == 0:
+        goto block_2
+    else:
+        goto block_3
+block_9:
+    if x == 2:
+        goto block_2
+    else:
+        goto block_3
+block_2:
+    tmp_0 = y + 2
+    goto block_1
+block_3:
+    tmp_0 = y + 10
+    goto block_1
+block_1:
+    print(tmp_0)
+    return 0
+\end{lstlisting}
+\end{minipage}
+\end{tabular} 
+\fi}
 \caption{Translation from \LangIf{} to \LangCIf{}
-  via the \code{explicate-control}.}
+  via the \code{explicate\_control}.}
 \label{fig:explicate-control-s1-38}
 \end{figure}
 
-%% The nice thing about the output of \code{explicate-control} is that
+%% The nice thing about the output of \code{explicate\_control} is that
 %% there are no unnecessary comparisons and every comparison is part of a
 %% conditional jump.
 
@@ -7386,8 +7499,10 @@ block39:
 %% \code{block95}, that only jump to another block. We discuss a solution
 %% to this problem in Section~\ref{sec:opt-jumps}.
 
+{\if\edition\racketEd\color{olive}        
+%
 Recall that in Section~\ref{sec:explicate-control-Rvar} we implement
-\code{explicate-control} for \LangVar{} using two mutually recursive
+\code{explicate\_control} for \LangVar{} using two mutually recursive
 functions, \code{explicate-tail} and \code{explicate-assign}.  The
 former function translates expressions in tail position whereas the
 later function translates expressions on the right-hand-side of a
@@ -7395,11 +7510,30 @@ later function translates expressions on the right-hand-side of a
 have a new kind of position to deal with: the predicate position of
 the \key{if}. We need another function, \code{explicate-pred}, that
 takes an \LangIf{} expression and two blocks for the then-branch and
-else-branch. The output of \code{explicate-pred} is a block.
+else-branch. The output of \code{explicate-pred} is a block.  In the
+following paragraphs we discuss specific cases in the
+\code{explicate\_pred} function as well as additions to the
+\code{explicate\_tail} and \code{explicate\_assign} functions.
 %
-In the following paragraphs we discuss specific cases in the
-\code{explicate-pred} function as well as additions to the
-\code{explicate-tail} and \code{explicate-assign} functions.
+\fi}
+%
+{\if\edition\pythonEd\color{purple}
+%
+We recommend implementing \code{explicate\_control} using four
+auxiliary functions:
+\begin{description}
+\item[\code{explicate\_pred}] generates code for expressions
+  that appear in the condition of an \code{if}.
+\item[\code{explicate\_assign}] generates code for exprssions
+  that appear on the right-hand side of an assignment.
+\item[\code{explicate\_exp}] generates code for expressions in all
+  other contexts.
+\item[\code{explicate\_stmt}] generates code for statements.
+\end{description}
+  
+\fi}
+
+UNDER CONSTRUCTION
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -7566,12 +7700,12 @@ recursive calls, so make sure to use \code{block->goto} on it.
 %% \[
 %% (\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els}) \quad\Rightarrow\quad B_4
 %% \]
-%% This completes the description of \code{explicate-control} for \LangIf{}.
+%% This completes the description of \code{explicate\_control} for \LangIf{}.
 
 
 The way in which the \code{shrink} pass transforms logical operations
 such as \code{and} and \code{or} can impact the quality of code
-generated by \code{explicate-control}. For example, consider the
+generated by \code{explicate\_control}. For example, consider the
 following program.
 % cond_test_21.rkt, and_eq_input.py
 \begin{lstlisting}
@@ -7582,7 +7716,7 @@ following program.
 The \code{and} operation should transform into something that the
 \code{explicate-pred} function can still analyze and descend through to
 reach the underlying \code{eq?} conditions. Ideally, your
-\code{explicate-control} pass should generate code similar to the
+\code{explicate\_control} pass should generate code similar to the
 following for the above program.
 \begin{center}
 \begin{lstlisting}
@@ -7602,7 +7736,7 @@ block39:
 \end{center}
 
 \begin{exercise}\normalfont
-Implement the pass \code{explicate-control} by adding the cases for
+Implement the pass \code{explicate\_control} by adding the cases for
 Boolean constants and \key{if} to the \code{explicate-tail} and
 \code{explicate-assign}. Implement the auxiliary function
 \code{explicate-pred} for predicate contexts.
@@ -7737,7 +7871,7 @@ algorithm itself does not change.
 
 Recall that for \LangVar{} we implemented liveness analysis for a single
 basic block (Section~\ref{sec:liveness-analysis-Rvar}). With the
-addition of \key{if} expressions to \LangIf{}, \code{explicate-control}
+addition of \key{if} expressions to \LangIf{}, \code{explicate\_control}
 produces many basic blocks arranged in a control-flow graph.  We
 recommend that you create a new auxiliary function named
 \code{uncover-live-CFG} that applies liveness analysis to a
@@ -7900,7 +8034,7 @@ compilation of \LangIf{}.
 
 Figure~\ref{fig:if-example-x86} shows a simple example program in
 \LangIf{} translated to x86, showing the results of
-\code{explicate-control}, \code{select-instructions}, and the final
+\code{explicate\_control}, \code{select-instructions}, and the final
 x86 assembly code.
 
 \begin{figure}[tbp]
@@ -7985,12 +8119,12 @@ conclusion:
 \section{Challenge: Remove Jumps}
 \label{sec:opt-jumps}
 
-%% Recall that in the example output of \code{explicate-control} in
+%% Recall that in the example output of \code{explicate\_control} in
 %% Figure~\ref{fig:explicate-control-s1-38}, \code{block57} through
 %% \code{block60} are trivial blocks, they do nothing but jump to another
 %% block. The first goal of this challenge assignment is to remove those
 %% blocks. Figure~\ref{fig:optimize-jumps} repeats the result of
-%% \code{explicate-control} on the left and shows the result of bypassing
+%% \code{explicate\_control} on the left and shows the result of bypassing
 %% the trivial blocks on the right. Let us focus on \code{block61}.  The
 %% \code{then} branch jumps to \code{block57}, which in turn jumps to
 %% \code{block55}. The optimized code on the right of
@@ -8096,7 +8230,7 @@ conclusion:
 
 %% \begin{exercise}\normalfont
 %%   Implement the \code{optimize-jumps} pass as a transformation from
-%%   \LangCIf{} to \LangCIf{}, coming after the \code{explicate-control} pass.
+%%   \LangCIf{} to \LangCIf{}, coming after the \code{explicate\_control} pass.
 %%   Check that \code{optimize-jumps} removes trivial blocks in a few
 %%   example programs. Then check that your compiler still passes all of
 %%   your tests.
@@ -8798,11 +8932,11 @@ to wrap \code{HasType} around each AST node that it generates.
 The pass \code{expose-allocation} lowers the \code{vector} creation
 form into a conditional call to the collector followed by the
 allocation.  We choose to place the \code{expose-allocation} pass
-before \code{remove-complex-opera*} because the code generated by
+before \code{remove\_complex\_operands} because the code generated by
 \code{expose-allocation} contains complex operands.  We also place
-\code{expose-allocation} before \code{explicate-control} because
+\code{expose-allocation} before \code{explicate\_control} because
 \code{expose-allocation} introduces new variables using \code{let},
-but \code{let} is gone after \code{explicate-control}.
+but \code{let} is gone after \code{explicate\_control}.
 
 The output of \code{expose-allocation} is a language \LangAlloc{} that
 extends \LangVec{} with the three new forms that we use in the translation
@@ -8970,13 +9104,13 @@ pass, which is \LangVec{} in administrative normal form.
 \label{fig:c2-syntax}
 \end{figure}
 
-The output of \code{explicate-control} is a program in the
+The output of \code{explicate\_control} is a program in the
 intermediate language \LangCVec{}, whose abstract syntax is defined in
 Figure~\ref{fig:c2-syntax}.  (The concrete syntax is defined in
 Figure~\ref{fig:c2-concrete-syntax} of the Appendix.)  The new forms
 of \LangCVec{} include the \key{allocate}, \key{vector-ref}, and
 \key{vector-set!}, and \key{global-value} expressions and the
-\code{collect} statement.  The \code{explicate-control} pass can treat
+\code{collect} statement.  The \code{explicate\_control} pass can treat
 these new forms much like the other expression forms that we've
 already encoutered.
 
@@ -10104,7 +10238,7 @@ The concrete syntax for a function reference is $\CFUNREF{f}$.
 Placing this pass after \code{uniquify} will make sure that there are
 no local variables and functions that share the same name. On the
 other hand, \code{reveal-functions} needs to come before the
-\code{explicate-control} pass because that pass helps us compile
+\code{explicate\_control} pass because that pass helps us compile
 \code{FunRef} forms into assignment statements.
 
 \section{Limit Functions}
@@ -10206,7 +10340,7 @@ R^{\dagger}_4  &::=& \gray{ \PROGRAMDEFS{\code{'()}}{\Def} }
 \label{sec:explicate-control-r4}
 
 Figure~\ref{fig:c3-syntax} defines the abstract syntax for \LangCFun{}, the
-output of \key{explicate-control}. (The concrete syntax is given in
+output of \code{explicate\_control}. (The concrete syntax is given in
 Figure~\ref{fig:c3-concrete-syntax} of the Appendix.) The auxiliary
 functions for assignment and tail contexts should be updated with
 cases for \code{Apply} and \code{FunRef} and the function for
@@ -10216,7 +10350,7 @@ and predicate contexts, \code{Apply} becomes \code{Call}, whereas in
 tail position \code{Apply} becomes \code{TailCall}.  We recommend
 defining a new auxiliary function for processing function definitions.
 This code is similar to the case for \code{Program} in \LangVec{}.  The
-top-level \code{explicate-control} function that handles the
+top-level \code{explicate\_control} function that handles the
 \code{ProgramDefs} form of \LangFun{} can then apply this new function to
 all the function definitions.
 
@@ -10614,7 +10748,7 @@ compiling \LangFun{} to x86.
 
 Figure~\ref{fig:add-fun} shows an example translation of a simple
 function in \LangFun{} to x86. The figure also includes the results of the
-\code{explicate-control} and \code{select-instructions} passes.
+\code{explicate\_control} and \code{select-instructions} passes.
 
 \begin{figure}[htbp]
 \begin{tabular}{ll}
@@ -11183,11 +11317,11 @@ The only difference is replacing the use of
 \section{Explicate Control and \LangCLam{}}
 \label{sec:explicate-r5}
 
-The output language of \code{explicate-control} is \LangCLam{} whose
+The output language of \code{explicate\_control} is \LangCLam{} whose
 abstract syntax is defined in Figure~\ref{fig:c4-syntax}.  The only
 difference with respect to \LangCFun{} is the addition of the
 \code{AllocateClosure} form to the grammar for $\Exp$.  The handling
-of \code{AllocateClosure} in the \code{explicate-control} pass is
+of \code{AllocateClosure} in the \code{explicate\_control} pass is
 similar to the handling of other expressions such as primitive
 operators.
 
@@ -12246,7 +12380,7 @@ The subexpression of \code{ValueOf} must be atomic.
 \section{Explicate Control and \LangCAny{}}
 \label{sec:explicate-Rany}
 
-The output of \code{explicate-control} is the \LangCAny{} language whose
+The output of \code{explicate\_control} is the \LangCAny{} language whose
 syntax is defined in Figure~\ref{fig:c5-syntax}. The \code{ValueOf}
 form that we added to \LangAny{} remains an expression and the \code{Exit}
 expression becomes a $\Tail$. Also, note that the index argument of
@@ -12796,7 +12930,7 @@ we one more problem to discuss.
 \label{sec:dataflow-analysis}
 
 Up until this point the control-flow graphs generated in
-\code{explicate-control} were guaranteed to be acyclic. However, each
+\code{explicate\_control} were guaranteed to be acyclic. However, each
 \code{while} loop introduces a cycle in the control-flow graph.
 But does that matter?
 %
@@ -13272,7 +13406,7 @@ fine to place \code{begin} there.
 \section{Explicate Control and \LangCLoop{}}
 \label{sec:explicate-loop}
 
-Recall that in the \code{explicate-control} pass we define one helper
+Recall that in the \code{explicate\_control} pass we define one helper
 function for each kind of position in the program.  For the \LangVar{}
 language of integers and variables we needed kinds of positions:
 assignment and tail. The \code{if} expressions of \LangIf{} introduced
@@ -13282,7 +13416,7 @@ subexpression, the subexpressions inside a \code{begin} are evaluated
 only for their effect. Their result values are discarded. We can
 generate better code by taking this fact into account.
 
-The output language of \code{explicate-control} is \LangCLoop{}
+The output language of \code{explicate\_control} is \LangCLoop{}
 (Figure~\ref{fig:c7-syntax}), which is nearly identical to
 \LangCLam{}. The only syntactic difference is that \code{Call},
 \code{vector-set!}, and \code{read} may also appear as statements.
@@ -14726,7 +14860,7 @@ updated to handle the \code{PVector} type.
 \section{Explicate Control}
 \label{sec:explicate-control-gradual}
 
-Update the \code{explicate-control} pass to handle the new primitive
+Update the \code{explicate\_control} pass to handle the new primitive
 operations on the \code{PVector} type.
 
 \section{Select Instructions}
