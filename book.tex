@@ -2428,7 +2428,7 @@ register allocation (Chapter~\ref{ch:register-allocation-Rvar}).
 \label{fig:x86-int-ast}
 \end{figure}
 
-\section{Planning the trip to x86 via the \LangCVar{} language}
+\section{Planning the trip to x86}
 \label{sec:plan-s0-x86}
 
 To compile one language to another it helps to focus on the
@@ -2437,26 +2437,28 @@ to bridge those differences. What are the differences between \LangVar{}
 and x86 assembly? Here are some of the most important ones:
 
 \begin{enumerate}
-\item[(a)] x86 arithmetic instructions typically have two arguments
+\item x86 arithmetic instructions typically have two arguments
   and update the second argument in place. In contrast, \LangVar{}
   arithmetic operations take two arguments and produce a new value.
   An x86 instruction may have at most one memory-accessing argument.
   Furthermore, some instructions place special restrictions on their
   arguments.
 
-\item[(b)] An argument of an \LangVar{} operator can be a deeply-nested
+\item An argument of an \LangVar{} operator can be a deeply-nested
   expression, whereas x86 instructions restrict their arguments to be
   integer constants, registers, and memory locations.
 
+{\if\edition\racketEd\color{olive}      
 \item[(c)] The order of execution in x86 is explicit in the syntax: a
   sequence of instructions and jumps to labeled positions, whereas in
   \LangVar{} the order of evaluation is a left-to-right depth-first
   traversal of the abstract syntax tree.
+\fi}
 
-\item[(d)] A program in \LangVar{} can have any number of variables
+\item A program in \LangVar{} can have any number of variables
   whereas x86 has 16 registers and the procedure calls stack.
 {\if\edition\racketEd\color{olive}    
-\item[(e)] Variables in \LangVar{} can shadow other variables with the
+\item Variables in \LangVar{} can shadow other variables with the
   same name. In x86, registers have unique names and memory locations
   have unique addresses.
 \fi}  
@@ -2482,10 +2484,10 @@ recursive function per non-terminal in the grammar of the input
 language of the pass.  \index{subject}{intermediate language}
 
 \begin{description}
-\item[\key{select\_instructions}] handles the difference between
-  \LangVar{} operations and x86 instructions. This pass converts each
-  \LangVar{} operation to a short sequence of instructions that
-  accomplishes the same task.
+{\if\edition\racketEd\color{olive}
+\item[\key{uniquify}] deals with the shadowing of variables by
+  renaming every variable to a unique name.
+  \fi}
 
 \item[\key{remove\_complex\_operands}] ensures that each subexpression
   of a primitive operation or function call is a variable or integer,
@@ -2494,9 +2496,6 @@ language of the pass.  \index{subject}{intermediate language}
   variables to hold the results of complex
   subexpressions.\index{subject}{atomic
     expression}\index{subject}{complex expression}%
-  \footnote{The subexpressions of an operation are often called
-    operators and operands which explains the presence of
-    \code{opera*} in the name of this pass.}
   
 {\if\edition\racketEd\color{olive}
 \item[\key{explicate\_control}] makes the execution order of the
@@ -2506,13 +2505,13 @@ language of the pass.  \index{subject}{intermediate language}
   to other nodes.
 \fi}
 
+\item[\key{select\_instructions}] handles the difference between
+  \LangVar{} operations and x86 instructions. This pass converts each
+  \LangVar{} operation to a short sequence of instructions that
+  accomplishes the same task.
+
 \item[\key{assign\_homes}] replaces the variables in \LangVar{} with
   registers or stack locations in x86.
-
-{\if\edition\racketEd\color{olive}
-\item[\key{uniquify}] deals with the shadowing of variables by
-  renaming every variable to a unique name.
-\fi}
 \end{description}
 
 The next question is: in what order should we apply these passes? This
@@ -3395,7 +3394,7 @@ be propagated to the \code{X86Program} node.}
 %
 \python{The \code{assign\_homes} pass should replace all uses of
   variables with stack locations.}
-
+%
 In the process of assigning variables to stack locations, it is
 convenient for you to compute and store the size of the frame (in
 bytes) in%
@@ -6135,7 +6134,8 @@ With the addition of \key{if}, programs can have non-trivial control flow which
 \python{impacts liveness analysis and motivates a new pass named
   \code{explicate\_control}}. Also, because
 we now have two kinds of values, we need to handle programs that apply
-an operation to the wrong kind of value, such as \code{(not 1)}.
+an operation to the wrong kind of value, such as
+\racket{\code{(not 1)}}\python{\code{not 1}}.
 
 There are two language design options for such situations.  One option
 is to signal an error and the other is to provide a wider
@@ -6195,11 +6195,11 @@ handled in later passes.
 %
 \python{The largest addition is a new pass named
   \code{explicate\_control} that translates \code{if} expressions and
-  statements into control-flow graphs
+  statements into conditional \code{goto}'s
   (Section~\ref{sec:explicate-control-Rif}).}
 %
 Regarding register allocation, there is the interesting question of
-how to handle conditional jumps during liveness analysis.
+how to handle conditional \code{goto}'s during liveness analysis.
 
 
 \section{The \LangIf{} Language}
@@ -6330,7 +6330,7 @@ is not evaluated if $e_1$ evaluates to \TRUE{}.
 \racket{With the increase in the number of primitive operations, the
   interpreter would become repetitive without some care.  We refactor
   the case for \code{Prim}, moving the code that differs with each
-  operation into the \code{interp_op} method shown in in
+  operation into the \code{interp\_op} method shown in in
   Figure~\ref{fig:interp-op-Rif}. We handle the \code{and} operation
   separately because of its short-circuiting behavior.}
 
@@ -6864,28 +6864,47 @@ expected.
 \section{The \LangCIf{} Intermediate Language}
 \label{sec:Cif}
 
+{\if\edition\pythonEd\color{purple}
+
+The output of \key{explicate\_control} is similar to the $C$
+language~\citep{Kernighan:1988nx} in that it has labels and \code{goto}
+statements, so we name it \LangCIf{}.  The abstract syntax for
+\LangCIf{} is defined in Figure~\ref{fig:c1-syntax}.  (The concrete
+syntax for \LangCIf{} is in the Appendix,
+Figure~\ref{fig:c1-concrete-syntax}.)
+%
+The \LangCIf{} language supports the same operators as \LangIf{} but
+the arguments of operators are restricted to atomic
+expressions. 
+%
+Also, a \LangCIf{} program consists of a dictionary mapping labels to
+lists of statements, instead of simply being a list of statements.
+\fi}
+
+\racket{
 Figure~\ref{fig:c1-syntax} defines the abstract syntax of the
 \LangCIf{} intermediate language. (The concrete syntax is in the
 Appendix, Figure~\ref{fig:c1-concrete-syntax}.)  Compared to
 \LangCVar{}, the \LangCIf{} language adds logical and comparison
-operators to the \Exp{} non-terminal and the literals \key{\#t} and
-\key{\#f} to the \Arg{} non-terminal.
+operators to the \Exp{} non-terminal and the literals \TRUE{} and
+\FALSE{} to the \Arg{} non-terminal.
 
 Regarding control flow, \LangCIf{} adds \key{goto} and \code{if}
 statements to the \Tail{} non-terminal. The condition of an \code{if}
 statement is a comparison operation and the branches are \code{goto}
 statements, making it straightforward to compile \code{if} statements
 to x86.
-
+}
 
 \begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \small    
+{\if\edition\racketEd\color{olive}    
 \[
 \begin{array}{lcl}
 \Atm &::=& \gray{\INT{\Int} \MID \VAR{\Var}} \MID \BOOL{\itm{bool}} \\
-\itm{cmp} &::= & \key{eq?} \MID \key{<}  \\
+\itm{cmp} &::= & \key{eq?} \MID \key{<} \\
 \Exp &::= & \gray{ \Atm \MID \READ{} }\\
      &\MID& \gray{ \NEG{\Atm} \MID \ADD{\Atm}{\Atm} } \\
      &\MID& \UNIOP{\key{'not}}{\Atm} 
@@ -6897,10 +6916,29 @@ to x86.
 \LangCIfM{} & ::= & \gray{\CPROGRAM{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP}}
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd\color{purple}
+\[
+\begin{array}{lcl}
+\Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} \\
+\itm{cmp} &::= & \key{eq?} \MID \key{<}  \\
+\Exp &::= & \Atm \MID \READ{} \\
+     &\MID& \BINOP{\Atm}{\itm{binop}}{\Atm}
+     \MID \UNIOP{\itm{uniop}}{\Atm} \\
+     &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} 
+     \MID \BOOLOP{\itm{boolop}}{\Atm}{\Atm} \\
+\Stmt &::=& \PRINT{\Exp} \MID \EXPR{\Exp} \\
+     &\MID& \ASSIGN{\VAR{\Var}}{\Exp}  
+     \MID \RETURN{\Exp} \MID \GOTO{\itm{label}} \\
+    &\MID& \IFSTMT{\CMP{\Atm}{\itm{cmp}}{\Atm}}{\LS\GOTO{\itm{label}}\RS}{\LS\GOTO{\itm{label}}\RS} \\
+\LangCIfM{} & ::= & \CPROGRAM{\itm{info}}{\LC\itm{label}\,\key{:}\,\Stmt^{+}, \ldots \RC}
+\end{array}
+\]
+\fi}
 \end{minipage}
 }
-\caption{The abstract syntax of \LangCIf{}, an extension of \LangCVar{}
-  (Figure~\ref{fig:c0-syntax}).}
+\caption{The abstract syntax of \LangCIf{}\racket{, an extension of \LangCVar{}
+  (Figure~\ref{fig:c0-syntax})}.}
 \label{fig:c1-syntax}
 \end{figure}
 
@@ -6934,7 +6972,7 @@ for the bit $1$, the result is the opposite of the second bit.  Thus,
 the \code{not} operation can be implemented by \code{xorq} with $1$ as
 the first argument:
 \[
-\Var~ \key{=}~ \LP\key{not}~\Arg\RP\key{;}
+\CASSIGN{\Var}{\CUNIOP{\key{not}}{\Arg}}
 \qquad\Rightarrow\qquad
 \begin{array}{l}
 \key{movq}~ \Arg\key{,} \Var\\
@@ -6995,7 +7033,7 @@ the first argument:
        \MID \BININSTR{\code{cmpq}}{\Arg}{\Arg}\\
        &\MID& \BININSTR{\code{set}}{\itm{cc}}{\Arg} 
        \MID \BININSTR{\code{movzbq}}{\Arg}{\Arg}\\
-       &\MID&  \JMPIF{\itm{cc}}{\itm{label}} \\
+       &\MID&  \JMPIF{'\itm{cc}'}{\itm{label}} \\
 \Block &::= & \gray{\BLOCK{\itm{info}}{\LP\Instr\ldots\RP}} \\
 \LangXIfM{} &::= & \gray{\XPROGRAM{\itm{info}}{\LP\LP\itm{label} \,\key{.}\, \Block \RP\ldots\RP}}
 \end{array}
@@ -7037,10 +7075,10 @@ the EFLAGS register matches the condition code \itm{cc}, otherwise the
 jump instruction falls through to the next instruction.  Like the
 abstract syntax for \code{set}, the abstract syntax for conditional
 jump separates the instruction name from the condition code. For
-example, \code{(JmpIf le foo)} corresponds to \code{jle foo}.  Because
-the conditional jump instruction relies on the EFLAGS register, it is
-common for it to be immediately preceded by a \key{cmpq} instruction
-to set the EFLAGS register.
+example, \JMPIF{\key{'le'}}{\key{foo}} corresponds to \code{jle foo}.
+Because the conditional jump instruction relies on the EFLAGS
+register, it is common for it to be immediately preceded by a
+\key{cmpq} instruction to set the EFLAGS register.
 
 
 \section{Shrink the \LangIf{} Language}
