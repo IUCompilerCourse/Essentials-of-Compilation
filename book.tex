@@ -40,6 +40,7 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\if\edition\racketEd
 \lstset{%
 language=Lisp,
 basicstyle=\ttfamily\small,
@@ -50,6 +51,19 @@ columns=flexible,
 moredelim=[is][\color{red}]{~}{~},
 showstringspaces=false
 }
+\fi
+\if\edition\pythonEd
+\lstset{%
+language=Python,
+basicstyle=\ttfamily\small,
+morekeywords={match,case,bool,int},
+deletekeywords={},
+escapechar=|,
+columns=flexible,
+moredelim=[is][\color{red}]{~}{~},
+showstringspaces=false
+}
+\fi
 
 
 %%% Any shortcut own defined macros place here
@@ -6368,13 +6382,15 @@ class InterpPif(InterpPvar):
         return l - r
       case UnaryOp(Not(), v):
         return not self.interp_exp(v, env)
-      case BoolOp(left, And(), right):
+      case BoolOp(And(), values):
+        left = values[0]; right = values[1]
         match self.interp_exp(left, env):
           case True:
             return self.interp_exp(right, env)
           case False:
             return False
-      case BoolOp(left, Or(), right):
+      case BoolOp(Or(), values):
+        left = values[0]; right = values[1]
         match self.interp_exp(left, env):
           case True:
             return True
@@ -6542,31 +6558,50 @@ error or returns an expression and its type (\INTTY{} or
 \BOOLTY{}). It returns an expression because there are situations
 in which we want to change or update the expression.
 
-Next we discuss the \code{match} cases in \code{type\_check\_exp} of
+Next we discuss the \code{type\_check\_exp} function in
 Figure~\ref{fig:type-check-Rvar}.  The type of an integer constant is
-\INTTY{}.  To handle variables, the type checker uses the
-environment \code{env} to map variables to types. Consider the case
-for \key{let}.  We type check the initializing expression to obtain
-its type \key{T} and then associate type \code{T} with the variable
-\code{x} in the environment used to type check the body of the
-\key{let}. Thus, when the type checker encounters a use of variable
-\code{x}, it can find its type in the environment.  Regarding
-primitive operators, we recursively analyze the arguments and then
-invoke \code{type\_check\_op} to check whether the argument types are
-allowed.
+\INTTY{}.  To handle variables, the type checker uses the environment
+\code{env} to map variables to types.
+%
+\racket{Consider the case for \key{let}.  We type check the
+  initializing expression to obtain its type \key{T} and then
+  associate type \code{T} with the variable \code{x} in the
+  environment used to type check the body of the \key{let}.  Thus,
+  when the type checker encounters a use of variable \code{x}, it can
+  find its type in the environment.}
+%
+\python{Consider the case for assignment. We type check the
+  initializing expression to obtain its type \key{t}.  If the variable
+  \code{lhs.id} is already in the environment because there was a
+  prior assignment, we check that this initializer has the same type
+  as the prior one. If this is the first assignment to the variable,
+  we associate type \code{t} with the variable \code{lhs.id} in the
+  environment. Thus, when the type checker encounters a use of
+  variable \code{x}, it can find its type in the environment.}
+%
+\racket{Regarding primitive operators, we recursively analyze the
+  arguments and then invoke \code{type\_check\_op} to check whether
+  the argument types are allowed.}
+%
+\python{Regarding addition and negation, we recursively analyze the
+  arguments, check that they have type \INT{}, and return \INT{}.}
 
-Several auxiliary methods are used in the type checker. The method
-\code{operator-types} defines a dictionary that maps the operator
-names to their parameter and return types. The \code{type-equal?}
-method determines whether two types are equal, which for now simply
-dispatches to \code{equal?}  (deep equality). The
-\code{check-type-equal?} method triggers an error if the two types are
-not equal. The \code{type-check-op} method looks up the operator in
-the \code{operator-types} dictionary and then checks whether the
-argument types are equal to the parameter types.  The result is the
-return type of the operator.
+\racket{Several auxiliary methods are used in the type checker. The
+  method \code{operator-types} defines a dictionary that maps the
+  operator names to their parameter and return types. The
+  \code{type-equal?}  method determines whether two types are equal,
+  which for now simply dispatches to \code{equal?}  (deep
+  equality). The \code{check-type-equal?} method triggers an error if
+  the two types are not equal. The \code{type-check-op} method looks
+  up the operator in the \code{operator-types} dictionary and then
+  checks whether the argument types are equal to the parameter types.
+  The result is the return type of the operator.}
+%
+\python{The auxiliary method \code{check\_type\_equal} method triggers
+  an error if the two types are not equal.}
 
 \begin{figure}[tbp]
+{\if\edition\racketEd\color{olive}  
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define type-check-Rvar_class
   (class object%
@@ -6618,11 +6653,65 @@ return type of the operator.
 (define (type-check-Rvar p)
   (send (new type-check-Rvar_class) type-check-program p))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+class TypeCheckPvar:
+  def check_type_equal(self, t1, t2, e):
+    if t1 != t2:
+      msg = 'error: ' + repr(t1) + ' != ' + repr(t2) + ' in ' + repr(e)
+      raise Exception(msg)
+          
+  def type_check_exp(self, e, env):
+    match e:
+      case BinOp(left, Add(), right):
+        l = self.type_check_exp(left, env)
+        check_type_equal(l, int, left)
+        r = self.type_check_exp(right, env)
+        check_type_equal(r, int, right)
+        return int
+      case UnaryOp(USub(), v):
+        t = self.type_check_exp(v, env)
+        check_type_equal(t, int, v)
+        return int
+      case Name(id):
+        return env[id]
+      case Constant(value) if isinstance(value, int):
+        return int
+      case Call(Name('input_int'), []):
+        return int
+
+  def type_check_stmts(self, ss, env):
+    if len(ss) == 0:
+      return
+    match ss[0]:
+      case Assign([lhs], value):
+        t = self.type_check_exp(value, env)
+        if lhs.id in env:
+          check_type_equal(env[lhs.id], t, value)
+        else:
+          env[lhs.id] = t
+        return self.type_check_stmts(ss[1:], env)
+      case Expr(Call(Name('print'), [arg])):
+        t = self.type_check_exp(arg, env)
+        check_type_equal(t, int, arg)
+        return self.type_check_stmts(ss[1:], env)
+      case Expr(value):
+        self.type_check_exp(value, env)
+        return self.type_check_stmts(ss[1:], env)
+
+  def type_check_P(self, p):
+    match p:
+      case Module(body):
+        self.type_check_stmts(body, {})
+\end{lstlisting}
+\fi}
 \caption{Type checker for the \LangVar{} language.}
 \label{fig:type-check-Rvar}
 \end{figure}
 
 \begin{figure}[tbp]
+{\if\edition\racketEd\color{olive}    
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define type-check-Rif_class
   (class type-check-Rvar_class
@@ -6644,12 +6733,12 @@ return type of the operator.
     (define/override (type-check-exp env)
       (lambda (e)
         (match e
+          [(Bool b) (values (Bool b) 'Boolean)]
           [(Prim 'eq? (list e1 e2))
            (define-values (e1^ T1) ((type-check-exp env) e1))
            (define-values (e2^ T2) ((type-check-exp env) e2))
            (check-type-equal? T1 T2 e)
            (values (Prim 'eq? (list e1^ e2^)) 'Boolean)]
-          [(Bool b) (values (Bool b) 'Boolean)]
           [(If cnd thn els)
            (define-values (cnd^ Tc) ((type-check-exp env) cnd))
            (define-values (thn^ Tt) ((type-check-exp env) thn))
@@ -6663,34 +6752,112 @@ return type of the operator.
 (define (type-check-Rif p)
   (send (new type-check-Rif_class) type-check-program p))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{lstlisting}
+class TypeCheckPif(TypeCheckPvar):
+  def type_check_exp(self, e, env):
+    match e:
+      case Constant(value) if isinstance(value, bool):
+        return bool
+      case BinOp(left, Sub(), right):
+        l = self.type_check_exp(left, env); check_type_equal(l, int, left)
+        r = self.type_check_exp(right, env); check_type_equal(r, int, right)
+        return int
+      case UnaryOp(Not(), v):
+        t = self.type_check_exp(v, env); check_type_equal(t, bool, v)
+        return bool 
+      case BoolOp(op, values):
+        left = values[0] ; right = values[1]
+        l = self.type_check_exp(left, env); check_type_equal(l, bool, left)
+        r = self.type_check_exp(right, env); check_type_equal(r, bool, right)
+        return bool
+      case Compare(left, [cmp], [right]) if isinstance(cmp, Eq) \
+                                            or isinstance(cmp, NotEq):
+        l = self.type_check_exp(left, env)
+        r = self.type_check_exp(right, env)
+        check_type_equal(l, r, e)
+        return bool
+      case Compare(left, [cmp], [right]):
+        l = self.type_check_exp(left, env); check_type_equal(l, int, left)
+        r = self.type_check_exp(right, env); check_type_equal(r, int, right)
+        return bool
+      case IfExp(test, body, orelse):
+        t = self.type_check_exp(test, env); check_type_equal(bool, t, test)
+        b = self.type_check_exp(body, env)
+        o = self.type_check_exp(orelse, env)
+        check_type_equal(b, o, e)
+        return b
+      case _:
+        return super().type_check_exp(e, env)
+
+  def type_check_stmts(self, ss, env):
+    if len(ss) == 0:
+      return
+    match ss[0]:
+      case If(test, body, orelse):
+        t = self.type_check_exp(test, env); check_type_equal(bool, t, test)
+        b = self.type_check_stmts(body, env)
+        o = self.type_check_stmts(orelse, env)
+        check_type_equal(b, o, ss[0])
+        return self.type_check_stmts(ss[1:], env)
+      case _:
+        return super().type_check_stmts(ss, env)
+\end{lstlisting}
+\fi}
 \caption{Type checker for the \LangIf{} language.}
 \label{fig:type-check-Rif}
 \end{figure}
 
 Next we discuss the type checker for \LangIf{} in
-Figure~\ref{fig:type-check-Rif}.  The operator \code{eq?} requires the
-two arguments to have the same type. The type of a Boolean constant is
-\code{Boolean}. The condition of an \code{if} must be of
-\code{Boolean} type and the two branches must have the same type.  The
-\code{operator-types} function adds dictionary entries for the other
-new operators.
+Figure~\ref{fig:type-check-Rif}.
+%
+The type of a Boolean constant is \code{Boolean}.
+%
+\racket{The \code{operator-types} function adds dictionary entries for
+  the other new operators.}
+%
+\python{Subtraction requires its arguments to be of type \INTTY{} and produces
+  an \INTTY{}. Negation requires its argument to be a \BOOLTY{} and
+  produces a \BOOLTY{}. Similarly for logical-and and logical-or. }
+%
+The equality operators requires the two arguments to have the same
+type.
+%
+\python{The other comparisons (less-than, etc.) require their
+arguments to be of type \INTTY{} and they produce a \BOOLTY{}.}
+%
+The condition of an \code{if} must
+be of \BOOLTY{} type and the two branches must have the same type.
+
 
 \begin{exercise}\normalfont
 Create 10 new test programs in \LangIf{}. Half of the programs should
 have a type error. For those programs, create an empty file with the
 same base name but with file extension \code{.tyerr}. For example, if
-the test \code{cond\_test\_14.rkt} is expected to error, then create
-an empty file named \code{cond\_test\_14.tyerr}.  This indicates to
-\code{interp-tests} and \code{compiler-tests} that a type error is
-expected. The other half of the test programs should not have type
-errors.
+the test
+\racket{\code{cond\_test\_14.rkt}}\python{\code{cond\_test\_14.py}}
+is expected to error, then create
+an empty file named \code{cond\_test\_14.tyerr}.
+%
+\racket{This indicates to \code{interp-tests} and
+  \code{compiler-tests} that a type error is expected. }
+%
+\racket{This indicates to the \code{run-tests.py} scripts that a type
+  error is expected.}
+%
+The other half of the test programs should not have type errors.
+% 
+\racket{In the \code{run-tests.rkt} script, change the second argument
+  of \code{interp-tests} and \code{compiler-tests} to
+  \code{type-check-Rif}, which causes the type checker to run prior to
+  the compiler passes. Temporarily change the \code{passes} to an
+  empty list and run the script, thereby checking that the new test
+  programs either type check or not as intended.}
+%
+Run the test script to check that these test programs type check as
+expected.
 
-In the \code{run-tests.rkt} script, change the second argument of
-\code{interp-tests} and \code{compiler-tests} to
-\code{type-check-Rif}, which causes the type checker to run prior to
-the compiler passes. Temporarily change the \code{passes} to an empty
-list and run the script, thereby checking that the new test programs
-either type check or not as intended.
 \end{exercise}
 
 
