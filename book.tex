@@ -7288,14 +7288,12 @@ above example would be as follows.
 \begin{center}
 \begin{minipage}{0.96\textwidth}
 \begin{lstlisting}
-    ...
     cmpq $1, x
     setl %al
     movzbq %al, tmp
     cmpq $1, tmp
     je then_branch_1
     jmp else_branch_1
-    ...
 \end{lstlisting}
 \end{minipage}
 \end{center}
@@ -7309,11 +7307,9 @@ For example, we want to generate the following code for the inner
 \begin{center}
 \begin{minipage}{0.96\textwidth}
 \begin{lstlisting}
-    ...
     cmpq $1, x
     je then_branch_1
     jmp else_branch_1
-    ...
 \end{lstlisting}
 \end{minipage}
 \end{center}
@@ -7393,7 +7389,7 @@ respectively.  In particular, we start \code{block40} with the
 comparison \racket{\code{(eq? x 0)}}\python{\code{x == 0}}
 and then branch to \code{block38} or
 \code{block39}, the two branches of the outer \key{if}, i.e.,
-\code{\code{(+ y 2)}}\python{\code{y + 2}} and
+\racket{\code{(+ y 2)}}\python{\code{y + 2}} and
 \racket{\code{(+ y 10)}}\python{\code{y + 10}}.
 The story for \code{block41} is similar.
 
@@ -7522,54 +7518,65 @@ following paragraphs we discuss specific cases in the
 We recommend implementing \code{explicate\_control} using four
 auxiliary functions which we discuss in the following paragraphs.
 \begin{description}
-\item[\code{explicate\_exp}] generates code for expressions in all
-  other contexts.
-\item[\code{explicate\_assign}] generates code for exprssions
-  that appear on the right-hand side of an assignment.
-\item[\code{explicate\_pred}] generates code for expressions
-  that appear in the condition of an \code{if}.
+\item[\code{explicate\_effect}] generates code for expressions as
+  statements, so their result is ignored and only their side-effects
+  matter.
+\item[\code{explicate\_assign}] generates code for expressions
+  on the right-hand side of an assignment.
+\item[\code{explicate\_pred}] generates code for an \code{if}
+  expression or statement by analyzing the condition expression.
 \item[\code{explicate\_stmt}] generates code for statements.
 \end{description}
 These four functions should incrementally build up the dictionary of
 basic blocks. The following auxiliary function can be used to create a
 new basic block from a list of statements. It returns a \code{goto}
 statement that jumps to the new basic block.
+\begin{center}
+\begin{minipage}{\textwidth}
 \begin{lstlisting}
 def create_block(stmts, basic_blocks):
     label = label_name(generate_name('block'))
     basic_blocks[label] = stmts
     return Goto(label)
 \end{lstlisting}
+\end{minipage}
+\end{center}
 Figure~\ref{fig:explicate-control-Rif} provides a skeleton for the
 \code{explicate\_control} pass.
 
-The \code{explicate\_exp} function has three parameters: 1) the
+The \code{explicate\_effect} function has three parameters: 1) the
 expression to be compiled, 2) the already-compiled code for this
-expression's \emph{continuation}, that is, the code that should
-execute after this expression, and 3) the dictionary of generated
-basic blocks. The output of \code{explicate\_exp} is a list of
-\LangCIf{} statements.
+expression's \emph{continuation}, that is, the list of statements that
+should execute after this expression, and 3) the dictionary of
+generated basic blocks. The output of \code{explicate\_effect} is a
+list of \LangCIf{} statements.
 %
-The only kind of expression in \LangIf{} that is not in \LangCIf{} is
-the \code{if} expression, so that must be translated into something
-else.  The two branches should be translated using
-\code{explicate\_exp} and the condition expression should be
-translated using \code{explicate\_pred}.  All other expressions can be
-translated into a statment using \code{Expr}.
+Let's consider a few of the cases for the expression to be compiled.
+If the expression to be compiled is a constant, then it can be
+discarded because it has no side effects. If it's a \CREAD{}, then
+that's a side-effect and should be preserved. So it should be
+translated into a statment using the \code{Expr} AST class. If the
+expression to be compiled is an \code{if} expression, we translate the
+two branches using \code{explicate\_effect} and then translate the
+condition expression using \code{explicate\_pred}, which generates
+code for the entire \code{if}.
 
 The \code{explicate\_assign} function has four parameters: 1) the
 right-hand-side of the assignment, 2) the left-hand-side of the
 assignment (the variable), 3) the continuation, and 4) the dictionary
-of basic blocks. When the right-hand-side is an \code{if} expression,
-there is some work to there. The two branches should be translated
-using \code{explicate\_assign} and the condition expression should be
+of basic blocks. The output of \code{explicate\_assign} is a list of
+\LangCIf{} statements.
+
+When the right-hand-side is an \code{if} expression, there is some
+work to do. In particular, the two branches should be translated using
+\code{explicate\_assign} and the condition expression should be
 translated using \code{explicate\_pred}.  Otherwise we can simply
 generate an assignment statement with the given left and right-hand
 sides.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-def explicate_exp(e, cont, basic_blocks):
+def explicate_effect(e, cont, basic_blocks):
     match e:
         case IfExp(test, body, orelse):
             ...
@@ -7607,7 +7614,7 @@ def explicate_stmt(s, cont, basic_blocks):
         case Assign([lhs], rhs):
             return explicate_assign(rhs, lhs, cont, basic_blocks)
         case Expr(value):
-            return explicate_exp(value, cont, basic_blocks)
+            return explicate_effect(value, cont, basic_blocks)
         case If(test, body, orelse):
             ...
 
@@ -7655,9 +7662,10 @@ def explicate_control(p):
   two branches of the enclosing \key{if}.}
 %
 \python{The \code{explicate\_pred} function has four parameters: 1)
-  the condition expession, 2) the generated code for the ``then''
-  branch, 3) the generated code for the ``else'' branch, and 4) the
-  dictionary of basic blocks.}
+  the condition expession, 2) the generated statements for the
+  ``then'' branch, 3) the generated statements for the ``else''
+  branch, and 4) the dictionary of basic blocks. The output of
+  \code{explicate\_pred} is a list of \LangCIf{} statements.}
 %
 Consider the case for comparison operators. We translate the
 comparison to an \code{if} statement whose branches are \code{goto}
@@ -7670,7 +7678,7 @@ either the \code{thn} or \code{els} branch depending on whether the
 constant is \TRUE{} or \FALSE{}. This case demonstrates that we
 sometimes discard the \code{thn} or \code{els} blocks that are input
 to \code{explicate\_pred}.
-%
+
 The case for \key{if} expressions in \code{explicate\_pred} is
 particularly illuminating because it deals with the challenges we
 discussed above regarding nested \key{if} expressions
@@ -7813,6 +7821,7 @@ Add the following entry to the list of \code{passes} in
 
 \end{exercise}
 
+\clearpage
 
 \section{Select Instructions}
 \label{sec:select-Rif}
