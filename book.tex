@@ -7833,33 +7833,32 @@ The \code{select\_instructions} pass translates \LangCIf{} to
 \racket{Recall that we implement this pass using three auxiliary
   functions, one for each of the non-terminals $\Atm$, $\Stmt$, and
   $\Tail$.}
-
-UNDER CONSTRUCTION
-
-For $\Atm$, we have new cases for the Booleans.  We take the usual
-approach of encoding them as integers, with true as 1 and false as 0.
+%
+\racket{For $\Atm$, we have new cases for the Booleans.}
+%
+\python{We begin by deciding how to compile the Boolean constants.}
+We take the usual approach of encoding them as integers.
 \[
-\TRUE{} \Rightarrow \key{1}
+\TRUE{} \quad\Rightarrow\quad \key{1}
 \qquad
-\FALSE{} \Rightarrow \key{0}
+\FALSE{} \quad\Rightarrow\quad \key{0}
 \]
 
-For $\Stmt$, we discuss a couple cases.  The \code{not} operation can
-be implemented in terms of \code{xorq} as we discussed at the
-beginning of this section. Given an assignment
-$\itm{var}$ \key{=} \key{(not} $\Atm$\key{);},
-if the left-hand side $\itm{var}$ is
-the same as $\Atm$, then just the \code{xorq} suffices.
+For translating statements, we discuss a couple cases.  The \code{not}
+operation can be implemented in terms of \code{xorq} as we discussed
+at the beginning of this section. Given an assignment, if the
+left-hand side variable is the same as the argument of \code{not},
+then just the \code{xorq} instruction suffices.
 \[
-\Var~\key{=}~ \key{(not}\; \Var\key{);}
+\CASSIGN{\Var}{ \CUNIOP{\key{not}}{\Var} }
 \quad\Rightarrow\quad
 \key{xorq}~\key{\$}1\key{,}~\Var
 \]
 Otherwise, a \key{movq} is needed to adapt to the update-in-place
-semantics of x86. Let $\Arg$ be the result of translating $\Atm$ to
-x86. Then we have
+semantics of x86. In the following translation, let $\Arg$ be the
+result of translating $\Atm$ to x86.
 \[
-\Var~\key{=}~ \key{(not}\; \Atm\key{);}
+\CASSIGN{\Var}{ \CUNIOP{\key{not}}{\Atm} }
 \quad\Rightarrow\quad
 \begin{array}{l}
 \key{movq}~\Arg\key{,}~\Var\\
@@ -7867,7 +7866,9 @@ x86. Then we have
 \end{array}
 \]
 
-Next consider the cases for \code{eq?} and less-than comparison.
+UNDER CONSTRUCTION
+
+Next consider the cases for equality and less-than comparison.
 Translating these operations to x86 is slightly involved due to the
 unusual nature of the \key{cmpq} instruction discussed above.  We
 recommend translating an assignment from \code{eq?} into the following
