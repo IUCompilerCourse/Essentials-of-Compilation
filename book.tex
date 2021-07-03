@@ -7580,8 +7580,10 @@ def explicate_effect(e, cont, basic_blocks):
     match e:
         case IfExp(test, body, orelse):
             ...
+        case Call(func, args):
+            ...
         case _:
-            return [Expr(e)] + cont
+            ...
 
 def explicate_assign(rhs, lhs, cont, basic_blocks):
     match rhs:
@@ -7696,6 +7698,28 @@ inside each recursive call. As discussed above, to avoid duplicating
 code, we need to add them to the dictionary of basic blocks so that we
 can instead refer to them by name and execute them with a \key{goto}.
 
+{\if\edition\pythonEd\color{purple}
+%
+The last of the auxiliary functions is \code{explicate\_stmt}.  It has
+three parameters: 1) the statement to be compiled, 2) the code for its
+continuation, and 3) the dictionary of basic blocks. The output is a
+list of statements. The cases for assignment and an
+expression-statement are given in full in the skeleton code: they
+simply dispatch to \code{explicate\_assign} and
+\code{explicate\_effect}, respectively. The case for \code{if}
+statements is not given, and is similar to the case for \code{if}
+expressions.
+
+The \code{explicate\_control} function itself is given in
+Figure~\ref{fig:explicate-control-Rif}. It applies
+\code{explicate\_stmt} to each statement in the program, from back to
+front. Thus, the result so-far, stored in \code{new\_body}, can be
+used as the continuation parameter in the next call to
+\code{explicate\_stmt}. The \code{new\_body} is initialized to a
+\code{Return} statment. Once complete, we add the \code{new\_body} to
+the dictionary of basic blocks, labeling it as the ``start'' block.
+%
+\fi}
 
 %% Getting back to the case for \code{if} in \code{explicate-pred}, we
 %% make the recursive calls to \code{explicate-pred} on the ``then'' and
@@ -7711,14 +7735,13 @@ can instead refer to them by name and execute them with a \key{goto}.
 %% B_5
 %% \]
 
-\racket{The \code{explicate-tail} and \code{explicate-assign} functions need
-additional cases for Boolean constants and \key{if}.
-%
-In the cases for \code{if}, the two branches inherit the current
-context, so in \code{explicate-tail} they are in tail position and in
-\code{explicate-assign} they are in assignment position. The
-\code{cont} parameter of \code{explicate-assign} is used in both
-recursive calls, so make sure to use \code{block->goto} on it.}
+\racket{The \code{explicate\_tail} and \code{explicate\_assign}
+  functions need additional cases for Boolean constants and \key{if}.
+  In the cases for \code{if}, the two branches inherit the current
+  context, so in \code{explicate\_tail} they are in tail position and
+  in \code{explicate\_assign} they are in assignment position. The
+  \code{cont} parameter of \code{explicate\_assign} is used in both
+  recursive calls, so make sure to use \code{block->goto} on it.}
 
 %% In the case for \code{if} in \code{explicate-tail}, the two branches
 %% inherit the current context, so they are in tail position. Thus, the
@@ -7836,7 +7859,7 @@ The \code{select\_instructions} pass translates \LangCIf{} to
 %
 \racket{For $\Atm$, we have new cases for the Booleans.}
 %
-\python{We begin by deciding how to compile the Boolean constants.}
+\python{We begin with the Boolean constants.}
 We take the usual approach of encoding them as integers.
 \[
 \TRUE{} \quad\Rightarrow\quad \key{1}
@@ -7866,17 +7889,15 @@ result of translating $\Atm$ to x86.
 \end{array}
 \]
 
-UNDER CONSTRUCTION
-
-Next consider the cases for equality and less-than comparison.
-Translating these operations to x86 is slightly involved due to the
-unusual nature of the \key{cmpq} instruction discussed above.  We
-recommend translating an assignment from \code{eq?} into the following
-sequence of three instructions. \\
+Next consider the cases for equality.  Translating this operation to
+x86 is slightly involved due to the unusual nature of the \key{cmpq}
+instruction discussed above.  We recommend translating an assignment
+with an equality on the right-hand side into the following sequence of
+three instructions. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-|$\Var$| = (eq? |$\Atm_1$| |$\Atm_2$|);
+|$\CASSIGN{\Var}{ \CEQ{\Atm_1}{\Atm_2} }$|
 \end{lstlisting}
 \end{minipage}
 &
@@ -7890,21 +7911,29 @@ movzbq %al, |$\Var$|
 \end{lstlisting}
 \end{minipage}
 \end{tabular}  \\
+The translations for the other comparison operators is similar to the
+above but use different suffixes for the \code{set} instruction.
 
-Regarding the $\Tail$ non-terminal, we have two new cases: \key{goto}
-and \key{if} statements. Both are straightforward to translate to
-x86. A \key{goto} becomes a jump instruction.
+
+\racket{Regarding the $\Tail$ non-terminal, we have two new cases:
+  \key{goto} and \key{if} statements. Both are straightforward to
+  translate to x86.}
+%
+A \key{goto} statement becomes a jump instruction.
 \[
-\key{goto}\; \ell\key{;} \quad \Rightarrow \quad \key{jmp}\;\ell
+\key{goto}\; \ell\racket{\key{;}} \quad \Rightarrow \quad \key{jmp}\;\ell
 \]
+%
 An \key{if} statement becomes a compare instruction followed by a
 conditional jump (for the ``then'' branch) and the fall-through is to
 a regular jump (for the ``else'' branch).\\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-if (eq? |$\Atm_1$| |$\Atm_2$|) goto |$\ell_1$|;
-else goto |$\ell_2$|;
+if |$\CEQ{\Atm_1}{\Atm_2}$||$\python{\key{:}}$|
+    goto |$\ell_1$||$\racket{\key{;}}$|
+else|$\python{\key{:}}$|
+    goto |$\ell_2$||$\racket{\key{;}}$|
 \end{lstlisting}
 \end{minipage}
 &
@@ -7918,16 +7947,20 @@ jmp |$\ell_2$|
 \end{lstlisting}
 \end{minipage}
 \end{tabular}  \\
+Again, the translations for the other comparison operators is similar to the
+above but use different suffixes for the conditional jump instruction.
 
 \begin{exercise}\normalfont
-Expand your \code{select-instructions} pass to handle the new features
-of the \LangIf{} language.
+Expand your \code{select\_instructions} pass to handle the new
+features of the \LangIf{} language.
 %
+{\if\edition\racketEd\color{olive}
 Add the following entry to the list of \code{passes} in
 \code{run-tests.rkt}
 \begin{lstlisting}
 (list "select-instructions" select-instructions interp-pseudo-x86-1)
 \end{lstlisting}
+\fi}
 %
 Run the script to test your compiler on all the test programs.
 \end{exercise}
@@ -7944,28 +7977,37 @@ algorithm itself does not change.
 \label{sec:liveness-analysis-Rif}
 \index{subject}{liveness analysis}
 
-Recall that for \LangVar{} we implemented liveness analysis for a single
-basic block (Section~\ref{sec:liveness-analysis-Rvar}). With the
-addition of \key{if} expressions to \LangIf{}, \code{explicate\_control}
-produces many basic blocks arranged in a control-flow graph.  We
-recommend that you create a new auxiliary function named
-\code{uncover-live-CFG} that applies liveness analysis to a
-control-flow graph.
+Recall that for \LangVar{} we implemented liveness analysis for a
+single basic block (Section~\ref{sec:liveness-analysis-Rvar}).  With
+the addition of \key{if} expressions to \LangIf{},
+\code{explicate\_control} produces many basic blocks.
+
+%% We recommend that you create a new auxiliary function named
+%% \code{uncover\_live\_CFG} that applies liveness analysis to a
+%% control-flow graph.
 
 The first question we is: what order should we process the basic
-blocks in the control-flow graph? Recall that to perform liveness
-analysis on a basic block we need to know its live-after set. If a
-basic block has no successors (i.e. no out-edges in the control flow
-graph), then it has an empty live-after set and we can immediately
-apply liveness analysis to it. If a basic block has some successors,
-then we need to complete liveness analysis on those blocks first. In
-graph theory, a sequence of nodes is in \emph{topological
-  order}\index{subject}{topological order} if each vertex comes before its
-successors. We need the opposite, so we can transpose the graph
-before computing a topological order.
+blocks? Recall that to perform liveness analysis on a basic block we
+need to know the live-after set for the last instruction in the
+block. If a basic block has no successors (i.e. contains no jumps to
+other blocks), then it has an empty live-after set and we can
+immediately apply liveness analysis to it. If a basic block has some
+successors, then we need to complete liveness analysis on those blocks
+first. These ordering contraints are the reverse of a
+\emph{topological order}\index{subject}{topological order} on the
+control-flow graph of the program~\citep{Allen:1970uq}.  In a
+\emph{control flow graph} (CFG), each node represents a \emph{basic
+block} and each edge represents a jump from one block to another
+\index{subject}{control-flow graph}.  It is straightforward to
+generate a CFG from the dictionary of basic blocks. One then needs to
+transpose the CFG and apply the topological sort algorithm.
 %
-Use the \code{tsort} and \code{transpose} functions of the Racket
-\code{graph} package to accomplish this.
+%
+\racket{We recommend using the \code{tsort} and \code{transpose}
+  functions of the Racket \code{graph} package to accomplish this.}
+%
+\python{We provide implementations of \code{topological\_sort} and
+  \code{transpose} in the file \code{graph.py} of the support code.}
 %
 As an aside, a topological ordering is only guaranteed to exist if the
 graph does not contain any cycles. That is indeed the case for the
@@ -7973,14 +8015,15 @@ control-flow graphs that we generate from \LangIf{} programs.
 However, in Chapter~\ref{ch:Rwhile} we add loops to \LangLoop{} and
 learn how to handle cycles in the control-flow graph.
 
-You'll need to construct a directed graph to represent the
-control-flow graph. Do not use the \code{directed-graph} of the
-\code{graph} package because that only allows at most one edge between
-each pair of vertices, but a control-flow graph may have multiple
-edges between a pair of vertices. The \code{multigraph.rkt} file in
-the support code implements a graph representation that allows
-multiple edges between a pair of vertices.
+\racket{You'll need to construct a directed graph to represent the
+  control-flow graph. Do not use the \code{directed-graph} of the
+  \code{graph} package because that only allows at most one edge
+  between each pair of vertices, but a control-flow graph may have
+  multiple edges between a pair of vertices. The \code{multigraph.rkt}
+  file in the support code implements a graph representation that
+  allows multiple edges between a pair of vertices.}
 
+{\if\edition\racketEd\color{olive}
 The next question is how to analyze jump instructions.  Recall that in
 Section~\ref{sec:liveness-analysis-Rvar} we maintain an alist named
 \code{label->live} that maps each label to the set of live locations
@@ -7991,18 +8034,33 @@ as we process the blocks. In particular, after performing liveness
 analysis on a block, we take the live-before set of its first
 instruction and associate that with the block's label in the
 \code{label->live}.
+\fi}
+%
+{\if\edition\pythonEd\color{purple}
+%
+The next question is how to analyze jump instructions.  The locations
+that are live before a \code{jmp} should be the locations in
+$L_{\mathtt{before}}$ at the target of the jump. So we recommend
+maintaining dictionary named \code{live\_before\_block} that maps each
+label to the $L_{\mathtt{before}}$ for the first instruction in its
+block. After performing liveness analysis on each block, we take the
+live-before set of its first instruction and associate that with the
+block's label in the \code{live\_before\_block} dictionary.
+%
+\fi}
 
 In \LangXIfVar{} we also have the conditional jump
 $\JMPIF{\itm{cc}}{\itm{label}}$ to deal with.  Liveness analysis for
 this instruction is particularly interesting because during
 compilation we do not know which way a conditional jump will go.  So
 we do not know whether to use the live-before set for the following
-instruction or the live-before set for the $\itm{label}$.  However,
-there is no harm to the correctness of the compiler if we classify
-more locations as live than the ones that are truly live during a
-particular execution of the instruction. Thus, we can take the union
-of the live-before sets from the following instruction and from the
-mapping for $\itm{label}$ in \code{label->live}.
+instruction or the live-before set for the block associated with the
+$\itm{label}$.  However, there is no harm to the correctness of the
+generated code if we classify more locations as live than the ones
+that are truly live during one particular execution of the
+instruction. Thus, we can take the union of the live-before sets from
+the following instruction and from the mapping for $\itm{label}$ in
+\racket{\code{label->live}}\python{\code{live\_before\_block}}.
 
 The auxiliary functions for computing the variables in an
 instruction's argument and for computing the variables read-from ($R$)
@@ -8010,17 +8068,32 @@ or written-to ($W$) by an instruction need to be updated to handle the
 new kinds of arguments and instructions in \LangXIfVar{}.
 
 \begin{exercise}\normalfont
-Update the \code{uncover\_live} \racket{pass}\python{function} and implement the
+{\if\edition\racketEd\color{olive}
+%
+Update the \code{uncover\_live} pass and implement the
 \code{uncover-live-CFG} auxiliary function to apply liveness analysis
-to the control-flow graph.  Add the following entry to the list of
-\code{passes} in the \code{run-tests.rkt} script.
+to the control-flow graph.
+%
+Add the following entry to the list of \code{passes} in the
+\code{run-tests.rkt} script.
 \begin{lstlisting}
 (list "uncover-live" uncover-live interp-pseudo-x86-1)
 \end{lstlisting}
+\fi}
+
+{\if\edition\pythonEd\color{purple}
+%
+Update the \code{uncover\_live} function to perform liveness analysis,
+in reverse topological order, on all of the basic blocks in the
+program.
+%  
+\fi}
 \end{exercise}
 
 \subsection{Build the Interference Graph}
 \label{sec:build-interference-Rif}
+
+UNDER CONSTRUCTION
 
 Many of the new instructions in \LangXIfVar{} can be handled in the
 same way as the instructions in \LangXVar{}. Thus, if your code was
