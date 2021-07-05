@@ -7180,6 +7180,12 @@ The output language for this pass is \LangIfANF{}
 All three sub-expressions of an
 \code{if} are allowed to be complex expressions but the operands of
 \code{not} and the comparisons must be atomic.
+%
+\python{We add a new language form, the \code{Let} expression, to aid
+  in the translation of \code{if} expressions.  The
+  $\LET{x}{e_1}{e_2}$ form is like an assignment statement, but can be
+  used as an expression. It assigns the result of $e_1$ to the
+  variable $x$, an then evaluates $e_2$, which may reference $x$.}
 
 Add cases for Boolean constants, \python{comparisons,} and \code{if}
 expressions to the \code{rco\_exp} and \code{rco\_atom} functions
@@ -7213,6 +7219,7 @@ R^{\mathsf{ANF}}_{\mathsf{if}}  &::=& \PROGRAM{\code{()}}{\Exp}
 \Exp &::=& \Atm \MID \READ{} \\
   &\MID& \BINOP{\itm{binop}}{\Atm}{\Atm} \MID \UNIOP{\key{uniop}}{\Atm} \\
   &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} \\
+  &\MID& \LET{\Var}{\Exp}{\Exp}\\
 \Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
         &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{*}}{\Stmt^{*}}\\
 P^{\mathsf{ANF}}_{\mathsf{if}}  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
@@ -7234,11 +7241,13 @@ and \code{rco\_exp} functions in \code{compiler.rkt}.
 Create three new \LangInt{} programs that exercise the interesting
 code in this pass.
 %
+{\if\edition\racketEd\color{olive}    
 In the \code{run-tests.rkt} script, add the following entry to the
 list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
 (list "remove-complex" remove-complex-opera* interp-Rif type-check-Rif)
 \end{lstlisting}
+\fi}
 \end{exercise}
 
 
@@ -7370,122 +7379,6 @@ In particular, the \key{CProgram} construct contains \racket{an
 basic block is \racket{represented by  the $\Tail$ non-terminal}
 \python{a list of statements}.
 
-Figure~\ref{fig:explicate-control-s1-38} shows the output of the
-\code{remove\_complex\_operands} pass and then the
-\code{explicate\_control} pass on the example program. We walk through
-the output program and then discuss the algorithm.
-%
-Following the order of evaluation in the output of
-\code{remove\_complex\_operands}, we first have two calls to \CREAD{}
-and then the comparison \racket{\code{(< x 1)}}\python{\code{x < 1}}
-in the predicate of the inner \key{if}.  In the output of
-\code{explicate\_control}, in the
-block labeled \code{start}, is two assignment statements followed by a
-\code{if} statement that branches to \code{block40} or
-\code{block41}. The blocks associated with those labels contain the
-translations of the code \racket{\code{(eq? x 0)}}\python{\code{x == 0}}
-and \racket{\code{(eq? x 2)}}\python{\code{x == 2}},
-respectively.  In particular, we start \code{block40} with the
-comparison \racket{\code{(eq? x 0)}}\python{\code{x == 0}}
-and then branch to \code{block38} or
-\code{block39}, the two branches of the outer \key{if}, i.e.,
-\racket{\code{(+ y 2)}}\python{\code{y + 2}} and
-\racket{\code{(+ y 10)}}\python{\code{y + 10}}.
-The story for \code{block41} is similar.
-
-\begin{figure}[tbp]
-{\if\edition\racketEd\color{olive}        
-\begin{tabular}{lll}
-\begin{minipage}{0.4\textwidth}
-% cond_test_41.rkt
-\begin{lstlisting}
-(let ([x (read)])
-   (let ([y (read)])
-      (if (if (< x 1)
-             (eq? x 0)
-             (eq? x 2))
-         (+ y 2)
-         (+ y 10))))
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.55\textwidth}
-\begin{lstlisting}
-start:
-    x = (read);
-    y = (read);
-    if (< x 1) goto block40;
-    else goto block41;
-block40:
-    if (eq? x 0) goto block38;
-    else goto block39;
-block41:
-    if (eq? x 2) goto block38;
-    else goto block39;
-block38:
-    return (+ y 2);
-block39:
-    return (+ y 10);
-\end{lstlisting}
-\end{minipage}
-\end{tabular} 
-\fi}
-{\if\edition\pythonEd\color{purple}
-\begin{tabular}{lll}
-\begin{minipage}{0.4\textwidth}
-% cond_test_41.rkt
-\begin{lstlisting}
-x = input_int()
-y = input_int()
-print(y + 2             \
-      if (x == 0        \
-          if x < 1      \
-          else x == 2) \
-      else y + 10)
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.55\textwidth}
-\begin{lstlisting}
-start:
-    x = input_int()
-    y = input_int()
-    if x < 1:
-        goto block_8
-    else:
-        goto block_9
-block_8:
-    if x == 0:
-        goto block_2
-    else:
-        goto block_3
-block_9:
-    if x == 2:
-        goto block_2
-    else:
-        goto block_3
-block_2:
-    tmp_0 = y + 2
-    goto block_1
-block_3:
-    tmp_0 = y + 10
-    goto block_1
-block_1:
-    print(tmp_0)
-    return 0
-\end{lstlisting}
-\end{minipage}
-\end{tabular} 
-\fi}
-\caption{Translation from \LangIf{} to \LangCIf{}
-  via the \code{explicate\_control}.}
-\label{fig:explicate-control-s1-38}
-\end{figure}
-
 %% The nice thing about the output of \code{explicate\_control} is that
 %% there are no unnecessary comparisons and every comparison is part of a
 %% conditional jump.
@@ -7575,12 +7468,14 @@ generate an assignment statement with the given left and right-hand
 sides.
 
 \begin{figure}[tbp]
-\begin{lstlisting}
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 def explicate_effect(e, cont, basic_blocks):
     match e:
         case IfExp(test, body, orelse):
             ...
         case Call(func, args):
+            ...
+        case Let(var, rhs, body):
             ...
         case _:
             ...
@@ -7588,6 +7483,8 @@ def explicate_effect(e, cont, basic_blocks):
 def explicate_assign(rhs, lhs, cont, basic_blocks):
     match rhs:
         case IfExp(test, body, orelse):
+            ...
+        case Let(var, rhs, body):
             ...
         case _:
             return [Assign([lhs], rhs)] + cont
@@ -7605,6 +7502,8 @@ def explicate_pred(cnd, thn, els, basic_blocks):
         case UnaryOp(Not(), operand):
             ...
         case IfExp(test, body, orelse):
+            ...
+        case Let(var, rhs, body):
             ...
         case _:
             return [If(Compare(cnd, [Eq()], [Constant(False)]),
@@ -7787,6 +7686,145 @@ the dictionary of basic blocks, labeling it as the ``start'' block.
 %% (\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els}) \quad\Rightarrow\quad B_4
 %% \]
 %% This completes the description of \code{explicate\_control} for \LangIf{}.
+
+Figure~\ref{fig:explicate-control-s1-38} shows the output of the
+\code{remove\_complex\_operands} pass and then the
+\code{explicate\_control} pass on the example program. We walk through
+the output program and then discuss the algorithm.
+%
+Following the order of evaluation in the output of
+\code{remove\_complex\_operands}, we first have two calls to \CREAD{}
+and then the comparison \racket{\code{(< x 1)}}\python{\code{x < 1}}
+in the predicate of the inner \key{if}.  In the output of
+\code{explicate\_control}, in the
+block labeled \code{start}, is two assignment statements followed by a
+\code{if} statement that branches to \code{block\_8} or
+\code{block\_9}. The blocks associated with those labels contain the
+translations of the code
+\racket{\code{(eq? x 0)}}\python{\code{x == 0}}
+and
+\racket{\code{(eq? x 2)}}\python{\code{x == 2}},
+respectively.  In particular, we start \code{block\_8} with the
+comparison
+\racket{\code{(eq? x 0)}}\python{\code{x == 0}}
+and then branch to \code{block\_4} or \code{block\_5}.
+Here was see that our algorithm sometimes inserts unnecessary blocks:
+\code{block\_4} consists of just a \code{goto} to \code{block\_2}
+and \code{block\_5} consists of just a \code{goto} to \code{block\_3}.
+It would be better to skip blocks \code{block\_4} and \code{block\_5}
+and go directly to \code{block\_2} and \code{block\_3},
+which we investigate doing in Section~\ref{sec:opt-jumps}.
+But getting back to the example, \code{block\_2} and \code{block\_3},
+corresponds to the two branches of the outer \key{if}, i.e.,
+\racket{\code{(+ y 2)}}\python{\code{y + 2}} and
+\racket{\code{(+ y 10)}}\python{\code{y + 10}}.
+%
+The story for \code{block\_9} is similar to that of \code{block\_8}.
+%
+\python{The \code{block\_1} corresponds to the \code{print} statment
+  at the end of the program.}
+
+\begin{figure}[tbp]
+{\if\edition\racketEd\color{olive}        
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+% cond_test_41.rkt
+\begin{lstlisting}
+(let ([x (read)])
+   (let ([y (read)])
+      (if (if (< x 1)
+             (eq? x 0)
+             (eq? x 2))
+         (+ y 2)
+         (+ y 10))))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.55\textwidth}
+  TODO: replace with non-optimized version. -Jeremy
+\begin{lstlisting}
+start:
+    x = (read);
+    y = (read);
+    if (< x 1) goto block40;
+    else goto block41;
+block40:
+    if (eq? x 0) goto block38;
+    else goto block39;
+block41:
+    if (eq? x 2) goto block38;
+    else goto block39;
+block38:
+    return (+ y 2);
+block39:
+    return (+ y 10);
+\end{lstlisting}
+\end{minipage}
+\end{tabular} 
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+% cond_test_41.rkt
+\begin{lstlisting}
+x = input_int()
+y = input_int()
+print(y + 2             \
+      if (x == 0        \
+          if x < 1      \
+          else x == 2) \
+      else y + 10)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.55\textwidth}
+\begin{lstlisting}
+start:
+  x = input_int()
+  y = input_int()
+  if x < 1:
+    goto block_8
+  else:
+    goto block_9
+block_8:
+  if x == 0:
+    goto block_4
+  else:
+    goto block_5
+block_9:
+  if x == 2:
+    goto block_6
+  else:
+    goto block_7
+block_4:
+  goto block_2
+block_5:
+  goto block_3
+block_6:
+  goto block_2
+block_7:
+  goto block_3
+block_2:
+  tmp_0 = y + 2
+  goto block_1
+block_3:
+  tmp_0 = y + 10
+  goto block_1
+block_1:
+  print(tmp_0)
+  return 0
+\end{lstlisting}
+\end{minipage}
+\end{tabular} 
+\fi}
+\caption{Translation from \LangIf{} to \LangCIf{}
+  via the \code{explicate\_control}.}
+\label{fig:explicate-control-s1-38}
+\end{figure}
 
 {\if\edition\racketEd\color{olive}
 The way in which the \code{shrink} pass transforms logical operations
@@ -8215,6 +8253,7 @@ Figure~\ref{fig:if-example-x86} shows a simple example program in
 x86 assembly code.
 
 \begin{figure}[tbp]
+{\if\edition\racketEd\color{olive}
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 % cond_test_20.rkt, eq_input.py
@@ -8288,7 +8327,92 @@ conclusion:
 \end{lstlisting}
 \end{minipage}
 \end{tabular}
-\caption{Example compilation of an \key{if} expression to x86.}
+\fi}
+
+{\if\edition\pythonEd\color{purple}
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+% cond_test_20.rkt, eq_input.py
+\begin{lstlisting}
+print(42 if input_int() == 1 else 0)
+\end{lstlisting}
+$\Downarrow$
+\begin{lstlisting}
+start:
+	tmp_0 = input_int()
+	if tmp_0 == 1:
+	  goto block_3
+	else:
+	  goto block_4
+block_3:
+	tmp_1 = 42
+	goto block_2
+block_4:
+	tmp_1 = 0
+	goto block_2
+block_2:
+	print(tmp_1)
+	return 0
+\end{lstlisting}
+$\Downarrow$
+\begin{lstlisting}
+start:
+	callq read_int
+	movq %rax, tmp_0
+	cmpq 1, tmp_0
+	je block_3
+	jmp block_4
+block_3:
+	movq 42, tmp_1
+	jmp block_2
+block_4:
+	movq 0, tmp_1
+	jmp block_2
+block_2:
+	movq tmp_1, %rdi
+	callq print_int
+	movq 0, %rax
+	jmp conclusion
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow\qquad$
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+	.globl main
+main:
+	pushq %rbp
+	movq %rsp, %rbp
+	subq $0, %rsp
+	jmp start
+start:
+	callq read_int
+	movq %rax, %rcx
+	cmpq $1, %rcx
+	je block_3
+	jmp block_4
+block_3:
+	movq $42, %rcx
+	jmp block_2
+block_4:
+	movq $0, %rcx
+	jmp block_2
+block_2:
+	movq %rcx, %rdi
+	callq print_int
+	movq $0, %rax
+	jmp conclusion
+conclusion:
+	addq $0, %rsp
+	popq %rbp
+	retq
+\end{lstlisting}
+\end{minipage}
+\end{tabular}
+\fi}
+\caption{Example compilation of an \key{if} expression to x86, showing
+  the results of \code{explicate\_control},
+  \code{select\_instructions}, and the final x86 assembly code.  }
 \label{fig:if-example-x86}
 \end{figure}
 
@@ -8296,45 +8420,92 @@ conclusion:
 \section{Challenge: Optimize and Remove Jumps}
 \label{sec:opt-jumps}
 
-UNDER CONSTRUCTION
 
-However, as we saw in the cases above for Boolean constants, the
-blocks \code{thn} and \code{els} may not get used at all and we don't
-want to prematurely add them to the control-flow graph if they end up
-being discarded.
+The algorithm for \code{explicate\_control} that we sketched in
+Section~\ref{sec:explicate-control-Rif} sometimes generates too many
+blocks. It does so in two different ways.
+%
+First, recall how in Figure~\ref{fig:explicate-control-s1-38},
+\code{block\_4} consists of just a jump to \code{block\_2}. What's
+going on here is that we created a new basic block from a single
+\code{goto} statement, whereas we could have simply returned the
+\code{goto} statement. We can solve this problem by modifying the
+\code{create\_block} function to recognize this situation.
+
+%
+Second, \code{explicate\_control} creates a basic block whenever a
+continuation \emph{might} get used more than once by passing it into
+two or more recursive calls. However, just because a continuation
+might get used more than once, doesn't mean it will.  In fact, some
+continuation parameters may not be used at all because we sometimes
+ignore them. For example, consider the case for the constant \TRUE{}
+in \code{explicate\_pred}, where we discard the \code{els} branch.  So
+the question is how can we decide whether to create a basic block?
 
 The solution to this conundrum is to use \emph{lazy
-  evaluation}\index{subject}{lazy evaluation}\citep{Friedman:1976aa} to delay
-adding the blocks to the control-flow graph until the points where we
-know they will be used. Racket provides support for lazy evaluation
-with the
+  evaluation}\index{subject}{lazy evaluation}\citep{Friedman:1976aa}
+to delay creating a basic block until the point in time where we know
+it will be used.
+%
+{\if\edition\racketEd\color{olive}
+%
+Racket provides support for
+lazy evaluation with the
 \href{https://docs.racket-lang.org/reference/Delayed_Evaluation.html}{\code{racket/promise}}
 package. The expression \key{(delay} $e_1 \ldots e_n$\key{)}
-\index{subject}{delay} creates a \emph{promise}\index{subject}{promise} in which the
-evaluation of the expressions is postponed. When \key{(force}
-$p$\key{)}\index{subject}{force} is applied to a promise $p$ for the first
-time, the expressions $e_1 \ldots e_n$ are evaluated and the result of
-$e_n$ is cached in the promise and returned. If \code{force} is
-applied again to the same promise, then the cached result is returned.
-If \code{force} is applied to an argument that is not a promise,
-\code{force} simply returns the argument.
+\index{subject}{delay} creates a
+\emph{promise}\index{subject}{promise} in which the evaluation of the
+expressions is postponed. When \key{(force}
+$p$\key{)}\index{subject}{force} is applied to a promise $p$ for the
+first time, the expressions $e_1 \ldots e_n$ are evaluated and the
+result of $e_n$ is cached in the promise and returned. If \code{force}
+is applied again to the same promise, then the cached result is
+returned.  If \code{force} is applied to an argument that is not a
+promise, \code{force} simply returns the argument.
+%
+\fi}
+%
+{\if\edition\pythonEd\color{purple}
+%
+While Python does not provide direct support for lazy evaluation, it
+is easy to mimic. We can \emph{delay} the evaluation of some
+compilation actions by wrapping them inside a function with no
+parameters. We can \emph{force} the evaluation simply by calling the
+function. However, in some cases in our \code{explicate\_...}
+functions will return lists of statements and in other cases they will
+return delayed actions. We use the term \emph{promise} to refer to
+both.  To uniformly deal with promises, we define the following
+\code{force} function that checks whether its input is a function and
+then either 1) calls the function, or 2) returns the input.
+\begin{lstlisting}
+def force(promise):
+    if isinstance(promise, types.FunctionType):
+        return promise()
+    else:
+        return promise
+\end{lstlisting}
+%
+\fi}
 
-We use lazy evaluation for the input and output blocks of the
-functions \code{explicate-pred} and \code{explicate-assign} and for
-the output block of \code{explicate-tail}. So instead of taking and
-returning blocks, they take and return promises. Furthermore, when we
-come to a situation in which we a block might be used more than once,
-as in the case for \code{if} in \code{explicate-pred}, we transform
-the promise into a new promise that will add the block to the
-control-flow graph and return a \code{goto}.  The following auxiliary
-function named \code{block->goto} accomplishes this task. It begins
-with \code{delay} to create a promise. When forced, this promise will
-force the original promise. If that returns a \code{goto} (because the
-block was already added to the control-flow graph), then we return the
-\code{goto}. Otherwise we add the block to the control-flow graph with
-another auxiliary function named \code{add-node}. That function
-returns the label for the new block, which we use to create a
-\code{goto}.
+We use lazy evaluation for the input and output of the functions
+\code{explicate\_pred}, \code{explicate\_assign}, \racket{ and
+  \code{explicate\_tail}} \python{ and \code{explicate\_effect}}. So
+instead of taking and returning lists of statments, they take and
+return promises. Furthermore, when we come to a situation in which we
+a block might be used more than once, as in the case for \code{if} in
+\code{explicate\_pred}, we transform the promise into a new promise
+that will create the basic block and return a \code{goto}.
+%
+{\if\edition\racketEd\color{olive}
+%
+The following auxiliary function named \code{block->goto} accomplishes
+this task. It begins with \code{delay} to create a promise. When
+forced, this promise will force the original promise. If that returns
+a \code{goto} (because the block was already added to the control-flow
+graph), then we return the \code{goto}. Otherwise we add the block to
+the control-flow graph with another auxiliary function named
+\code{add-node}. That function returns the label for the new block,
+which we use to create a \code{goto}.
 \begin{lstlisting}
 (define (block->goto block)
   (delay
@@ -8343,7 +8514,124 @@ returns the label for the new block, which we use to create a
       [(Goto label) (Goto label)]
       [else (Goto (add-node b))])))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd\color{purple}
+%
+Here's the new version of the \code{create\_block} auxiliary function
+that accomplished this.
+\begin{lstlisting}
+def create_block(stmts, basic_blocks):
+  ss = force(stmts)
+  match ss:
+    case [Goto(l)]:
+       return Goto(l)
+    case _:
+      label = label_name(generate_name('block'))
+      basic_blocks[label] = ss
+      return Goto(label)
+\end{lstlisting}
+\fi}
 
+Figure~\ref{fig:explicate-control-challenge} shows the output of
+\code{explicate\_control} on the example of the nested \code{if}
+expressions with the two improvements discussed in this section.  As
+you can see, the number of basic blocks has been reduced from 10
+blocks (see Figure~\ref{fig:explicate-control-s1-38}) down to 6
+blocks.
+
+
+\begin{figure}[tbp]
+{\if\edition\racketEd\color{olive}        
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+% cond_test_41.rkt
+\begin{lstlisting}
+(let ([x (read)])
+   (let ([y (read)])
+      (if (if (< x 1)
+             (eq? x 0)
+             (eq? x 2))
+         (+ y 2)
+         (+ y 10))))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.55\textwidth}
+\begin{lstlisting}
+start:
+    x = (read);
+    y = (read);
+    if (< x 1) goto block40;
+    else goto block41;
+block40:
+    if (eq? x 0) goto block38;
+    else goto block39;
+block41:
+    if (eq? x 2) goto block38;
+    else goto block39;
+block38:
+    return (+ y 2);
+block39:
+    return (+ y 10);
+\end{lstlisting}
+\end{minipage}
+\end{tabular} 
+\fi}
+{\if\edition\pythonEd\color{purple}
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+% cond_test_41.rkt
+\begin{lstlisting}
+x = input_int()
+y = input_int()
+print(y + 2             \
+      if (x == 0        \
+          if x < 1      \
+          else x == 2) \
+      else y + 10)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.55\textwidth}
+\begin{lstlisting}
+start:
+    x = input_int()
+    y = input_int()
+    if x < 1:
+        goto block_4
+    else:
+        goto block_5
+block_4:
+    if x == 0:
+        goto block_2
+    else:
+        goto block_3
+block_5:
+    if x == 2:
+        goto block_2
+    else:
+        goto block_3
+block_2:
+    tmp_0 = y + 2
+    goto block_1
+block_3:
+    tmp_0 = y + 10
+    goto block_1
+block_1:
+    print(tmp_0)
+    return 0
+\end{lstlisting}
+\end{minipage}
+\end{tabular} 
+\fi}
+\caption{Translation from \LangIf{} to \LangCIf{}
+  via the improved \code{explicate\_control}.}
+\label{fig:explicate-control-challenge}
+\end{figure}
 
 %% Recall that in the example output of \code{explicate\_control} in
 %% Figure~\ref{fig:explicate-control-s1-38}, \code{block57} through
@@ -8469,7 +8757,7 @@ ends with a jump to \code{block7953} and there are no other jumps to
 avoid the runtime overhead of this jump by merging \code{block7953}
 into the preceding block, in this case the \code{start} block.
 Figure~\ref{fig:remove-jumps} shows the output of
-\code{select-instructions} on the left and the result of this
+\code{select\_instructions} on the left and the result of this
 optimization on the right.
 
 \begin{figure}[tbp]
@@ -11610,7 +11898,6 @@ extract the $5$-bits starting at position $58$ from the tag.
 \node (x86-3) at (6,-4)  {\large \LangXIndCallVar{}};
 \node (x86-4) at (9,-4) {\large \LangXIndCall{}};
 \node (x86-5) at (9,-6) {\large \LangXIndCall{}};
-
 
 \path[->,bend left=15] (Rfun) edge [above] node
      {\ttfamily\footnotesize shrink} (Rfun-2);
