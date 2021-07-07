@@ -218,12 +218,12 @@ Our choice of language features is designed to elicit the fundamental
 concepts and algorithms used in compilers.
 \begin{itemize}
 \item We begin with integer arithmetic and local variables in
-  Chapters~\ref{ch:trees-recur} and \ref{ch:Rvar}, where we introduce
+  Chapters~\ref{ch:trees-recur} and \ref{ch:Lvar}, where we introduce
   the fundamental tools of compiler construction: \emph{abstract
     syntax trees} and \emph{recursive functions}. 
-\item In Chapter~\ref{ch:register-allocation-Rvar} we apply
+\item In Chapter~\ref{ch:register-allocation-Lvar} we apply
   \emph{graph coloring} to assign variables to machine registers.
-\item Chapter~\ref{ch:Rif} adds \code{if} expressions, which motivates
+\item Chapter~\ref{ch:Lif} adds \code{if} expressions, which motivates
   an elegant recursive algorithm for translating them into conditional
   \code{goto}'s.
 \item Chapter~\ref{ch:Rwhile} fleshes out support for imperative
@@ -277,7 +277,7 @@ mathematics.
 %
 At the beginning of the course, students form groups of 2-4 people.
 The groups complete one chapter every two weeks, starting with
-Chapter~\ref{ch:Rvar}. Many chapters include a challenge problem that
+Chapter~\ref{ch:Lvar}. Many chapters include a challenge problem that
 we assign to the graduate students. The last two weeks of the course
 involve a final project in which students design and implement a
 compiler extension of their choosing.  Chapters~\ref{ch:Rgrad} and
@@ -302,9 +302,9 @@ University of Vermont.
 {\if\edition\racketEd
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
   \node (C1) at (0,1.5) {\small Ch.~\ref{ch:trees-recur} Preliminaries};
-  \node (C2) at (4,1.5) {\small Ch.~\ref{ch:Rvar} Variables};
-  \node (C3) at (8,1.5) {\small Ch.~\ref{ch:register-allocation-Rvar} Registers};
-  \node (C4) at (0,0) {\small Ch.~\ref{ch:Rif} Conditionals};
+  \node (C2) at (4,1.5) {\small Ch.~\ref{ch:Lvar} Variables};
+  \node (C3) at (8,1.5) {\small Ch.~\ref{ch:register-allocation-Lvar} Registers};
+  \node (C4) at (0,0) {\small Ch.~\ref{ch:Lif} Conditionals};
   \node (C5) at (4,0) {\small Ch.~\ref{ch:Rvec} Tuples};
   \node (C6) at (8,0) {\small Ch.~\ref{ch:Rfun} Functions};
   \node (C9) at (0,-1.5) {\small Ch.~\ref{ch:Rwhile} Loops};
@@ -328,9 +328,9 @@ University of Vermont.
 {\if\edition\pythonEd
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
   \node (C1) at (0,1.5) {\small Ch.~\ref{ch:trees-recur} Preliminaries};
-  \node (C2) at (4,1.5) {\small Ch.~\ref{ch:Rvar} Variables};
-  \node (C3) at (8,1.5) {\small Ch.~\ref{ch:register-allocation-Rvar} Registers};
-  \node (C4) at (0,0) {\small Ch.~\ref{ch:Rif} Conditionals};
+  \node (C2) at (4,1.5) {\small Ch.~\ref{ch:Lvar} Variables};
+  \node (C3) at (8,1.5) {\small Ch.~\ref{ch:register-allocation-Lvar} Registers};
+  \node (C4) at (0,0) {\small Ch.~\ref{ch:Lif} Conditionals};
   \node (C5) at (4,0) {\small Ch.~\ref{ch:Rvec} Tuples};
   \node (C6) at (8,0) {\small Ch.~\ref{ch:Rfun} Functions};
   \node (C9) at (0,-1.5) {\small Ch.~\ref{ch:Rwhile} Loops};
@@ -1132,7 +1132,7 @@ child node.\footnote{This principle of structuring code according to
 \python{We define a second function, named \code{stmt}, that recognizes
 whether a value is a \LangInt{} statement.}
 \python{Finally, }
-Figure~\ref{fig:exp-predicate} \racket{also} defines \racket{\code{Rint}}\python{\code{Pint}}, which
+Figure~\ref{fig:exp-predicate} \racket{also} defines \code{Lint}, which
 determines whether an AST is a program in \LangInt{}.  In general we can
 expect to write one recursive function to handle each non-terminal in
 a grammar.\index{subject}{structural recursion}
@@ -1150,13 +1150,13 @@ a grammar.\index{subject}{structural recursion}
       (and (exp e1) (exp e2))]
     [else #f]))
 
-(define (Rint ast)
+(define (Lint ast)
   (match ast
     [(Program '() e) (exp e)]
     [else #f]))
 
-(Rint (Program '() ast1_1)
-(Rint (Program '()
+(Lint (Program '() ast1_1)
+(Lint (Program '()
        (Prim '- (list (Prim 'read '())
                       (Prim '+ (list (Num 8)))))))
 \end{lstlisting}
@@ -1264,13 +1264,13 @@ print(P_int(Module([Expr(BinOp(read, Sub(),
 %% \begin{center}
 %% \begin{minipage}{0.5\textwidth}
 %% \begin{lstlisting}
-%% (define (Rint ast)
+%% (define (Lint ast)
 %%   (match ast
 %%     [(Int n) #t]
 %%     [(Prim 'read '()) #t]
-%%     [(Prim '- (list e)) (Rint e)]
-%%     [(Prim '+ (list e1 e2)) (and (Rint e1) (Rint e2))]
-%%     [(Program '() e) (Rint e)]
+%%     [(Prim '- (list e)) (Lint e)]
+%%     [(Prim '+ (list e1 e2)) (and (Lint e1) (Lint e2))]
+%%     [(Program '() e) (Lint e)]
 %%     [else #f]))
 %% \end{lstlisting}
 %% \end{minipage}
@@ -1281,12 +1281,12 @@ print(P_int(Module([Expr(BinOp(read, Sub(),
 %% \emph{not} recommended because it can get you into trouble.
 %% %
 %% For example, the above function is subtly wrong:
-%% \lstinline{(Rint (Program '() (Program '() (Int 3))))}
+%% \lstinline{(Lint (Program '() (Program '() (Int 3))))}
 %% returns true when it should return false.
 
 
 \section{Interpreters}
-\label{sec:interp_Rint}
+\label{sec:interp_Lint}
 \index{subject}{interpreter}
 
 The behavior of a program is defined by the specification of the
@@ -1305,9 +1305,8 @@ designated as the definition of a language is called a
 \emph{definitional interpreter}~\citep{reynolds72:_def_interp}.
 \index{subject}{definitional interpreter} We warm up by creating a
 definitional interpreter for the \LangInt{} language, which serves as
-a second example of structural recursion. The \racket{\code{interp\_Rint}}
-\python{\code{interp\_Pint}}
-function is defined in Figure~\ref{fig:interp_Rint}.
+a second example of structural recursion. The \code{interp\_Lint}
+function is defined in Figure~\ref{fig:interp_Lint}.
 %
 \racket{The body of the function is a match on the input program
   followed by a call to the \lstinline{interp_exp} helper function,
@@ -1340,7 +1339,7 @@ function is defined in Figure~\ref{fig:interp_Rint}.
      (define v2 (interp_exp e2))
      (fx+ v1 v2)]))
 
-(define (interp_Rint p)
+(define (interp_Lint p)
   (match p
     [(Program '() e) (interp_exp e)]))
 \end{lstlisting}
@@ -1375,7 +1374,7 @@ def interp_P_int(p):
 \end{lstlisting}
 \fi}
 \caption{Interpreter for the \LangInt{} language.}
-\label{fig:interp_Rint}
+\label{fig:interp_Lint}
 \end{figure}
 
 Let us consider the result of interpreting a few \LangInt{} programs. The
@@ -1466,7 +1465,7 @@ Recall that program \eqref{eq:arith-prog} requests an integer input
 and then subtracts \code{8}. So if we run
 {\if\edition\racketEd\color{olive}
 \begin{lstlisting}
-(interp_Rint (Program '() ast1_1))
+(interp_Lint (Program '() ast1_1))
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
@@ -1570,7 +1569,7 @@ operation.
     [(Prim '- (list e1)) (pe_neg (pe_exp e1))]
     [(Prim '+ (list e1 e2)) (pe_add (pe_exp e1) (pe_exp e2))]))
 
-(define (pe_Rint p)
+(define (pe_Lint p)
   (match p
     [(Program '() e) (Program '() (pe_exp e))]))
 \end{lstlisting}
@@ -1634,8 +1633,8 @@ Appendix~\ref{appendix:utilities}.\\
 \begin{minipage}{1.0\textwidth}
 \begin{lstlisting}
 (define (test_pe p)
-  (assert "testing pe_Rint"
-     (equal? (interp_Rint p) (interp_Rint (pe_Rint p)))))
+  (assert "testing pe_Lint"
+     (equal? (interp_Lint p) (interp_Lint (pe_Lint p)))))
 
 (test_pe (parse-program `(program () (+ 10 (- (+ 5 3))))))
 (test_pe (parse-program `(program () (+ 1 (+ 3 1)))))
@@ -1647,15 +1646,15 @@ Appendix~\ref{appendix:utilities}.\\
 
 \begin{exercise}\normalfont
   Create three programs in the \LangInt{} language and test whether
-  partially evaluating them with \code{pe\_Pint} and then
-  interpreting them with \code{interp\_Pint} gives the same result
-  as directly interpreting them with \code{interp\_Pint}.
+  partially evaluating them with \code{pe\_Lint} and then
+  interpreting them with \code{interp\_Lint} gives the same result
+  as directly interpreting them with \code{interp\_Lint}.
 \end{exercise}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Integers and Variables}
-\label{ch:Rvar}
+\label{ch:Lvar}
 
 This chapter is about compiling a subset of
 \racket{Racket}\python{Python} to x86-64 assembly
@@ -1683,8 +1682,8 @@ code.
 
 The \LangVar{} language extends the \LangInt{} language with
 variables.  The concrete syntax of the \LangVar{} language is defined
-by the grammar in Figure~\ref{fig:Rvar-concrete-syntax} and the
-abstract syntax is defined in Figure~\ref{fig:Rvar-syntax}.  The
+by the grammar in Figure~\ref{fig:Lvar-concrete-syntax} and the
+abstract syntax is defined in Figure~\ref{fig:Lvar-syntax}.  The
 non-terminal \Var{} may be any \racket{Racket}\python{Python} identifier.
 As in \LangInt{}, \READOP{} is a nullary operator, \key{-} is a unary operator, and
 \key{+} is a binary operator.  Similar to \LangInt{}, the abstract
@@ -1723,7 +1722,7 @@ exhibit several compilation techniques.
 \end{minipage}
 }
 \caption{The concrete syntax of \LangVar{}.}
-\label{fig:Rvar-concrete-syntax}
+\label{fig:Lvar-concrete-syntax}
 \end{figure}
 
 \begin{figure}[tp]
@@ -1754,7 +1753,7 @@ exhibit several compilation techniques.
 \end{minipage}
 }
 \caption{The abstract syntax of \LangVar{}.}
-\label{fig:Rvar-syntax}
+\label{fig:Lvar-syntax}
 \end{figure}
 
 {\if\edition\racketEd\color{olive}
@@ -1762,7 +1761,7 @@ Let us dive further into the syntax and semantics of the \LangVar{}
 language.  The \key{let} feature defines a variable for use within its
 body and initializes the variable with the value of an expression.
 The abstract syntax for \key{let} is defined in
-Figure~\ref{fig:Rvar-syntax}.  The concrete syntax for \key{let} is
+Figure~\ref{fig:Lvar-syntax}.  The concrete syntax for \key{let} is
 \begin{lstlisting}
 (let ([|$\itm{var}$| |$\itm{exp}$|]) |$\itm{exp}$|)
 \end{lstlisting}
@@ -1778,7 +1777,7 @@ evaluates the body \code{(+ 10 x)}, producing $42$.
 The \LangVar{} language includes assignment statements, which define a
 variable for use in later statements and initializes the variable with
 the value of an expression.  The abstract syntax for assignment is
-defined in Figure~\ref{fig:Rvar-syntax}.  The concrete syntax for
+defined in Figure~\ref{fig:Lvar-syntax}.  The concrete syntax for
 assignment is
 \begin{lstlisting}
 |$\itm{var}$| = |$\itm{exp}$|
@@ -1835,23 +1834,23 @@ interpreter for \LangVar{}. The following code sketches this idea.
 {\if\edition\racketEd\color{olive}  
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-(define (interp_Rvar_exp e)
+(define (interp_Lvar_exp e)
   (match e
     [(Prim '- (list e1))
-     (fx- 0 (interp_Rvar_exp e1))]
+     (fx- 0 (interp_Lvar_exp e1))]
     ...))
 \end{lstlisting}
 \end{minipage}
 \begin{minipage}{0.45\textwidth}
   \begin{lstlisting}
-(define (interp_Rif_exp e)
+(define (interp_Lif_exp e)
   (match e
     [(If cnd thn els)
-     (match (interp_Rif_exp cnd)
-       [#t (interp_Rif_exp thn)]
-       [#f (interp_Rif_exp els)])]
+     (match (interp_Lif_exp cnd)
+       [#t (interp_Lif_exp thn)]
+       [#f (interp_Lif_exp els)])]
     ...
-    [else (interp_Rvar_exp e)]))    
+    [else (interp_Lvar_exp e)]))    
 \end{lstlisting}
 \end{minipage}
 \fi}
@@ -1897,19 +1896,12 @@ the following program.
 print(-(42 if True else 0))
 \end{lstlisting}
 \fi}
-If we invoke
-\racket{\code{interp\_Rif\_exp}}
-\python{\code{interp\_Pif\_exp}}
-on this program, it dispatches to
-\racket{\code{interp\_Rvar\_exp}}
-\python{\code{interp\_Pvar\_exp}}
-to handle the \code{-} operator, but then it recurisvely calls
-\racket{\code{interp\_Rvar\_exp}}
-\python{\code{interp\_Pvar\_exp}}
-again on the argument of \code{-}, which is an \code{If}.  But there is no case for \code{If} in
-\racket{\code{interp\_Rvar\_exp}}
-\python{\code{interp\_Pvar\_exp}},
-so we get an error!
+%
+If we invoke \code{interp\_Lif\_exp} on this program, it dispatches to
+\code{interp\_Lvar\_exp} to handle the \code{-} operator, but then it
+recurisvely calls \code{interp\_Lvar\_exp} again on the argument of
+\code{-}, which is an \code{If}.  But there is no case for \code{If}
+in \code{interp\_Lvar\_exp} so we get an error!
 
 To make our interpreters extensible we need something called
 \emph{open recursion}\index{subject}{open recursion}, where the tying of the
@@ -1937,7 +1929,7 @@ inherits from the class for \LangVar{} and the method
 {\if\edition\racketEd\color{olive}  
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-(define interp_Rvar_class
+(define interp_Lvar_class
   (class object%
     (define/public (interp_exp e)
       (match e
@@ -1949,8 +1941,8 @@ inherits from the class for \LangVar{} and the method
 \end{minipage}
 \begin{minipage}{0.45\textwidth}
   \begin{lstlisting}
-(define interp_Rif_class
-  (class interp_Rvar_class
+(define interp_Lif_class
+  (class interp_Lvar_class
     (define/override (interp_exp e)
       (match e
         [(If cnd thn els)
@@ -1967,7 +1959,7 @@ inherits from the class for \LangVar{} and the method
 {\if\edition\pythonEd
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-class InterpRvar:
+class InterpLvar:
   def interp_exp(e):
      match e:
        case UnaryOp(USub(), e1):
@@ -1978,7 +1970,7 @@ class InterpRvar:
 \end{minipage}
 \begin{minipage}{0.45\textwidth}
   \begin{lstlisting}
-def InterpRif(InterpRVar):
+def InterpLif(InterpRVar):
   def interp_exp(e):
     match e:
       case IfExp(cnd, thn, els):
@@ -2011,7 +2003,7 @@ expression, call it \code{e0}, by creating an object of the \LangIf{} class
 and calling the \code{interp\_exp} method.
 {\if\edition\racketEd\color{olive}
 \begin{lstlisting}
-(send (new interp_Rif_class) interp_exp e0)
+(send (new interp_Lif_class) interp_exp e0)
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
@@ -2071,7 +2063,7 @@ extensible way.
 
 Having justified the use of classes and methods to implement
 interpreters, we turn to the definitional interpreter for \LangVar{}
-in Figure~\ref{fig:interp-Rvar}. It is similar to the interpreter for
+in Figure~\ref{fig:interp-Lvar}. It is similar to the interpreter for
 \LangInt{} but adds two new \key{match} cases for variables and
 \racket{\key{let}}\python{assignment}. For
 \racket{\key{let}}\python{assignment} we need a way to communicate the
@@ -2107,9 +2099,9 @@ variable, it looks up the corresponding value in the dictionary.
   with the variable in the environment.}
 
 \begin{figure}[tp]
-{\if\edition\racketEd\color{olive}  
+{\if\edition\racketEd
 \begin{lstlisting}
-(define interp_Rvar_class
+(define interp_Lvar_class
   (class object%
     (super-new)
     
@@ -2133,13 +2125,13 @@ variable, it looks up the corresponding value in the dictionary.
         [(Program '() e) ((interp_exp '()) e)]))
     ))
 
-(define (interp_Rvar p)
-  (send (new interp_Rvar_class) interp_program p))
+(define (interp_Lvar p)
+  (send (new interp_Lvar_class) interp_program p))
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
-class InterpPvar:
+class InterpLvar:
   def interp_exp(self, e, env):
     match e:
       case BinOp(left, Add(), right):
@@ -2176,14 +2168,14 @@ class InterpPvar:
 \end{lstlisting}
 \fi}
 \caption{Interpreter for the \LangVar{} language.}
-\label{fig:interp-Rvar}
+\label{fig:interp-Lvar}
 \end{figure}
 
 The goal for this chapter is to implement a compiler that translates
 any program $P_1$ written in the \LangVar{} language into an x86 assembly
 program $P_2$ such that $P_2$ exhibits the same behavior when run on a
-computer as the $P_1$ program interpreted by \code{interp\_Rvar}.  That
-is, they output the same integer $n$. We depict this correctness
+computer as the $P_1$ program interpreted by \code{interp\_Lvar}.
+That is, they output the same integer $n$. We depict this correctness
 criteria in the following diagram.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
@@ -2192,7 +2184,7 @@ criteria in the following diagram.
  \node (o)  at (4, -2) {$n$};
 
  \path[->] (p1) edge [above] node {\footnotesize compile} (p2);
- \path[->] (p1) edge [left]  node {\footnotesize\code{interp\_Rvar}} (o);
+ \path[->] (p1) edge [left]  node {\footnotesize\code{interp\_Lvar}} (o);
  \path[->] (p2) edge [right] node {\footnotesize\code{interp\_x86int}} (o);
 \end{tikzpicture}
 \]
@@ -2210,9 +2202,7 @@ assembler.
 A program begins with a \code{main} label followed by a sequence of
 instructions. The \key{globl} directive says that the \key{main}
 procedure is externally visible, which is necessary so that the
-operating system can call it.  In the grammar, ellipses such as
-$\ldots$ are used to indicate a sequence of items, e.g., $\Instr
-\ldots$ is a sequence of instructions.\index{subject}{instruction}
+operating system can call it.
 %
 An x86 program is stored in the computer's memory.  For our purposes,
 the computer's memory is a mapping of 64-bit addresses to 64-bit
@@ -2234,6 +2224,7 @@ integer constant (called an \emph{immediate value}\index{subject}{immediate
 \begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
+{\if\edition\racketEd    
 \[
 \begin{array}{lcl}
 \Reg &::=& \allregisters{} \\
@@ -2248,14 +2239,30 @@ integer constant (called an \emph{immediate value}\index{subject}{immediate
       &    & \key{main:} \; \Instr\ldots
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd
+\[
+\begin{array}{lcl}
+\Reg &::=& \allregisters{} \\
+\Arg &::=&  \key{\$}\Int \MID \key{\%}\Reg \MID \Int\key{(}\key{\%}\Reg\key{)}\\
+\Instr &::=& \key{addq} \; \Arg\key{,} \Arg \MID
+      \key{subq} \; \Arg\key{,} \Arg \MID
+      \key{negq} \; \Arg \MID \key{movq} \; \Arg\key{,} \Arg \MID \\
+  &&  \key{callq} \; \mathit{label} \MID
+      \key{pushq}\;\Arg \MID \key{popq}\;\Arg \MID \key{retq} \\
+\LangXIntM{} &::= & \key{.globl main}\\
+      &    & \key{main:} \; \Instr^{*}
+\end{array}
+\]
+\fi}
 \end{minipage}
 }
 \caption{The syntax of the \LangXInt{} assembly language (AT\&T syntax).}
 \label{fig:x86-int-concrete}
 \end{figure}
 
-A register is a special kind of variable. Each one holds a 64-bit
-value; there are 16 general-purpose registers in the computer and
+A register is a special kind of variable that holds a 64-bit
+value. There are 16 general-purpose registers in the computer and
 their names are given in Figure~\ref{fig:x86-int-concrete}.  A register
 is written with a \key{\%} followed by the register name, such as
 \key{\%rax}.
@@ -2272,7 +2279,7 @@ argument of an instruction.
 
 An arithmetic instruction such as $\key{addq}\,s\key{,}\,d$ reads from the
 source $s$ and destination $d$, applies the arithmetic operation, then
-writes the result back to the destination $d$.
+writes the result back to the destination $d$. \index{subject}{instruction}
 %
 The move instruction $\key{movq}\,s\key{,}\,d$ reads from $s$ and
 stores the result in $d$.
@@ -2282,9 +2289,11 @@ specified by the label and $\key{retq}$ returns from a procedure to
 its caller. 
 %
 We discuss procedure calls in more detail later in this chapter and in
-Chapter~\ref{ch:Rfun}. The instruction $\key{jmp}\,\itm{label}$
-updates the program counter to the address of the instruction after
-the specified label.
+Chapter~\ref{ch:Rfun}.
+%
+\racket{The instruction $\key{jmp}\,\itm{label}$ updates the program
+  counter to the address of the instruction after the specified
+  label.}
 
 Appendix~\ref{sec:x86-quick-reference} contains a quick-reference for
 all of the x86 instructions used in this book.
@@ -2301,8 +2310,10 @@ returning the integer in \key{rax} to the operating system. The
 operating system interprets this integer as the program's exit
 code. By convention, an exit code of 0 indicates that a program
 completed successfully, and all other exit codes indicate various
-errors. Nevertheless, in this book we return the result of the program
-as the exit code.
+errors.
+%
+\racket{Nevertheless, in this book we return the result of the program
+  as the exit code.}
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -2316,12 +2327,6 @@ main:
   \racket{\code{(+ 10 32)}}\python{10 + 32}.}
 \label{fig:p0-x86}
 \end{figure}
-
-The x86 assembly language varies in a couple of ways depending on what
-operating system it is assembled in. The code examples shown here are
-correct on Linux and most Unix-like platforms, but when assembled on
-Mac OS X, labels like \key{main} must be prefixed with an underscore,
-as in \key{\_main}.
 
 We exhibit the use of memory for storing intermediate results in the
 next example.  Figure~\ref{fig:p1-x86} lists an x86 program that
@@ -2342,13 +2347,13 @@ call instruction on the caller side. The function call instruction,
 jumping to the procedure.  The register \key{rbp} is the \emph{base
 pointer}\index{subject}{base pointer} and is used to access variables
 that are stored in the frame of the current procedure call.  The base
-pointer of the caller is pushed onto the stack after the return
-address and then the base pointer is set to the location of the old
-base pointer. In Figure~\ref{fig:frame} we number the variables from
-$1$ to $n$. Variable $1$ is stored at address $-8\key{(\%rbp)}$,
-variable $2$ at $-16\key{(\%rbp)}$, etc.
+pointer of the caller is store after the return address. In
+Figure~\ref{fig:frame} we number the variables from $1$ to
+$n$. Variable $1$ is stored at address $-8\key{(\%rbp)}$, variable $2$
+at $-16\key{(\%rbp)}$, etc.
 
 \begin{figure}[tbp]
+{\if\edition\racketEd
 \begin{lstlisting}
 start:
 	movq	$10, -8(%rbp)
@@ -2368,6 +2373,23 @@ conclusion:
 	popq	%rbp
 	retq
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+	.globl main
+main:
+	pushq	%rbp
+	movq	%rsp, %rbp
+	subq	$16, %rsp
+	movq	$10, -8(%rbp)
+	negq	-8(%rbp)
+	movq	-8(%rbp), %rax
+	addq	$52, %rax
+	addq	$16, %rsp
+	popq	%rbp
+	retq
+\end{lstlisting}
+\fi}
 \caption{An x86 program that computes
   \racket{\code{(+ 52 (- 10))}}\python{52 + -10}.}
 \label{fig:p1-x86}
@@ -2401,17 +2423,21 @@ alignment (because the \code{callq} pushed the return address).  The
 first three instructions are the typical \emph{prelude}\index{subject}{prelude}
 for a procedure.  The instruction \code{pushq \%rbp} saves the base
 pointer for the caller onto the stack and subtracts $8$ from the stack
-pointer. The second instruction \code{movq \%rsp, \%rbp} changes the
-base pointer so that it points the location of the old base
-pointer. The instruction \code{subq \$16, \%rsp} moves the stack
+pointer. The second instruction \code{movq \%rsp, \%rbp} sets the
+base pointer to the current stack pointer, which is pointing at the location
+of the old base pointer. The instruction \code{subq \$16, \%rsp} moves the stack
 pointer down to make enough room for storing variables.  This program
 needs one variable ($8$ bytes) but we round up to 16 bytes so that
 \code{rsp} is 16-byte aligned and we're ready to make calls to other
-functions. The last instruction of the prelude is \code{jmp start},
+functions.
+\racket{The last instruction of the prelude is \code{jmp start},
 which transfers control to the instructions that were generated from
-the expression \racket{\code{(+ 52 (- 10))}}\python{52 + -10}.
+the expression \racket{\code{(+ 52 (- 10))}}\python{52 + -10}.}
 
-The first instruction under the \code{start} label is
+\racket{The first instruction under the \code{start} label is}
+%
+\python{The first instruction after the prelude is}
+%
 \code{movq \$10, -8(\%rbp)}, which stores $10$ in variable $1$.
 %
 The instruction \code{negq -8(\%rbp)} changes variable $1$ to $-10$.
@@ -2420,17 +2446,21 @@ The next instruction moves the $-10$ from variable $1$ into the
 \code{rax} register.  Finally, \code{addq \$52, \%rax} adds $52$ to
 the value in \code{rax}, updating its contents to $42$.
 
-The three instructions under the label \code{conclusion} are the
-typical \emph{conclusion}\index{subject}{conclusion} of a procedure.  The first
-two instructions restore the \code{rsp} and \code{rbp} registers to
-the state they were in at the beginning of the procedure.  The
-instruction \key{addq \$16, \%rsp} moves the stack pointer back to
-point at the old base pointer. Then \key{popq \%rbp} returns the old
-base pointer to \key{rbp} and adds $8$ to the stack pointer.  The last
-instruction, \key{retq}, jumps back to the procedure that called this
-one and adds $8$ to the stack pointer.
+\racket{The three instructions under the label \code{conclusion} are the
+  typical \emph{conclusion}\index{subject}{conclusion} of a procedure.}
+%
+\python{The \emph{conclusion}\index{subject}{conclusion} of the
+  \code{main} function consists of the last three instructions.}
+%
+The first two restore the \code{rsp} and \code{rbp} registers to the
+state they were in at the beginning of the procedure. In particular,
+\key{addq \$16, \%rsp} moves the stack pointer back to point at the
+old base pointer. Then \key{popq \%rbp} returns the old base pointer
+to \key{rbp} and adds $8$ to the stack pointer.  The last instruction,
+\key{retq}, jumps back to the procedure that called this one and adds
+$8$ to the stack pointer.
 
-The compiler needs a convenient representation for manipulating x86
+Our compiler needs a convenient representation for manipulating x86
 programs, so we define an abstract syntax for x86 in
 Figure~\ref{fig:x86-int-ast}. We refer to this language as
 \LangXInt{}.
@@ -2442,27 +2472,17 @@ front of every instruction. Instead instructions are grouped into
 \emph{blocks}\index{subject}{block}\index{subject}{basic block} with a
 label associated with every block, which is why the \key{X86Program}
 struct includes an alist mapping labels to blocks. The reason for this
-organization becomes apparent in Chapter~\ref{ch:Rif} when we
+organization becomes apparent in Chapter~\ref{ch:Lif} when we
 introduce conditional branching. The \code{Block} structure includes
 an $\itm{info}$ field that is not needed for this chapter, but becomes
-useful in Chapter~\ref{ch:register-allocation-Rvar}.  For now, the
+useful in Chapter~\ref{ch:register-allocation-Lvar}.  For now, the
 $\itm{info}$ field should contain an empty list.
 \fi}
 %
-{\if\edition\pythonEd
-%
-The main difference compared to the concrete syntax of \LangXInt{}
-(Figure~\ref{fig:x86-int-concrete}) is that we do not yet include a
-way to label instructions but instead recommend inserting the
-\key{main}, \key{start}, and \key{conclusion} labels when printing the
-final x86 program.
-%
-\fi}
-
 Regarding the abstract syntax for \code{callq}, the \code{Callq} AST
 node includes an integer for representing the arity of the function,
 i.e., the number of arguments, which is helpful to know during
-register allocation (Chapter~\ref{ch:register-allocation-Rvar}).
+register allocation (Chapter~\ref{ch:register-allocation-Lvar}).
 
 \begin{figure}[tp]
 \fbox{
@@ -2633,9 +2653,9 @@ outstanding problems.
 \begin{figure}[tbp]
 {\if\edition\racketEd\color{olive}  
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (Rvar) at (0,2)  {\large \LangVar{}};
-\node (Rvar-2) at (3,2)  {\large \LangVar{}};
-\node (Rvar-3) at (6,2)  {\large \LangVarANF{}};
+\node (Lvar) at (0,2)  {\large \LangVar{}};
+\node (Lvar-2) at (3,2)  {\large \LangVar{}};
+\node (Lvar-3) at (6,2)  {\large \LangVarANF{}};
 %\node (Cvar-1) at (6,0)  {\large \LangCVar{}};
 \node (Cvar-2) at (3,0)  {\large \LangCVar{}};
 
@@ -2644,9 +2664,9 @@ outstanding problems.
 \node (x86-4) at (9,-2) {\large \LangXInt{}};
 \node (x86-5) at (12,-2) {\large \LangXInt{}};
 
-\path[->,bend left=15] (Rvar) edge [above] node {\ttfamily\footnotesize uniquify} (Rvar-2);
-\path[->,bend left=15] (Rvar-2) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Rvar-3);
-\path[->,bend left=15] (Rvar-3) edge [right] node {\ttfamily\footnotesize explicate\_control} (Cvar-2);
+\path[->,bend left=15] (Lvar) edge [above] node {\ttfamily\footnotesize uniquify} (Lvar-2);
+\path[->,bend left=15] (Lvar-2) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Lvar-3);
+\path[->,bend left=15] (Lvar-3) edge [right] node {\ttfamily\footnotesize explicate\_control} (Cvar-2);
 \path[->,bend right=15] (Cvar-2) edge [left] node {\ttfamily\footnotesize select\_instr.} (x86-2);
 \path[->,bend left=15] (x86-2) edge [above] node {\ttfamily\footnotesize assign\_homes} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch\_instr.} (x86-4);
@@ -2656,25 +2676,25 @@ outstanding problems.
 
 {\if\edition\pythonEd
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (Rvar) at (0,2)  {\large \LangVar{}};
-\node (Rvar-2) at (3,2)  {\large \LangVar{}};
+\node (Lvar) at (0,2)  {\large \LangVar{}};
+\node (Lvar-2) at (3,2)  {\large \LangVar{}};
 \node (x86-1) at (3,0)  {\large \LangXVar{}};
 \node (x86-2) at (6,0)  {\large \LangXVar{}};
 \node (x86-3) at (9,0) {\large \LangXInt{}};
 \node (x86-4) at (12,0) {\large \LangXInt{}};
 
-\path[->,bend left=15] (Rvar) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Rvar-2);
-\path[->,bend right=15] (Rvar-2) edge [left] node {\ttfamily\footnotesize select\_instr.} (x86-1);
+\path[->,bend left=15] (Lvar) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Lvar-2);
+\path[->,bend right=15] (Lvar-2) edge [left] node {\ttfamily\footnotesize select\_instr.} (x86-1);
 \path[->,bend right=15] (x86-1) edge [below] node {\ttfamily\footnotesize assign\_homes} (x86-2);
 \path[->,bend left=15] (x86-2) edge [above] node {\ttfamily\footnotesize patch\_instr.} (x86-3);
 \path[->,bend right=15] (x86-3) edge [below] node {\ttfamily\footnotesize print\_x86} (x86-4);
 \end{tikzpicture}
 \fi}  
 \caption{Diagram of the passes for compiling \LangVar{}. }
-\label{fig:Rvar-passes}
+\label{fig:Lvar-passes}
 \end{figure}
 
-Figure~\ref{fig:Rvar-passes} presents the ordering of the compiler
+Figure~\ref{fig:Lvar-passes} presents the ordering of the compiler
 passes and identifies the input and output language of each pass.  The
 last pass, \key{print\_x86}, converts from the abstract syntax of
 \LangXInt{} to the concrete syntax.
@@ -2686,12 +2706,12 @@ last pass, \key{print\_x86}, converts from the abstract syntax of
   x86.}
 %
 The remainder of this chapter gives hints regarding the implementation
-of each of the compiler passes in Figure~\ref{fig:Rvar-passes}.
+of each of the compiler passes in Figure~\ref{fig:Lvar-passes}.
 
 %% The output of \key{uniquify} and \key{remove-complex-opera*}
 %% are programs that are still in the \LangVar{} language, though the
 %% output of the later is a subset of \LangVar{} named \LangVarANF{}
-%% (Section~\ref{sec:remove-complex-opera-Rvar}).
+%% (Section~\ref{sec:remove-complex-opera-Lvar}).
 %% %
 %% The output of \code{explicate\_control} is in an intermediate language
 %% \LangCVar{} designed to make the order of evaluation explicit in its
@@ -2726,7 +2746,7 @@ A \LangCVar{} program consists of a control-flow graph represented as
 an alist mapping labels to tails. This is more general than necessary
 for the present chapter, as we do not yet introduce \key{goto} for
 jumping to labels, but it saves us from having to change the syntax in
-Chapter~\ref{ch:Rif}.  For now there will be just one label,
+Chapter~\ref{ch:Lif}.  For now there will be just one label,
 \key{start}, and the whole program is its tail.
 %
 The $\itm{info}$ field of the \key{CProgram} form, after the
@@ -2769,7 +2789,7 @@ regarding instruction arguments.
 
 {\if\edition\racketEd\color{olive}  
 \section{Uniquify Variables}
-\label{sec:uniquify-Rvar}
+\label{sec:uniquify-Lvar}
 
 The \code{uniquify} pass compiles \LangVar{} programs into \LangVar{}
 programs in which every \key{let} binds a unique variable name. For
@@ -2814,10 +2834,10 @@ to a variable reference, so we add a parameter to \code{uniquify-exp}
 for the alist.
 
 The skeleton of the \code{uniquify-exp} function is shown in
-Figure~\ref{fig:uniquify-Rvar}.  The function is curried so that it is
+Figure~\ref{fig:uniquify-Lvar}.  The function is curried so that it is
 convenient to partially apply it to an alist and then apply it to
 different expressions, as in the last case for primitive operations in
-Figure~\ref{fig:uniquify-Rvar}.  The
+Figure~\ref{fig:uniquify-Lvar}.  The
 %
 \href{https://docs.racket-lang.org/reference/for.html#%28form._%28%28lib._racket%2Fprivate%2Fbase..rkt%29._for%2Flist%29%29}{\key{for/list}}
 %
@@ -2840,21 +2860,21 @@ produce a new list.\index{subject}{for/list}
     [(Program '() e) (Program '() ((uniquify-exp '()) e))]))
 \end{lstlisting}
 \caption{Skeleton for the \key{uniquify} pass.}
-\label{fig:uniquify-Rvar}
+\label{fig:uniquify-Lvar}
 \end{figure}
 
 \begin{exercise}
 \normalfont % I don't like the italics for exercises. -Jeremy
 
 Complete the \code{uniquify} pass by filling in the blanks in
-Figure~\ref{fig:uniquify-Rvar}, that is, implement the cases for
+Figure~\ref{fig:uniquify-Lvar}, that is, implement the cases for
 variables and for the \key{let} form in the file \code{compiler.rkt}
 in the support code.
 \end{exercise}
 
 \begin{exercise}
 \normalfont % I don't like the italics for exercises. -Jeremy
-\label{ex:Rvar}
+\label{ex:Lvar}
 
 Create five \LangVar{} programs that exercise the most interesting
 parts of the \key{uniquify} pass, that is, the programs should include
@@ -2874,7 +2894,7 @@ for each pass in your compiler.  For now, define \code{passes} to
 contain just one entry for \code{uniquify} as shown below.
 \begin{lstlisting}
 (define passes 
-  (list (list "uniquify" uniquify interp_Rvar type-check-Rvar)))
+  (list (list "uniquify" uniquify interp_Lvar type-check-Lvar)))
 \end{lstlisting}
 Run the \key{run-tests.rkt} script in the support code to check
 whether the output programs produce the same result as the input
@@ -2884,7 +2904,7 @@ programs.
 \fi}
 
 \section{Remove Complex Operands}
-\label{sec:remove-complex-opera-Rvar}
+\label{sec:remove-complex-opera-Lvar}
 
 The \code{remove\_complex\_operands} pass compiles \LangVar{} programs
 into a restricted form in which the arguments of operations are atomic
@@ -2959,10 +2979,10 @@ print(tmp_1)
 }
 \caption{\LangVarANF{} is \LangVar{} with operands restricted to
    atomic expressions, like administrative normal form (ANF).}
-\label{fig:Rvar-anf-syntax}
+\label{fig:Lvar-anf-syntax}
 \end{figure}
 
-Figure~\ref{fig:Rvar-anf-syntax} presents the grammar for the output of
+Figure~\ref{fig:Lvar-anf-syntax} presents the grammar for the output of
 this pass, the language \LangVarANF{}. The only difference is that
 operator arguments are restricted to be atomic expressions that are
 defined by the \Atm{} non-terminal. In particular, integer constants
@@ -3110,12 +3130,12 @@ Implement the \code{remove\_complex\_operands} function in
 %
 Create three new \LangVar{} programs that exercise the interesting
 code in the \code{remove\_complex\_operands} pass.  Follow the guidelines
-regarding file names described in Exercise~\ref{ex:Rvar}.
+regarding file names described in Exercise~\ref{ex:Lvar}.
 %
 In the \code{run-tests.rkt} script, add the following entry to the
 list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
-(list "remove-complex" remove-complex-opera* interp_Rvar type-check-Rvar)
+(list "remove-complex" remove-complex-opera* interp_Lvar type-check-Lvar)
 \end{lstlisting}
 While debugging your compiler, it is often useful to see the
 intermediate programs that are output from each pass. To print the
@@ -3134,7 +3154,7 @@ intermediate programs, place \lstinline{(debug-level 1)} before the call to
 {\if\edition\pythonEd
 \begin{exercise}
 \normalfont % I don't like the italics for exercises. -Jeremy
-\label{ex:Rvar}
+\label{ex:Lvar}
 
 Create five \LangVar{} programs that exercise the most interesting
 parts of the Remove Complex Operands pass.  The five programs should
@@ -3152,7 +3172,7 @@ end with the file extension \key{.py}.
 %% contain just one entry for \code{uniquify} as shown below.
 %% \begin{lstlisting}
 %% (define passes 
-%%   (list (list "uniquify" uniquify interp_Rvar type-check-Rvar)))
+%%   (list (list "uniquify" uniquify interp_Lvar type-check-Lvar)))
 %% \end{lstlisting}
 Run the \key{run-tests.py} script in the support code to check
 whether the output programs produce the same result as the input
@@ -3164,7 +3184,7 @@ programs.
 
 {\if\edition\racketEd\color{olive}  
 \section{Explicate Control}
-\label{sec:explicate-control-Rvar}
+\label{sec:explicate-control-Lvar}
 
 The \code{explicate\_control} pass compiles \LangVar{} programs into \LangCVar{}
 programs that make the order of execution explicit in their
@@ -3226,7 +3246,7 @@ start:
     [(Program info body) ___]))
 \end{lstlisting}
 \caption{Skeleton for the \code{explicate\_control} pass.}
-\label{fig:explicate-control-Rvar}
+\label{fig:explicate-control-Lvar}
 \end{figure}
 
 The organization of this pass depends on the notion of tail position
@@ -3244,7 +3264,7 @@ that we have alluded to earlier.
 We recommend implementing \code{explicate\_control} using two mutually
 recursive functions, \code{explicate-tail} and
 \code{explicate-assign}, as suggested in the skeleton code in
-Figure~\ref{fig:explicate-control-Rvar}.  The \code{explicate-tail}
+Figure~\ref{fig:explicate-control-Lvar}.  The \code{explicate-tail}
 function should be applied to expressions in tail position whereas the
 \code{explicate-assign} should be applied to expressions that occur on
 the right-hand-side of a \key{let}.
@@ -3261,7 +3281,7 @@ the variable that it is to be assigned to, and a \Tail{} in
 The \code{explicate-assign} function is in accumulator-passing style:
 the \code{cont} parameter is used for accumulating the output. This
 accumulator-passing style plays an important role in how we generate
-high-quality code for conditional expressions in Chapter~\ref{ch:Rif}.
+high-quality code for conditional expressions in Chapter~\ref{ch:Lif}.
 
 \begin{exercise}\normalfont
 %
@@ -3278,7 +3298,7 @@ list of \code{passes} and then run the script to test your compiler.
 \fi}
 
 \section{Select Instructions}
-\label{sec:select-Rvar}
+\label{sec:select-Lvar}
 \index{subject}{instruction selection}
 
 In the \code{select\_instructions} pass we begin the work of
@@ -3409,7 +3429,7 @@ programs.
 
 
 \section{Assign Homes}
-\label{sec:assign-Rvar}
+\label{sec:assign-Lvar}
 
 The \key{assign\_homes} pass compiles \LangXVar{} programs to
 \LangXVar{} programs that no longer use program variables.
@@ -3420,10 +3440,10 @@ are only 16 registers, some programs must necessarily resort to
 placing some variables on the stack. In this chapter we focus on the
 mechanics of placing variables on the stack. We study an algorithm for
 placing variables in registers in
-Chapter~\ref{ch:register-allocation-Rvar}.
+Chapter~\ref{ch:register-allocation-Lvar}.
 
 Consider again the following \LangVar{} program from
-Section~\ref{sec:remove-complex-opera-Rvar}.
+Section~\ref{sec:remove-complex-opera-Lvar}.
 % var_test_20.rkt
 {\if\edition\racketEd\color{olive}
 \begin{lstlisting}
@@ -3599,11 +3619,15 @@ obtain from the \racket{\code{stack-space} entry in the $\itm{info}$ field}
 of the \key{X86Program} node.
 
 When running on Mac OS X, your compiler should prefix an underscore to
-labels like \key{main}. \racket{The Racket call \code{(system-type 'os)} is
-useful for determining which operating system the compiler is running
-on. It returns \code{'macosx}, \code{'unix}, or \code{'windows}.}
-\python{The Python \code{platform} library includes a \code{system()} function
-that returns \code{'Linux'}, \code{'Windows'}, or \code{'Darwin'} (for Mac).}
+all labels, e.g., changing \key{main} to \key{\_main}.
+%
+\racket{The Racket call \code{(system-type 'os)} is useful for
+  determining which operating system the compiler is running on. It
+  returns \code{'macosx}, \code{'unix}, or \code{'windows}.}
+%
+\python{The Python \code{platform} library includes a \code{system()}
+  function that returns \code{'Linux'}, \code{'Windows'}, or
+  \code{'Darwin'} (for Mac).}
 
 \begin{exercise}\normalfont
 %
@@ -3632,14 +3656,14 @@ programs.
 
 
 \section{Challenge: Partial Evaluator for \LangVar{}}
-\label{sec:pe-Rvar}
+\label{sec:pe-Lvar}
 \index{subject}{partial evaluation}
 
 This section describes optional challenge exercises that involve
 adapting and improving the partial evaluator for \LangInt{} that was
 introduced in Section~\ref{sec:partial-evaluation}.
 
-\begin{exercise}\label{ex:pe-Rvar}
+\begin{exercise}\label{ex:pe-Lvar}
 \normalfont
   
 Adapt the partial evaluator from Section~\ref{sec:partial-evaluation}
@@ -3652,7 +3676,7 @@ evaluation pass to the front of your compiler and make sure that your
 compiler still passes all of the tests.
 \end{exercise}
 
-The next exercise builds on Exercise~\ref{ex:pe-Rvar}.
+The next exercise builds on Exercise~\ref{ex:pe-Lvar}.
 
 \begin{exercise}
 \normalfont
@@ -3717,11 +3741,11 @@ all, fast code is useless if it produces incorrect results!
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Register Allocation}
-\label{ch:register-allocation-Rvar}
+\label{ch:register-allocation-Lvar}
 
 \index{subject}{register allocation}
 
-In Chapter~\ref{ch:Rvar} we learned how to store variables on the
+In Chapter~\ref{ch:Lvar} we learned how to store variables on the
 stack. In this Chapter we learn how to improve the performance of the
 generated code by placing some variables into registers.  The CPU can
 access a register in a single cycle, whereas accessing the stack can
@@ -3810,7 +3834,7 @@ Consider variables \code{x} and \code{z} in Figure~\ref{fig:reg-eg}.
 After the variable \code{x} is moved to \code{z} it is no longer
 needed.  Variable \code{z}, on the other hand, is used only after this
 point, so \code{x} and \code{z} could share the same register. The
-topic of Section~\ref{sec:liveness-analysis-Rvar} is how to compute
+topic of Section~\ref{sec:liveness-analysis-Lvar} is how to compute
 where a variable is needed.  Once we have that information, we compute
 which variables are needed at the same time, i.e., which ones
 \emph{interfere} with each other, and represent this relation as an
@@ -3821,7 +3845,7 @@ then model register allocation as a graph coloring problem
 
 If we run out of registers despite these efforts, we place the
 remaining variables on the stack, similar to what we did in
-Chapter~\ref{ch:Rvar}. It is common to use the verb \emph{spill}
+Chapter~\ref{ch:Lvar}. It is common to use the verb \emph{spill}
 for assigning a variable to a stack location. The decision to spill a
 variable is handled as part of the graph coloring process
 (Section~\ref{sec:graph-coloring}).
@@ -3935,7 +3959,7 @@ callee-saved register, and 3) spill the variable to the stack.
 It is straightforward to implement this approach in a graph coloring
 register allocator. First, we know which variables are in use during
 every function call because we compute that information for every
-instruction (Section~\ref{sec:liveness-analysis-Rvar}). Second, when we
+instruction (Section~\ref{sec:liveness-analysis-Lvar}). Second, when we
 build the interference graph (Section~\ref{sec:build-interference}),
 we can place an edge between each of these variables and the
 caller-saved registers in the interference graph. This will prevent
@@ -4044,7 +4068,7 @@ main:
 %\clearpage
 
 \section{Liveness Analysis}
-\label{sec:liveness-analysis-Rvar}
+\label{sec:liveness-analysis-Lvar}
 \index{subject}{liveness analysis}
 
 The \code{uncover\_live} \racket{pass}\python{function}
@@ -5191,7 +5215,7 @@ assignment of variables to locations.
 \fi}
 
 Adapt the code from the \code{assign\_homes} pass
-(Section~\ref{sec:assign-Rvar}) to replace the variables with their
+(Section~\ref{sec:assign-Lvar}) to replace the variables with their
 assigned location. Applying the above assignment to our running
 example, on the left, yields the program on the right.
 % why frame size of 32? -JGS
@@ -5426,9 +5450,9 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \begin{figure}[tbp]
 {\if\edition\racketEd\color{olive}      
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (Rvar) at (0,2)  {\large \LangVar{}};
-\node (Rvar-2) at (3,2)  {\large \LangVar{}};
-\node (Rvar-3) at (6,2)  {\large \LangVar{}};
+\node (Lvar) at (0,2)  {\large \LangVar{}};
+\node (Lvar-2) at (3,2)  {\large \LangVar{}};
+\node (Lvar-3) at (6,2)  {\large \LangVar{}};
 \node (Cvar-1) at (3,0)  {\large \LangCVar{}};
 
 \node (x86-2) at (3,-2)  {\large \LangXVar{}};
@@ -5439,9 +5463,9 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \node (x86-2-1) at (3,-4)  {\large \LangXVar{}};
 \node (x86-2-2) at (6,-4)  {\large \LangXVar{}};
 
-\path[->,bend left=15] (Rvar) edge [above] node {\ttfamily\footnotesize uniquify} (Rvar-2);
-\path[->,bend left=15] (Rvar-2) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Rvar-3);
-\path[->,bend left=15] (Rvar-3) edge [right] node {\ttfamily\footnotesize explicate\_control} (Cvar-1);
+\path[->,bend left=15] (Lvar) edge [above] node {\ttfamily\footnotesize uniquify} (Lvar-2);
+\path[->,bend left=15] (Lvar-2) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Lvar-3);
+\path[->,bend left=15] (Lvar-3) edge [right] node {\ttfamily\footnotesize explicate\_control} (Cvar-1);
 \path[->,bend right=15] (Cvar-1) edge [left] node {\ttfamily\footnotesize select\_instr.} (x86-2);
 \path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize uncover\_live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build\_inter.} (x86-2-2);
@@ -5452,15 +5476,15 @@ shown in Figure~\ref{fig:reg-alloc-passes}.
 \fi}
 {\if\edition\pythonEd
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (Rvar-1) at (0,2)  {\large \LangVar{}};
-\node (Rvar-2) at (3,2)  {\large \LangVar{}};
+\node (Lvar-1) at (0,2)  {\large \LangVar{}};
+\node (Lvar-2) at (3,2)  {\large \LangVar{}};
 \node (x86-1) at (3,0)  {\large \LangXVar{}};
 \node (x86-2) at (6,0)  {\large \LangXVar{}};
 \node (x86-3) at (9,0) {\large \LangXInt{}};
 \node (x86-4) at (11,0) {\large \LangXInt{}};
 
-\path[->,bend left=15] (Rvar-1) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Rvar-2);
-\path[->,bend right=15] (Rvar-2) edge [left] node {\ttfamily\footnotesize select\_instr.} (x86-1);
+\path[->,bend left=15] (Lvar-1) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Lvar-2);
+\path[->,bend right=15] (Lvar-2) edge [left] node {\ttfamily\footnotesize select\_instr.} (x86-1);
 \path[->,bend right=15] (x86-1) edge [below] node {\ttfamily\footnotesize allocate\_reg.} (x86-2);
 \path[->,bend left=15] (x86-2) edge [above] node {\ttfamily\footnotesize patch\_instr.} (x86-3);
 \path[->,bend right=15] (x86-3) edge [below] node {\ttfamily\footnotesize print\_x86} (x86-4);
@@ -6196,7 +6220,7 @@ and the linear scan of \citet{Poletto:1999uq} may be more appropriate.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Booleans and Conditionals}
-\label{ch:Rif}
+\label{ch:Lif}
 \index{subject}{Boolean}
 \index{subject}{control flow}
 \index{subject}{conditional expression}
@@ -6256,7 +6280,7 @@ This chapter is organized as follows.  We begin by defining the syntax
 and interpreter for the \LangIf{} language
 (Section~\ref{sec:lang-if}). We then introduce the idea of type
 checking and build a type checker for \LangIf{}
-(Section~\ref{sec:type-check-Rif}).
+(Section~\ref{sec:type-check-Lif}).
 %
 \racket{To compile \LangIf{} we need to enlarge the intermediate
   language \LangCVar{} into \LangCIf{} (Section~\ref{sec:Cif}) and
@@ -6270,12 +6294,12 @@ handled in later passes.
 %
 \racket{The largest changes occur in \code{explicate\_control}, to
   translate \code{if} expressions into control-flow graphs
-  (Section~\ref{sec:explicate-control-Rif}).}
+  (Section~\ref{sec:explicate-control-Lif}).}
 %
 \python{The largest addition is a new pass named
   \code{explicate\_control} that translates \code{if} expressions and
   statements into conditional \code{goto}'s
-  (Section~\ref{sec:explicate-control-Rif}).}
+  (Section~\ref{sec:explicate-control-Lif}).}
 %
 Regarding register allocation, there is the interesting question of
 how to handle conditional \code{goto}'s during liveness analysis.
@@ -6285,8 +6309,8 @@ how to handle conditional \code{goto}'s during liveness analysis.
 \label{sec:lang-if}
 
 The concrete syntax of the \LangIf{} language is defined in
-Figure~\ref{fig:Rif-concrete-syntax} and the abstract syntax is defined
-in Figure~\ref{fig:Rif-syntax}. The \LangIf{} language includes all of
+Figure~\ref{fig:Lif-concrete-syntax} and the abstract syntax is defined
+in Figure~\ref{fig:Lif-syntax}. The \LangIf{} language includes all of
 \LangVar{}\racket{(shown in gray)}, the Boolean literals \TRUE{} and
 \FALSE{}, and the \code{if} expression \python{and statement}. We expand the
 operators to include
@@ -6300,11 +6324,11 @@ operators to include
 \end{enumerate}
 
 \racket{We reorganize the abstract syntax for the primitive
-  operations in Figure~\ref{fig:Rif-syntax}, using only one grammar
+  operations in Figure~\ref{fig:Lif-syntax}, using only one grammar
   rule for all of them. This means that the grammar no longer checks
   whether the arity of an operators matches the number of
   arguments. That responsibility is moved to the type checker for
-  \LangIf{}, which we introduce in Section~\ref{sec:type-check-Rif}.}
+  \LangIf{}, which we introduce in Section~\ref{sec:type-check-Lif}.}
 
 \begin{figure}[tp]
 \centering
@@ -6341,8 +6365,8 @@ operators to include
 \end{minipage}
 }
 \caption{The concrete syntax of \LangIf{}, extending \LangVar{}
-  (Figure~\ref{fig:Rvar-concrete-syntax}) with Booleans and conditionals.}
-\label{fig:Rif-concrete-syntax}
+  (Figure~\ref{fig:Lvar-concrete-syntax}) with Booleans and conditionals.}
+\label{fig:Lif-concrete-syntax}
 \end{figure}
 
 \begin{figure}[tp]
@@ -6386,12 +6410,12 @@ operators to include
 \end{minipage}
 }
 \caption{The abstract syntax of \LangIf{}.}
-\label{fig:Rif-syntax}
+\label{fig:Lif-syntax}
 \end{figure}
 
-Figure~\ref{fig:interp-Rif} defines the interpreter for \LangIf{},
+Figure~\ref{fig:interp-Lif} defines the interpreter for \LangIf{},
 which inherits from the interpreter for \LangVar{}
-(Figure~\ref{fig:interp-Rvar}). The literals \TRUE{} and \FALSE{}
+(Figure~\ref{fig:interp-Lvar}). The literals \TRUE{} and \FALSE{}
 evaluate to the corresponding Boolean values. The conditional
 expression $\CIF{\itm{cnd}}{\itm{thn}}{\itm{els}}$ evaluates \itm{cnd}
 and then either evaluates \itm{thn} or \itm{els} depending on whether
@@ -6410,14 +6434,14 @@ is not evaluated if $e_1$ evaluates to \TRUE{}.
   interpreter would become repetitive without some care.  We refactor
   the case for \code{Prim}, moving the code that differs with each
   operation into the \code{interp\_op} method shown in in
-  Figure~\ref{fig:interp-op-Rif}. We handle the \code{and} operation
+  Figure~\ref{fig:interp-op-Lif}. We handle the \code{and} operation
   separately because of its short-circuiting behavior.}
 
 \begin{figure}[tbp]
 {\if\edition\racketEd\color{olive}    
 \begin{lstlisting}
-(define interp_Rif_class
-  (class interp_Rvar_class
+(define interp_Lif_class
+  (class interp_Lvar_class
     (super-new)
 
     (define/public (interp_op op) ...)
@@ -6439,13 +6463,13 @@ is not evaluated if $e_1$ evaluates to \TRUE{}.
         [else ((super interp_exp env) e)]))
     ))
 
-(define (interp_Rif p)
-  (send (new interp_Rif_class) interp_program p))
+(define (interp_Lif p)
+  (send (new interp_Lif_class) interp_program p))
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
-class InterpPif(InterpPvar):
+class InterpPif(InterpLvar):
 
   def interp_exp(self, e, env):
     match e:
@@ -6498,9 +6522,9 @@ class InterpPif(InterpPvar):
 \end{lstlisting}
 \fi}
 \caption{Interpreter for the \LangIf{} language. \racket{(See
-    Figure~\ref{fig:interp-op-Rif} for \code{interp-op}.)}
-  \python{(See Figure~\ref{fig:interp-cmp-Rif} for \code{interp\_cmp}.)}}
-\label{fig:interp-Rif}
+    Figure~\ref{fig:interp-op-Lif} for \code{interp-op}.)}
+  \python{(See Figure~\ref{fig:interp-cmp-Lif} for \code{interp\_cmp}.)}}
+\label{fig:interp-Lif}
 \end{figure}
 
 {\if\edition\racketEd\color{olive}
@@ -6535,14 +6559,14 @@ class InterpPif(InterpPvar):
     [else (error 'interp_op "unknown operator")]))
 \end{lstlisting}
 \caption{Interpreter for the primitive operators in the \LangIf{} language.}
-\label{fig:interp-op-Rif}
+\label{fig:interp-op-Lif}
 \end{figure}
 \fi}
 
 {\if\edition\pythonEd
 \begin{figure}
 \begin{lstlisting}
-class InterpPif(InterpPvar):
+class InterpPif(InterpLvar):
   ...
 
   def interp_cmp(self, cmp):
@@ -6561,12 +6585,12 @@ class InterpPif(InterpPvar):
         return lambda x, y: x != y
 \end{lstlisting}
 \caption{Interpreter for the comparison operators in the \LangIf{} language.}
-\label{fig:interp-cmp-Rif}
+\label{fig:interp-cmp-Lif}
 \end{figure}
 \fi}
 
 \section{Type Checking \LangIf{} Programs}
-\label{sec:type-check-Rif}
+\label{sec:type-check-Lif}
 \index{subject}{type checking}
 \index{subject}{semantic analysis}
 
@@ -6622,13 +6646,13 @@ checker in later chapters, analogous to the use of classes and methods
 for the interpreters (Section~\ref{sec:extensible-interp}).
 
 We separate the type checker for the \LangVar{} fragment into its own
-class, shown in Figure~\ref{fig:type-check-Rvar}. The type checker for
-\LangIf{} is shown in Figure~\ref{fig:type-check-Rif} and it inherits
+class, shown in Figure~\ref{fig:type-check-Lvar}. The type checker for
+\LangIf{} is shown in Figure~\ref{fig:type-check-Lif} and it inherits
 from the type checker for \LangVar{}. These type checkers are in the
 files
-\racket{\code{type-check-Rvar.rkt}}\python{\code{type\_check\_Pvar.py}}
+\racket{\code{type-check-Lvar.rkt}}\python{\code{type\_check\_Lvar.py}}
 and
-\racket{\code{type-check-Rif.rkt}}\python{\code{type\_check\_Pif.py}}
+\racket{\code{type-check-Lif.rkt}}\python{\code{type\_check\_Pif.py}}
 of the support code.
 %
 Each type checker is a structurally recursive function over the AST.
@@ -6638,7 +6662,7 @@ error or returns an expression and its type (\INTTY{} or
 in which we want to change or update the expression.
 
 Next we discuss the \code{type\_check\_exp} function in
-Figure~\ref{fig:type-check-Rvar}.  The type of an integer constant is
+Figure~\ref{fig:type-check-Lvar}.  The type of an integer constant is
 \INTTY{}.  To handle variables, the type checker uses the environment
 \code{env} to map variables to types.
 %
@@ -6682,7 +6706,7 @@ Figure~\ref{fig:type-check-Rvar}.  The type of an integer constant is
 \begin{figure}[tbp]
 {\if\edition\racketEd\color{olive}  
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define type-check-Rvar_class
+(define type-check-Lvar_class
   (class object%
     (super-new)
 
@@ -6726,16 +6750,16 @@ Figure~\ref{fig:type-check-Rvar}.  The type of an integer constant is
          (define-values (body^ Tb) ((type-check-exp '()) body))
          (check-type-equal? Tb 'Integer body)
          (Program info body^)]
-        [else (error 'type-check-Rvar "couldn't match ~a" e)]))
+        [else (error 'type-check-Lvar "couldn't match ~a" e)]))
     ))
 
-(define (type-check-Rvar p)
-  (send (new type-check-Rvar_class) type-check-program p))
+(define (type-check-Lvar p)
+  (send (new type-check-Lvar_class) type-check-program p))
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
-class TypeCheckPvar:
+class TypeCheckLvar:
   def check_type_equal(self, t1, t2, e):
     if t1 != t2:
       msg = 'error: ' + repr(t1) + ' != ' + repr(t2) + ' in ' + repr(e)
@@ -6786,14 +6810,14 @@ class TypeCheckPvar:
 \end{lstlisting}
 \fi}
 \caption{Type checker for the \LangVar{} language.}
-\label{fig:type-check-Rvar}
+\label{fig:type-check-Lvar}
 \end{figure}
 
 \begin{figure}[tbp]
 {\if\edition\racketEd\color{olive}    
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define type-check-Rif_class
-  (class type-check-Rvar_class
+(define type-check-Lif_class
+  (class type-check-Lvar_class
     (super-new)
     (inherit check-type-equal?)
     
@@ -6828,13 +6852,13 @@ class TypeCheckPvar:
           [else ((super type-check-exp env) e)])))
     ))
 
-(define (type-check-Rif p)
-  (send (new type-check-Rif_class) type-check-program p))
+(define (type-check-Lif p)
+  (send (new type-check-Lif_class) type-check-program p))
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
-class TypeCheckPif(TypeCheckPvar):
+class TypeCheckPif(TypeCheckLvar):
   def type_check_exp(self, e, env):
     match e:
       case Constant(value) if isinstance(value, bool):
@@ -6885,11 +6909,11 @@ class TypeCheckPif(TypeCheckPvar):
 \end{lstlisting}
 \fi}
 \caption{Type checker for the \LangIf{} language.}
-\label{fig:type-check-Rif}
+\label{fig:type-check-Lif}
 \end{figure}
 
 Next we discuss the type checker for \LangIf{} in
-Figure~\ref{fig:type-check-Rif}.
+Figure~\ref{fig:type-check-Lif}.
 %
 The type of a Boolean constant is \code{Boolean}.
 %
@@ -6929,7 +6953,7 @@ The other half of the test programs should not have type errors.
 % 
 \racket{In the \code{run-tests.rkt} script, change the second argument
   of \code{interp-tests} and \code{compiler-tests} to
-  \code{type-check-Rif}, which causes the type checker to run prior to
+  \code{type-check-Lif}, which causes the type checker to run prior to
   the compiler passes. Temporarily change the \code{passes} to an
   empty list and run the script, thereby checking that the new test
   programs either type check or not as intended.}
@@ -7077,8 +7101,8 @@ the first argument:
       \key{subq} \; \Arg\key{,} \Arg \MID
       \key{negq} \; \Arg \MID \key{movq} \; \Arg\key{,} \Arg \MID } \\
   &&  \gray{ \key{callq} \; \itm{label} \MID
-      \key{pushq}\;\Arg \MID \key{popq}\;\Arg \MID \key{retq} \MID \key{jmp}\,\itm{label} } \\
-  && \gray{ \itm{label}\key{:}\; \Instr }
+      \key{pushq}\;\Arg \MID \key{popq}\;\Arg \MID \key{retq} \MID \racket{\key{jmp}\,\itm{label} \MID} } \python{\key{jmp}\,\itm{label} \MID}  \\
+  && \racket{\gray{ \itm{label}\key{:}\; \Instr }}\python{\itm{label}\key{:}\; \Instr}
      \MID \key{xorq}~\Arg\key{,}~\Arg
      \MID \key{cmpq}~\Arg\key{,}~\Arg  \MID \\
   &&  \key{set}cc~\Arg
@@ -7137,7 +7161,7 @@ the first argument:
        &\MID& \gray{ \BININSTR{\code{movq}}{\Arg}{\Arg} 
        \MID \UNIINSTR{\code{negq}}{\Arg} } \\
        &\MID& \gray{ \CALLQ{\itm{label}}{\itm{int}} \MID \RETQ{} 
-       \MID \PUSHQ{\Arg} \MID \POPQ{\Arg} \MID \JMP{\itm{label}} } \\
+       \MID \PUSHQ{\Arg} \MID \POPQ{\Arg} \MID \racket{\JMP{\itm{label}}} } \python{\JMP{\itm{label}}}\\
        &\MID& \BININSTR{\code{xorq}}{\Arg}{\Arg}
        \MID \BININSTR{\code{cmpq}}{\Arg}{\Arg}\\
        &\MID& \BININSTR{\code{set}}{\itm{cc}}{\Arg} 
@@ -7176,22 +7200,30 @@ normal 64-bit register.  The abstract syntax for the \code{set}
 instruction differs from the concrete syntax in that it separates the
 instruction name from the condition code.
 
-The x86 instruction for conditional jump is relevant to the
-compilation of \key{if} expressions.  The instruction
-$\key{j}\itm{cc}~\itm{label}$ updates the program counter to point to
-the instruction after \itm{label} depending on whether the result in
-the EFLAGS register matches the condition code \itm{cc}, otherwise the
-jump instruction falls through to the next instruction.  Like the
-abstract syntax for \code{set}, the abstract syntax for conditional
-jump separates the instruction name from the condition code. For
-example, \JMPIF{\key{'le'}}{\key{foo}} corresponds to \code{jle foo}.
-Because the conditional jump instruction relies on the EFLAGS
-register, it is common for it to be immediately preceded by a
-\key{cmpq} instruction to set the EFLAGS register.
+\python{The x86 instructions for jumping are relevant to the
+  compilation of \key{if} expressions.}
+%
+\python{The instruction $\key{jmp}\,\itm{label}$ updates the program
+  counter to the address of the instruction after the specified
+  label.}
+%
+\racket{The x86 instruction for conditional jump is relevant to the
+  compilation of \key{if} expressions.}
+%
+The instruction $\key{j}\itm{cc}~\itm{label}$ updates the program
+counter to point to the instruction after \itm{label} depending on
+whether the result in the EFLAGS register matches the condition code
+\itm{cc}, otherwise the jump instruction falls through to the next
+instruction.  Like the abstract syntax for \code{set}, the abstract
+syntax for conditional jump separates the instruction name from the
+condition code. For example, \JMPIF{\key{'le'}}{\key{foo}} corresponds
+to \code{jle foo}.  Because the conditional jump instruction relies on
+the EFLAGS register, it is common for it to be immediately preceded by
+a \key{cmpq} instruction to set the EFLAGS register.
 
 
 \section{Shrink the \LangIf{} Language}
-\label{sec:shrink-Rif}
+\label{sec:shrink-Lif}
 
 The \LangIf{} language includes several features that are easily
 expressible with other features. For example, \code{and} and \code{or}
@@ -7246,10 +7278,10 @@ In the \code{run-tests.rkt} script, add the following entry for
 \code{shrink} to the list of passes (it should be the only pass at
 this point).
 \begin{lstlisting}
-(list "shrink" shrink interp_Rif type-check-Rif)
+(list "shrink" shrink interp_Lif type-check-Lif)
 \end{lstlisting}
 This instructs \code{interp-tests} to run the intepreter
-\code{interp\_Rif} and the type checker \code{type-check-Rif} on the
+\code{interp\_Lif} and the type checker \code{type-check-Lif} on the
 output of \code{shrink}.
 \fi}
 %
@@ -7259,7 +7291,7 @@ Run the script to test your compiler on all the test programs.
 {\if\edition\racketEd\color{olive}    
 
 \section{Uniquify Variables}
-\label{sec:uniquify-Rif}
+\label{sec:uniquify-Lif}
 
 Add cases to \code{uniquify-exp} to handle Boolean constants and
 \code{if} expressions.
@@ -7268,7 +7300,7 @@ Add cases to \code{uniquify-exp} to handle Boolean constants and
 Update the \code{uniquify\_exp} for \LangIf{} and add the following
 entry to the list of \code{passes} in the \code{run-tests.rkt} script.
 \begin{lstlisting}
-(list "uniquify" uniquify interp_Rif type_check_Rif)
+(list "uniquify" uniquify interp_Lif type_check_Lif)
 \end{lstlisting}
 Run the script to test your compiler.
 \end{exercise}
@@ -7276,10 +7308,10 @@ Run the script to test your compiler.
 \fi}
 
 \section{Remove Complex Operands}
-\label{sec:remove-complex-opera-Rif}
+\label{sec:remove-complex-opera-Lif}
 
 The output language for this pass is \LangIfANF{}
-(Figure~\ref{fig:Rif-anf-syntax}), the administrative normal form of
+(Figure~\ref{fig:Lif-anf-syntax}), the administrative normal form of
 \LangIf{}.  A Boolean constant is an atomic expressions but the
 \code{if} expression is not.
 All three sub-expressions of an
@@ -7334,7 +7366,7 @@ P^{\mathsf{ANF}}_{\mathsf{if}}  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
 \end{minipage}
 }
 \caption{\LangIfANF{} is \LangIf{} in administrative normal form (ANF).}
-\label{fig:Rif-anf-syntax}
+\label{fig:Lif-anf-syntax}
 \end{figure}
 
 
@@ -7350,14 +7382,14 @@ code in this pass.
 In the \code{run-tests.rkt} script, add the following entry to the
 list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
-(list "remove-complex" remove-complex-opera* interp-Rif type-check-Rif)
+(list "remove-complex" remove-complex-opera* interp-Lif type-check-Lif)
 \end{lstlisting}
 \fi}
 \end{exercise}
 
 
 \section{Explicate Control}
-\label{sec:explicate-control-Rif}
+\label{sec:explicate-control-Lif}
 
 \racket{Recall that the purpose of \code{explicate\_control} is to
   make the order of evaluation explicit in the syntax of the program.
@@ -7495,7 +7527,7 @@ basic block is \racket{represented by  the $\Tail$ non-terminal}
 
 {\if\edition\racketEd\color{olive}        
 %
-Recall that in Section~\ref{sec:explicate-control-Rvar} we implement
+Recall that in Section~\ref{sec:explicate-control-Lvar} we implement
 \code{explicate\_control} for \LangVar{} using two mutually recursive
 functions, \code{explicate-tail} and \code{explicate-assign}.  The
 former function translates expressions in tail position whereas the
@@ -7539,7 +7571,7 @@ def create_block(stmts, basic_blocks):
 \end{lstlisting}
 \end{minipage}
 \end{center}
-Figure~\ref{fig:explicate-control-Rif} provides a skeleton for the
+Figure~\ref{fig:explicate-control-Lif} provides a skeleton for the
 \code{explicate\_control} pass.
 
 The \code{explicate\_effect} function has three parameters: 1) the
@@ -7635,7 +7667,7 @@ def explicate_control(p):
             return CProgram(basic_blocks)
 \end{lstlisting}
 \caption{Skeleton for the \code{explicate\_control} pass.}
-\label{fig:explicate-control-Rif}
+\label{fig:explicate-control-Lif}
 \end{figure}
 \fi}
 
@@ -7715,7 +7747,7 @@ statements is not given, and is similar to the case for \code{if}
 expressions.
 
 The \code{explicate\_control} function itself is given in
-Figure~\ref{fig:explicate-control-Rif}. It applies
+Figure~\ref{fig:explicate-control-Lif}. It applies
 \code{explicate\_stmt} to each statement in the program, from back to
 front. Thus, the result so-far, stored in \code{new\_body}, can be
 used as the continuation parameter in the next call to
@@ -7990,7 +8022,7 @@ Add the following entry to the list of \code{passes} in
 \clearpage
 
 \section{Select Instructions}
-\label{sec:select-Rif}
+\label{sec:select-Lif}
 \index{subject}{instruction selection}
 
 The \code{select\_instructions} pass translates \LangCIf{} to
@@ -8109,7 +8141,7 @@ Run the script to test your compiler on all the test programs.
 \end{exercise}
 
 \section{Register Allocation}
-\label{sec:register-allocation-Rif}
+\label{sec:register-allocation-Lif}
 
 \index{subject}{register allocation}
 The changes required for \LangIf{} affect liveness analysis, building the
@@ -8117,11 +8149,11 @@ interference graph, and assigning homes, but the graph coloring
 algorithm itself does not change.
 
 \subsection{Liveness Analysis}
-\label{sec:liveness-analysis-Rif}
+\label{sec:liveness-analysis-Lif}
 \index{subject}{liveness analysis}
 
 Recall that for \LangVar{} we implemented liveness analysis for a
-single basic block (Section~\ref{sec:liveness-analysis-Rvar}).  With
+single basic block (Section~\ref{sec:liveness-analysis-Lvar}).  With
 the addition of \key{if} expressions to \LangIf{},
 \code{explicate\_control} produces many basic blocks.
 
@@ -8168,7 +8200,7 @@ learn how to handle cycles in the control-flow graph.
 
 {\if\edition\racketEd\color{olive}
 The next question is how to analyze jump instructions.  Recall that in
-Section~\ref{sec:liveness-analysis-Rvar} we maintain an alist named
+Section~\ref{sec:liveness-analysis-Lvar} we maintain an alist named
 \code{label->live} that maps each label to the set of live locations
 at the beginning of its block. We use \code{label->live} to determine
 the live-before set for each $\JMP{\itm{label}}$ instruction.  Now
@@ -8236,7 +8268,7 @@ program.
 \end{exercise}
 
 \subsection{Build the Interference Graph}
-\label{sec:build-interference-Rif}
+\label{sec:build-interference-Lif}
 
 Many of the new instructions in \LangXIfVar{} can be handled in the
 same way as the instructions in \LangXVar{}. Thus, if your code was
@@ -8293,11 +8325,11 @@ Add the following entry to the list of \code{passes} in
 \begin{figure}[tbp]
 {\if\edition\racketEd\color{olive}
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (Rif) at (0,2)  {\large \LangIf{}};
-\node (Rif-2) at (3,2)  {\large \LangIf{}};
-\node (Rif-3) at (6,2)  {\large \LangIf{}};
-\node (Rif-4) at (9,2)  {\large \LangIf{}};
-\node (Rif-5) at (12,2)  {\large \LangIf{}};
+\node (Lif) at (0,2)  {\large \LangIf{}};
+\node (Lif-2) at (3,2)  {\large \LangIf{}};
+\node (Lif-3) at (6,2)  {\large \LangIf{}};
+\node (Lif-4) at (9,2)  {\large \LangIf{}};
+\node (Lif-5) at (12,2)  {\large \LangIf{}};
 \node (C1-1) at (3,0)  {\large \LangCIf{}};
 
 \node (x86-2) at (3,-2)  {\large \LangXIfVar{}};
@@ -8307,11 +8339,11 @@ Add the following entry to the list of \code{passes} in
 \node (x86-4) at (9,-2) {\large \LangXIf{}};
 \node (x86-5) at (9,-4) {\large \LangXIf{}};
 
-\path[->,bend left=15] (Rif) edge [above] node {\ttfamily\footnotesize type-check} (Rif-2);
-\path[->,bend left=15] (Rif-2) edge [above] node {\ttfamily\footnotesize shrink} (Rif-3);
-\path[->,bend left=15] (Rif-3) edge [above] node {\ttfamily\footnotesize uniquify} (Rif-4);
-\path[->,bend left=15] (Rif-4) edge [above] node {\ttfamily\footnotesize remove-complex.} (Rif-5);
-\path[->,bend left=15] (Rif-5) edge [left] node {\ttfamily\footnotesize explicate-control} (C1-1);
+\path[->,bend left=15] (Lif) edge [above] node {\ttfamily\footnotesize type-check} (Lif-2);
+\path[->,bend left=15] (Lif-2) edge [above] node {\ttfamily\footnotesize shrink} (Lif-3);
+\path[->,bend left=15] (Lif-3) edge [above] node {\ttfamily\footnotesize uniquify} (Lif-4);
+\path[->,bend left=15] (Lif-4) edge [above] node {\ttfamily\footnotesize remove-complex.} (Lif-5);
+\path[->,bend left=15] (Lif-5) edge [left] node {\ttfamily\footnotesize explicate-control} (C1-1);
 \path[->,bend right=15] (C1-1) edge [left] node {\ttfamily\footnotesize select-instructions} (x86-2);
 \path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize uncover-live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build-inter.} (x86-2-2);
@@ -8322,10 +8354,10 @@ Add the following entry to the list of \code{passes} in
 \fi}
 {\if\edition\pythonEd
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (Rif-1) at (0,2)  {\large \LangIf{}};
-\node (Rif-2) at (3,2)  {\large \LangIf{}};
-\node (Rif-3) at (6,2)  {\large \LangIf{}};
-\node (Rif-4) at (9,2)  {\large \LangIf{}};
+\node (Lif-1) at (0,2)  {\large \LangIf{}};
+\node (Lif-2) at (3,2)  {\large \LangIf{}};
+\node (Lif-3) at (6,2)  {\large \LangIf{}};
+\node (Lif-4) at (9,2)  {\large \LangIf{}};
 \node (C-1) at (3,0)  {\large \LangCIf{}};
 
 \node (x86-1) at (3,-2)  {\large \LangXIfVar{}};
@@ -8333,10 +8365,10 @@ Add the following entry to the list of \code{passes} in
 \node (x86-3) at (9,-2)  {\large \LangXIf{}};
 \node (x86-4) at (12,-2) {\large \LangXIf{}};
 
-\path[->,bend left=15] (Rif-1) edge [above] node {\ttfamily\footnotesize type\_check} (Rif-2);
-\path[->,bend left=15] (Rif-2) edge [above] node {\ttfamily\footnotesize shrink} (Rif-3);
-\path[->,bend left=15] (Rif-3) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Rif-4);
-\path[->,bend left=15] (Rif-4) edge [right] node {\ttfamily\footnotesize explicate\_control} (C-1);
+\path[->,bend left=15] (Lif-1) edge [above] node {\ttfamily\footnotesize type\_check} (Lif-2);
+\path[->,bend left=15] (Lif-2) edge [above] node {\ttfamily\footnotesize shrink} (Lif-3);
+\path[->,bend left=15] (Lif-3) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Lif-4);
+\path[->,bend left=15] (Lif-4) edge [right] node {\ttfamily\footnotesize explicate\_control} (C-1);
 \path[->,bend right=15] (C-1) edge [left] node {\ttfamily\footnotesize select\_instr.} (x86-1);
 \path[->,bend right=15] (x86-1) edge [below] node {\ttfamily\footnotesize assign\_homes} (x86-2);
 \path[->,bend left=15] (x86-2) edge [above] node {\ttfamily\footnotesize patch\_instr.} (x86-3);
@@ -8344,10 +8376,10 @@ Add the following entry to the list of \code{passes} in
 \end{tikzpicture}
 \fi}
 \caption{Diagram of the passes for \LangIf{}, a language with conditionals.}
- \label{fig:Rif-passes}
+ \label{fig:Lif-passes}
 \end{figure}
 
-Figure~\ref{fig:Rif-passes} lists all the passes needed for the
+Figure~\ref{fig:Lif-passes} lists all the passes needed for the
 compilation of \LangIf{}.
 
 \section{An Example Translation}
@@ -8531,7 +8563,7 @@ the program.
 \subsection{Optimize Blocks}
 
 The algorithm for \code{explicate\_control} that we sketched in
-Section~\ref{sec:explicate-control-Rif} sometimes generates too many
+Section~\ref{sec:explicate-control-Lif} sometimes generates too many
 blocks. It does so in two different ways.
 %
 First, recall how in Figure~\ref{fig:explicate-control-s1-38},
@@ -9272,7 +9304,7 @@ But does that matter?
 %
 Indeed it does.  Recall that for register allocation, the compiler
 performs liveness analysis to determine which variables can share the
-same register.  In Section~\ref{sec:liveness-analysis-Rif} we analyze
+same register.  In Section~\ref{sec:liveness-analysis-Lif} we analyze
 the control-flow graph in reverse topological order, but topological
 order is only well-defined for acyclic graphs.
 
@@ -9832,7 +9864,7 @@ We recommend using the generic \code{analyze-dataflow} function that
 was presented at the end of Section~\ref{sec:dataflow-analysis} to
 perform liveness analysis, replacing the code in
 \code{uncover-live-CFG} that processed the basic blocks in topological
-order (Section~\ref{sec:liveness-analysis-Rif}).
+order (Section~\ref{sec:liveness-analysis-Lif}).
 
 The \code{analyze-dataflow} function has four parameters.
 \begin{enumerate}
@@ -10270,7 +10302,7 @@ no longer needed, which is why we also study \emph{garbage collection}
 
 Section~\ref{sec:r3} introduces the \LangVec{} language including its
 interpreter and type checker. The \LangVec{} language extends the \LangIf{}
-language of Chapter~\ref{ch:Rif} with vectors and Racket's
+language of Chapter~\ref{ch:Lif} with vectors and Racket's
 \code{void} value. The reason for including the later is that the
 \code{vector-set!} operation returns a value of type
 \code{Void}\footnote{Racket's \code{Void} type corresponds to what is
@@ -10332,7 +10364,7 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
 \end{minipage}
 }
 \caption{The concrete syntax of \LangVec{}, extending \LangIf{}
-  (Figure~\ref{fig:Rif-concrete-syntax}).}
+  (Figure~\ref{fig:Lif-concrete-syntax}).}
 \label{fig:Rvec-concrete-syntax}
 \end{figure}
 
@@ -10436,7 +10468,7 @@ otherwise.
 \begin{figure}[tbp]
 \begin{lstlisting}
 (define interp-Rvec_class
-  (class interp-Rif_class
+  (class interp-Lif_class
     (super-new)
 
     (define/override (interp-op op)
@@ -10488,7 +10520,7 @@ start and end parentheses.  \index{subject}{unquote-slicing}
 \begin{figure}[tp]
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
 (define type-check-Rvec_class
-  (class type-check-Rif_class
+  (class type-check-Lif_class
     (super-new)
     (inherit check-type-equal?)
 
@@ -12493,9 +12525,9 @@ means ``pop the frame and then do an indirect jump'', which we name
 argument that specifies where to jump and an integer that represents
 the arity of the function being called.
 
-Recall that in Section~\ref{sec:explicate-control-Rvar} we recommended
+Recall that in Section~\ref{sec:explicate-control-Lvar} we recommended
 using the label \code{start} for the initial block of a program, and
-in Section~\ref{sec:select-Rvar} we recommended labeling the conclusion
+in Section~\ref{sec:select-Lvar} we recommended labeling the conclusion
 of the program with \code{conclusion}, so that $(\key{Return}\;\Arg)$
 can be compiled to an assignment to \code{rax} followed by a jump to
 \code{conclusion}. With the addition of function definitions, we will
@@ -12556,7 +12588,7 @@ The primary change to the \code{allocate-registers} pass is adding an
 auxiliary function for handling definitions (the \Def{} non-terminal
 in Figure~\ref{fig:x86-3}) with one case for function definitions. The
 logic is the same as described in
-Chapter~\ref{ch:register-allocation-Rvar}, except now register
+Chapter~\ref{ch:register-allocation-Lvar}, except now register
 allocation is performed many times, once for each function definition,
 instead of just once for the whole program.
 
@@ -13643,7 +13675,7 @@ The definitional interpreter for \LangDyn{} is presented in
 Figure~\ref{fig:interp-Rdyn} and its auxiliary functions are defined i
 Figure~\ref{fig:interp-Rdyn-aux}. Consider the match case for
 \code{(Int n)}.  Instead of simply returning the integer \code{n} (as
-in the interpreter for \LangVar{} in Figure~\ref{fig:interp-Rvar}), the
+in the interpreter for \LangVar{} in Figure~\ref{fig:interp-Lvar}), the
 interpreter for \LangDyn{} creates a \emph{tagged value}\index{subject}{tagged
   value} that combines an underlying value with a tag that identifies
 what kind of value it is. We define the following struct
@@ -13662,7 +13694,7 @@ Next consider the match case for \code{vector-ref}.  The
 \code{check-tag} auxiliary function (Figure~\ref{fig:interp-Rdyn-aux})
 is used to ensure that the first argument is a vector and the second
 is an integer. If they are not, a \code{trapped-error} is raised.
-Recall from Section~\ref{sec:interp_Rint} that when a definition
+Recall from Section~\ref{sec:interp_Lint} that when a definition
 interpreter raises a \code{trapped-error} error, the compiled code
 must also signal an error by exiting with return code \code{255}.  A
 \code{trapped-error} is also raised if the index is not less than
@@ -15912,7 +15944,7 @@ applies the polymorphic function to a Boolean and to an integer.
 \label{fig:apply-twice}
 \end{figure}
 
-The type checker for \LangPoly{} in Figure~\ref{fig:type-check-Rvar0} has
+The type checker for \LangPoly{} in Figure~\ref{fig:type-check-Lvar0} has
 three new responsibilities (compared to \LangLoop{}). The type checking of
 function application is extended to handle the case where the operator
 expression is a polymorphic function. In that case the type arguments
@@ -15945,7 +15977,7 @@ different even though they are equivalent types. For example,
 \code{(All (a) (a -> a))} is equivalent to \code{(All (b) (b -> b))}.
 Two polymorphic types should be considered equal if they differ only
 in the choice of the names of the type parameters. The
-\code{type-equal?} function in Figure~\ref{fig:type-check-Rvar0-aux}
+\code{type-equal?} function in Figure~\ref{fig:type-check-Lvar0-aux}
 renames the type parameters of the first type to match the type
 parameters of the second type.
 
@@ -16069,7 +16101,7 @@ example is listed in Figure~\ref{fig:map-vec-type-check}.
   ))
 \end{lstlisting}
 \caption{Type checker for the \LangPoly{} language.}
-\label{fig:type-check-Rvar0}
+\label{fig:type-check-Lvar0}
 \end{figure}
 
 \begin{figure}[tbp]
@@ -16135,7 +16167,7 @@ example is listed in Figure~\ref{fig:map-vec-type-check}.
      (cons (Def f params rt info body) (combine-decls-defs ds^))]))
 \end{lstlisting}
 \caption{Auxiliary functions for type checking \LangPoly{}.}
-\label{fig:type-check-Rvar0-aux}
+\label{fig:type-check-Lvar0-aux}
 \end{figure}
 
 
@@ -16433,8 +16465,8 @@ for the compilation of \LangPoly{}.
 \index{subject}{interpreter}
 
 We provide interpreters for each of the source languages \LangInt{},
-\LangVar{}, $\ldots$ in the files \code{interp\_Rint.rkt},
-\code{interp-Rvar.rkt}, etc.  The interpreters for the intermediate
+\LangVar{}, $\ldots$ in the files \code{interp\_Lint.rkt},
+\code{interp-Lvar.rkt}, etc.  The interpreters for the intermediate
 languages \LangCVar{} and \LangCIf{} are in \code{interp-Cvar.rkt} and
 \code{interp-C1.rkt}.  The interpreters for \LangCVec{}, \LangCFun{}, pseudo-x86,
 and x86 are in the \key{interp.rkt} file.
@@ -16470,7 +16502,7 @@ parameters:
   \item and a type checker for the output language.  Type checkers for
     the $R$ and $C$ languages are provided in the support code.  For
     example, the type checkers for \LangVar{} and \LangCVar{} are in
-    \code{type-check-Rvar.rkt} and \code{type-check-Cvar.rkt}. The
+    \code{type-check-Lvar.rkt} and \code{type-check-Cvar.rkt}. The
     type checker entry is optional.  The support code does not provide
     type checkers for the x86 languages.
   \end{enumerate}
