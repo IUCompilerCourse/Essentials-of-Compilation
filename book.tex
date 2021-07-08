@@ -2969,7 +2969,7 @@ print(tmp_1)
 \begin{array}{rcl}
 \Atm &::=& \INT{\Int} \MID \VAR{\Var} \\  
 \Exp{} &::=& \Atm \MID \READ{} \\
-       &\MID& \NEG{\Exp} \MID  \ADD{\Exp}{\Exp} \\
+       &\MID& \NEG{\Atm} \MID  \ADD{\Atm}{\Atm} \\
 \Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
         &\MID& \ASSIGN{\VAR{\Var}}{\Exp}\\
 \LangVarANFM{}  &::=& \PROGRAM{}{\Stmt^{*}}
@@ -3061,11 +3061,14 @@ tmp_1
 %  
 \fi}
 
-Take special care of programs such as the following that \racket{bind
-  a variable to an atomic expression}\python{assign an atomic
-  expression to a variable}. You should leave such \racket{variable
-  bindings}\python{assignments} unchanged, as shown in the program on
-the right\\
+Take special care of programs such as the following that
+%
+\racket{bind a variable to an atomic expression}
+%
+\python{assign an atomic expression to a variable}.
+%
+You should leave such \racket{variable bindings}\python{assignments}
+unchanged, as shown in the program on the right\\
 %
 {\if\edition\racketEd\color{olive}
 \begin{transformation}
@@ -3098,8 +3101,8 @@ print(b)
 \end{lstlisting}
 \end{transformation}
 \fi}
-
-A careless implementation might produce the following output with
+%
+\noindent A careless implementation might produce the following output with
 unnecessary temporary variables.
 \begin{center}
 \begin{minipage}{0.4\textwidth}
@@ -3146,7 +3149,7 @@ intermediate programs, place \lstinline{(debug-level 1)} before the call to
 \fi}
 %
 {\if\edition\pythonEd
-  Implement the \code{remove\_complex\_operands} function in
+  Implement the \code{remove\_complex\_operands} pass in
   \code{compiler.py}, creating auxiliary functions for each
   non-terminal in the grammar, i.e., \code{rco\_exp}
   and \code{rco\_stmt}.
@@ -3159,11 +3162,10 @@ intermediate programs, place \lstinline{(debug-level 1)} before the call to
 \label{ex:Lvar}
 
 Create five \LangVar{} programs that exercise the most interesting
-parts of the Remove Complex Operands pass.  The five programs should
-be placed in the subdirectory named \key{tests} and the file names
-should start with \code{var\_test\_} followed by a unique integer and
-end with the file extension \key{.py}.
-% TODO: come up with passes infrastructure for Python -Jeremy
+parts of the \code{remove\_complex\_operands} pass.  The five programs
+should be placed in the subdirectory named \key{tests} and the file
+names should start with \code{var\_test\_} followed by a unique
+integer and end with the file extension \key{.py}.
 %% The \key{run-tests.rkt} script in the support code checks whether the
 %% output programs produce the same result as the input programs.  The
 %% script uses the \key{interp-tests} function
@@ -3322,61 +3324,63 @@ the same and integer constants change to immediates:
 $\INT{n}$ changes to $\IMM{n}$.}
 
 We consider the cases for the $\Stmt$ non-terminal, starting with
-arithmetic operations. For example, consider the addition
-operation. We can use the \key{addq} instruction, but it performs an
-in-place update.  So we could move $\itm{arg}_1$ into the left-hand
-side \itm{var} and then add $\itm{arg}_2$ to \itm{var}.
+arithmetic operations. For example, consider the addition operation
+below, on the left side. There is an \key{addq} instruction in x86,
+but it performs an in-place update.  So we could move $\Arg_1$
+into the left-hand side \itm{var} and then add $\Arg_2$ to
+\itm{var}, where $\Arg_1$ and $\Arg_2$ are the translations of
+$\Atm_1$ and $\Atm_2$ respectively.
 \begin{transformation}
 {\if\edition\racketEd\color{olive}    
 \begin{lstlisting}
-|$\itm{var}$| = (+ |$\itm{arg}_1$| |$\itm{arg}_2$|);
+|$\itm{var}$| = (+ |$\Atm_1$| |$\Atm_2$|);
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
-|$\itm{var}$| = |$\itm{arg}_1$| + |$\itm{arg}_2$|
+|$\itm{var}$| = |$\Atm_1$| + |$\Atm_2$|
 \end{lstlisting}
 \fi}
 \compilesto
 \begin{lstlisting}
-movq |$\itm{arg}_1$|, |$\itm{var}$|
-addq |$\itm{arg}_2$|, |$\itm{var}$|
+movq |$\Arg_1$|, |$\itm{var}$|
+addq |$\Arg_2$|, |$\itm{var}$|
 \end{lstlisting}
 \end{transformation}
 There are also cases that require special care to avoid generating
 needlessly complicated code. For example, if one of the arguments of
 the addition is the same variable as the left-hand side of the
-assignment, then there is no need for the extra move instruction.  The
-assignment statement can be translated into a single \key{addq}
-instruction as follows.
+assignment, as shown below, then there is no need for the extra move
+instruction.  The assignment statement can be translated into a single
+\key{addq} instruction as follows.
 \begin{transformation}
 {\if\edition\racketEd\color{olive}
 \begin{lstlisting}
-|$\itm{var}$| = (+ |$\itm{arg}_1$| |$\itm{var}$|);
+|$\itm{var}$| = (+ |$\Atm_1$| |$\itm{var}$|);
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
-|$\itm{var}$| = |$\itm{arg}_1$| + |$\itm{var}$|
+|$\itm{var}$| = |$\Atm_1$| + |$\itm{var}$|
 \end{lstlisting}
 \fi}    
 \compilesto
 \begin{lstlisting}
-addq |$\itm{arg}_1$|, |$\itm{var}$|
+addq |$\Arg_1$|, |$\itm{var}$|
 \end{lstlisting}
 \end{transformation}
 
-The \key{read} operation does not have a direct counterpart in x86
+The \READOP{} operation does not have a direct counterpart in x86
 assembly, so we provide this functionality with the function
 \code{read\_int} in the file \code{runtime.c}, written in
 C~\citep{Kernighan:1988nx}. In general, we refer to all of the
 functionality in this file as the \emph{runtime system}\index{subject}{runtime
   system}, or simply the \emph{runtime} for short. When compiling your
 generated x86 assembly code, you need to compile \code{runtime.c} to
-\code{runtime.o} (an ``object file'', using \code{gcc} option
+\code{runtime.o} (an ``object file'', using \code{gcc} with option
 \code{-c}) and link it into the executable. For our purposes of code
 generation, all you need to do is translate an assignment of
-\key{read} into a call to the \code{read\_int} function followed by a
+\READOP{} into a call to the \code{read\_int} function followed by a
 move from \code{rax} to the left-hand-side variable.  (Recall that the
 return value of a function goes into \code{rax}.)  
 \begin{transformation}
@@ -3396,6 +3400,27 @@ callq read_int
 movq %rax, |$\itm{var}$|
 \end{lstlisting}
 \end{transformation}
+
+{\if\edition\pythonEd
+%
+Similarly, we translate the \code{print} operation, shown below, into
+a call to the \code{print\_int} function defined in \code{runtime.c}.
+In x86, the first six arguments to functions are passed in registers,
+with the first argument passed in register \code{rdi}. So we move the
+$\Arg$ into \code{rdi} and then call \code{print\_int} using the
+\code{callq} instruction.
+\begin{transformation}
+\begin{lstlisting}
+print(|$\Atm$|)    
+\end{lstlisting}
+\compilesto
+\begin{lstlisting}
+movq |$\Arg$|, %rdi
+callq print_int  
+\end{lstlisting}
+\end{transformation}
+%
+\fi}  
 
 {\if\edition\racketEd\color{olive}
 There are two cases for the $\Tail$ non-terminal: \key{Return} and
@@ -3461,37 +3486,34 @@ b = a
 print(b)
 \end{lstlisting}
 \fi}
-The output of \code{select\_instructions} is shown on the left and the
-output of \code{assign\_homes} on the right.  In this example, we
-assign variable \code{a} to stack location \code{-8(\%rbp)} and
-variable \code{b} to location \code{-16(\%rbp)}.
+%
+The output of \code{select\_instructions} is shown below, on the left,
+and the output of \code{assign\_homes} is on the right.  In this
+example, we assign variable \code{a} to stack location
+\code{-8(\%rbp)} and variable \code{b} to location \code{-16(\%rbp)}.
 \begin{transformation}
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-start: 
-    movq $42, a
-    movq a, b
-    movq b, %rax
-    jmp conclusion
+movq $42, a
+movq a, b
+movq b, %rax
 \end{lstlisting}
 \compilesto
 %stack-space: 16
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-start:
-    movq $42, -8(%rbp)
-    movq -8(%rbp), -16(%rbp)
-    movq -16(%rbp), %rax
-    jmp conclusion
+movq $42, -8(%rbp)
+movq -8(%rbp), -16(%rbp)
+movq -16(%rbp), %rax
 \end{lstlisting}
 \end{transformation}
 
 \racket{The \code{locals-types} entry in the $\itm{info}$ of the
-\code{X86Program} node is an alist mapping all the variables in the
-program to their types (for now just \code{Integer}).  The
-\code{assign\_homes} pass should replace all uses of those variables
-with stack locations.  As an aside, the \code{locals-types} entry is
-computed by \code{type-check-Cvar} in the support code, which installs
-it in the $\itm{info}$ field of the \code{CProgram} node, which should
-be propagated to the \code{X86Program} node.}
+  \code{X86Program} node is an alist mapping all the variables in the
+  program to their types (for now just \code{Integer}).  The
+  \code{assign\_homes} pass should replace all uses of those variables
+  with stack locations.  As an aside, the \code{locals-types} entry is
+  computed by \code{type-check-Cvar} in the support code, which
+  installs it in the $\itm{info}$ field of the \code{CProgram} node,
+  which should be propagated to the \code{X86Program} node.}
 %
 \python{The \code{assign\_homes} pass should replace all uses of
   variables with stack locations.}
@@ -3511,8 +3533,8 @@ multiple of 16 bytes.\index{subject}{frame}
 \begin{exercise}\normalfont
 Implement the \key{assign\_homes} pass in
 \racket{\code{compiler.rkt}}\python{\code{compiler.py}}, defining
-auxiliary functions for the non-terminals \Arg{}, \Instr{}, and
-\Block{}.  We recommend that the auxiliary functions take an extra
+auxiliary functions for each of the non-terminals in the \LangXVar{}
+grammar.  We recommend that the auxiliary functions take an extra
 parameter that maps variable names to homes (stack locations for now).
 %
 {\if\edition\racketEd\color{olive}
@@ -3610,14 +3632,21 @@ programs.
 The last step of the compiler from \LangVar{} to x86 is to convert the
 \LangXInt{} AST (defined in Figure~\ref{fig:x86-int-ast}) to the
 string representation (defined in
-Figure~\ref{fig:x86-int-concrete}). \racket{The Racket \key{format} and
-\key{string-append} functions are useful in this regard.} The main work
-that this step needs to perform is to create the \key{main} function
-and the standard instructions for its prelude and conclusion, as shown
-in Figure~\ref{fig:p1-x86} of Section~\ref{sec:x86}. You will need to
+Figure~\ref{fig:x86-int-concrete}).
+%
+\racket{The Racket \key{format} and \key{string-append} functions are
+  useful in this regard.}
+%
+This pass creates the \key{main} function and the standard
+instructions for its prelude and conclusion, as shown in
+Figure~\ref{fig:p1-x86} of Section~\ref{sec:x86}. You will need to
 know the amount of space needed for the stack frame, which you can
-obtain from the \racket{\code{stack-space} entry in the $\itm{info}$ field}
+obtain from the
+%
+\racket{\code{stack-space} entry in the $\itm{info}$ field}
+%
 \python{\code{stack\_space} field}
+%
 of the \key{X86Program} node.
 
 When running on Mac OS X, your compiler should prefix an underscore to
@@ -3661,7 +3690,7 @@ programs.
 \label{sec:pe-Lvar}
 \index{subject}{partial evaluation}
 
-This section describes optional challenge exercises that involve
+This section describes two optional challenge exercises that involve
 adapting and improving the partial evaluator for \LangInt{} that was
 introduced in Section~\ref{sec:partial-evaluation}.
 
@@ -3670,15 +3699,21 @@ introduced in Section~\ref{sec:partial-evaluation}.
   
 Adapt the partial evaluator from Section~\ref{sec:partial-evaluation}
 (Figure~\ref{fig:pe-arith}) so that it applies to \LangVar{} programs
-instead of \LangInt{} programs. Recall that \LangVar{} adds
+instead of \LangInt{} programs. Recall that \LangVar{} adds variables and
+%
 \racket{\key{let} binding}\python{assignment}
-and variables to the \LangInt{} language, so you will need to add cases for
-them in the \code{pe\_exp} \racket{function}\python{and \code{pe\_stmt functions}}. Once complete, add the partial
-evaluation pass to the front of your compiler and make sure that your
-compiler still passes all of the tests.
+%
+to the \LangInt{} language, so you will need to add cases for them in
+the \code{pe\_exp}
+%
+\racket{function}
+%
+\python{and \code{pe\_stmt} functions}.
+%
+Once complete, add the partial evaluation pass to the front of your
+compiler and make sure that your compiler still passes all of the
+tests.
 \end{exercise}
-
-The next exercise builds on Exercise~\ref{ex:pe-Lvar}.
 
 \begin{exercise}
 \normalfont
