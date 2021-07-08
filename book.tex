@@ -2423,7 +2423,7 @@ alignment (because the \code{callq} pushed the return address).  The
 first three instructions are the typical \emph{prelude}\index{subject}{prelude}
 for a procedure.  The instruction \code{pushq \%rbp} saves the base
 pointer for the caller onto the stack and subtracts $8$ from the stack
-pointer. The second instruction \code{movq \%rsp, \%rbp} sets the
+pointer. The next instruction \code{movq \%rsp, \%rbp} sets the
 base pointer to the current stack pointer, which is pointing at the location
 of the old base pointer. The instruction \code{subq \$16, \%rsp} moves the stack
 pointer down to make enough room for storing variables.  This program
@@ -2555,7 +2555,7 @@ and x86 assembly? Here are some of the most important ones:
 \fi}
 
 \item A program in \LangVar{} can have any number of variables
-  whereas x86 has 16 registers and the procedure calls stack.
+  whereas x86 has 16 registers and the procedure call stack.
 {\if\edition\racketEd\color{olive}    
 \item Variables in \LangVar{} can shadow other variables with the
   same name. In x86, registers have unique names and memory locations
@@ -2634,14 +2634,20 @@ use \key{let} in the output of \key{remove\_complex\_opera*}.}
 \key{remove\_complex\_opera*} does not matter so we arbitrarily choose
 \key{uniquify} to come first.}
 
-The \key{select\_instructions} and \key{assign\_homes}.  passes are
-intertwined. In Chapter~\ref{ch:Rfun} we learn that, in x86, registers
-are used for passing arguments to functions and it is preferable to
-assign parameters to their corresponding registers. On the other hand,
-by selecting instructions first we may run into a dead end in
-\key{assign\_homes}. Recall that only one argument of an x86
-instruction may be a memory access but \key{assign\_homes} might fail
-to assign even one of them to a register.
+The \key{select\_instructions} and \key{assign\_homes} passes are
+intertwined.
+%
+In Chapter~\ref{ch:Rfun} we learn that, in x86, registers are used for
+passing arguments to functions and it is preferable to assign
+parameters to their corresponding registers.  This suggests that it
+would be better to start with the \key{select\_instructions} pass,
+which generates the instructions for argument passing, before
+performing register allocation.
+%
+On the other hand, by selecting instructions first we may run into a
+dead end in \key{assign\_homes}. Recall that only one argument of an
+x86 instruction may be a memory access but \key{assign\_homes} might
+be forced to assign both arguments to memory locations.
 %
 A sophisticated approach is to iteratively repeat the two passes until
 a solution is found. However, to reduce implementation complexity we
@@ -2695,17 +2701,20 @@ outstanding problems.
 \end{figure}
 
 Figure~\ref{fig:Lvar-passes} presents the ordering of the compiler
-passes and identifies the input and output language of each pass.  The
-last pass, \key{print\_x86}, converts from the abstract syntax of
+passes and identifies the input and output language of each pass.
+%
+The output of the \key{select\_instructions} pass is the \LangXVar{}
+language, which extends \LangXInt{} with an unbounded number of
+program-scope variables and removes the restrictions regarding
+instruction arguments.
+%
+The last pass, \key{print\_x86}, converts from the abstract syntax of
 \LangXInt{} to the concrete syntax.
 %
-\racket{In the following two sections we discuss the \LangCVar{}
-  intermediate language and the \LangXVar{} dialect of x86.}
+\racket{In the following section we discuss the \LangCVar{}
+  intermediate language.}
 %
-\python{In the following section we discuss the \LangXVar{} dialect of
-  x86.}
-%
-The remainder of this chapter gives hints regarding the implementation
+The remainder of this chapter provides guidance on the implementation
 of each of the compiler passes in Figure~\ref{fig:Lvar-passes}.
 
 %% The output of \key{uniquify} and \key{remove-complex-opera*}
@@ -2779,13 +2788,6 @@ The definitional interpreter for \LangCVar{} is in the support code,
 in the file \code{interp-Cvar.rkt}.
 
 \fi}
-
-\section{The \LangXVar{} dialect}
-
-The \LangXVar{} language is the output of the pass
-\key{select\_instructions}. It extends \LangXInt{} with an unbounded
-number of program-scope variables and removes the restrictions
-regarding instruction arguments.
 
 {\if\edition\racketEd\color{olive}  
 \section{Uniquify Variables}
