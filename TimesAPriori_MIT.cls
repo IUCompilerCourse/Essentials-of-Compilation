@@ -88,7 +88,7 @@
 \newcommand\@ptsize{0}
 
 % Set twoside printing
-\@twosidetrue 
+\@twosidetrue
 
 % Marginal notes are on the outside edge
 \@mparswitchtrue
@@ -370,7 +370,7 @@ ItalicFont=SyntaxLTStd-Italic,
 \setcounter{topnumber}{5}
 \setcounter{bottomnumber}{5}
 % The maximum part of the top or bottom of a text page that can be
-% occupied by floats. This is set so that at least four lines of text 
+% occupied by floats. This is set so that at least four lines of text
 % fit on the page.
 \renewcommand\topfraction{.921}
 \renewcommand\bottomfraction{.921}
@@ -424,14 +424,14 @@ ItalicFont=SyntaxLTStd-Italic,
 %  \def\@oddfoot{\hfill{{\fontsize{10\p@}{12\p@}\selectfont\thepage}}}%
   \let\@evenfoot\@oddfoot%
   \let\@oddhead\relax \let\@evenhead\relax}%
-                                                                    
-%          
+
+%
 % Sectional units
 %
 
 % Lowest level heading that takes a number by default
 \setcounter{secnumdepth}{3}
-    
+
 % Counters
 \newcounter{part}
 \newcounter{chapter}
@@ -599,7 +599,7 @@ ItalicFont=SyntaxLTStd-Italic,
   \@makeparthead{#2}
   \@afterindentfalse
   \@afterheading}
-        
+
 \def\@spart#1{%
   \thispagestyle{empty}
   \@makesparthead{#1}
@@ -622,7 +622,7 @@ ItalicFont=SyntaxLTStd-Italic,
   \@afterindentfalse
   \@afterheading\chapterauthor{}\notenum=0%
 }
-        
+
 \def\@schapter#1{%
   \chaptermark{#1}
   \thispagestyle{plain}
@@ -630,7 +630,7 @@ ItalicFont=SyntaxLTStd-Italic,
   \@afterindentfalse
   \@afterheading}
 
-\def\@makeparthead#1{% 
+\def\@makeparthead#1{%
   \begingroup%
     \parindent\z@\raggedright%
 \null\vspace{-10.5\p@}%
@@ -667,7 +667,7 @@ ItalicFont=SyntaxLTStd-Italic,
 \let\@chapterauthor\@empty%
 \def\chapterauthor#1{\def\@chapterauthor{#1}}%
 
-\def\@makechapterhead#1{% 
+\def\@makechapterhead#1{%
   \begingroup%
     \parindent\z@\raggedright%
 \null\vspace{-7.5\p@}%
@@ -697,7 +697,7 @@ ItalicFont=SyntaxLTStd-Italic,
 \def\endabstract{\vskip1sp\egroup\vskip9pt}%
 
 %%%%Appendix Chapter Title
-\def\@makeappchapterhead#1{% 
+\def\@makeappchapterhead#1{%
   \begingroup%
     \parindent\z@\raggedright%
 \null\vspace{-7.5\p@}%
@@ -722,7 +722,7 @@ ItalicFont=SyntaxLTStd-Italic,
   \@afterindentfalse
   \@afterheading}
 
-  
+
   \def\@makeschapterhead#1{%
   \begingroup\parindent\z@\raggedright%
 \null\vspace{-6.5\p@}%
@@ -750,7 +750,7 @@ ItalicFont=SyntaxLTStd-Italic,
     \begingroup
       #6{%
         \@hangfrom{\hskip #3\relax\@svsec}%
-          \interlinepenalty \@M \titlecap{\sansbold{#8}} \@@par}%
+          \interlinepenalty \@M \titlecap[\sansbold{#8}] \@@par}%
     \endgroup\else
     \begingroup
       #6{%
@@ -970,7 +970,7 @@ ItalicFont=SyntaxLTStd-Italic,
 \def\labelitemiii{$\ast$}%
 \def\labelitemiv{$\cdot$}%
 
-      
+
 \setlength\leftmargini   {\z@}%
 \leftmargin  \leftmargini
 \setlength\leftmarginii  {\z@}
@@ -1248,7 +1248,7 @@ ItalicFont=SyntaxLTStd-Italic,
 \def\theindex{\@mainmatterfalse
 %  \addcontentsline{toc}{chapter}{Index}
   \columnseprule \z@
-  \columnsep 12pt\begin{multicols*}{2}[\chapter*{\indexname}\vspace{-10\p@}] 
+  \columnsep 12pt\begin{multicols*}{2}[\chapter*{\indexname}\vspace{-10\p@}]
                                 %Subject or Author here
   \markboth{\indexname}{\indexname}%
   \parskip\z@\relax\let\item\idxitem\fontsize{8\p@}{9.5\p@}\selectfont}
@@ -1268,7 +1268,7 @@ ItalicFont=SyntaxLTStd-Italic,
 \def\theindex{\@mainmatterfalse
 %  \addcontentsline{toc}{chapter}{Index}
   \columnseprule \z@
-  \columnsep 12pt%\begin{multicols*}{2}[\chapter*{\indexname}] 
+  \columnsep 12pt%\begin{multicols*}{2}[\chapter*{\indexname}]
                                 %Subject or Author here
   \markboth{\indexname}{\indexname}%
   \parskip\z@\relax\let\item\idxitem\fontsize{8\p@}{9.5\p@}\selectfont}%
@@ -1279,7 +1279,7 @@ ItalicFont=SyntaxLTStd-Italic,
 \def\indexspace{\par \vskip 10\p@\relax}
 %%
 }%
-     
+
 % ***********
 % Footnotes *
 % ***********
@@ -1327,7 +1327,7 @@ chapendnote\the\endnotenum\string\endcsname{%
 #1\strut\vskip1sp}\vskip1pt}}
 
 \def\chapternotes{\ifnum\notenum>0
-\section*{\small\bfseries\itshape %Notes for 
+\section*{\small\bfseries\itshape %Notes for
 Chapter \arabic{chapter}}%
 %\markright{Notes for Chapter \arabic{chapter}}%
 \addcontentsline{toc}{section}{\protect\numberline{}Chapter Notes}%
@@ -1391,7 +1391,7 @@ Chapter \arabic{chapter}}%
 
 %Math parameters
 
-\setlength{\jot}{7\p@} 
+\setlength{\jot}{7\p@}
 
 \def\frenchspacing{\sfcode`\.\@m \sfcode`\?\@m \sfcode`\!\@m
   \sfcode`\:\@m \sfcode`\;\@m \sfcode`\,\@m}
@@ -1626,9 +1626,9 @@ Chapter \arabic{chapter}}%
 
 \hyphenation{Figure Figures Table Tables Section Sections}
 
-% Reset eqnarray to avoid to avoid \arraycolsep between 
-% columns. Take from a post on comp.text.tex 
-% by Fred Bartlett <fbartlet@optonline.net> 
+% Reset eqnarray to avoid to avoid \arraycolsep between
+% columns. Take from a post on comp.text.tex
+% by Fred Bartlett <fbartlet@optonline.net>
 \newif\if@alignpoint
 \def\eqnarray{%
   \stepcounter{equation}%
@@ -1871,7 +1871,7 @@ Chapter \arabic{chapter}}%
 \global\c@subsubexercise=0
 {\leftskip=27.5\p@%
 \noindent\hskip-15.5\p@\hbox to
-15.5\p@{\sansbold{(\alph{subexercise})}\hfill}\ignorespaces#1\vskip1sp}} 
+15.5\p@{\sansbold{(\alph{subexercise})}\hfill}\ignorespaces#1\vskip1sp}}
 
 \long\def\subsubexer#1{\vskip3pt\global\advance\c@subsubexercise by 1
 {\leftskip=3pc
@@ -1880,7 +1880,7 @@ Chapter \arabic{chapter}}%
 \def\sidebysidesubexer#1#2{\vskip3pt\centerline{\hskip1pc\vtop{\global\advance\c@subexercise by 1
 \advance\hsize -14\p@ \hsize=.5\hsize
 \noindent\hbox to 14\p@{\sansbold{(\alph{subexercise})}\hfill}
-#1}\hfill\vtop{\global\advance\c@subexercise by 1 
+#1}\hfill\vtop{\global\advance\c@subexercise by 1
 \advance\hsize -1pc \hsize=.5\hsize
 \noindent\hbox to 14\p@{\sansbold{(\alph{subexercise})}\hfill} #2}}}
 
@@ -1908,7 +1908,7 @@ by 1\relax%
 %%%%
 
 
-\usepackage{algorithm} %% 
+\usepackage{algorithm} %%
 \usepackage{algorithmicx}
 \usepackage{algpseudocode}
 
