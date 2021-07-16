@@ -1,6 +1,7 @@
 # Essentials of Compilation
 
-This is a book about compiling a subset of Racket to x86-64 assembly code.
+This is the LaTeX sources for two books, one about compiling a subset of Racket to x86-64 assembly code
+and the other about compiling a subset of Python, also to x86-64.
 
 **Generating the book**
 
