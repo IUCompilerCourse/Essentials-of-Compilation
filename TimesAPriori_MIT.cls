@@ -750,7 +750,7 @@ ItalicFont=SyntaxLTStd-Italic,
     \begingroup
       #6{%
         \@hangfrom{\hskip #3\relax\@svsec}%
-          \interlinepenalty \@M \titlecap[\sansbold{#8}] \@@par}%
+          \interlinepenalty \@M \titlecap{\sansbold{#8}} \@@par}%
     \endgroup\else
     \begingroup
       #6{%
