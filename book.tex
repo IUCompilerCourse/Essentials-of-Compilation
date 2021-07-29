@@ -22,7 +22,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{1}
+\def\edition{0}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd\color{olive}{#1}\fi}}
@@ -2457,7 +2457,7 @@ Figure~\ref{fig:x86-int-ast}. We refer to this language as
 The main difference compared to the concrete syntax of \LangXInt{}
 (Figure~\ref{fig:x86-int-concrete}) is that labels are not allowed in
 front of every instruction. Instead instructions are grouped into
-\emph{blocks}\index{subject}{block}\index{subject}{basic block} with a
+\emph{blocks}\index{subject}{block} with a
 label associated with every block, which is why the \key{X86Program}
 struct includes an alist mapping labels to blocks. The reason for this
 organization becomes apparent in Chapter~\ref{ch:Lif} when we
@@ -3217,23 +3217,23 @@ start:
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(define (explicate-tail e)
+(define (explicate_tail e)
   (match e
     [(Var x) ___]
     [(Int n) (Return (Int n))]
     [(Let x rhs body) ___]
     [(Prim op es) ___]
-    [else (error "explicate-tail unhandled case" e)]))
+    [else (error "explicate_tail unhandled case" e)]))
 
-(define (explicate-assign e x cont)
+(define (explicate_assign e x cont)
   (match e
     [(Var x) ___]
     [(Int n) (Seq (Assign (Var x) (Int n)) cont)]
     [(Let y rhs body) ___]
     [(Prim op es) ___]
-    [else (error "explicate-assign unhandled case" e)]))
+    [else (error "explicate_assign unhandled case" e)]))
 
-(define (explicate-control p)
+(define (explicate_control p)
   (match p
     [(Program info body) ___]))
 \end{lstlisting}
@@ -3254,23 +3254,23 @@ that we have alluded to earlier.
 \end{definition}
 
 We recommend implementing \code{explicate\_control} using two mutually
-recursive functions, \code{explicate-tail} and
-\code{explicate-assign}, as suggested in the skeleton code in
-Figure~\ref{fig:explicate-control-Lvar}.  The \code{explicate-tail}
+recursive functions, \code{explicate\_tail} and
+\code{explicate\_assign}, as suggested in the skeleton code in
+Figure~\ref{fig:explicate-control-Lvar}.  The \code{explicate\_tail}
 function should be applied to expressions in tail position whereas the
-\code{explicate-assign} should be applied to expressions that occur on
+\code{explicate\_assign} should be applied to expressions that occur on
 the right-hand-side of a \key{let}.
 %
-The \code{explicate-tail} function takes an \Exp{} in \LangVar{} as
+The \code{explicate\_tail} function takes an \Exp{} in \LangVar{} as
 input and produces a \Tail{} in \LangCVar{} (see
 Figure~\ref{fig:c0-syntax}).
 %
-The \code{explicate-assign} function takes an \Exp{} in \LangVar{},
+The \code{explicate\_assign} function takes an \Exp{} in \LangVar{},
 the variable that it is to be assigned to, and a \Tail{} in
 \LangCVar{} for the code that comes after the assignment.  The
-\code{explicate-assign} function returns a $\Tail$ in \LangCVar{}.
+\code{explicate\_assign} function returns a $\Tail$ in \LangCVar{}.
 
-The \code{explicate-assign} function is in accumulator-passing style:
+The \code{explicate\_assign} function is in accumulator-passing style:
 the \code{cont} parameter is used for accumulating the output. This
 accumulator-passing style plays an important role in how we generate
 high-quality code for conditional expressions in Chapter~\ref{ch:Lif}.
@@ -3284,7 +3284,7 @@ exercise the code in \code{explicate\_control}.
 In the \code{run-tests.rkt} script, add the following entry to the
 list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
-(list "explicate control" explicate-control interp_Cvar type-check-Cvar)  
+(list "explicate control" explicate_control interp_Cvar type-check-Cvar)  
 \end{lstlisting}
 \end{exercise}
 \fi}
@@ -3422,14 +3422,14 @@ recursively and then append the resulting instructions.
 \begin{exercise}
   \normalfont
 {\if\edition\racketEd\color{olive}
-Implement the \key{select-instructions} pass in
+Implement the \code{select\_instructions} pass in
 \code{compiler.rkt}. Create three new example programs that are
 designed to exercise all of the interesting cases in this pass.
 %
 In the \code{run-tests.rkt} script, add the following entry to the
 list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
-(list "instruction selection" select-instructions interp_pseudo-x86-0)
+(list "instruction selection" select_instructions interp_pseudo-x86-0)
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
@@ -3603,7 +3603,7 @@ designed to exercise all of the interesting cases in this pass.
 In the \code{run-tests.rkt} script, add the following entry to the
 list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
-(list "patch instructions" patch-instructions interp_x86-0)
+(list "patch instructions" patch_instructions interp_x86-0)
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
@@ -7016,11 +7016,13 @@ The \key{CProgram} construct contains
 %
 \racket{an alist}\python{a dictionary}
 %
-mapping labels to \emph{basic blocks}, where each basic block is
+mapping labels to \emph{basic blocks}\index{subject}{basic block},
+that is to say, a sequence of straight-line statements that ends with
+a \code{return}, \code{goto}, or conditional \code{goto}.
 %
-\racket{represented by the $\Tail$ non-terminal}
-%
-\python{a list of statements}.
+\racket{Basic blocks are represented in the grammar by the $\Tail$
+  non-terminal.}
+
 
 
 \begin{figure}[tp]
@@ -7554,14 +7556,14 @@ sequence of code and to jump to a label via \code{goto}.
 %
 Recall that in Section~\ref{sec:explicate-control-Lvar} we implement
 \code{explicate\_control} for \LangVar{} using two mutually recursive
-functions, \code{explicate-tail} and \code{explicate-assign}.  The
+functions, \code{explicate\_tail} and \code{explicate\_assign}.  The
 former function translates expressions in tail position whereas the
 later function translates expressions on the right-hand-side of a
 \key{let}. With the addition of \key{if} expression in \LangIf{} we
 have a new kind of position to deal with: the predicate position of
-the \key{if}. We need another function, \code{explicate-pred}, that
+the \key{if}. We need another function, \code{explicate\_pred}, that
 takes an \LangIf{} expression and two blocks for the then-branch and
-else-branch. The output of \code{explicate-pred} is a block.  In the
+else-branch. The output of \code{explicate\_pred} is a block.  In the
 following paragraphs we discuss specific cases in the
 \code{explicate\_pred} function as well as additions to the
 \code{explicate\_tail} and \code{explicate\_assign} functions.
@@ -7702,7 +7704,7 @@ def explicate_control(p):
 {\if\edition\racketEd\color{olive}        
 \begin{figure}[tbp]
 \begin{lstlisting}
-(define (explicate-pred cnd thn els)
+(define (explicate_pred cnd thn els)
   (match cnd
     [(Var x) ___]
     [(Let x rhs body) ___]
@@ -7712,9 +7714,9 @@ def explicate_control(p):
               (force (block->goto els)))]
     [(Bool b) (if b thn els)]
     [(If cnd^ thn^ els^) ___]
-    [else (error "explicate-pred unhandled case" cnd)]))
+    [else (error "explicate_pred unhandled case" cnd)]))
 \end{lstlisting}
-\caption{Skeleton for the \key{explicate-pred} auxiliary function.}
+\caption{Skeleton for the \key{explicate\_pred} auxiliary function.}
 \label{fig:explicate-pred}
 \end{figure}
 \fi}
@@ -7786,12 +7788,12 @@ the dictionary of basic blocks, labeling it as the ``start'' block.
 %
 \fi}
 
-%% Getting back to the case for \code{if} in \code{explicate-pred}, we
-%% make the recursive calls to \code{explicate-pred} on the ``then'' and
+%% Getting back to the case for \code{if} in \code{explicate\_pred}, we
+%% make the recursive calls to \code{explicate\_pred} on the ``then'' and
 %% ``else'' branches with the arguments \code{(block->goto} $B_1$\code{)}
 %% and \code{(block->goto} $B_2$\code{)}. Let $B_3$ and $B_4$ be the
 %% results from the two recursive calls.  We complete the case for
-%% \code{if} by recursively apply \code{explicate-pred} to the condition
+%% \code{if} by recursively apply \code{explicate\_pred} to the condition
 %% of the \code{if} with the promised blocks $B_3$ and $B_4$ to obtain
 %% the result $B_5$.
 %% \[
@@ -7808,20 +7810,20 @@ the dictionary of basic blocks, labeling it as the ``start'' block.
   \code{cont} parameter of \code{explicate\_assign} is used in both
   recursive calls, so make sure to use \code{block->goto} on it.}
 
-%% In the case for \code{if} in \code{explicate-tail}, the two branches
+%% In the case for \code{if} in \code{explicate\_tail}, the two branches
 %% inherit the current context, so they are in tail position. Thus, the
 %% recursive calls on the ``then'' and ``else'' branch should be calls to
-%% \code{explicate-tail}.
+%% \code{explicate\_tail}.
 %% %
 %% We need to pass $B_0$ as the accumulator argument for both of these
 %% recursive calls, but we need to be careful not to duplicate $B_0$.
 %% Thus, we first apply \code{block->goto} to $B_0$ so that it gets added
 %% to the control-flow graph and obtain a promised goto $G_0$.
 %% %
-%% Let $B_1$ be the result of \code{explicate-tail} on the ``then''
-%% branch and $G_0$ and let $B_2$ be the result of \code{explicate-tail}
+%% Let $B_1$ be the result of \code{explicate\_tail} on the ``then''
+%% branch and $G_0$ and let $B_2$ be the result of \code{explicate\_tail}
 %% on the ``else'' branch and $G_0$.  Let $B_3$ be the result of applying
-%% \code{explicate-pred} to the condition of the \key{if}, $B_1$, and
+%% \code{explicate\_pred} to the condition of the \key{if}, $B_1$, and
 %% $B_2$.  Then the \key{if} as a whole translates to promise $B_3$.
 %% \[
 %%     (\key{if}\; \itm{cnd}\; \itm{thn}\; \itm{els}) \quad\Rightarrow\quad B_3
@@ -7834,7 +7836,7 @@ the dictionary of basic blocks, labeling it as the ``start'' block.
 %% attach labels to blocks when we add them to the control-flow graph, as
 %% we see in the next case.
 
-%% Next consider the case for \key{if} in the \code{explicate-assign}
+%% Next consider the case for \key{if} in the \code{explicate\_assign}
 %% function. The context of the \key{if} is an assignment to some
 %% variable $x$ and then the control continues to some promised block
 %% $B_1$.  The code that we generate for both the ``then'' and ``else''
@@ -7842,10 +7844,10 @@ the dictionary of basic blocks, labeling it as the ``start'' block.
 %% apply \code{block->goto} to it and obtain a promised goto $G_1$.  The
 %% branches of the \key{if} inherit the current context, so they are in
 %% assignment positions.  Let $B_2$ be the result of applying
-%% \code{explicate-assign} to the ``then'' branch, variable $x$, and
-%% $G_1$.  Let $B_3$ be the result of applying \code{explicate-assign} to
+%% \code{explicate\_assign} to the ``then'' branch, variable $x$, and
+%% $G_1$.  Let $B_3$ be the result of applying \code{explicate\_assign} to
 %% the ``else'' branch, variable $x$, and $G_1$. Finally, let $B_4$ be
-%% the result of applying \code{explicate-pred} to the predicate
+%% the result of applying \code{explicate\_pred} to the predicate
 %% $\itm{cnd}$ and the promises $B_2$ and $B_3$. The \key{if} as a whole
 %% translates to the promise $B_4$.
 %% \[
@@ -8004,7 +8006,7 @@ following program.
     42)  
 \end{lstlisting}
 The \code{and} operation should transform into something that the
-\code{explicate-pred} function can still analyze and descend through to
+\code{explicate\_pred} function can still analyze and descend through to
 reach the underlying \code{eq?} conditions. Ideally, your
 \code{explicate\_control} pass should generate code similar to the
 following for the above program.
@@ -8029,9 +8031,9 @@ block39:
 \begin{exercise}\normalfont
 \racket{
 Implement the pass \code{explicate\_control} by adding the cases for
-Boolean constants and \key{if} to the \code{explicate-tail} and
-\code{explicate-assign}. Implement the auxiliary function
-\code{explicate-pred} for predicate contexts.}
+Boolean constants and \key{if} to the \code{explicate\_tail} and
+\code{explicate\_assign} functions. Implement the auxiliary function
+\code{explicate\_pred} for predicate contexts.}
 \python{Implement \code{explicate\_control} pass with its
 four auxiliary functions.}
 %
@@ -8042,7 +8044,7 @@ this pass.
 Add the following entry to the list of \code{passes} in
 \code{run-tests.rkt} and then run this script to test your compiler.
 \begin{lstlisting}
-(list "explicate-control" explicate-control interp-Cif type-check-Cif)
+(list "explicate_control" explicate_control interp-Cif type-check-Cif)
 \end{lstlisting}
 \fi}
 
@@ -8166,7 +8168,7 @@ features of the \LangIf{} language.
 Add the following entry to the list of \code{passes} in
 \code{run-tests.rkt}
 \begin{lstlisting}
-(list "select-instructions" select-instructions interp-pseudo-x86-1)
+(list "select_instructions" select_instructions interp-pseudo-x86-1)
 \end{lstlisting}
 \fi}
 %
@@ -8204,8 +8206,8 @@ then we need to complete liveness analysis on those blocks
 first. These ordering contraints are the reverse of a
 \emph{topological order}\index{subject}{topological order} on the
 control-flow graph of the program~\citep{Allen:1970uq}.  In a
-\emph{control flow graph} (CFG), each node represents a \emph{basic
-block} and each edge represents a jump from one block to another
+\emph{control flow graph} (CFG), each node represents a basic
+block and each edge represents a jump from one block to another
 \index{subject}{control-flow graph}.  It is straightforward to
 generate a CFG from the dictionary of basic blocks. One then needs to
 transpose the CFG and apply the topological sort algorithm.
@@ -8278,14 +8280,13 @@ new kinds of arguments and instructions in \LangXIfVar{}.
 \begin{exercise}\normalfont
 {\if\edition\racketEd\color{olive}
 %
-Update the \code{uncover\_live} pass and implement the
-\code{uncover-live-CFG} auxiliary function to apply liveness analysis
-to the control-flow graph.
+Update the \code{uncover\_live} pass to apply liveness analysis to
+every basic block in the program.
 %
 Add the following entry to the list of \code{passes} in the
 \code{run-tests.rkt} script.
 \begin{lstlisting}
-(list "uncover-live" uncover-live interp-pseudo-x86-1)
+(list "uncover_live" uncover_live interp-pseudo-x86-1)
 \end{lstlisting}
 \fi}
 
@@ -8321,8 +8322,8 @@ Update the \code{build\_interference} pass for \LangXIfVar{}.
 Add the following entries to the list of \code{passes} in the
 \code{run-tests.rkt} script.
 \begin{lstlisting}
-(list "build-interference" build-interference interp-pseudo-x86-1)
-(list "allocate-registers" allocate-registers interp-x86-1)
+(list "build_interference" build_interference interp-pseudo-x86-1)
+(list "allocate_registers" allocate_registers interp-x86-1)
 \end{lstlisting}
 \fi}
 % Check that the interference graph that you generate for
@@ -8346,13 +8347,13 @@ The second argument of the \key{movzbq} must be a register.
 
 \begin{exercise}\normalfont
 %
-Update \code{patch-instructions} pass for \LangXIfVar{}.
+Update \code{patch\_instructions} pass for \LangXIfVar{}.
 %  
 {\if\edition\racketEd\color{olive}
 Add the following entry to the list of \code{passes} in
 \code{run-tests.rkt} and then run this script to test your compiler.
 \begin{lstlisting}
-(list "patch-instructions" patch-instructions interp-x86-1)
+(list "patch_instructions" patch_instructions interp-x86-1)
 \end{lstlisting}
 \fi}
 \end{exercise}
@@ -8559,17 +8560,17 @@ conclusion:
 \node (x86-4) at (9,-2) {\large \LangXIf{}};
 \node (x86-5) at (9,-4) {\large \LangXIf{}};
 
-\path[->,bend left=15] (Lif) edge [above] node {\ttfamily\footnotesize type-check} (Lif-2);
+\path[->,bend left=15] (Lif) edge [above] node {\ttfamily\footnotesize type\_check} (Lif-2);
 \path[->,bend left=15] (Lif-2) edge [above] node {\ttfamily\footnotesize shrink} (Lif-3);
 \path[->,bend left=15] (Lif-3) edge [above] node {\ttfamily\footnotesize uniquify} (Lif-4);
-\path[->,bend left=15] (Lif-4) edge [above] node {\ttfamily\footnotesize remove-complex.} (Lif-5);
-\path[->,bend left=15] (Lif-5) edge [left] node {\ttfamily\footnotesize explicate-control} (C1-1);
-\path[->,bend right=15] (C1-1) edge [left] node {\ttfamily\footnotesize select-instructions} (x86-2);
-\path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize uncover-live} (x86-2-1);
-\path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build-inter.} (x86-2-2);
-\path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate-reg.} (x86-3);
-\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print-x86 } (x86-5);
+\path[->,bend left=15] (Lif-4) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Lif-5);
+\path[->,bend left=15] (Lif-5) edge [left] node {\ttfamily\footnotesize explicate\_control} (C1-1);
+\path[->,bend right=15] (C1-1) edge [left] node {\ttfamily\footnotesize select\_instructions} (x86-2);
+\path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize uncover\_live} (x86-2-1);
+\path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build\_inter.} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate\_reg.} (x86-3);
+\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch\_instr.} (x86-4);
+\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print\_x86 } (x86-5);
 \end{tikzpicture}
 \fi}
 {\if\edition\pythonEd
@@ -9053,8 +9054,8 @@ block. The pass should translate from \LangXIfVar{} to \LangXIfVar{}.
 %
 {\if\edition\racketEd\color{olive}        
 In the \code{run-tests.rkt} script, add the following entry to the
-list of \code{passes} between \code{allocate-registers}
-and \code{patch-instructions}.
+list of \code{passes} between \code{allocate\_registers}
+and \code{patch\_instructions}.
 \begin{lstlisting}
 (list "remove-jumps" remove-jumps interp-pseudo-x86-1)
 \end{lstlisting}
@@ -9811,7 +9812,7 @@ must introduce a temporary variable and bind it to the complex
 expression.  This approach applies, unchanged, to handle the new
 language forms.  For example, in the following code there are two
 \code{begin} expressions appearing as arguments to \code{+}.  The
-output of \code{rco-exp} is shown below, in which the \code{begin}
+output of \code{rco\_exp} is shown below, in which the \code{begin}
 expressions have been bound to temporary variables. Recall that
 \code{let} expressions in \LangLoopANF{} are allowed to have
 arbitrary expressions in their right-hand-side expression, so it is
@@ -9873,7 +9874,7 @@ is that the control-flow graphs of the later may contain cycles.
 \label{fig:c7-syntax}
 \end{figure}
 
-The new auxiliary function \code{explicate-effect} takes an expression
+The new auxiliary function \code{explicate\_effect} takes an expression
 (in an effect position) and a promise of a continuation block. The
 function returns a promise for a $\Tail$ that includes the generated
 code for the input expression followed by the continuation block.  If
@@ -9903,7 +9904,7 @@ other two have result type \code{Void}.
 \label{sec:select-instructions-loop}
 
 Only three small additions are needed in the
-\code{select-instructions} pass to handle the changes to \LangCLoop{}.  That
+\code{select\_instructions} pass to handle the changes to \LangCLoop{}.  That
 is, \code{Call}, \code{read}, and \code{vector-set!} may now appear as
 stand-alone statements instead of only appearing on the right-hand
 side of an assignment statement. The code generation is nearly
@@ -9924,7 +9925,7 @@ allocation.
 We recommend using the generic \code{analyze-dataflow} function that
 was presented at the end of Section~\ref{sec:dataflow-analysis} to
 perform liveness analysis, replacing the code in
-\code{uncover-live-CFG} that processed the basic blocks in topological
+\code{uncover\_live} that processed the basic blocks in topological
 order (Section~\ref{sec:liveness-analysis-Lif}).
 
 The \code{analyze-dataflow} function has four parameters.
@@ -9976,29 +9977,29 @@ The \code{analyze-dataflow} function has four parameters.
 \path[->,bend left=15] (Rfun-2) edge [above] node
      {\ttfamily\footnotesize uniquify} (Rfun-3);
 \path[->,bend left=15] (Rfun-3) edge [above] node
-     {\ttfamily\footnotesize reveal-functions} (Rfun-4);
+     {\ttfamily\footnotesize reveal\_functions} (Rfun-4);
 \path[->,bend left=15] (Rfun-4) edge [right] node
-     {\ttfamily\footnotesize convert-assignments} (F1-1);
+     {\ttfamily\footnotesize convert\_assignments} (F1-1);
 \path[->,bend left=15] (F1-1) edge [below] node
-     {\ttfamily\footnotesize convert-to-clos.} (F1-2);
+     {\ttfamily\footnotesize convert\_to\_clos.} (F1-2);
 \path[->,bend right=15] (F1-2) edge [above] node
-     {\ttfamily\footnotesize limit-fun.} (F1-3);
+     {\ttfamily\footnotesize limit\_fun.} (F1-3);
 \path[->,bend right=15] (F1-3) edge [above] node
      {\ttfamily\footnotesize expose-alloc.} (F1-4);
 \path[->,bend right=15] (F1-4) edge [above] node
-     {\ttfamily\footnotesize remove-complex.} (F1-5);
+     {\ttfamily\footnotesize remove\_complex.} (F1-5);
 \path[->,bend right=15] (F1-5) edge [right] node
-     {\ttfamily\footnotesize explicate-control} (C3-2);
+     {\ttfamily\footnotesize explicate\_control} (C3-2);
 \path[->,bend left=15] (C3-2) edge [left] node
-     {\ttfamily\footnotesize select-instr.} (x86-2);
+     {\ttfamily\footnotesize select\_instr.} (x86-2);
 \path[->,bend right=15] (x86-2) edge [left] node
-     {\ttfamily\footnotesize uncover-live} (x86-2-1);
+     {\ttfamily\footnotesize uncover\_live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node 
-     {\ttfamily\footnotesize build-inter.} (x86-2-2);
+     {\ttfamily\footnotesize build\_inter.} (x86-2-2);
 \path[->,bend right=15] (x86-2-2) edge [left] node
-     {\ttfamily\footnotesize allocate-reg.} (x86-3);
+     {\ttfamily\footnotesize allocate\_reg.} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node
-     {\ttfamily\footnotesize patch-instr.} (x86-4);
+     {\ttfamily\footnotesize patch\_instr.} (x86-4);
 \path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print-x86} (x86-5);
 \end{tikzpicture}
   \caption{Diagram of the passes for \LangLoop{} (loops and assignment).}
@@ -10262,7 +10263,7 @@ injected to \code{Any}. For the \code{any-vector-length} operator, the
 generated code should test whether the tag is for tuples (\code{010})
 or arrays (\code{110}) and then dispatch to either
 \code{any-vector-length} or \code{any-vectorof-length}.  For the later
-we add a case in \code{select-instructions} to generate the
+we add a case in \code{select\_instructions} to generate the
 appropriate instructions for accessing the array length from the
 header of an array.
 
@@ -10291,14 +10292,14 @@ the array.
 
 \subsection{Remove Complex Operands}
 
-Add cases in the \code{rco-atom} and \code{rco-exp} for
+Add cases in the \code{rco\_atom} and \code{rco\_exp} for
 \code{AllocateArray}. In particular, an \code{AllocateArray} node is
 complex and its subexpression must be atomic.
 
 \subsection{Explicate Control}
 
-Add cases for \code{AllocateArray} to \code{explicate-tail} and
-\code{explicate-assign}.
+Add cases for \code{AllocateArray} to \code{explicate\_tail} and
+\code{explicate\_assign}.
 
 \subsection{Select Instructions}
 
@@ -10939,8 +10940,8 @@ succeed.
 The introduction of garbage collection has a non-trivial impact on our
 compiler passes. We introduce a new compiler pass named
 \code{expose-allocation}. We make
-significant changes to \code{select-instructions},
-\code{build-interference}, \code{allocate-registers}, and
+significant changes to \code{select\_instructions},
+\code{build\_interference}, \code{allocate\_registers}, and
 \code{print\_x86} and make minor changes in several more passes.  The
 following program will serve as our running example.  It creates two
 tuples, one nested inside the other. Both tuples have length one. The
@@ -10986,7 +10987,7 @@ of the \code{vector} form.
 \]
 The $(\key{collect}\,n)$ form runs the garbage collector, requesting
 $n$ bytes. It will become a call to the \code{collect} function in
-\code{runtime.c} in \code{select-instructions}.  The
+\code{runtime.c} in \code{select\_instructions}.  The
 $(\key{allocate}\,n\,T)$ form creates an tuple of $n$ elements.
 \index{subject}{allocate}
 The $T$ parameter is the type of the tuple: \code{(Vector $\Type_1 \ldots
@@ -11198,7 +11199,7 @@ movq |$\itm{arg}'$|, |$8(n+1)$|(%rax)
 movq $0, |$\itm{lhs}'$|
 \end{lstlisting}
 Next, suppose that $\itm{arg}'$ ends up as a stack location, so
-\code{patch-instructions} would insert a move through \code{rax}
+\code{patch\_instructions} would insert a move through \code{rax}
 as follows.
 \begin{lstlisting}
 movq |$\itm{vec}'$|, %rax
@@ -11287,7 +11288,7 @@ differs from \LangXIf{} just in the addition of the form for global
 variables.
 %
 Figure~\ref{fig:select-instr-output-gc} shows the output of the
-\code{select-instructions} pass on the running example.
+\code{select\_instructions} pass on the running example.
 
 \begin{figure}[tbp]
 \centering
@@ -11354,7 +11355,7 @@ block40:
     jmp block38
 \end{lstlisting}
 \end{minipage}
-\caption{Output of the \code{select-instructions} pass.}
+\caption{Output of the \code{select\_instructions} pass.}
 \label{fig:select-instr-output-gc}
 \end{figure}
 
@@ -11380,7 +11381,7 @@ interference graph, by adding interference edges between the call-live
 vector-typed variables and all the callee-saved registers. (They
 already interfere with the caller-saved registers.)  The type
 information for variables is in the \code{Program} form, so we
-recommend adding another parameter to the \code{build-interference}
+recommend adding another parameter to the \code{build\_interference}
 function to communicate this alist.
 
 The spilling of vector-typed variables to the root stack can be
@@ -11537,15 +11538,15 @@ conclusion:
 %\path[->,bend left=15] (Rvec) edge [above] node {\ttfamily\footnotesize type-check} (Rvec-2);
 \path[->,bend left=15] (Rvec) edge [above] node {\ttfamily\footnotesize shrink} (Rvec-2);
 \path[->,bend left=15] (Rvec-2) edge [above] node {\ttfamily\footnotesize uniquify} (Rvec-3);
-\path[->,bend left=15] (Rvec-3) edge [above] node {\ttfamily\footnotesize expose-alloc.} (Rvec-4);
-\path[->,bend left=15] (Rvec-4) edge [above] node {\ttfamily\footnotesize remove-complex.} (Rvec-5);
-\path[->,bend left=20] (Rvec-5) edge [left] node {\ttfamily\footnotesize explicate-control} (C2-4);
-\path[->,bend left=15] (C2-4) edge [right] node {\ttfamily\footnotesize select-instr.} (x86-2);
-\path[->,bend right=15] (x86-2) edge [left] node {\ttfamily\footnotesize uncover-live} (x86-2-1);
-\path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build-inter.} (x86-2-2);
-\path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate-reg.} (x86-3);
-\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch-instr.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print-x86} (x86-5);
+\path[->,bend left=15] (Rvec-3) edge [above] node {\ttfamily\footnotesize expose\_alloc.} (Rvec-4);
+\path[->,bend left=15] (Rvec-4) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Rvec-5);
+\path[->,bend left=20] (Rvec-5) edge [left] node {\ttfamily\footnotesize explicate\_control} (C2-4);
+\path[->,bend left=15] (C2-4) edge [right] node {\ttfamily\footnotesize select\_instr.} (x86-2);
+\path[->,bend right=15] (x86-2) edge [left] node {\ttfamily\footnotesize uncover\_live} (x86-2-1);
+\path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build\_inter.} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate\_reg.} (x86-3);
+\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch\_instr.} (x86-4);
+\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print\_x86} (x86-5);
 \end{tikzpicture}
 \caption{Diagram of the passes for \LangVec{}, a language with tuples.}
 \label{fig:Rvec-passes}
@@ -12545,7 +12546,7 @@ register allocator control over which registers or stack locations to
 use for them. If you implemented the move-biasing challenge
 (Section~\ref{sec:move-biasing}), the register allocator will try to
 assign the parameter variables to the corresponding argument register,
-in which case the \code{patch-instructions} pass will remove the
+in which case the \code{patch\_instructions} pass will remove the
 \code{movq} instruction. This happens in the example translation in
 Figure~\ref{fig:add-fun} of Section~\ref{sec:functions-example}, in
 the \code{add} function.
@@ -12638,7 +12639,7 @@ need to revisit this issue. Many functions perform allocation and
 therefore have calls to the collector inside of them. Thus, we should
 not only spill a vector-typed variable when it is live during a call
 to \code{collect}, but we should spill the variable if it is live
-during any function call. Thus, in the \code{build-interference} pass,
+during any function call. Thus, in the \code{build\_interference} pass,
 we recommend adding interference edges between call-live vector-typed
 variables and the callee-saved registers (in addition to the usual
 addition of edges between call-live variables and the caller-saved
@@ -12647,7 +12648,7 @@ registers).
 
 \subsection{Allocate Registers}
 
-The primary change to the \code{allocate-registers} pass is adding an
+The primary change to the \code{allocate\_registers} pass is adding an
 auxiliary function for handling definitions (the \Def{} non-terminal
 in Figure~\ref{fig:x86-3}) with one case for function definitions. The
 logic is the same as described in
@@ -12658,7 +12659,7 @@ instead of just once for the whole program.
 
 \section{Patch Instructions}
 
-In \code{patch-instructions}, you should deal with the x86
+In \code{patch\_instructions}, you should deal with the x86
 idiosyncrasy that the destination argument of \code{leaq} must be a
 register. Additionally, you should ensure that the argument of
 \code{TailJmp} is \itm{rax}, our reserved register---this is to make
@@ -12756,25 +12757,25 @@ previously created test programs.
 \path[->,bend left=15] (Rfun-1) edge [above] node
      {\ttfamily\footnotesize uniquify} (Rfun-2);
 \path[->,bend left=15] (Rfun-2) edge [right] node
-     {\ttfamily\footnotesize ~~reveal-functions} (F1-1);
+     {\ttfamily\footnotesize ~~reveal\_functions} (F1-1);
 \path[->,bend left=15] (F1-1) edge [below] node
-     {\ttfamily\footnotesize limit-functions} (F1-2);
+     {\ttfamily\footnotesize limit\_functions} (F1-2);
 \path[->,bend right=15] (F1-2) edge [above] node
-     {\ttfamily\footnotesize expose-alloc.} (F1-3);
+     {\ttfamily\footnotesize expose\_alloc.} (F1-3);
 \path[->,bend right=15] (F1-3) edge [above] node
-     {\ttfamily\footnotesize remove-complex.} (F1-4);
+     {\ttfamily\footnotesize remove\_complex.} (F1-4);
 \path[->,bend left=15] (F1-4) edge [right] node
-     {\ttfamily\footnotesize explicate-control} (C3-2);
+     {\ttfamily\footnotesize explicate\_control} (C3-2);
 \path[->,bend right=15] (C3-2) edge [left] node
-     {\ttfamily\footnotesize select-instr.} (x86-2);
+     {\ttfamily\footnotesize select\_instr.} (x86-2);
 \path[->,bend left=15] (x86-2) edge [left] node
-     {\ttfamily\footnotesize uncover-live} (x86-2-1);
+     {\ttfamily\footnotesize uncover\_live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node 
-     {\ttfamily\footnotesize build-inter.} (x86-2-2);
+     {\ttfamily\footnotesize build\_inter.} (x86-2-2);
 \path[->,bend right=15] (x86-2-2) edge [left] node
-     {\ttfamily\footnotesize allocate-reg.} (x86-3);
+     {\ttfamily\footnotesize allocate\_reg.} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node
-     {\ttfamily\footnotesize patch-instr.} (x86-4);
+     {\ttfamily\footnotesize patch\_instr.} (x86-4);
 \path[->,bend right=15] (x86-4) edge [left] node {\ttfamily\footnotesize print-x86} (x86-5);
 \end{tikzpicture}
 \caption{Diagram of the passes for \LangFun{}, a language with functions.}
@@ -12789,7 +12790,7 @@ compiling \LangFun{} to x86.
 
 Figure~\ref{fig:add-fun} shows an example translation of a simple
 function in \LangFun{} to x86. The figure also includes the results of the
-\code{explicate\_control} and \code{select-instructions} passes.
+\code{explicate\_control} and \code{select\_instructions} passes.
 
 \begin{figure}[htbp]
 \begin{tabular}{ll}
@@ -13435,29 +13436,29 @@ extract the $5$-bits starting at position $58$ from the tag.
 \path[->,bend left=15] (Rfun-2) edge [above] node
      {\ttfamily\footnotesize uniquify} (Rfun-3);
 \path[->,bend left=15] (Rfun-3) edge [right] node
-     {\ttfamily\footnotesize reveal-functions} (F1-1);
+     {\ttfamily\footnotesize reveal\_functions} (F1-1);
 \path[->,bend left=15] (F1-1) edge [below] node
-     {\ttfamily\footnotesize convert-to-clos.} (F1-2);
+     {\ttfamily\footnotesize convert\_to\_clos.} (F1-2);
 \path[->,bend right=15] (F1-2) edge [above] node
-     {\ttfamily\footnotesize limit-fun.} (F1-3);
+     {\ttfamily\footnotesize limit\_fun.} (F1-3);
 \path[->,bend right=15] (F1-3) edge [above] node
-     {\ttfamily\footnotesize expose-alloc.} (F1-4);
+     {\ttfamily\footnotesize expose\_alloc.} (F1-4);
 \path[->,bend right=15] (F1-4) edge [above] node
-     {\ttfamily\footnotesize remove-complex.} (F1-5);
+     {\ttfamily\footnotesize remove\_complex.} (F1-5);
 \path[->,bend right=15] (F1-5) edge [right] node
-     {\ttfamily\footnotesize explicate-control} (C3-2);
+     {\ttfamily\footnotesize explicate\_control} (C3-2);
 \path[->,bend left=15] (C3-2) edge [left] node
-     {\ttfamily\footnotesize select-instr.} (x86-2);
+     {\ttfamily\footnotesize select\_instr.} (x86-2);
 \path[->,bend right=15] (x86-2) edge [left] node
-     {\ttfamily\footnotesize uncover-live} (x86-2-1);
+     {\ttfamily\footnotesize uncover\_live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node 
-     {\ttfamily\footnotesize build-inter.} (x86-2-2);
+     {\ttfamily\footnotesize build\_inter.} (x86-2-2);
 \path[->,bend right=15] (x86-2-2) edge [left] node
-     {\ttfamily\footnotesize allocate-reg.} (x86-3);
+     {\ttfamily\footnotesize allocate\_reg.} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node
-     {\ttfamily\footnotesize patch-instr.} (x86-4);
+     {\ttfamily\footnotesize patch\_instr.} (x86-4);
 \path[->,bend left=15] (x86-4) edge [right] node
-     {\ttfamily\footnotesize print-x86} (x86-5);
+     {\ttfamily\footnotesize print\_x86} (x86-5);
 \end{tikzpicture}
   \caption{Diagram of the passes for \LangLam{}, a language with lexically-scoped
   functions.}
@@ -14466,7 +14467,7 @@ of an integer, as in \LangCVec{} (Figure~\ref{fig:c2-syntax}).
 \section{Select Instructions}
 \label{sec:select-Rany}
 
-In the \code{select-instructions} pass we translate the primitive
+In the \code{select\_instructions} pass we translate the primitive
 operations on the \code{Any} type to x86 instructions that involve
 manipulating the 3 tag bits of the tagged value.
 
@@ -14595,7 +14596,7 @@ register allocation.  In particular,
 \begin{itemize}
 \item If a variable of type \code{Any} is live during a function call,
   then it must be spilled. This can be accomplished by changing
-  \code{build-interference} to mark all variables of type \code{Any}
+  \code{build\_interference} to mark all variables of type \code{Any}
   that are live after a \code{callq} as interfering with all the
   registers.
 
@@ -14661,36 +14662,36 @@ completion without error.
 \path[->,bend left=15] (Rfun-2) edge [above] node
      {\ttfamily\footnotesize uniquify} (Rfun-3);
 \path[->,bend left=15] (Rfun-3) edge [above] node
-     {\ttfamily\footnotesize reveal-functions} (Rfun-4);
+     {\ttfamily\footnotesize reveal\_functions} (Rfun-4);
 \path[->,bend right=15] (Rfun-4) edge [left] node
-     {\ttfamily\footnotesize cast-insert} (Rfun-5);
+     {\ttfamily\footnotesize cast\_insert} (Rfun-5);
 \path[->,bend left=15] (Rfun-5) edge [above] node
-     {\ttfamily\footnotesize check-bounds} (Rfun-6);
+     {\ttfamily\footnotesize check\_bounds} (Rfun-6);
 \path[->,bend left=15] (Rfun-6) edge [left] node
-     {\ttfamily\footnotesize reveal-casts} (Rfun-7);
+     {\ttfamily\footnotesize reveal\_casts} (Rfun-7);
      
 \path[->,bend left=15] (Rfun-7) edge [below] node
-     {\ttfamily\footnotesize convert-to-clos.} (F1-2);
+     {\ttfamily\footnotesize convert\_to\_clos.} (F1-2);
 \path[->,bend right=15] (F1-2) edge [above] node
-     {\ttfamily\footnotesize limit-fun.} (F1-3);
+     {\ttfamily\footnotesize limit\_fun.} (F1-3);
 \path[->,bend right=15] (F1-3) edge [above] node
-     {\ttfamily\footnotesize expose-alloc.} (F1-4);
+     {\ttfamily\footnotesize expose\_alloc.} (F1-4);
 \path[->,bend right=15] (F1-4) edge [above] node
-     {\ttfamily\footnotesize remove-complex.} (F1-5);
+     {\ttfamily\footnotesize remove\_complex.} (F1-5);
 \path[->,bend right=15] (F1-5) edge [right] node
-     {\ttfamily\footnotesize explicate-control} (C3-2);
+     {\ttfamily\footnotesize explicate\_control} (C3-2);
 \path[->,bend left=15] (C3-2) edge [left] node
-     {\ttfamily\footnotesize select-instr.} (x86-2);
+     {\ttfamily\footnotesize select\_instr.} (x86-2);
 \path[->,bend right=15] (x86-2) edge [left] node
-     {\ttfamily\footnotesize uncover-live} (x86-2-1);
+     {\ttfamily\footnotesize uncover\_live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node 
-     {\ttfamily\footnotesize build-inter.} (x86-2-2);
+     {\ttfamily\footnotesize build\_inter.} (x86-2-2);
 \path[->,bend right=15] (x86-2-2) edge [left] node
-     {\ttfamily\footnotesize allocate-reg.} (x86-3);
+     {\ttfamily\footnotesize allocate\_reg.} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node
-     {\ttfamily\footnotesize patch-instr.} (x86-4);
+     {\ttfamily\footnotesize patch\_instr.} (x86-4);
 \path[->,bend left=15] (x86-4) edge [right] node
-     {\ttfamily\footnotesize print-x86} (x86-5);
+     {\ttfamily\footnotesize print\_x86} (x86-5);
 \end{tikzpicture}
   \caption{Diagram of the passes for \LangDyn{}, a dynamically typed language.}
 \label{fig:Rdyn-passes}
@@ -15671,7 +15672,7 @@ operations on the \code{PVector} type.
 \section{Select Instructions}
 \label{sec:select-instructions-gradual}
 
-Recall that the \code{select-instructions} pass is responsible for
+Recall that the \code{select\_instructions} pass is responsible for
 lowering the primitive operations into x86 instructions.  So we need
 to translate the new \code{PVector} operations to x86.  To do so, the
 first question we need to answer is how will we differentiate the two
@@ -15790,41 +15791,41 @@ be translated in a similar way.
 
 
 \path[->,bend right=15] (Rgradual) edge [above] node
-     {\ttfamily\footnotesize type-check} (Rgradualp);
+     {\ttfamily\footnotesize type\_check} (Rgradualp);
 \path[->,bend right=15] (Rgradualp) edge [above] node
-     {\ttfamily\footnotesize lower-casts} (Rwhilepp);
+     {\ttfamily\footnotesize lower\_casts} (Rwhilepp);
 \path[->,bend right=15] (Rwhilepp) edge [right] node
-     {\ttfamily\footnotesize differentiate-proxies} (Rwhileproxy);
+     {\ttfamily\footnotesize differentiate\_proxies} (Rwhileproxy);
 \path[->,bend left=15] (Rwhileproxy) edge [above] node
      {\ttfamily\footnotesize shrink} (Rwhileproxy-2);
 \path[->,bend left=15] (Rwhileproxy-2) edge [above] node
      {\ttfamily\footnotesize uniquify} (Rwhileproxy-3);
 \path[->,bend left=15] (Rwhileproxy-3) edge [above] node
-     {\ttfamily\footnotesize reveal-functions} (Rwhileproxy-4);
+     {\ttfamily\footnotesize reveal\_functions} (Rwhileproxy-4);
 \path[->,bend left=15] (Rwhileproxy-4) edge [above] node
-     {\ttfamily\footnotesize reveal-casts} (Rwhileproxy-5);
+     {\ttfamily\footnotesize reveal\_casts} (Rwhileproxy-5);
 \path[->,bend left=15] (Rwhileproxy-5) edge [left] node
-     {\ttfamily\footnotesize convert-assignments} (F1-1);
+     {\ttfamily\footnotesize convert\_assignments} (F1-1);
 \path[->,bend left=15] (F1-1) edge [below] node
-     {\ttfamily\footnotesize convert-to-clos.} (F1-2);
+     {\ttfamily\footnotesize convert\_to\_clos.} (F1-2);
 \path[->,bend right=15] (F1-2) edge [above] node
-     {\ttfamily\footnotesize limit-fun.} (F1-3);
+     {\ttfamily\footnotesize limit\_fun.} (F1-3);
 \path[->,bend right=15] (F1-3) edge [above] node
-     {\ttfamily\footnotesize expose-alloc.} (F1-4);
+     {\ttfamily\footnotesize expose\_alloc.} (F1-4);
 \path[->,bend right=15] (F1-4) edge [above] node
-     {\ttfamily\footnotesize remove-complex.} (F1-5);
+     {\ttfamily\footnotesize remove\_complex.} (F1-5);
 \path[->,bend right=15] (F1-5) edge [right] node
-     {\ttfamily\footnotesize explicate-control} (C3-2);
+     {\ttfamily\footnotesize explicate\_control} (C3-2);
 \path[->,bend left=15] (C3-2) edge [left] node
-     {\ttfamily\footnotesize select-instr.} (x86-2);
+     {\ttfamily\footnotesize select\_instr.} (x86-2);
 \path[->,bend right=15] (x86-2) edge [left] node
-     {\ttfamily\footnotesize uncover-live} (x86-2-1);
+     {\ttfamily\footnotesize uncover\_live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node 
-     {\ttfamily\footnotesize build-inter.} (x86-2-2);
+     {\ttfamily\footnotesize build\_inter.} (x86-2-2);
 \path[->,bend right=15] (x86-2-2) edge [left] node
-     {\ttfamily\footnotesize allocate-reg.} (x86-3);
+     {\ttfamily\footnotesize allocate\_reg.} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node
-     {\ttfamily\footnotesize patch-instr.} (x86-4);
+     {\ttfamily\footnotesize patch\_instr.} (x86-4);
 \path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print-x86} (x86-5);
 \end{tikzpicture}
   \caption{Diagram of the passes for \LangGrad{} (gradual typing).}
@@ -16462,44 +16463,44 @@ annotations and the body.
 
 
 \path[->,bend right=15] (Rpoly) edge [above] node
-     {\ttfamily\footnotesize type-check} (Rpolyp);
+     {\ttfamily\footnotesize type\_check} (Rpolyp);
 \path[->,bend right=15] (Rpolyp) edge [above] node
-     {\ttfamily\footnotesize erase-types} (Rgradualp);
+     {\ttfamily\footnotesize erase\_types} (Rgradualp);
 \path[->,bend right=15] (Rgradualp) edge [above] node
-     {\ttfamily\footnotesize lower-casts} (Rwhilepp);
+     {\ttfamily\footnotesize lower\_casts} (Rwhilepp);
 \path[->,bend right=15] (Rwhilepp) edge [right] node
-     {\ttfamily\footnotesize differentiate-proxies} (Rwhileproxy);
+     {\ttfamily\footnotesize differentiate\_proxies} (Rwhileproxy);
 \path[->,bend left=15] (Rwhileproxy) edge [above] node
      {\ttfamily\footnotesize shrink} (Rwhileproxy-2);
 \path[->,bend left=15] (Rwhileproxy-2) edge [above] node
      {\ttfamily\footnotesize uniquify} (Rwhileproxy-3);
 \path[->,bend left=15] (Rwhileproxy-3) edge [above] node
-     {\ttfamily\footnotesize reveal-functions} (Rwhileproxy-4);
+     {\ttfamily\footnotesize reveal\_functions} (Rwhileproxy-4);
 \path[->,bend left=15] (Rwhileproxy-4) edge [above] node
-     {\ttfamily\footnotesize reveal-casts} (Rwhileproxy-5);
+     {\ttfamily\footnotesize reveal\_casts} (Rwhileproxy-5);
 \path[->,bend left=15] (Rwhileproxy-5) edge [left] node
-     {\ttfamily\footnotesize convert-assignments} (F1-1);
+     {\ttfamily\footnotesize convert\_assignments} (F1-1);
 \path[->,bend left=15] (F1-1) edge [below] node
-     {\ttfamily\footnotesize convert-to-clos.} (F1-2);
+     {\ttfamily\footnotesize convert\_to\_clos.} (F1-2);
 \path[->,bend right=15] (F1-2) edge [above] node
-     {\ttfamily\footnotesize limit-fun.} (F1-3);
+     {\ttfamily\footnotesize limit\_fun.} (F1-3);
 \path[->,bend right=15] (F1-3) edge [above] node
-     {\ttfamily\footnotesize expose-alloc.} (F1-4);
+     {\ttfamily\footnotesize expose\_alloc.} (F1-4);
 \path[->,bend right=15] (F1-4) edge [above] node
-     {\ttfamily\footnotesize remove-complex.} (F1-5);
+     {\ttfamily\footnotesize remove\_complex.} (F1-5);
 \path[->,bend right=15] (F1-5) edge [right] node
-     {\ttfamily\footnotesize explicate-control} (C3-2);
+     {\ttfamily\footnotesize explicate\_control} (C3-2);
 \path[->,bend left=15] (C3-2) edge [left] node
-     {\ttfamily\footnotesize select-instr.} (x86-2);
+     {\ttfamily\footnotesize select\_instr.} (x86-2);
 \path[->,bend right=15] (x86-2) edge [left] node
-     {\ttfamily\footnotesize uncover-live} (x86-2-1);
+     {\ttfamily\footnotesize uncover\_live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node 
-     {\ttfamily\footnotesize build-inter.} (x86-2-2);
+     {\ttfamily\footnotesize build\_inter.} (x86-2-2);
 \path[->,bend right=15] (x86-2-2) edge [left] node
-     {\ttfamily\footnotesize allocate-reg.} (x86-3);
+     {\ttfamily\footnotesize allocate\_reg.} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node
-     {\ttfamily\footnotesize patch-instr.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print-x86} (x86-5);
+     {\ttfamily\footnotesize patch\_instr.} (x86-4);
+\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print\_x86} (x86-5);
 \end{tikzpicture}
   \caption{Diagram of the passes for \LangPoly{} (parametric polymorphism).}
 \label{fig:Rpoly-passes}
