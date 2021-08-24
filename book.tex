@@ -2696,8 +2696,9 @@ language, which extends \LangXInt{} with an unbounded number of
 program-scope variables and removes the restrictions regarding
 instruction arguments.
 %
-The last pass, \key{print\_x86}, converts from the abstract syntax of
-\LangXInt{} to the concrete syntax.
+The last pass, \key{prelude\_and\_conclusion}, places the program
+instructions inside a \code{main} function with instructions for the
+prelude and conclusion.
 %
 \racket{In the following section we discuss the \LangCVar{}
   intermediate language.}
@@ -3614,28 +3615,14 @@ programs.
 \end{exercise}
 
 
-\section{Print x86}
+\section{Generate Prelude and Conclusion}
 \label{sec:print-x86}
+\index{subject}{prelude}\index{subject}{conclusion}
 
-The last step of the compiler from \LangVar{} to x86 is to convert the
-\LangXInt{} AST (defined in Figure~\ref{fig:x86-int-ast}) to the
-string representation (defined in
-Figure~\ref{fig:x86-int-concrete}).
-%
-\racket{The Racket \key{format} and \key{string-append} functions are
-  useful in this regard.}
-%
-This pass creates the \key{main} function and the standard
-instructions for its prelude and conclusion, as shown in
-Figure~\ref{fig:p1-x86} of Section~\ref{sec:x86}. You will need to
-know the amount of space needed for the stack frame, which you can
-obtain from the
-%
-\racket{\code{stack-space} entry in the $\itm{info}$ field}
-%
-\python{\code{stack\_space} field}
-%
-of the \key{X86Program} node.
+The last step of the compiler from \LangVar{} to x86 is to generate
+the \code{main} function with a prelude and conclusion wrapped around
+the rest of the program, as shown in Figure~\ref{fig:p1-x86} and
+discussed in Section~\ref{sec:x86}.
 
 When running on Mac OS X, your compiler should prefix an underscore to
 all labels, e.g., changing \key{main} to \key{\_main}.
@@ -3650,25 +3637,33 @@ all labels, e.g., changing \key{main} to \key{\_main}.
 
 \begin{exercise}\normalfont
 %
-Implement the \key{print\_x86} pass in \racket{\code{compiler.rkt}}\python{\code{compiler.py}}.
+Implement the \key{prelude\_and\_conclusion} pass in
+\racket{\code{compiler.rkt}}\python{\code{compiler.py}}.
 %
 {\if\edition\racketEd
 In the \code{run-tests.rkt} script, add the following entry to the
 list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
-(list "print x86" print-x86 #f)
+(list "prelude and conclusion" prelude-and-conclusion interp_x86-0)
 \end{lstlisting}
 %  
 Uncomment the call to the \key{compiler-tests} function
 (Appendix~\ref{appendix:utilities}), which tests your complete
-compiler by executing the generated x86 code. Compile the provided
-\key{runtime.c} file to \key{runtime.o} using \key{gcc}. Run the
-script to test your compiler.
+compiler by executing the generated x86 code. It translates the x86
+AST that you produce into a string by invoking the \code{print-x86}
+method of the \code{print-x86-class} in \code{utilities.rkt}. Compile
+the provided \key{runtime.c} file to \key{runtime.o} using
+\key{gcc}. Run the script to test your compiler.
+%
 \fi}
 {\if\edition\pythonEd
-Run the \code{run-tests.py} script to to check
-whether the output programs produce the same result as the input
-programs.
+%
+Run the \code{run-tests.py} script to to check whether the output
+programs produce the same result as the input programs. That script
+translates the x86 AST that you produce into a string by invoking the
+\code{repr} method that is implemented by the x86 AST classes in
+\code{x86\_ast.py}.
+%
 \fi}
 
 \end{exercise}
@@ -10848,16 +10843,17 @@ stack.
 
 
 
-\section{Print x86}
+\section{Generate Prelude and Conclusion}
 \label{sec:print-x86-gc}
+\label{sec:prelude-conclusion-x86-gc}
 \index{subject}{prelude}\index{subject}{conclusion}
 
 Figure~\ref{fig:print-x86-output-gc} shows the output of the
-\code{print\_x86} pass on the running example. In the prelude and
-conclusion of the \code{main} function, we treat the root stack very
-much like the regular stack in that we move the root stack pointer
-(\code{r15}) to make room for the spills to the root stack, except
-that the root stack grows up instead of down.  For the running
+\code{prelude\_and\_conclusion} pass on the running example. In the
+prelude and conclusion of the \code{main} function, we treat the root
+stack very much like the regular stack in that we move the root stack
+pointer (\code{r15}) to make room for the spills to the root stack,
+except that the root stack grows up instead of down.  For the running
 example, there was just one spill so we increment \code{r15} by 8
 bytes. In the conclusion we decrement \code{r15} by 8 bytes.
 
