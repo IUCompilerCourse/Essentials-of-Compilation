@@ -22,7 +22,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{1}
+\def\edition{0}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd{#1}\fi}}
@@ -1809,38 +1809,41 @@ $52$ then $10$, the following produces $42$ (not $-42$).
 \subsection{Extensible Interpreters via Method Overriding}
 \label{sec:extensible-interp}
 
-To prepare for discussing the interpreter for \LangVar{}, we 
-explain why we to implement the interpreter using
-object-oriented programming, that is, as a collection of methods
-inside of a class. Throughout this book we define many interpreters,
-one for each of the languages that we study. Because each language
-builds on the prior one, there is a lot of commonality between these
-interpreters. We want to write down the common parts just once
-instead of many times. A naive approach would be to have, for example,
-the interpreter for \LangIf{} handle all of the new features in that
-language and then have a default case that dispatches to the
-interpreter for \LangVar{}. The following code sketches this idea.
+To prepare for discussing the interpreter for \LangVar{}, we explain
+why we to implement the interpreter using object-oriented programming,
+that is, as a collection of methods inside of a class. Throughout this
+book we define many interpreters, one for each of the languages that
+we study. Because each language builds on the prior one, there is a
+lot of commonality between these interpreters. We want to write down
+the common parts just once instead of many times. A naive approach
+would be to have, for example, the interpreter for \LangVar{} handle
+the cases for variables and \code{let} and then have a default case
+that dispatches to the interpreter for \LangInt{}. The following code
+sketches this idea. (We explain the \code{env} parameter soon, in
+Section~\ref{sec:interp-Lvar}.)
+
 \begin{center}
 {\if\edition\racketEd  
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-(define (interp_Lvar_exp e)
+(define ((interp_Lint env) e)
   (match e
     [(Prim '- (list e1))
-     (fx- 0 (interp_Lvar_exp e1))]
+     (fx- 0 ((interp_Lint env) e1))]
     ...))
 \end{lstlisting}
 \end{minipage}
 \begin{minipage}{0.45\textwidth}
   \begin{lstlisting}
-(define (interp_Lif_exp e)
+(define ((interp_Lvar env) e)
   (match e
-    [(If cnd thn els)
-     (match (interp_Lif_exp cnd)
-       [#t (interp_Lif_exp thn)]
-       [#f (interp_Lif_exp els)])]
-    ...
-    [else (interp_Lvar_exp e)]))    
+    [(Var x)
+     (dict-ref env x)]
+    [(Let x e body)
+     (define v ((interp_exp env) e))
+     (define env^ (dict-set env x v))
+     ((interp_exp env^) body)]
+    [else ((interp_Lint env) e)]))    
 \end{lstlisting}
 \end{minipage}
 \fi}
@@ -1848,50 +1851,50 @@ interpreter for \LangVar{}. The following code sketches this idea.
 {\if\edition\pythonEd
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-def interp_Lvar_exp(e):
+def interp_Lint(e):
   match e:
     case UnaryOp(USub(), e1):
-       return - interp_Lvar_exp(e1)
+       return - interp_Lint(e1)
     ...
 \end{lstlisting}
 \end{minipage}
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-def interp_Lif_exp(e):
+def interp_Lvar(e):
   match e:
     case IfExp(cnd, thn, els):
-      match interp_Lif_exp(cnd):
+      match interp_Lvar(cnd):
         case True:
-          return interp_Lif_exp(thn)
+          return interp_Lvar(thn)
         case False:
-          return interp_Lif_exp(els)
+          return interp_Lvar(els)
     ...
     case _:
-      return interp_Lvar_exp(e)
+      return interp_Lint(e)
 \end{lstlisting}
 \end{minipage}
 \fi}
 \end{center}
 The problem with this approach is that it does not handle situations
-in which an \LangIf{} feature, such as a conditional expression, is
-nested inside an \LangVar{} feature, like the \code{-} operator, as in
-the following program.
-{\if\edition\racketEd  
+in which an \LangVar{} feature, such as a variable, is nested inside
+an \LangInt{} feature, like the \code{-} operator, as in the following
+program.  {\if\edition\racketEd
 \begin{lstlisting}
-(Prim '- (list (If (Bool #t) (Int 42) (Int 0))))
+(Let 'y (Int 10) (Prim '- (list (Var 'y))))
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
-\begin{lstlisting}
-print(-(42 if True else 0))
+  \begin{lstlisting}
+y = 10 
+print(-y)
 \end{lstlisting}
 \fi}
 %
-If we invoke \code{interp\_Lif\_exp} on this program, it dispatches to
-\code{interp\_Lvar\_exp} to handle the \code{-} operator, but then it
-recursively calls \code{interp\_Lvar\_exp} again on the argument of
-\code{-}, which is an \code{If}.  But there is no case for \code{If}
-in \code{interp\_Lvar\_exp} so we get an error!
+If we invoke \code{interp\_Lvar} on this program, it dispatches to
+\code{interp\_Lint} to handle the \code{-} operator, but then it
+recursively calls \code{interp\_Lint} again on the argument of
+\code{-}, which is a \code{Var}.  But there is no case for \code{Var}
+in \code{interp\_Lint} so we get an error!
 
 To make our interpreters extensible we need something called
 \emph{open recursion}\index{subject}{open recursion}, where the tying of the
@@ -1919,28 +1922,29 @@ inherits from the class for \LangVar{} and the method
 {\if\edition\racketEd  
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-(define interp_Lvar_class
+(define interp_Lint_class
   (class object%
-    (define/public (interp_exp e)
+    (define/public ((interp_exp env) e)
       (match e
         [(Prim '- (list e))
-         (fx- 0 (interp_exp e))]
+         (fx- 0 ((interp_exp env) e))]
         ...))
     ...))
 \end{lstlisting}
 \end{minipage}
 \begin{minipage}{0.45\textwidth}
   \begin{lstlisting}
-(define interp_Lif_class
+(define interp_Lint_class
   (class interp_Lvar_class
-    (define/override (interp_exp e)
+    (define/override ((interp_exp env) e)
       (match e
-        [(If cnd thn els)
-         (match (interp_exp cnd)
-           [#t (interp_exp thn)]
-           [#f (interp_exp els)])]
-        ...
-        [else (super interp_exp e)]))
+        [(Var x)
+         (dict-ref env x)]
+        [(Let x e body)
+         (define v ((interp_exp env) e))
+         (define env^ (dict-set env x v))
+         ((interp_exp env^) body)]
+        [else (super (interp_exp env) e)]))
     ...
   ))
 \end{lstlisting}
@@ -1980,12 +1984,13 @@ def InterpLif(InterpRVar):
 Getting back to the troublesome example, repeated here:
 {\if\edition\racketEd  
 \begin{lstlisting}
-(define e0 (Prim '- (list (If (Bool #t) (Int 42) (Int 0)))))
+(define e0 (Let 'y (Int 10) (Prim '- (Var 'y))))
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
--(42 if True else 0)
+y = 10
+print(-y)
 \end{lstlisting}
 \fi}
 \noindent We can invoke the \code{interp\_exp} method for \LangIf{} on this
@@ -1993,7 +1998,7 @@ expression, call it \code{e0}, by creating an object of the \LangIf{} class
 and calling the \code{interp\_exp} method.
 {\if\edition\racketEd
 \begin{lstlisting}
-(send (new interp_Lif_class) interp_exp e0)
+(send (new interp_Lvar_class) interp_exp e0)
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
@@ -2001,16 +2006,17 @@ and calling the \code{interp\_exp} method.
 InterpLif().interp_exp(e0)
 \end{lstlisting}
 \fi}
-\noindent The default case of \code{interp\_exp} in \LangIf{} handles it by
-dispatching to the \code{interp\_exp} method in \LangVar{}, which
+\noindent The default case of \code{interp\_exp} in \LangVar{} handles it by
+dispatching to the \code{interp\_exp} method in \LangInt{}, which
 handles the \code{-} operator. But then for the recursive method call,
-it dispatches back to \code{interp\_exp} in \LangIf{}, where the
-\code{If} is handled correctly. Thus, method overriding gives us the
+it dispatches back to \code{interp\_exp} in \LangVar{}, where the
+\code{Var} node is handled correctly. Thus, method overriding gives us the
 open recursion that we need to implement our interpreters in an
 extensible way.
 
 
 \subsection{Definitional Interpreter for \LangVar{}}
+\label{sec:interp-Lvar}
 
 {\if\edition\racketEd
 \begin{figure}[tp]
