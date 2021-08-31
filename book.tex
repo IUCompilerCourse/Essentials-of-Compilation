@@ -1816,11 +1816,10 @@ book we define many interpreters, one for each of the languages that
 we study. Because each language builds on the prior one, there is a
 lot of commonality between these interpreters. We want to write down
 the common parts just once instead of many times. A naive approach
-would be to have, for example, the interpreter for \LangVar{} handle
-the cases for variables and \code{let} and then have a default case
-that dispatches to the interpreter for \LangInt{}. The following code
-sketches this idea. (We explain the \code{env} parameter soon, in
-Section~\ref{sec:interp-Lvar}.)
+would be for the interpreter of \LangVar{} to handle the cases for
+variables and \code{let} but dispatch to \LangInt{} for the rest of
+the cases. The following code sketches this idea. (We explain the
+\code{env} parameter soon, in Section~\ref{sec:interp-Lvar}.)
 
 \begin{center}
 {\if\edition\racketEd  
@@ -1878,7 +1877,9 @@ def interp_Lvar(e):
 The problem with this approach is that it does not handle situations
 in which an \LangVar{} feature, such as a variable, is nested inside
 an \LangInt{} feature, like the \code{-} operator, as in the following
-program.  {\if\edition\racketEd
+program.
+%
+{\if\edition\racketEd
 \begin{lstlisting}
 (Let 'y (Int 10) (Prim '- (list (Var 'y))))
 \end{lstlisting}
@@ -1890,19 +1891,19 @@ print(-y)
 \end{lstlisting}
 \fi}
 %
-If we invoke \code{interp\_Lvar} on this program, it dispatches to
-\code{interp\_Lint} to handle the \code{-} operator, but then it
-recursively calls \code{interp\_Lint} again on the argument of
-\code{-}, which is a \code{Var}.  But there is no case for \code{Var}
-in \code{interp\_Lint} so we get an error!
+\noindent If we invoke \code{interp\_Lvar} on this program, it
+dispatches to \code{interp\_Lint} to handle the \code{-} operator, but
+then it recursively calls \code{interp\_Lint} again on its argument.
+But there is no case for \code{Var} in \code{interp\_Lint} so we get
+an error!
 
 To make our interpreters extensible we need something called
 \emph{open recursion}\index{subject}{open recursion}, where the tying of the
 recursive knot is delayed to when the functions are
 composed. Object-oriented languages provide open recursion via
 method overriding\index{subject}{method overriding}. The
-following code uses method overriding to interpret \LangVar{} and
-\LangIf{} using
+following code uses method overriding to interpret \LangInt{} and
+\LangVar{} using
 %
 \racket{the
   \href{https://docs.racket-lang.org/guide/classes.html}{\code{class}}
@@ -1911,13 +1912,13 @@ following code uses method overriding to interpret \LangVar{} and
 \python{a Python \code{class} definition}.
 %
 We define one class for each language and define a method for
-interpreting expressions inside each class. The class for \LangIf{}
-inherits from the class for \LangVar{} and the method
-\code{interp\_exp} in \LangIf{} overrides the \code{interp\_exp} in
-\LangVar{}. Note that the default case of \code{interp\_exp} in
-\LangIf{} uses \code{super} to invoke \code{interp\_exp}, and because
-\LangIf{} inherits from \LangVar{}, that dispatches to the
-\code{interp\_exp} in \LangVar{}.
+interpreting expressions inside each class. The class for \LangVar{}
+inherits from the class for \LangInt{} and the method
+\code{interp\_exp} in \LangVar{} overrides the \code{interp\_exp} in
+\LangInt{}. Note that the default case of \code{interp\_exp} in
+\LangVar{} uses \code{super} to invoke \code{interp\_exp}, and because
+\LangVar{} inherits from \LangInt{}, that dispatches to the
+\code{interp\_exp} in \LangInt{}.
 \begin{center}
 {\if\edition\racketEd  
 \begin{minipage}{0.45\textwidth}
@@ -1953,7 +1954,7 @@ inherits from the class for \LangVar{} and the method
 {\if\edition\pythonEd
 \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
-class InterpLvar:
+class InterpLint:
   def interp_exp(e):
      match e:
        case UnaryOp(USub(), e1):
@@ -1964,7 +1965,7 @@ class InterpLvar:
 \end{minipage}
 \begin{minipage}{0.45\textwidth}
   \begin{lstlisting}
-def InterpLif(InterpRVar):
+def InterpLvar(InterpRVar):
   def interp_exp(e):
     match e:
       case IfExp(cnd, thn, els):
@@ -1993,8 +1994,8 @@ y = 10
 print(-y)
 \end{lstlisting}
 \fi}
-\noindent We can invoke the \code{interp\_exp} method for \LangIf{} on this
-expression, call it \code{e0}, by creating an object of the \LangIf{} class
+\noindent We can invoke the \code{interp\_exp} method for \LangVar{} on this
+expression, call it \code{e0}, by creating an object of the \LangVar{} class
 and calling the \code{interp\_exp} method.
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -2003,15 +2004,15 @@ and calling the \code{interp\_exp} method.
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
-InterpLif().interp_exp(e0)
+InterpLvar().interp_exp(e0)
 \end{lstlisting}
 \fi}
-\noindent The default case of \code{interp\_exp} in \LangVar{} handles it by
-dispatching to the \code{interp\_exp} method in \LangInt{}, which
-handles the \code{-} operator. But then for the recursive method call,
-it dispatches back to \code{interp\_exp} in \LangVar{}, where the
-\code{Var} node is handled correctly. Thus, method overriding gives us the
-open recursion that we need to implement our interpreters in an
+\noindent To process the \code{-} operator, the default case of
+\code{interp\_exp} in \LangVar{} dispatches to the \code{interp\_exp}
+method in \LangInt{}. But then for the recursive method call, it
+dispatches back to \code{interp\_exp} in \LangVar{}, where the
+\code{Var} node is handled correctly. Thus, method overriding gives us
+the open recursion that we need to implement our interpreters in an
 extensible way.
 
 
