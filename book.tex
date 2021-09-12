@@ -22,7 +22,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{1}
+\def\edition{0}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd{#1}\fi}}
@@ -2766,10 +2766,11 @@ of each of the compiler passes in Figure~\ref{fig:Lvar-passes}.
 
 The output of \code{explicate\_control} is similar to the $C$
 language~\citep{Kernighan:1988nx} in that it has separate syntactic
-categories for expressions and statements, so we name it \LangCVar{}.  The
-abstract syntax for \LangCVar{} is defined in Figure~\ref{fig:c0-syntax}.
-\racket{(The concrete syntax for \LangCVar{} is in the Appendix,
-Figure~\ref{fig:c0-concrete-syntax}.)}
+categories for expressions and statements, so we name it \LangCVar{}.
+
+The concrete syntax for \LangCVar{} is defined in
+Figure~\ref{fig:c0-concrete-syntax} and the abstract syntax for
+\LangCVar{} is defined in Figure~\ref{fig:c0-syntax}.
 %
 The \LangCVar{} language supports the same operators as \LangVar{} but
 the arguments of operators are restricted to atomic
@@ -2781,12 +2782,12 @@ assignment statements which can be executed in sequence using the
 \emph{tail position}\index{subject}{tail position}, which refers to an
 expression that is the last one to execute within a function.
 
-A \LangCVar{} program consists of a control-flow graph represented as
-an alist mapping labels to tails. This is more general than necessary
-for the present chapter, as we do not yet introduce \key{goto} for
-jumping to labels, but it saves us from having to change the syntax in
-Chapter~\ref{ch:Lif}.  For now there will be just one label,
-\key{start}, and the whole program is its tail.
+A \LangCVar{} program consists of an alist mapping labels to
+tails. This is more general than necessary for the present chapter, as
+we do not yet introduce \key{goto} for jumping to labels, but it saves
+us from having to change the syntax in Chapter~\ref{ch:Lif}.  For now
+there will be just one label, \key{start}, and the whole program is
+its tail.
 %
 The $\itm{info}$ field of the \key{CProgram} form, after the
 \code{explicate\_control} pass, contains a mapping from the symbol
@@ -2794,6 +2795,25 @@ The $\itm{info}$ field of the \key{CProgram} form, after the
 variables used in the program. At the start of the program, these
 variables are uninitialized; they become initialized on their first
 assignment.
+
+\begin{figure}[tbp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{lcl}
+\Atm &::=& \Int \MID \Var \\
+\Exp &::=& \Atm \MID \key{(read)} \MID \key{(-}~\Atm\key{)} \MID \key{(+}~\Atm~\Atm\key{)}\\
+\Stmt &::=& \Var~\key{=}~\Exp\key{;} \\
+\Tail &::= & \key{return}~\Exp\key{;} \MID \Stmt~\Tail \\
+\LangCVarM{} & ::= & (\itm{label}\key{:}~ \Tail)\ldots
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The concrete syntax of the \LangCVar{} intermediate language.}
+\label{fig:c0-concrete-syntax}
+\end{figure}
+
 
 \begin{figure}[tbp]
 \fbox{
@@ -7014,29 +7034,31 @@ expected.
 \section{The \LangCIf{} Intermediate Language}
 \label{sec:Cif}
 
-\racket{
-Figure~\ref{fig:c1-syntax} defines the abstract syntax of the
-\LangCIf{} intermediate language. (The concrete syntax is in the
-Appendix, Figure~\ref{fig:c1-concrete-syntax}.)  Compared to
-\LangCVar{}, the \LangCIf{} language adds logical and comparison
-operators to the \Exp{} non-terminal and the literals \TRUE{} and
-\FALSE{} to the \Arg{} non-terminal.
+{\if\edition\racketEd
+%
+Figure~\ref{fig:c1-concrete-syntax} defines the concrete syntax of the
+\LangCIf{} intermediate language and Figure~\ref{fig:c1-syntax}
+defines its abstract syntax. Compared to \LangCVar{}, the \LangCIf{}
+language adds logical and comparison operators to the \Exp{}
+non-terminal and the literals \TRUE{} and \FALSE{} to the \Arg{}
+non-terminal.
 
 Regarding control flow, \LangCIf{} adds \key{goto} and \code{if}
 statements to the \Tail{} non-terminal. The condition of an \code{if}
 statement is a comparison operation and the branches are \code{goto}
 statements, making it straightforward to compile \code{if} statements
 to x86.
-}
+%
+\fi}
 %
 {\if\edition\pythonEd
 %
 The output of \key{explicate\_control} is a language similar to the
 $C$ language~\citep{Kernighan:1988nx} in that it has labels and
-\code{goto} statements, so we name it \LangCIf{}.  The abstract syntax
-for \LangCIf{} is defined in Figure~\ref{fig:c1-syntax}.
-\racket{(The concrete syntax for \LangCIf{} is in the Appendix,
-Figure~\ref{fig:c1-concrete-syntax}.)}
+\code{goto} statements, so we name it \LangCIf{}.  The
+concrete syntax for \LangCIf{} is defined in
+Figure~\ref{fig:c1-concrete-syntax}
+and the abstract syntax is defined in Figure~\ref{fig:c1-syntax}.
 %
 The \LangCIf{} language supports the same operators as \LangIf{} but
 the arguments of operators are restricted to atomic expressions. The
@@ -7052,14 +7074,33 @@ The \key{CProgram} construct contains
 %
 \racket{an alist}\python{a dictionary}
 %
-mapping labels to \emph{basic blocks}\index{subject}{basic block},
-that is to say, a sequence of straight-line statements that ends with
-a \code{return}, \code{goto}, or conditional \code{goto}.
-%
-\racket{Basic blocks are represented in the grammar by the $\Tail$
-  non-terminal.}
+mapping labels to $\Tail$ expressions, which can be return statements,
+an assignment statement followed by a $\Tail$ expression, a
+\code{goto}, or a conditional \code{goto}.
 
 
+\begin{figure}[tbp]
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\small    
+\[
+\begin{array}{lcl}
+\Atm &::=& \gray{ \Int \MID \Var } \MID \itm{bool} \\
+\itm{cmp} &::= & \code{eq?} \MID \code{<} \MID \code{<=} \MID \code{>} \MID \code{>=} \\
+\Exp &::=& \gray{ \Atm \MID \key{(read)} \MID \key{(-}~\Atm\key{)} \MID \key{(+}~\Atm~\Atm\key{)} } \\
+   &\MID& \LP \key{not}~\Atm \RP \MID \LP \itm{cmp}~\Atm~\Atm\RP \\
+\Stmt &::=& \gray{ \Var~\key{=}~\Exp\key{;} } \\
+\Tail &::= & \gray{ \key{return}~\Exp\key{;} \MID \Stmt~\Tail } 
+   \MID \key{goto}~\itm{label}\key{;}\\
+   &\MID& \key{if}~\LP \itm{cmp}~\Atm~\Atm \RP~ \key{goto}~\itm{label}\key{;} ~\key{else}~\key{goto}~\itm{label}\key{;} \\
+\LangCIfM{} & ::= & \gray{ (\itm{label}\key{:}~ \Tail)\ldots }
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The concrete syntax of the \LangCIf{} intermediate language.}
+\label{fig:c1-concrete-syntax}
+\end{figure}
 
 \begin{figure}[tp]
 \fbox{
@@ -7069,7 +7110,7 @@ a \code{return}, \code{goto}, or conditional \code{goto}.
 \[
 \begin{array}{lcl}
 \Atm &::=& \gray{\INT{\Int} \MID \VAR{\Var}} \MID \BOOL{\itm{bool}} \\
-\itm{cmp} &::= & \key{eq?} \MID \key{<} \\
+\itm{cmp} &::= & \code{eq?} \MID \code{<} \MID \code{<=} \MID \code{>} \MID \code{>=} \\
 \Exp &::= & \gray{ \Atm \MID \READ{} }\\
      &\MID& \gray{ \NEG{\Atm} \MID \ADD{\Atm}{\Atm} } \\
      &\MID& \UNIOP{\key{'not}}{\Atm} 
@@ -7598,11 +7639,12 @@ later function translates expressions on the right-hand-side of a
 \key{let}. With the addition of \key{if} expression in \LangIf{} we
 have a new kind of position to deal with: the predicate position of
 the \key{if}. We need another function, \code{explicate\_pred}, that
-takes an \LangIf{} expression and two blocks for the then-branch and
-else-branch. The output of \code{explicate\_pred} is a block.  In the
+decides how to compile an \key{if} by analyzing its predicate.  So
+\code{explicate\_pred} takes an \LangIf{} expression and two \LangCIf{}
+tails for the then-branch and else-branch and outputs a tail.  In the
 following paragraphs we discuss specific cases in the
-\code{explicate\_pred} function as well as additions to the
-\code{explicate\_tail} and \code{explicate\_assign} functions.
+\code{explicate\_tail}, \code{explicate\_assign}, and
+\code{explicate\_pred} functions.
 %
 \fi}
 %
@@ -7751,15 +7793,11 @@ position.
 (let ([x (read)])
   (if (eq? x 0) 42 777))
 \end{lstlisting}
-The two branches are recursively compiled to \code{(Return 42)} and
-\code{(Return 777)}. We then invoke \code{explicate\_pred} on the
-condition \code{(eq? x 0)} and the two return statements, which is
+The two branches are recursively compiled to \code{return 42;} and
+\code{return 777;}. We then delegate to \code{explicate\_pred},
+passing the condition \code{(eq? x 0)} and the two return statements, which is
 used as the result for \code{explicate\_tail}.
-\begin{lstlisting}
-  (if (eq? x 0) 42 777)
-  |$\Rightarrow$| (explicate_pred `(Prim eq? ((Var x) (Int 0)))
-                       `(Return 42) `(Return 777))
-\end{lstlisting}
+
 Next let us consider a program with an \code{if} on the right-hand
 side of a \code{let}.
 \begin{lstlisting}
@@ -7768,7 +7806,7 @@ side of a \code{let}.
     (+ x 2)))
 \end{lstlisting}
 Note that the body of the inner \code{let} will have already been
-compiled to \code{(Return (+ x 2))} and passed as the \code{cont}
+compiled to \code{return (+ x 2);} and passed as the \code{cont}
 parameter of \code{explicate\_assign}. We'll need to use \code{cont}
 to recursively process both branches of the \code{if}, so we generate
 the following block using an auxiliary function named \code{create\_block}.
@@ -7776,7 +7814,7 @@ the following block using an auxiliary function named \code{create\_block}.
 block_6:
   return (+ x 2)
 \end{lstlisting}
-and use \code{(Goto 'block\_6)} as the \code{cont} argument for
+and use \code{goto block\_6;} as the \code{cont} argument for
 compiling the branches. So the two branches compile to
 \begin{lstlisting}
 x = 40;
@@ -7787,9 +7825,8 @@ and
 x = 777;
 goto block_6;
 \end{lstlisting}
-We then invoke \code{explicate\_pred} on the condition \code{(eq? y
-  0)} and the above code for the branches, which is used as the result
-for \code{explicate\_tail}.
+We then delegate to \code{explicate\_pred}, passing the condition \code{(eq? y
+  0)} and the above code for the branches.
 
 \fi}
 
@@ -8357,13 +8394,13 @@ blocks), then it has an empty live-after set and we can immediately
 apply liveness analysis to it. If a basic block has some successors,
 then we need to complete liveness analysis on those blocks
 first. These ordering contraints are the reverse of a
-\emph{topological order}\index{subject}{topological order} on the
-control-flow graph of the program~\citep{Allen:1970uq}.  In a
-\emph{control flow graph} (CFG), each node represents a basic
-block and each edge represents a jump from one block to another
-\index{subject}{control-flow graph}.  It is straightforward to
-generate a CFG from the dictionary of basic blocks. One then needs to
-transpose the CFG and apply the topological sort algorithm.
+\emph{topological order}\index{subject}{topological order} on a graph
+representation of the program.  In particular, the \emph{control flow
+  graph} (CFG)\index{subject}{control-flow graph}~\citep{Allen:1970uq}
+of a program has a node for each basic block and an edge for each jump
+from one block to another.  It is straightforward to generate a CFG
+from the dictionary of basic blocks. One then transposes the CFG and
+applies the topological sort algorithm.
 %
 %
 \racket{We recommend using the \code{tsort} and \code{transpose}
@@ -8373,7 +8410,7 @@ transpose the CFG and apply the topological sort algorithm.
   \code{transpose} in the file \code{graph.py} of the support code.}
 %
 As an aside, a topological ordering is only guaranteed to exist if the
-graph does not contain any cycles. That is indeed the case for the
+graph does not contain any cycles. This is the case for the
 control-flow graphs that we generate from \LangIf{} programs.
 However, in Chapter~\ref{ch:Rwhile} we add loops to create \LangLoop{}
 and learn how to handle cycles in the control-flow graph.
@@ -16910,46 +16947,6 @@ defined in Figures~\ref{fig:c0-concrete-syntax},
 \ref{fig:c1-concrete-syntax}, \ref{fig:c2-concrete-syntax},
 and \ref{fig:c3-concrete-syntax}, respectively.
 
-\begin{figure}[tbp]
-\fbox{
-\begin{minipage}{0.96\textwidth}
-\[
-\begin{array}{lcl}
-\Atm &::=& \Int \MID \Var \\
-\Exp &::=& \Atm \MID \key{(read)} \MID \key{(-}~\Atm\key{)} \MID \key{(+}~\Atm~\Atm\key{)}\\
-\Stmt &::=& \Var~\key{=}~\Exp\key{;} \\
-\Tail &::= & \key{return}~\Exp\key{;} \MID \Stmt~\Tail \\
-\LangCVarM{} & ::= & (\itm{label}\key{:}~ \Tail)\ldots
-\end{array}
-\]
-\end{minipage}
-}
-\caption{The concrete syntax of the \LangCVar{} intermediate language.}
-\label{fig:c0-concrete-syntax}
-\end{figure}
-
-\begin{figure}[tbp]
-\fbox{
-\begin{minipage}{0.96\textwidth}
-\small    
-\[
-\begin{array}{lcl}
-\Atm &::=& \gray{ \Int \MID \Var } \MID \itm{bool} \\
-\itm{cmp} &::= & \key{eq?} \MID \key{<}  \\
-\Exp &::=& \gray{ \Atm \MID \key{(read)} \MID \key{(-}~\Atm\key{)} \MID \key{(+}~\Atm~\Atm\key{)} } \\
-   &\MID& \LP \key{not}~\Atm \RP \MID \LP \itm{cmp}~\Atm~\Atm\RP \\
-\Stmt &::=& \gray{ \Var~\key{=}~\Exp\key{;} } \\
-\Tail &::= & \gray{ \key{return}~\Exp\key{;} \MID \Stmt~\Tail } 
-   \MID \key{goto}~\itm{label}\key{;}\\
-   &\MID& \key{if}~\LP \itm{cmp}~\Atm~\Atm \RP~ \key{goto}~\itm{label}\key{;} ~\key{else}~\key{goto}~\itm{label}\key{;} \\
-\LangCIfM{} & ::= & \gray{ (\itm{label}\key{:}~ \Tail)\ldots }
-\end{array}
-\]
-\end{minipage}
-}
-\caption{The concrete syntax of the \LangCIf{} intermediate language.}
-\label{fig:c1-concrete-syntax}
-\end{figure}
 
 \begin{figure}[tbp]
 \fbox{
