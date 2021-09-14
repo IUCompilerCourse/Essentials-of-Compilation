@@ -1,4 +1,8 @@
+which registers to use for coloring?
+which not?
 
+register allocation
+  update print x86
 
 
 
