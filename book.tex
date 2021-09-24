@@ -4493,20 +4493,14 @@ because they both hold the same value.
 So we have the following two rules.
 
 \begin{enumerate}
-\item If instruction $I_k$ is a move instruction, \key{movq} $s$\key{,}
-  $d$, then add the edge $(d,v)$ for every $v \in
-  L_{\mathsf{after}}(k)$ unless $v = d$ or $v = s$.
+\item If instruction $I_k$ is a move instruction of the form
+  \key{movq} $s$\key{,} $d$, then for every $v \in
+  L_{\mathsf{after}}(k)$, if $v \neq d$ and $v \neq s$, add the edge
+  $(d,v)$.
 
-\item For any other instruction $I_k$, for every $d \in W(k)$
-  add an edge $(d,v)$ for every $v \in L_{\mathsf{after}}(k)$ unless $v = d$.
-  
-%% \item If instruction $I_k$ is an arithmetic instruction such as
-%%   \code{addq} $s$\key{,} $d$, then add the edge $(d,v)$ for every $v \in
-%%   L_{\mathsf{after}}(k)$ unless $v = d$.
-
-%% \item If instruction $I_k$ is of the form \key{callq}
-%%   $\mathit{label}$, then add an edge $(r,v)$ for every caller-saved
-%%   register $r$ and every variable $v \in L_{\mathsf{after}}(k)$.
+\item For any other instruction $I_k$, for every $d \in W(k)$ and
+  every $v \in L_{\mathsf{after}}(k)$, if $v \neq d$, add the edge
+  $(d,v)$.
 \end{enumerate}
 
 Working from the top to bottom of Figure~\ref{fig:live-eg}, we apply
@@ -6476,7 +6470,7 @@ operators to include
      \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp}\\
      &\MID& \BOOL{\itm{bool}} \MID \IF{\Exp}{\Exp}{\Exp} \\
 \Stmt{} &::=& \PRINT{\Exp} \MID \EXPR{\Exp} \\
-        &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{*}}{\Stmt^{*}}\\
+        &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
 \LangIfM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
 \end{array}
 \]
@@ -8551,8 +8545,8 @@ Add the following entry to the list of \code{passes} in
 
 {\if\edition\pythonEd
   
-\section{Print x86}
-\label{sec:print-x86-cond}
+\section{Prelude and Conclusion}
+\label{sec:prelude-conclusion-cond}
 
 The generation of the \code{main} function with its prelude and
 conclusion must change to accomodate how the program now consists of
@@ -9276,7 +9270,7 @@ such as the case-of-case transformation of \citet{PeytonJones:1998}.
 % TODO: multi-graph
 
 \if\edition\racketEd
-
+%
 In this chapter we study two features that are the hallmarks of
 imperative programming languages: loops and assignments to local
 variables. The following example demonstrates these new features by
@@ -9292,15 +9286,44 @@ computing the sum of the first five positive integers.
           (set! i (- i 1))))
       sum)))
 \end{lstlisting}
-The \code{while} loop consists of a condition and a body.  
+The \code{while} loop consists of a condition and a
+body\footnote{The \code{while} loop in particular is not a built-in
+feature of the Racket language, but Racket includes many looping
+constructs and it is straightforward to define \code{while} as a
+macro.}. The body is evaluated repeatedly so long as the condition
+remains true.
 %
-The \code{set!} consists of a variable and a right-hand-side expression.
+The \code{set!} consists of a variable and a right-hand-side
+expression.  The \code{set!} updates value of the variable to the
+value of the right-hand-side.
 %
 The primary purpose of both the \code{while} loop and \code{set!}  is
 to cause side effects, so it is convenient to also include in a
 language feature for sequencing side effects: the \code{begin}
 expression. It consists of one or more subexpressions that are
 evaluated left-to-right.
+%
+\fi
+
+\if\edition\pythonEd
+%
+In this chapter we study loops, one of the hallmarks of imperative
+programming languages. The following example demonstrates the
+\code{while} loop by computing the sum of the first five positive
+integers.
+\begin{lstlisting}
+sum = 0
+i = 5
+while i > 0:
+    sum = sum + i
+    i = i - 1
+print(sum)
+\end{lstlisting}
+The \code{while} loop consists of a condition expression and a body (a
+sequence of statements). The body is evaluated repeatedly so long as
+the condition remains true.
+%
+\fi
 
 \section{The \LangLoop{} Language}
 
@@ -9309,6 +9332,7 @@ evaluated left-to-right.
 \fbox{
   \begin{minipage}{0.96\textwidth}
     \small
+{\if\edition\racketEd    
 \[
 \begin{array}{lcl}
   \Exp &::=& \gray{ \Int \MID \CREAD{} \MID \CNEG{\Exp}
@@ -9332,10 +9356,25 @@ evaluated left-to-right.
   \LangLoopM{} &::=& \gray{\Def\ldots \; \Exp}
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd
+\[
+\begin{array}{rcl}
+  \itm{binop} &::= & \key{+} \MID \key{-} \MID \key{and} \MID \key{or} \MID \key{==} \MID \key{!=} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=} \\
+  \itm{uniop} &::= & \key{-} \MID \key{not} \\
+  \Exp &::=& \Int \MID \key{input\_int}\LP\RP \MID \CUNIOP{\itm{uniop}}{\Exp} \MID \CBINOP{\itm{binop}}{\Exp}{\Exp} \MID \Var{} \\
+       &\MID&  \TRUE \MID \FALSE \MID \CIF{\Exp}{\Exp}{\Exp} \\
+  \Stmt &::=& \key{print}\LP \Exp \RP \MID \Exp \MID \CASSIGN{\Var}{\Exp}
+         \MID \key{if}~ \Exp \key{:}~ \Stmt^{+} ~\key{else:}~ \Stmt^{+}\\
+        &\MID& \key{while}~ \Exp \key{:}~ \Stmt^{+}\\
+  \LangLoopM{} &::=& \Stmt^{*}
+\end{array}
+\]
+\fi}
 \end{minipage}
 }
-\caption{The concrete syntax of \LangLoop{}, extending \LangAny{} (Figure~\ref{fig:Rany-concrete-syntax}).}
-\label{fig:Rwhile-concrete-syntax}
+\caption{The concrete syntax of \LangLoop{}, extending \LangIf{} (Figure~\ref{fig:Lif-concrete-syntax}).}
+\label{fig:Lwhile-concrete-syntax}
 \end{figure}
 
 \begin{figure}[tp]
@@ -9343,6 +9382,7 @@ evaluated left-to-right.
 \fbox{
   \begin{minipage}{0.96\textwidth}
     \small
+{\if\edition\racketEd    
 \[
 \begin{array}{lcl}
   \Exp &::=& \gray{ \INT{\Int} \VAR{\Var} \MID \LET{\Var}{\Exp}{\Exp} } \\
@@ -9358,18 +9398,44 @@ evaluated left-to-right.
   \LangLoopM{} &::=& \gray{ \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp} }
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd
+\[
+\begin{array}{lcl}
+\itm{binop} &::=& \code{Add()} \MID \code{Sub()} \\
+\itm{boolop} &::=& \code{And()} \MID \code{Or()} \\
+\itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \\
+\itm{uniop} &::=& \code{USub()} \MID \code{Not()} \\
+\itm{bool} &::=& \code{True} \MID \code{False} \\
+\Exp &::=& \INT{\Int} \MID \READ{} \MID \VAR{\Var} \\
+     &\MID& \BINOP{\Exp}{\itm{binop}}{\Exp}
+     \MID \UNIOP{\itm{uniop}}{\Exp}\\
+     &\MID& \CMP{\Exp}{\itm{cmp}}{\Exp} 
+     \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp}\\
+     &\MID& \BOOL{\itm{bool}} \MID \IF{\Exp}{\Exp}{\Exp} \\
+\Stmt{} &::=& \PRINT{\Exp} \MID \EXPR{\Exp} \\
+     &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
+     &\MID& \WHILESTMT{\Exp}{\Stmt^{+}}\\
+\LangLoopM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
+\end{array}
+\]
+\fi}
 \end{minipage}
 }
-\caption{The abstract syntax of \LangLoop{}, extending \LangAny{} (Figure~\ref{fig:Rany-syntax}).}
-\label{fig:Rwhile-syntax}
+\caption{The abstract syntax of \LangLoop{}, extending \LangIf{} (Figure~\ref{fig:Lif-syntax}).}
+\label{fig:Lwhile-syntax}
 \end{figure}
 
 The concrete syntax of \LangLoop{} is defined in
-Figure~\ref{fig:Rwhile-concrete-syntax} and its abstract syntax is defined
-in Figure~\ref{fig:Rwhile-syntax}.
+Figure~\ref{fig:Lwhile-concrete-syntax} and its abstract syntax is defined
+in Figure~\ref{fig:Lwhile-syntax}.
 %
 The definitional interpreter for \LangLoop{} is shown in
-Figure~\ref{fig:interp-Rwhile}. We add three new cases for \code{SetBang},
+Figure~\ref{fig:interp-Rwhile}.
+%
+{\if\edition\racketEd    
+%
+We add three new cases for \code{SetBang},
 \code{WhileLoop}, and \code{Begin} and we make changes to the cases
 for \code{Var}, \code{Let}, and \code{Apply} regarding variables. To
 support assignment to variables and to make their lifetimes indefinite
@@ -9390,9 +9456,19 @@ The result value of a \code{while} loop is also \code{void}.
 Finally, the $\BEGIN{\itm{es}}{\itm{body}}$ expression evaluates the
 subexpressions \itm{es} for their effects and then evaluates
 and returns the result from \itm{body}.
+%
+\fi}
+{\if\edition\pythonEd
+%
+We add a new case for \code{While} in the \code{interp\_stmts}
+function, where we repeatedly interpret the \code{body} so long as the
+\code{test} expression remains true.
+%
+\fi}
 
 
 \begin{figure}[tbp]
+{\if\edition\racketEd    
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define interp-Rwhile_class
   (class interp-Rany_class
@@ -9417,18 +9493,50 @@ and returns the result from \itm{body}.
 (define (interp-Rwhile p)
   (send (new interp-Rwhile_class) interp-program p))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+class InterpLwhile(InterpLif):
+
+  def interp_stmts(self, ss, env):
+    if len(ss) == 0:
+      return
+    match ss[0]:
+      case While(test, body, []):
+        while self.interp_exp(test, env):
+            self.interp_stmts(body, env)
+        return self.interp_stmts(ss[1:], env)
+      case _:
+        return super().interp_stmts(ss, env)
+\end{lstlisting}
+\fi}
 \caption{Interpreter for \LangLoop{}.}
 \label{fig:interp-Rwhile}
 \end{figure}
 
-The type checker for \LangLoop{} is define in
-Figure~\ref{fig:type-check-Rwhile}.  For \code{SetBang}, the type of the
-variable and the right-hand-side must agree. The result type is
-\code{Void}. For the \code{WhileLoop}, the condition must be a
-\code{Boolean}. The result type is also \code{Void}.  For
-\code{Begin}, the result type is the type of its last subexpression.
+The type checker for \LangLoop{} is defined in
+Figure~\ref{fig:type-check-Rwhile}.
+%
+{\if\edition\racketEd    
+%
+For \code{SetBang}, the type of the variable and the right-hand-side
+must agree. The result type is \code{Void}. For the \code{WhileLoop},
+the condition must be a \code{Boolean}. The result type is also
+\code{Void}.  For \code{Begin}, the result type is the type of its
+last subexpression.
+%
+\fi}
+%
+{\if\edition\pythonEd
+%
+A \code{while} loop is well typed if the type of the \code{test}
+expression is \code{bool} and the statements in the \code{body} are
+well typed.
+%
+\fi}
 
 \begin{figure}[tbp]
+{\if\edition\racketEd    
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define type-check-Rwhile_class
   (class type-check-Rany_class
@@ -9460,44 +9568,75 @@ variable and the right-hand-side must agree. The result type is
 (define (type-check-Rwhile p)
   (send (new type-check-Rwhile_class) type-check-program p))
 \end{lstlisting}
-\caption{Type checking \key{SetBang}, \key{WhileLoop},
-    and \code{Begin} in \LangLoop{}.}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+class TypeCheckLwhile(TypeCheckLif):
+
+  def type_check_stmts(self, ss, env):
+    if len(ss) == 0:
+      return
+    match ss[0]:
+      case While(test, body, []):
+        test_t = self.type_check_exp(test, env)
+        check_type_equal(bool, test_t, test)
+        body_t = self.type_check_stmts(body, env)
+        return self.type_check_stmts(ss[1:], env)
+      case _:
+        return super().type_check_stmts(ss, env)
+\end{lstlisting}
+\fi}
+\caption{Type checker for the \LangLoop{} language.}
 \label{fig:type-check-Rwhile}
 \end{figure}
 
 
-  
+{\if\edition\racketEd    
+%  
 At first glance, the translation of these language features to x86
-seems straightforward because the \LangCFun{} intermediate language
+seems straightforward because the \LangCIf{} intermediate language
 already supports all of the ingredients that we need: assignment,
 \code{goto}, conditional branching, and sequencing. However, there are
 complications that arise which we discuss in the next section. After
 that we introduce the changes necessary to the existing passes.
+%
+\fi}
 
+{\if\edition\pythonEd
+%
+At first glance, the translation of \code{while} loops to x86 seems
+straightforward because the \LangCIf{} intermediate language already
+supports \code{goto} and conditional branching. However, there are
+complications that arise which we discuss in the next section. After
+that we introduce the changes necessary to the existing passes.
+%
+\fi}
 
 \section{Cyclic Control Flow and Dataflow Analysis}
 \label{sec:dataflow-analysis}
 
-Up until this point the control-flow graphs generated in
-\code{explicate\_control} were guaranteed to be acyclic. However, each
-\code{while} loop introduces a cycle in the control-flow graph.
+Up until this point the control-flow graphs of the programs generated
+in \code{explicate\_control} were guaranteed to be acyclic. However,
+each \code{while} loop introduces a cycle in the control-flow graph.
 But does that matter?
 %
 Indeed it does.  Recall that for register allocation, the compiler
 performs liveness analysis to determine which variables can share the
-same register.  In Section~\ref{sec:liveness-analysis-Lif} we analyze
-the control-flow graph in reverse topological order, but topological
-order is only well-defined for acyclic graphs.
+same register.  To accomplish this we analyzed the control-flow graph
+in reverse topological order
+(Section~\ref{sec:liveness-analysis-Lif}), but topological order is
+only well-defined for acyclic graphs.
 
 Let us return to the example of computing the sum of the first five
 positive integers. Here is the program after instruction selection but
 before register allocation.
 \begin{center}
-\begin{minipage}{0.45\textwidth}
+{\if\edition\racketEd    
+  \begin{minipage}{0.45\textwidth}
 \begin{lstlisting}
 (define (main) : Integer
    mainstart:
-      movq $0, sum1
+      movq $0, sum
       movq $5, i2
       jmp block5
    block5:
@@ -9511,40 +9650,67 @@ before register allocation.
   \begin{lstlisting}
 
     
-block7:
-      addq i2, sum1
+   block7:
+      addq i2, sum
       movq $1, tmp4
       negq tmp4
       addq tmp4, i2
       jmp block5
    block8:
       movq $27, %rax
-      addq sum1, %rax
+      addq sum, %rax
       jmp mainconclusion
 )
 \end{lstlisting}
   \end{minipage}
+\fi}
+{\if\edition\pythonEd
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+mainstart:
+	movq $0, sum
+	movq $5, i
+	jmp block5
+block5:
+	cmpq $0, i
+	jg block7
+	jmp block8
+\end{lstlisting}
+\end{minipage}
+\begin{minipage}{0.45\textwidth}
+\begin{lstlisting}
+block7:
+	addq i, sum
+	subq $1, i
+	jmp block5
+block8:
+	movq sum, %rdi
+	callq print_int
+	movq $0, %rax
+	jmp mainconclusion
+\end{lstlisting}
+  \end{minipage}
+\fi}
 \end{center}
 Recall that liveness analysis works backwards, starting at the end
 of each function. For this example we could start with \code{block8}
 because we know what is live at the beginning of the conclusion,
 just \code{rax} and \code{rsp}. So the live-before set
-for \code{block8} is $\{\ttm{rsp},\ttm{sum1}\}$.
+for \code{block8} is $\{\ttm{rsp},\ttm{sum}\}$.
 %
 Next we might try to analyze \code{block5} or \code{block7}, but
 \code{block5} jumps to \code{block7} and vice versa, so it seems that
 we are stuck.
 
-The way out of this impasse comes from the realization that one can
-perform liveness analysis starting with an empty live-after set to
-compute an under-approximation of the live-before set.  By
-\emph{under-approximation}, we mean that the set only contains
-variables that are really live, but it may be missing some.  Next, the
-under-approximations for each block can be improved by 1) updating the
-live-after set for each block using the approximate live-before sets
-from the other blocks and 2) perform liveness analysis again on each
-block.  In fact, by iterating this process, the under-approximations
-eventually become the correct solutions!
+The way out of this impasse is to realize that we can compute an
+under-approximation of the live-before set by starting with empty
+live-after sets.  By \emph{under-approximation}, we mean that the set
+only contains variables that are really live, but it may be missing
+some.  Next, the under-approximations for each block can be improved
+by 1) updating the live-after set for each block using the approximate
+live-before sets from the other blocks and 2) perform liveness
+analysis again on each block.  In fact, by iterating this process, the
+under-approximations eventually become the correct solutions!
 %
 This approach of iteratively analyzing a control-flow graph is
 applicable to many static analysis problems and goes by the name
@@ -9572,8 +9738,8 @@ sets.
   \begin{lstlisting}
 mainstart: {}
 block5: {i2}
-block7: {i2, sum1}
-block8: {rsp, sum1}
+block7: {i2, sum}
+block8: {rsp, sum}
 \end{lstlisting}
 \end{center}
 
@@ -9581,19 +9747,19 @@ For the second round, the live-after for \code{mainstart} is the
 current live-before for \code{block5}, which is \code{\{i2\}}.  So the
 liveness analysis for \code{mainstart} computes the empty set. The
 live-after for \code{block5} is the union of the live-before sets for
-\code{block7} and \code{block8}, which is \code{\{i2 , rsp, sum1\}}.
+\code{block7} and \code{block8}, which is \code{\{i2 , rsp, sum\}}.
 So the liveness analysis for \code{block5} computes \code{\{i2 , rsp,
-  sum1\}}.  The live-after for \code{block7} is the live-before for
+  sum\}}.  The live-after for \code{block7} is the live-before for
 \code{block5} (from the previous iteration), which is \code{\{i2\}}.
 So the liveness analysis for \code{block7} remains \code{\{i2,
-  sum1\}}.  Together these yield the following approximation $m_2$ of
+  sum\}}.  Together these yield the following approximation $m_2$ of
 the live-before sets.
 \begin{center}
   \begin{lstlisting}
 mainstart: {}
-block5: {i2, rsp, sum1}
-block7: {i2, sum1}
-block8: {rsp, sum1}
+block5: {i2, rsp, sum}
+block7: {i2, sum}
+block8: {rsp, sum}
 \end{lstlisting}
 \end{center}
 In the preceding iteration, only \code{block5} changed, so we can
@@ -9604,13 +9770,13 @@ for \code{mainstart} and \code{block7} are updated to include
 \begin{center}
   \begin{lstlisting}
 mainstart: {rsp}
-block5: {i2, rsp, sum1}
-block7: {i2, rsp, sum1}
-block8: {rsp, sum1}
+block5: {i2, rsp, sum}
+block7: {i2, rsp, sum}
+block8: {rsp, sum}
 \end{lstlisting}
 \end{center}
 Because \code{block7} changed, we analyze \code{block5} once more, but
-its live-before set remains \code{\{ i2, rsp, sum1 \}}.  At this point
+its live-before set remains \code{\{ i2, rsp, sum \}}.  At this point
 our approximations have converged, so $m_3$ is the solution.
 
 This iteration process is guaranteed to converge to a solution by the
@@ -9973,7 +10139,7 @@ for the compilation of \LangLoop{}.
 
 % Further Reading: dataflow analysis
 
-\fi
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Tuples and Garbage Collection}
@@ -11337,7 +11503,7 @@ inner-product of two arrays (Figure~\ref{fig:inner-product}).
 \]
 \end{minipage}
 }
-\caption{The concrete syntax of \LangArray{}, extending \LangLoop{} (Figure~\ref{fig:Rwhile-concrete-syntax}).}
+\caption{The concrete syntax of \LangArray{}, extending \LangLoop{} (Figure~\ref{fig:Lwhile-concrete-syntax}).}
 \label{fig:Rvecof-concrete-syntax}
 \end{figure}
 
@@ -14969,7 +15135,7 @@ syntax.
 \]
 \end{minipage}
 }
-\caption{The concrete syntax of \LangGrad{}, extending \LangLoop{} (Figure~\ref{fig:Rwhile-concrete-syntax}).}
+\caption{The concrete syntax of \LangGrad{}, extending \LangLoop{} (Figure~\ref{fig:Lwhile-concrete-syntax}).}
 \label{fig:Rgrad-concrete-syntax}
 \end{figure}
 
@@ -14996,7 +15162,7 @@ syntax.
 \]
 \end{minipage}
 }
-\caption{The abstract syntax of \LangGrad{}, extending \LangLoop{} (Figure~\ref{fig:Rwhile-syntax}).}
+\caption{The abstract syntax of \LangGrad{}, extending \LangLoop{} (Figure~\ref{fig:Lwhile-syntax}).}
 \label{fig:Rgrad-syntax}
 \end{figure}
 
@@ -15101,7 +15267,7 @@ Figure~\ref{fig:Rgrad-prime-syntax}.
 \]
 \end{minipage}
 }
-\caption{The abstract syntax of \LangCast{}, extending \LangLoop{} (Figure~\ref{fig:Rwhile-syntax}).}
+\caption{The abstract syntax of \LangCast{}, extending \LangLoop{} (Figure~\ref{fig:Lwhile-syntax}).}
 \label{fig:Rgrad-prime-syntax}
 \end{figure}
 
@@ -16152,7 +16318,7 @@ polymorphic types and type variables.
 \end{minipage}
 }
 \caption{The concrete syntax of \LangPoly{}, extending \LangLoop{}
-    (Figure~\ref{fig:Rwhile-concrete-syntax}).}
+    (Figure~\ref{fig:Lwhile-concrete-syntax}).}
 \label{fig:Rpoly-concrete-syntax}
 \end{figure}
 
@@ -16173,7 +16339,7 @@ polymorphic types and type variables.
 \end{minipage}
 }
 \caption{The abstract syntax of \LangPoly{}, extending \LangLoop{}
-    (Figure~\ref{fig:Rwhile-syntax}).}
+    (Figure~\ref{fig:Lwhile-syntax}).}
 \label{fig:Rpoly-syntax}
 \end{figure}
 
@@ -16271,7 +16437,7 @@ process in next pass of the compiler.
 \end{minipage}
 }
 \caption{The abstract syntax of \LangInst{}, extending \LangLoop{}
-    (Figure~\ref{fig:Rwhile-syntax}).}
+    (Figure~\ref{fig:Lwhile-syntax}).}
 \label{fig:Rpoly-prime-syntax}
 \end{figure}
 
