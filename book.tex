@@ -22,7 +22,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{1}
+\def\edition{0}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd{#1}\fi}}
@@ -5554,7 +5554,7 @@ a multiple of 16 bytes!
 \path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build\_inter.} (x86-2-2);
 \path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate\_reg.} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch\_instr.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print\_x86} (x86-5);
+\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize prelude\_and\_concl.} (x86-5);
 \end{tikzpicture}
 \caption{Diagram of the passes for \LangVar{} with register allocation.}
 \label{fig:reg-alloc-passes}
@@ -7006,7 +7006,7 @@ an empty file named \code{cond\_test\_14.tyerr}.
 \racket{This indicates to \code{interp-tests} and
   \code{compiler-tests} that a type error is expected. }
 %
-\racket{This indicates to the \code{run-tests.py} scripts that a type
+\racket{This indicates to the \code{run-tests.rkt} scripts that a type
   error is expected.}
 %
 The other half of the test programs should not have type errors.
@@ -7449,10 +7449,10 @@ R^{\mathsf{ANF}}_{\mathsf{if}}  &::=& \PROGRAM{\code{()}}{\Exp}
 \Exp &::=& \Atm \MID \READ{} \\
   &\MID& \BINOP{\itm{binop}}{\Atm}{\Atm} \MID \UNIOP{\key{uniop}}{\Atm} \\
   &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} \\
-  &\MID& \LET{\Var}{\Exp}{\Exp}\\
+%  &\MID& \LET{\Var}{\Exp}{\Exp}\\
 \Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
         &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{*}}{\Stmt^{*}}\\
-P^{\mathsf{ANF}}_{\mathsf{if}}  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
+\LangIfANF  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
 \end{array}
 \]
 \fi}
@@ -8775,7 +8775,7 @@ conclusion:
 \path[->,bend right=15] (C-1) edge [left] node {\ttfamily\footnotesize select\_instr.} (x86-1);
 \path[->,bend right=15] (x86-1) edge [below] node {\ttfamily\footnotesize assign\_homes} (x86-2);
 \path[->,bend left=15] (x86-2) edge [above] node {\ttfamily\footnotesize patch\_instr.} (x86-3);
-\path[->,bend right=15] (x86-3) edge [below] node {\ttfamily\footnotesize print\_x86 } (x86-4);
+\path[->,bend right=15] (x86-3) edge [below] node {\ttfamily\footnotesize prelude\_and\_concl. } (x86-4);
 \end{tikzpicture}
 \fi}
 \caption{Diagram of the passes for \LangIf{}, a language with conditionals.}
@@ -9637,10 +9637,10 @@ before register allocation.
 (define (main) : Integer
    mainstart:
       movq $0, sum
-      movq $5, i2
+      movq $5, i
       jmp block5
    block5:
-      movq i2, tmp3
+      movq i, tmp3
       cmpq tmp3, $0
       jl block7
       jmp block8
@@ -9651,10 +9651,10 @@ before register allocation.
 
     
    block7:
-      addq i2, sum
+      addq i, sum
       movq $1, tmp4
       negq tmp4
-      addq tmp4, i2
+      addq tmp4, i
       jmp block5
    block8:
       movq $27, %rax
@@ -9737,28 +9737,28 @@ sets.
 \begin{center}
   \begin{lstlisting}
 mainstart: {}
-block5: {i2}
-block7: {i2, sum}
+block5: {i}
+block7: {i, sum}
 block8: {rsp, sum}
 \end{lstlisting}
 \end{center}
 
 For the second round, the live-after for \code{mainstart} is the
-current live-before for \code{block5}, which is \code{\{i2\}}.  So the
+current live-before for \code{block5}, which is \code{\{i\}}.  So the
 liveness analysis for \code{mainstart} computes the empty set. The
 live-after for \code{block5} is the union of the live-before sets for
-\code{block7} and \code{block8}, which is \code{\{i2 , rsp, sum\}}.
-So the liveness analysis for \code{block5} computes \code{\{i2 , rsp,
+\code{block7} and \code{block8}, which is \code{\{i , rsp, sum\}}.
+So the liveness analysis for \code{block5} computes \code{\{i , rsp,
   sum\}}.  The live-after for \code{block7} is the live-before for
-\code{block5} (from the previous iteration), which is \code{\{i2\}}.
-So the liveness analysis for \code{block7} remains \code{\{i2,
+\code{block5} (from the previous iteration), which is \code{\{i\}}.
+So the liveness analysis for \code{block7} remains \code{\{i,
   sum\}}.  Together these yield the following approximation $m_2$ of
 the live-before sets.
 \begin{center}
   \begin{lstlisting}
 mainstart: {}
-block5: {i2, rsp, sum}
-block7: {i2, sum}
+block5: {i, rsp, sum}
+block7: {i, sum}
 block8: {rsp, sum}
 \end{lstlisting}
 \end{center}
@@ -9770,13 +9770,13 @@ for \code{mainstart} and \code{block7} are updated to include
 \begin{center}
   \begin{lstlisting}
 mainstart: {rsp}
-block5: {i2, rsp, sum}
-block7: {i2, rsp, sum}
+block5: {i, rsp, sum}
+block7: {i, rsp, sum}
 block8: {rsp, sum}
 \end{lstlisting}
 \end{center}
 Because \code{block7} changed, we analyze \code{block5} once more, but
-its live-before set remains \code{\{ i2, rsp, sum \}}.  At this point
+its live-before set remains \code{\{ i, rsp, sum \}}.  At this point
 our approximations have converged, so $m_3$ is the solution.
 
 This iteration process is guaranteed to converge to a solution by the
@@ -9871,8 +9871,9 @@ the mapping for this block is updated and its successor nodes are
 pushed onto the work list.
 
 \begin{figure}[tb]
+{\if\edition\racketEd    
 \begin{lstlisting}
-(define (analyze-dataflow G transfer bottom join)
+(define (analyze_dataflow G transfer bottom join)
   (define mapping (make-hash))
   (for ([v (in-vertices G)])
     (dict-set! mapping v bottom))
@@ -9892,6 +9893,27 @@ pushed onto the work list.
              (enqueue! worklist v))]))
   mapping)
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+def analyze_dataflow(G, transfer, bottom, join):
+    trans_G = transpose(G)
+    mapping = {}
+    for v in G.vertices():
+        mapping[v] = bottom
+    worklist = deque()
+    for v in G.vertices():
+        worklist.append(v)
+    while worklist:
+        node = worklist.pop()
+        input = reduce(join, [mapping[v] for v in trans_G.adjacent(node)], bottom)
+        output = transfer(node, input)
+        if output != mapping[node]:
+            mapping[node] = output
+            for v in G.adjacent(node):
+                worklist.append(v)
+\end{lstlisting}
+\fi}
 \caption{Generic work list algorithm for dataflow analysis}
   \label{fig:generic-dataflow}
 \end{figure}
@@ -9905,16 +9927,31 @@ existing passes.
 \section{Remove Complex Operands}
 \label{sec:rco-loop}
 
+{\if\edition\racketEd
+%
 The three new language forms, \code{while}, \code{set!}, and
 \code{begin} are all complex expressions and their subexpressions are
-allowed to be complex.  Figure~\ref{fig:Rfun-anf-syntax} defines the
-output language \LangFunANF{} of this pass.
+allowed to be complex.
+%
+\fi}
+{\if\edition\pythonEd
+%
+The change needed for this pass is to add a case for the \code{while}
+statement. The condition of a \code{while} loop is allowed to be a
+complex expression, just like the condition of the \code{if}
+statement.
+%
+\fi}  
+%
+Figure~\ref{fig:Rwhile-anf-syntax} defines the output language
+\LangLoopANF{} of this pass.
 
 \begin{figure}[tp]
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \small
+{\if\edition\racketEd    
 \[
 \begin{array}{rcl}
 \Atm &::=& \gray{ \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}}
@@ -9923,15 +9960,32 @@ output language \LangFunANF{} of this pass.
     &\MID& \WHILE{\Exp}{\Exp} \MID \SETBANG{\Var}{\Exp}
    \MID \BEGIN{\LP\Exp\ldots\RP}{\Exp} \\
 \Def &::=& \gray{ \FUNDEF{\Var}{([\Var \code{:} \Type]\ldots)}{\Type}{\code{'()}}{\Exp} }\\
-R^{\dagger}_8  &::=& \gray{ \PROGRAMDEFS{\code{'()}}{\Def} }
+\LangLoopANF  &::=& \gray{ \PROGRAMDEFS{\code{'()}}{\Def} }
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd
+\[
+\begin{array}{rcl}
+\Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}}\\
+\Exp &::=& \Atm \MID \READ{} \\
+  &\MID& \BINOP{\itm{binop}}{\Atm}{\Atm} \MID \UNIOP{\key{uniop}}{\Atm} \\
+  &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} \\
+%  &\MID& \LET{\Var}{\Exp}{\Exp}\\
+\Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
+  &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
+  &\MID& \WHILESTMT{\Exp}{\Stmt^{+}} \\
+\LangLoopANF  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
+\end{array}
+\]
+\fi}
 \end{minipage}
 }
 \caption{\LangLoopANF{} is \LangLoop{} in administrative normal form (ANF).}
 \label{fig:Rwhile-anf-syntax}
 \end{figure}
 
+{\if\edition\racketEd    
 As usual, when a complex expression appears in a grammar position that
 needs to be atomic, such as the argument of a primitive operator, we
 must introduce a temporary variable and bind it to the complex
@@ -9959,8 +10013,12 @@ fine to place \code{begin} there.
           (+ tmp4 x0))))))
 \end{lstlisting}
 
-\section{Explicate Control and \LangCLoop{}}
+\fi}
+
+\section{Explicate Control \racket{and \LangCLoop{}}}
 \label{sec:explicate-loop}
+
+{\if\edition\racketEd
 
 Recall that in the \code{explicate\_control} pass we define one helper
 function for each kind of position in the program.  For the \LangVar{}
@@ -9974,10 +10032,10 @@ generate better code by taking this fact into account.
 
 The output language of \code{explicate\_control} is \LangCLoop{}
 (Figure~\ref{fig:c7-syntax}), which is nearly identical to
-\LangCLam{}. The only syntactic difference is that \code{Call},
-\code{vector-set!}, and \code{read} may also appear as statements.
-The most significant difference between \LangCLam{} and \LangCLoop{}
-is that the control-flow graphs of the later may contain cycles.
+\LangCLam{}. The only syntactic difference is that \code{Call} and
+\code{read} may also appear as statements.  The most significant
+difference between \LangCLam{} and \LangCLoop{} is that the
+control-flow graphs of the later may contain cycles.
 
 
 \begin{figure}[tp]
@@ -9989,7 +10047,7 @@ is that the control-flow graphs of the later may contain cycles.
 \Stmt &::=& \gray{ \ASSIGN{\VAR{\Var}}{\Exp} 
        \MID \LP\key{Collect} \,\itm{int}\RP } \\
      &\MID& \CALL{\Atm}{\LP\Atm\ldots\RP} \MID \READ{}\\
-     &\MID& \LP\key{Prim}~\key{'vector-set!}\,\LP\key{list}\,\Atm\,\INT{\Int}\,\Atm\RP\RP \\
+%     &\MID& \LP\key{Prim}~\key{'vector-set!}\,\LP\key{list}\,\Atm\,\INT{\Int}\,\Atm\RP\RP \\
 \Def &::=& \DEF{\itm{label}}{\LP\LS\Var\key{:}\Type\RS\ldots\RP}{\Type}{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP}\\
 \LangCLoopM{} & ::= & \PROGRAMDEFS{\itm{info}}{\LP\Def\ldots\RP} 
 \end{array}
@@ -10026,6 +10084,23 @@ need to be updated. The three new language forms, \code{while},
 positions.  Only \code{begin} may appear in predicate positions; the
 other two have result type \code{Void}.
 
+\fi}
+%
+{\if\edition\pythonEd
+%
+The output of this pass is the language \LangCIf{}. No new language
+features are needed in the output because a \code{while} loop can be
+expressed in terms of \code{goto} and \code{if} statements, which are
+already in \LangCIf{}.
+%  
+Add a case for the \code{while} statement to the
+\code{explicate\_stmt} method, using \code{explicate\_pred} to process
+the condition expression.
+%
+\fi}
+
+{\if\edition\racketEd
+  
 \section{Select Instructions}
 \label{sec:select-instructions-loop}
 
@@ -10036,6 +10111,8 @@ stand-alone statements instead of only appearing on the right-hand
 side of an assignment statement. The code generation is nearly
 identical; just leave off the instruction for moving the result into
 the left-hand side.
+
+\fi}
 
 \section{Register Allocation}
 \label{sec:register-allocation-loop}
@@ -10048,30 +10125,39 @@ allocation.
 \subsection{Liveness Analysis}
 \label{sec:liveness-analysis-r8}
 
-We recommend using the generic \code{analyze-dataflow} function that
+We recommend using the generic \code{analyze\_dataflow} function that
 was presented at the end of Section~\ref{sec:dataflow-analysis} to
 perform liveness analysis, replacing the code in
 \code{uncover\_live} that processed the basic blocks in topological
 order (Section~\ref{sec:liveness-analysis-Lif}).
 
-The \code{analyze-dataflow} function has four parameters.
+The \code{analyze\_dataflow} function has four parameters.
 \begin{enumerate}
 \item The first parameter \code{G} should be a directed graph from the
+  \racket{
   \code{racket/graph} package (see the sidebar in
-  Section~\ref{sec:build-interference}) that represents the
+  Section~\ref{sec:build-interference})}
+  \python{\code{graph.py} file in the support code}  
+  that represents the
   control-flow graph.
 \item The second parameter \code{transfer} is a function that applies
   liveness analysis to a basic block. It takes two parameters: the
   label for the block to analyze and the live-after set for that
   block.  The transfer function should return the live-before set for
-  the block.  Also, as a side-effect, it should update the block's
-  $\itm{info}$ with the liveness information for each instruction. To
-  implement the \code{transfer} function, you should be able to reuse
-  the code you already have for analyzing basic blocks.
-\item The third and fourth parameters of \code{analyze-dataflow} are
+  the block.
+  %
+  \racket{Also, as a side-effect, it should update the block's
+    $\itm{info}$ with the liveness information for each instruction.}
+  %
+  \python{Also, as a side-effect, it should update the live-before and
+    live-after sets for each instruction.}
+  %
+  To implement the \code{transfer} function, you should be able to
+  reuse the code you already have for analyzing basic blocks.
+\item The third and fourth parameters of \code{analyze\_dataflow} are
   \code{bottom} and \code{join} for the lattice of abstract states,
   i.e.  sets of locations. The bottom of the lattice is the empty set
-  \code{(set)} and the join operator is \code{set-union}.
+  and the join operator is set union.
 \end{enumerate}
 
 
@@ -10086,7 +10172,7 @@ The \code{analyze-dataflow} function has four parameters.
 %\node (F1-3) at (6,0)  {\large \LangLoopFunRef{}};
 \node (F1-4) at (6,2)  {\large \LangLoop{}};
 \node (F1-5) at (9,2)  {\large \LangLoop{}};
-\node (C3-2) at (3,0)  {\large \LangCLoop{}};
+\node (C3-2) at (3,0)  {\large \racket{\LangCLoop{}}\python{\LangCIf{}}};
 
 \node (x86-2) at (3,-2)  {\large \LangXIfVar{}};
 \node (x86-2-1) at (3,-4)  {\large \LangXIfVar{}};
@@ -10126,9 +10212,9 @@ The \code{analyze-dataflow} function has four parameters.
      {\ttfamily\footnotesize allocate\_reg.} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node
      {\ttfamily\footnotesize patch\_instr.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print-x86} (x86-5);
+\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize prelude\_and\_concl.} (x86-5);
 \end{tikzpicture}
-  \caption{Diagram of the passes for \LangLoop{} (loops and assignment).}
+  \caption{Diagram of the passes for \LangLoop{}.}
 \label{fig:Rwhile-passes}
 \end{figure}
 
