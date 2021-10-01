@@ -7403,19 +7403,24 @@ Run the script to test your compiler.
 \section{Remove Complex Operands}
 \label{sec:remove-complex-opera-Lif}
 
-The output language of \code{remove\_complex\_operands} is \LangIfANF{}
-(Figure~\ref{fig:Lif-anf-syntax}), the administrative normal form of
-\LangIf{}.  A Boolean constant is an atomic expressions but the
-\code{if} expression is not.
-All three sub-expressions of an
+The output language of \code{remove\_complex\_operands} is
+\LangIfANF{} (Figure~\ref{fig:Lif-anf-syntax}), the administrative
+normal form of \LangIf{}.  A Boolean constant is an atomic expressions
+but the \code{if} expression is not.  All three sub-expressions of an
 \code{if} are allowed to be complex expressions but the operands of
 \code{not} and the comparisons must be atomic.
 %
 \python{We add a new language form, the \code{Let} expression, to aid
-  in the translation of \code{if} expressions.  The
-  $\LET{x}{e_1}{e_2}$ form is like an assignment statement, but can be
-  used as an expression. It assigns the result of $e_1$ to the
-  variable $x$, an then evaluates $e_2$, which may reference $x$.}
+  in the translation of \code{if} expressions. When we recursively
+  process the two branches of the \code{if}, we generate temporary
+  variables and their initializing expressions. However, these
+  expressions may contain side effects and should only be executed
+  when the condition of the \code{if} is true (for the ``then''
+  branch) or false (for the ``else'' branch). The \code{Let} provides
+  a way to initialize the temporary variables within the two branches
+  of the \code{if} expression.  In general, the $\LET{x}{e_1}{e_2}$
+  form assigns the result of $e_1$ to the variable $x$, an then
+  evaluates $e_2$, which may reference $x$.}
 
 Add cases for Boolean constants, \python{comparisons,} and \code{if}
 expressions to the \code{rco\_exp} and \code{rco\_atom} functions
@@ -7449,7 +7454,7 @@ R^{\mathsf{ANF}}_{\mathsf{if}}  &::=& \PROGRAM{\code{()}}{\Exp}
 \Exp &::=& \Atm \MID \READ{} \\
   &\MID& \BINOP{\itm{binop}}{\Atm}{\Atm} \MID \UNIOP{\key{uniop}}{\Atm} \\
   &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} \\
-%  &\MID& \LET{\Var}{\Exp}{\Exp}\\
+  &\MID& \LET{\Var}{\Exp}{\Exp}\\
 \Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
         &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{*}}{\Stmt^{*}}\\
 \LangIfANF  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
@@ -7555,7 +7560,7 @@ For example, we want to generate the following code for the inner
 \begin{minipage}{0.96\textwidth}
 \begin{lstlisting}
     cmpq $1, x
-    je then_branch_1
+    jl then_branch_1
     jmp else_branch_1
 \end{lstlisting}
 \end{minipage}
@@ -9338,22 +9343,15 @@ the condition remains true.
   \Exp &::=& \gray{ \Int \MID \CREAD{} \MID \CNEG{\Exp}
      \MID \CADD{\Exp}{\Exp} \MID \CSUB{\Exp}{\Exp} }  \\
     &\MID&  \gray{ \Var \MID \CLET{\Var}{\Exp}{\Exp} }\\
-    &\MID& \gray{\key{\#t} \MID \key{\#f} 
+    &\MID& \gray{\itm{bool} 
      \MID (\key{and}\;\Exp\;\Exp) 
      \MID (\key{or}\;\Exp\;\Exp) 
      \MID (\key{not}\;\Exp) } \\
-    &\MID& \gray{ (\key{eq?}\;\Exp\;\Exp) \MID \CIF{\Exp}{\Exp}{\Exp} } \\
-    &\MID& \gray{ (\key{vector}\;\Exp\ldots) \MID
-          (\key{vector-ref}\;\Exp\;\Int)} \\
-    &\MID& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\MID (\key{void})
-    \MID (\Exp \; \Exp\ldots) } \\
-    &\MID& \gray{ \LP \key{procedure-arity}~\Exp\RP 
-    \MID \CLAMBDA{\LP\LS\Var \key{:} \Type\RS\ldots\RP}{\Type}{\Exp} } \\
-  &\MID& \CSETBANG{\Var}{\Exp}
+    &\MID& \gray{ (\itm{cmp}\;\Exp\;\Exp) \MID \CIF{\Exp}{\Exp}{\Exp} } \\
+   &\MID& \CSETBANG{\Var}{\Exp}
   \MID \CBEGIN{\Exp\ldots}{\Exp}
   \MID \CWHILE{\Exp}{\Exp} \\
-  \Def &::=& \gray{ \CDEF{\Var}{\LS\Var \key{:} \Type\RS\ldots}{\Type}{\Exp} } \\
-  \LangLoopM{} &::=& \gray{\Def\ldots \; \Exp}
+  \LangLoopM{} &::=& \gray{\Exp}
 \end{array}
 \]
 \fi}
@@ -9389,13 +9387,9 @@ the condition remains true.
        &\MID& \gray{ \PRIM{\itm{op}}{\Exp\ldots} }\\
      &\MID& \gray{ \BOOL{\itm{bool}}
       \MID \IF{\Exp}{\Exp}{\Exp} } \\
-     &\MID& \gray{ \VOID{} \MID \LP\key{HasType}~\Exp~\Type \RP 
-     \MID \APPLY{\Exp}{\Exp\ldots} }\\
-  &\MID& \gray{ \LAMBDA{\LP\LS\Var\code{:}\Type\RS\ldots\RP}{\Type}{\Exp} }\\
   &\MID& \SETBANG{\Var}{\Exp} \MID \BEGIN{\LP\Exp\ldots\RP}{\Exp}
    \MID \WHILE{\Exp}{\Exp} \\
- \Def &::=& \gray{ \FUNDEF{\Var}{\LP\LS\Var \code{:} \Type\RS\ldots\RP}{\Type}{\code{'()}}{\Exp} }\\
-  \LangLoopM{} &::=& \gray{ \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp} }
+  \LangLoopM{} &::=& \gray{ \PROGRAM{\code{'()}}{\Exp} }
 \end{array}
 \]
 \fi}
