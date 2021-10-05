@@ -22,7 +22,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{1}
+\def\edition{0}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd{#1}\fi}}
@@ -6485,7 +6485,7 @@ Figure~\ref{fig:interp-Lif} defines the interpreter for \LangIf{},
 which inherits from the interpreter for \LangVar{}
 (Figure~\ref{fig:interp-Lvar}). The literals \TRUE{} and \FALSE{}
 evaluate to the corresponding Boolean values. The conditional
-expression $(\CIF{e_1}{e_2}{\itm{e_3}})$ evaluates expression $e_1$
+expression $\CIF{e_1}{e_2}{\itm{e_3}}$ evaluates expression $e_1$
 and then either evaluates $e_2$ or $e_3$ depending on whether
 $e_1$ produced \TRUE{} or \FALSE{}. The logical operations
 \code{and}, \code{or}, and \code{not} behave according to propositional logic,
@@ -6502,8 +6502,9 @@ evaluated if $e_1$ evaluates to \TRUE{}.
   interpreter would become repetitive without some care.  We refactor
   the case for \code{Prim}, moving the code that differs with each
   operation into the \code{interp\_op} method shown in in
-  Figure~\ref{fig:interp-op-Lif}. We handle the \code{and} operation
-  separately because of its short-circuiting behavior.}
+  Figure~\ref{fig:interp-op-Lif}. We handle the \code{and} and
+  \code{or} operations separately because of their short-circuiting
+  behavior.}
 
 \begin{figure}[tbp]
 {\if\edition\racketEd    
@@ -6526,6 +6527,11 @@ evaluated if $e_1$ evaluates to \TRUE{}.
          (match (recur e1)
            [#t (match (recur e2) [#t #t] [#f #f])]
            [#f #f])]
+        [(Prim 'or (list e1 e2))
+         (define v1 (recur e1))
+         (match v1
+           [#t #t]
+           [#f (match (recur e2) [#t #t] [#f #f])])]
         [(Prim op args)
          (apply (interp_op op) (for/list ([e args]) (recur e)))]
         [else ((super interp_exp env) e)]))
@@ -6596,9 +6602,6 @@ class InterpLif(InterpLvar):
     ['- fx-]
     ['read read-fixnum]
     ['not (lambda (v) (match v [#t #f] [#f #t]))]
-    ['or (lambda (v1 v2)
-           (cond [(and (boolean? v1) (boolean? v2))
-                  (or v1 v2)]))]
     ['eq? (lambda (v1 v2)
             (cond [(or (and (fixnum? v1) (fixnum? v2))
                        (and (boolean? v1) (boolean? v2))
@@ -7477,7 +7480,7 @@ R^{\mathsf{ANF}}_{\mathsf{if}}  &::=& \PROGRAM{\code{()}}{\Exp}
 Add cases for Boolean constants and \code{if} to the \code{rco\_atom}
 and \code{rco\_exp} functions in \code{compiler.rkt}.
 %
-Create three new \LangInt{} programs that exercise the interesting
+Create three new \LangIf{} programs that exercise the interesting
 code in this pass.
 %
 {\if\edition\racketEd    
