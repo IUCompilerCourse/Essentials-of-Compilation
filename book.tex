@@ -9357,7 +9357,7 @@ the condition remains true.
     &\MID& \gray{ (\itm{cmp}\;\Exp\;\Exp) \MID \CIF{\Exp}{\Exp}{\Exp} } \\
    &\MID& \CSETBANG{\Var}{\Exp}
   \MID \CBEGIN{\Exp\ldots}{\Exp}
-  \MID \CWHILE{\Exp}{\Exp} \\
+  \MID \CWHILE{\Exp}{\Exp} \MID \LP\key{void}\RP \\
   \LangLoopM{} &::=& \gray{\Exp}
 \end{array}
 \]
@@ -9395,7 +9395,8 @@ the condition remains true.
      &\MID& \gray{ \BOOL{\itm{bool}}
       \MID \IF{\Exp}{\Exp}{\Exp} } \\
   &\MID& \SETBANG{\Var}{\Exp} \MID \BEGIN{\LP\Exp\ldots\RP}{\Exp}
-   \MID \WHILE{\Exp}{\Exp} \\
+    \MID \WHILE{\Exp}{\Exp} \\
+    &\MID& \VOID{}  \\
   \LangLoopM{} &::=& \gray{ \PROGRAM{\code{'()}}{\Exp} }
 \end{array}
 \]
@@ -9436,14 +9437,14 @@ Figure~\ref{fig:interp-Rwhile}.
 %
 {\if\edition\racketEd    
 %
-We add three new cases for \code{SetBang},
-\code{WhileLoop}, and \code{Begin} and we make changes to the cases
-for \code{Var}, \code{Let}, and \code{Apply} regarding variables. To
-support assignment to variables and to make their lifetimes indefinite
-(see the second example in Section~\ref{sec:assignment-scoping}), we
-box the value that is bound to each variable (in \code{Let}) and
-function parameter (in \code{Apply}). The case for \code{Var} unboxes
-the value.
+We add new cases for \code{SetBang}, \code{WhileLoop}, \code{Begin},
+and \code{Void} and we make changes to the cases for \code{Var},
+\code{Let}, and \code{Apply} regarding variables. To support
+assignment to variables and to make their lifetimes indefinite (see
+the second example in Section~\ref{sec:assignment-scoping}), we box
+the value that is bound to each variable (in \code{Let}) and function
+parameter (in \code{Apply}). The case for \code{Var} unboxes the
+value.
 %
 Now to discuss the new cases. For \code{SetBang}, we lookup the
 variable in the environment to obtain a boxed value and then we change
@@ -9454,9 +9455,11 @@ For the \code{WhileLoop}, we repeatedly 1) evaluate the condition, and
 if the result is true, 2) evaluate the body.
 The result value of a \code{while} loop is also \code{void}.
 %
-Finally, the $\BEGIN{\itm{es}}{\itm{body}}$ expression evaluates the
+The $\BEGIN{\itm{es}}{\itm{body}}$ expression evaluates the
 subexpressions \itm{es} for their effects and then evaluates
 and returns the result from \itm{body}.
+%
+The $\VOID{}$ expression produces the \code{void} value.
 %
 \fi}
 {\if\edition\pythonEd
@@ -9488,6 +9491,7 @@ function, where we repeatedly interpret the \code{body} so long as the
         [(Begin es body)
          (for ([e es]) (recur e))
          (recur body)]
+        [(Void)  (void)]
         [else ((super interp-exp env) e)]))
     ))
 
@@ -9520,11 +9524,14 @@ Figure~\ref{fig:type-check-Rwhile}.
 %
 {\if\edition\racketEd    
 %
-For \code{SetBang}, the type of the variable and the right-hand-side
-must agree. The result type is \code{Void}. For the \code{WhileLoop},
-the condition must be a \code{Boolean}. The result type is also
-\code{Void}.  For \code{Begin}, the result type is the type of its
-last subexpression.
+For \LangLoop{} we add a type named \code{Void} and the only value of
+this type is the \code{void} value.
+%
+The type checking of the \code{SetBang} expression requires the type of
+the variable and the right-hand-side to agree. The result type is
+\code{Void}. For \code{while}, the condition must be a
+\code{Boolean}. The result type is also \code{Void}.  For
+\code{Begin}, the result type is the type of its last subexpression.
 %
 \fi}
 %
@@ -10303,7 +10310,7 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
    \MID \LP\key{vector-length}\;\Exp\RP \\
   &\MID& \LP\key{vector-ref}\;\Exp\;\Int\RP
    \MID \LP\key{vector-set!}\;\Exp\;\Int\;\Exp\RP \\
-  &\MID& \LP\key{void}\RP \MID \LP\key{has-type}~\Exp~\Type\RP\\
+  &\MID& \LP\key{has-type}~\Exp~\Type\RP\\
   \LangVecM{} &::=& \Exp
 \end{array}
 \]
@@ -10339,7 +10346,7 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
       \MID \IF{\Exp}{\Exp}{\Exp} } \\
     &\MID& \VECREF{\Exp}{\INT{\Int}}\\
     &\MID& \VECSET{\Exp}{\INT{\Int}}{\Exp} \\
-     &\MID& \VOID{} \MID \LP\key{HasType}~\Exp~\Type \RP \\
+     &\MID& \LP\key{HasType}~\Exp~\Type \RP \\
   \LangVecM{} &::=& \PROGRAM{\key{'()}}{\Exp}
 \end{array}
 \]
