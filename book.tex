@@ -216,7 +216,7 @@ concepts and algorithms used in compilers.
 \item Chapter~\ref{ch:Lif} adds \code{if} expressions, which motivates
   an elegant recursive algorithm for translating them into conditional
   \code{goto}'s.
-\item Chapter~\ref{ch:Rwhile} fleshes out support for imperative
+\item Chapter~\ref{ch:Lwhile} fleshes out support for imperative
   programming languages with the addition of loops\racket{ and mutable
   variables}. This elicits the need for \emph{dataflow
     analysis} in the register allocator.
@@ -297,7 +297,7 @@ University of Vermont.
   \node (C4) at (0,0) {\small Ch.~\ref{ch:Lif} Conditionals};
   \node (C5) at (4,0) {\small Ch.~\ref{ch:Rvec} Tuples};
   \node (C6) at (8,0) {\small Ch.~\ref{ch:Rfun} Functions};
-  \node (C9) at (0,-1.5) {\small Ch.~\ref{ch:Rwhile} Loops};
+  \node (C9) at (0,-1.5) {\small Ch.~\ref{ch:Lwhile} Loops};
   \node (C8) at (4,-1.5) {\small Ch.~\ref{ch:Rdyn} Dynamic};
   \node (C7) at (8,-1.5) {\small Ch.~\ref{ch:Rlam} Lambda};
   \node (C10) at (4,-3) {\small Ch.~\ref{ch:Rgrad} Gradual Typing};
@@ -323,7 +323,7 @@ University of Vermont.
   \node (C4) at (0,0) {\small Ch.~\ref{ch:Lif} Conditionals};
   \node (C5) at (4,0) {\small Ch.~\ref{ch:Rvec} Tuples};
   \node (C6) at (8,0) {\small Ch.~\ref{ch:Rfun} Functions};
-  \node (C9) at (0,-1.5) {\small Ch.~\ref{ch:Rwhile} Loops};
+  \node (C9) at (0,-1.5) {\small Ch.~\ref{ch:Lwhile} Loops};
   \node (C8) at (4,-1.5) {\small Ch.~\ref{ch:Rdyn} Dynamic};
   \node (CO) at (0,-3) {\small Ch.~\ref{ch:Robject} Objects};
   \node (C7) at (8,-1.5) {\small Ch.~\ref{ch:Rlam} Lambda};
@@ -8418,7 +8418,7 @@ applies the topological sort algorithm.
 As an aside, a topological ordering is only guaranteed to exist if the
 graph does not contain any cycles. This is the case for the
 control-flow graphs that we generate from \LangIf{} programs.
-However, in Chapter~\ref{ch:Rwhile} we add loops to create \LangLoop{}
+However, in Chapter~\ref{ch:Lwhile} we add loops to create \LangLoop{}
 and learn how to handle cycles in the control-flow graph.
 
 \racket{You'll need to construct a directed graph to represent the
@@ -9275,7 +9275,7 @@ such as the case-of-case transformation of \citet{PeytonJones:1998}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Loops and Dataflow Analysis}
-\label{ch:Rwhile}
+\label{ch:Lwhile}
 
 % TODO: define R'_8
 
@@ -10246,17 +10246,14 @@ for the compilation of \LangLoop{}.
 \index{subject}{tuple}
 \index{subject}{vector}
 
-\if\edition\racketEd
-
 %% \margincomment{\scriptsize To do: Flesh out this chapter, e.g., make sure
 %%   all the IR grammars are spelled out! \\ --Jeremy}
 %% \margincomment{\scriptsize Be more explicit about how to deal with
 %%   the root stack. \\ --Jeremy}
 
-In this chapter we study the implementation of tuples
-\racket{, called vectors in Racket}.
+In this chapter we study the implementation of tuples\racket{, called vectors in Racket}.
 %
-This language feature is the first to use the computer's
+This language feature is the first of ours to use the computer's
 \emph{heap}\index{subject}{heap} because the lifetime of a tuple is
 indefinite, that is, a tuple lives forever from the programmer's
 viewpoint. Of course, from an implementer's viewpoint, it is important
@@ -10265,8 +10262,8 @@ needed, which is why we also study \emph{garbage collection}
 \index{garbage collection} techniques in this chapter.
 
 Section~\ref{sec:r3} introduces the \LangVec{} language including its
-interpreter and type checker. The \LangVec{} language extends the \LangIf{}
-language of Chapter~\ref{ch:Lif} with tuple.
+interpreter and type checker. The \LangVec{} language extends the \LangLoop{}
+language of Chapter~\ref{ch:Lwhile} with tuple.
 
 Section~\ref{sec:GC} describes a garbage collection algorithm based on
 copying live objects back and forth between two halves of the
@@ -10282,22 +10279,30 @@ passes, including a new compiler pass named \code{expose-allocation}.
 \label{sec:r3}
 
 Figure~\ref{fig:Rvec-concrete-syntax} defines the concrete syntax for
-\LangVec{} and Figure~\ref{fig:Rvec-syntax} defines the abstract syntax.  The
-\LangVec{} language includes three new forms: \code{vector} for creating a
-tuple, \code{vector-ref} for reading an element of a tuple, and
-\code{vector-set!} for writing to an element of a tuple. The program
-in Figure~\ref{fig:vector-eg} shows the usage of tuples in Racket. We
-create a 3-tuple \code{t} and a 1-tuple that is stored at index $2$ of
-the 3-tuple, demonstrating that tuples are first-class values.  The
-element at index $1$ of \code{t} is \code{\#t}, so the ``then'' branch
-of the \key{if} is taken.  The element at index $0$ of \code{t} is
-\code{40}, to which we add \code{2}, the element at index $0$ of the
-1-tuple. So the result of the program is \code{42}.
+\LangVec{} and Figure~\ref{fig:Rvec-syntax} defines the abstract syntax.
+%
+\racket{The \LangVec{} language includes the forms: \code{vector} for
+  creating a tuple, \code{vector-ref} for reading an element of a
+  tuple, and \code{vector-set!} for writing to an element of a tuple.}
+%
+\python{The \LangVec{} language includes tuple creation via a
+  comma-separated list of expressions and it supports accessing an
+  element of a tuple with the square bracket notation, i.e.,
+  \code{t[n]} returns the nth element of the tuple \code{t}.}
+%
+The program in Figure~\ref{fig:vector-eg} shows the usage of
+tuples. We create a 3-tuple \code{t} and a 1-tuple that is stored at
+index $2$ of the 3-tuple, demonstrating that tuples are first-class
+values.  The element at index $1$ of \code{t} is \racket{\code{\#t}}\python{True}, so the
+``then'' branch of the \key{if} is taken.  The element at index $0$ of
+\code{t} is \code{40}, to which we add \code{2}, the element at index
+$0$ of the 1-tuple. So the result of the program is \code{42}.
 
 \begin{figure}[tbp]
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
+{\if\edition\racketEd    
 \[
 \begin{array}{lcl}
   \Type &::=& \gray{\key{Integer} \MID \key{Boolean}}
@@ -10310,6 +10315,9 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
    \MID \LP\key{not}\;\Exp\RP } \\
   &\MID& \gray{  \LP\itm{cmp}\;\Exp\;\Exp\RP 
    \MID \CIF{\Exp}{\Exp}{\Exp}  } \\
+   &\MID& \gray{ \CSETBANG{\Var}{\Exp}
+    \MID \CBEGIN{\Exp\ldots}{\Exp}
+    \MID \CWHILE{\Exp}{\Exp} \MID \LP\key{void}\RP } \\
   &\MID& \LP\key{vector}\;\Exp\ldots\RP 
    \MID \LP\key{vector-length}\;\Exp\RP \\
   &\MID& \LP\key{vector-ref}\;\Exp\;\Int\RP
@@ -10318,14 +10326,31 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
   \LangVecM{} &::=& \Exp
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd
+\[
+\begin{array}{rcl}
+  \itm{binop} &::= & \key{+} \MID \key{-} \MID \key{and} \MID \key{or} \MID \key{==} \MID \key{!=} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=} \\
+  \itm{uniop} &::= & \key{-} \MID \key{not} \\
+  \Exp &::=& \Int \MID \key{input\_int}\LP\RP \MID \CUNIOP{\itm{uniop}}{\Exp} \MID \CBINOP{\itm{binop}}{\Exp}{\Exp} \MID \Var{} \\
+  &\MID&  \TRUE \MID \FALSE \MID \CIF{\Exp}{\Exp}{\Exp} \\
+  &\MID& \Exp \key{,} \ldots \MID \CGET{\Exp}{\Exp} \\
+  \Stmt &::=& \key{print}\LP \Exp \RP \MID \Exp \MID \CASSIGN{\Var}{\Exp}
+         \MID \key{if}~ \Exp \key{:}~ \Stmt^{+} ~\key{else:}~ \Stmt^{+}\\
+        &\MID& \key{while}~ \Exp \key{:}~ \Stmt^{+}\\
+  \LangVecM{} &::=& \Stmt^{*}
+\end{array}
+\]
+\fi}
 \end{minipage}
 }
-\caption{The concrete syntax of \LangVec{}, extending \LangIf{}
-  (Figure~\ref{fig:Lif-concrete-syntax}).}
+\caption{The concrete syntax of \LangVec{}, extending \LangLoop{}
+  (Figure~\ref{fig:Lwhile-concrete-syntax}).}
 \label{fig:Rvec-concrete-syntax}
 \end{figure}
 
 \begin{figure}[tbp]
+{\if\edition\racketEd      
 \begin{lstlisting}
     (let ([t (vector 40 #t (vector 2))])
       (if (vector-ref t 1)
@@ -10333,6 +10358,13 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
              (vector-ref (vector-ref t 2) 0))
           44))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+t = 40, True, (2,)
+print( t[0] + t[2][0] if t[1] else 44 )
+\end{lstlisting}
+\fi}
 \caption{Example program that creates tuples and reads from them.}
 \label{fig:vector-eg}
 \end{figure}
@@ -10341,6 +10373,7 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
+{\if\edition\racketEd    
 \[
 \begin{array}{lcl}
   \itm{op} &::=& \ldots \MID \code{vector} \MID \code{vector-length} \\
@@ -10354,11 +10387,36 @@ of the \key{if} is taken.  The element at index $0$ of \code{t} is
   \LangVecM{} &::=& \PROGRAM{\key{'()}}{\Exp}
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd
+\[
+\begin{array}{lcl}
+\itm{binop} &::=& \code{Add()} \MID \code{Sub()} \\
+\itm{boolop} &::=& \code{And()} \MID \code{Or()} \\
+\itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \\
+\itm{uniop} &::=& \code{USub()} \MID \code{Not()} \\
+\itm{bool} &::=& \code{True} \MID \code{False} \\
+\Exp &::=& \INT{\Int} \MID \READ{} \MID \VAR{\Var} \\
+     &\MID& \BINOP{\Exp}{\itm{binop}}{\Exp}
+     \MID \UNIOP{\itm{uniop}}{\Exp}\\
+     &\MID& \CMP{\Exp}{\itm{cmp}}{\Exp} 
+     \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp}\\
+     &\MID& \BOOL{\itm{bool}} \MID \IF{\Exp}{\Exp}{\Exp} \\
+     &\MID& \TUPLE{\Exp^{+}} \MID \GET{\Exp}{\Exp}\\
+\Stmt{} &::=& \PRINT{\Exp} \MID \EXPR{\Exp} \\
+     &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
+     &\MID& \WHILESTMT{\Exp}{\Stmt^{+}}\\
+\LangLoopM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
+\end{array}
+\]
+\fi}
 \end{minipage}
 }
 \caption{The abstract syntax of \LangVec{}.}
 \label{fig:Rvec-syntax}
 \end{figure}
+
+\python{UNDER CONSTRUCTION}
 
 \index{subject}{allocate}
 \index{subject}{heap allocate}
@@ -11939,8 +11997,6 @@ from the set.
 \end{exercise}
 
 % Further Reading
-
-\fi % racketEd
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Functions}
