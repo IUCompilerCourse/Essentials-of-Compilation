@@ -3034,14 +3034,31 @@ print(tmp_1)
 \label{fig:Lvar-anf-syntax}
 \end{figure}
 
-Figure~\ref{fig:Lvar-anf-syntax} presents the grammar for the output of
-this pass, the language \LangVarANF{}. The only difference is that
+Figure~\ref{fig:Lvar-anf-syntax} presents the grammar for the output
+of this pass, the language \LangVarANF{}. The only difference is that
 operator arguments are restricted to be atomic expressions that are
 defined by the \Atm{} non-terminal. In particular, integer constants
-and variables are atomic. In the literature, restricting arguments to
-be atomic expressions is one of the ideas in \emph{administrative
-normal form}, or ANF for short~\citep{Danvy:1991fk,Flanagan:1993cg}.
+and variables are atomic. This restriction brings us closer to what is
+known as a \emph{three-address code}~\citep{Aho:1986qf} language.
+
+The atomic expressions are pure (they do not cause side-effects or
+depend on them) whereas complex expressions may have side effects,
+such as \READ{}.  A language with this separation between pure versus
+side-effecting expressions is said to be in monadic normal
+form~\citep{Moggi:1991in,Danvy:2003fk} which explains the \textit{mon}
+in \LangVarANF{}. An important invariant of the
+\code{remove\_complex\_operands} pass is that the relative ordering
+among complex expressions is not changed, but the relative ordering
+between atomic expressions and complex expressions can change and
+often does. The reason that these changes are behaviour preserving is
+that the atomic expressions are pure.
+
+Another well-known form is the \emph{administrative normal form}
+(ANF)~\citep{Danvy:1991fk,Flanagan:1993cg}.
 \index{subject}{administrative normal form} \index{subject}{ANF}
+%
+The \LangVarANF{} language is not quite in ANF because we allow the
+right-hand side of a \code{let} to be a complex expression.
 
 {\if\edition\racketEd
 We recommend implementing this pass with two mutually recursive
@@ -9267,11 +9284,13 @@ blocks on several test programs.
 \label{sec:cond-further-reading}
 
 The algorithm for the \code{explicate\_control} pass comes from the
-course notes of \citet{Dybvig:2010aa}. The use of lazy evaluation in
-Section~\ref{sec:opt-jumps} to optimize basic blocks is new.  There
-are algorithms similar to \code{explicate\_control} in the literature,
-such as the case-of-case transformation of \citet{PeytonJones:1998}.
-
+course notes of \citet{Dybvig:2010aa} and it has several similarities
+to an algorithm of \citet{Danvy:2003fk}. The use of lazy evaluation in
+Section~\ref{sec:opt-jumps} to prevent the generation of unused basic
+blocks appears to be new. The treatment of conditionals in the
+\code{explicate\_control} pass is similar to the case-of-case
+transformation of \citet{PeytonJones:1998} and to short-cut boolean
+evaluation~\citep{Logothetis:1981,Aho:1986qf,Clarke:1989,Danvy:2003fk}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Loops and Dataflow Analysis}
@@ -9730,12 +9749,13 @@ we are stuck.
 The way out of this impasse is to realize that we can compute an
 under-approximation of the live-before set by starting with empty
 live-after sets.  By \emph{under-approximation}, we mean that the set
-only contains variables that are really live, but it may be missing
-some.  Next, the under-approximations for each block can be improved
-by 1) updating the live-after set for each block using the approximate
-live-before sets from the other blocks and 2) perform liveness
-analysis again on each block.  In fact, by iterating this process, the
-under-approximations eventually become the correct solutions!
+only contains variables that are live for some execution of the
+program, but the set may be missing some variables.  Next, the
+under-approximations for each block can be improved by 1) updating the
+live-after set for each block using the approximate live-before sets
+from the other blocks and 2) perform liveness analysis again on each
+block.  In fact, by iterating this process, the under-approximations
+eventually become the correct solutions!
 %
 This approach of iteratively analyzing a control-flow graph is
 applicable to many static analysis problems and goes by the name
@@ -9749,10 +9769,7 @@ following mapping from label names to sets of locations (variables and
 registers).
 \begin{center}
 \begin{lstlisting}
-mainstart: {}
-block5: {}
-block7: {}
-block8: {}
+mainstart: {}, block5: {}, block7: {}, block8: {}
 \end{lstlisting}
 \end{center}
 Using the above live-before approximations, we determine the
@@ -9761,10 +9778,7 @@ block.  This produces our next approximation $m_1$ of the live-before
 sets.
 \begin{center}
   \begin{lstlisting}
-mainstart: {}
-block5: {i}
-block7: {i, sum}
-block8: {rsp, sum}
+mainstart: {}, block5: {i}, block7: {i, sum}, block8: {rsp, sum}
 \end{lstlisting}
 \end{center}
 
@@ -9781,10 +9795,7 @@ So the liveness analysis for \code{block7} remains \code{\{i,
 the live-before sets.
 \begin{center}
   \begin{lstlisting}
-mainstart: {}
-block5: {i, rsp, sum}
-block7: {i, sum}
-block8: {rsp, sum}
+mainstart: {}, block5: {i, rsp, sum}, block7: {i, sum}, block8: {rsp, sum}
 \end{lstlisting}
 \end{center}
 In the preceding iteration, only \code{block5} changed, so we can
@@ -9794,14 +9805,11 @@ for \code{mainstart} and \code{block7} are updated to include
 \code{rsp}, yielding the following approximation $m_3$.
 \begin{center}
   \begin{lstlisting}
-mainstart: {rsp}
-block5: {i, rsp, sum}
-block7: {i, rsp, sum}
-block8: {rsp, sum}
+mainstart: {rsp}, block5: {i,rsp,sum}, block7: {i,rsp,sum}, block8: {rsp,sum}
 \end{lstlisting}
 \end{center}
 Because \code{block7} changed, we analyze \code{block5} once more, but
-its live-before set remains \code{\{ i, rsp, sum \}}.  At this point
+its live-before set remains \code{\{i,rsp,sum\}}.  At this point
 our approximations have converged, so $m_3$ is the solution.
 
 This iteration process is guaranteed to converge to a solution by the
@@ -9836,9 +9844,9 @@ two mappings $m_i$ and $m_j$, $m_i \sqsubseteq_M m_j$ when $m_i(\ell)
 bottom element of $M$ is the mapping $\bot_M$ that sends every label
 to the empty set, i.e., $\bot_M(\ell) = \emptyset$.
 
-We can think of one iteration of liveness analysis as being a function
-$f$ on the lattice $M$. It takes a mapping as input and computes a new
-mapping.
+We can think of one iteration of liveness analysis applied to the
+whole program as being a function $f$ on the lattice $M$. It takes a
+mapping as input and computes a new mapping.
 \[
    f(m_i) = m_{i+1}
 \]
@@ -9863,7 +9871,7 @@ follows.\index{subject}{Kleene Fixed-Point Theorem}
   \sqsubseteq f^n(\bot) \sqsubseteq \cdots
 \]
 When a lattice contains only finitely-long ascending chains, then
-every Kleene chain tops out at some fixed point after a number of
+every Kleene chain tops out at some fixed point after some number of
 iterations of $f$.
 \[
 \bot \sqsubseteq f(\bot) \sqsubseteq f(f(\bot)) \sqsubseteq \cdots
@@ -9893,6 +9901,13 @@ function is then applied to obtain the \code{output} abstract
 state. If the output differs from the previous state for this block,
 the mapping for this block is updated and its successor nodes are
 pushed onto the work list.
+
+Note that the \code{analyze\_dataflow} function is formulated as a
+\emph{forward} dataflow analysis, that is, the inputs to the transfer
+function come from the predecessor nodes in the control-flow
+graph. However, liveness analysis is a \emph{backward} dataflow
+analysis, so in that case one must supply the \code{analyze\_dataflow}
+function with the transpose of the control-flow graph.
 
 \begin{figure}[tb]
 {\if\edition\racketEd    
@@ -10016,19 +10031,24 @@ modification to \code{remove\_complex\_operands} to handle
 \code{uncover-get!}, that we discuss in
 Section~\ref{sec:uncover-get-bang}.
 
-As an aside, this problematic interaction between \code{set!}  and
-\code{remove\_complex\_operands} is particular to Racket and not its
-predecessor, the Scheme language. The key difference is that Scheme
-does not specify an order of evaluation for the arguments of an
-operator or function call. Thus, a compiler for Scheme is free to
-choose any ordering: both \code{42} and \code{80} would be correct
-results for the example program.
+As an aside, this problematic interaction between \code{set!} and the
+pass \code{remove\_complex\_operands} is particular to Racket and not
+its predecessor, the Scheme language. The key difference is that
+Scheme does not specify an order of evaluation for the arguments of an
+operator or function call~\citep{SPERBER:2009aa}. Thus, a compiler for
+Scheme is free to choose any ordering: both \code{42} and \code{80}
+would be correct results for the example program. Interestingly,
+Racket is implemented on top of the Chez Scheme
+compiler~\citep{Dybvig:2006aa} and an approach similar to the one
+presented in this section (using extra \code{let} bindings to control
+the order of evaluation) is used in the translation from Racket to
+Scheme~\citep{Flatt:2019tb}.
 
 \fi} % racket
 
 Having discussed the complications that arise from adding support for
-assignment and loops, we turn to discussing the significant changes to
-existing passes.
+assignment and loops, we turn to discussing the individual compilation
+passes.
 
 
 {\if\edition\racketEd
@@ -10036,8 +10056,9 @@ existing passes.
 \label{sec:uncover-get-bang}
 
 The goal of this pass it to mark uses of mutable variables so that
-\code{remove\_complex\_operands} can treat them as complex
-expressions. So the first step is to collect all the mutable
+\code{remove\_complex\_operands} can treat them as complex expressions
+and thereby preserve their ordering relative to the side-effects in
+other operands. So the first step is to collect all the mutable
 variables. We recommend creating an auxilliary function for this,
 named \code{collect-set!}, that recursively traverses expressions,
 returning a set of all variables that occur on the left-hand side of a
