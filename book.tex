@@ -22,7 +22,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{1}
+\def\edition{0}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd{#1}\fi}}
@@ -9942,11 +9942,100 @@ def analyze_dataflow(G, transfer, bottom, join):
   \label{fig:generic-dataflow}
 \end{figure}
 
+{\if\edition\racketEd
+\section{Mutable Variables \& Remove Complex Operands}
+
+There is a subtle interaction between the addition of \code{set!}, the
+\code{remove\_complex\_operands} pass, and the left-to-right order of
+evaluation of Racket. Consider the following example.
+\begin{lstlisting}
+(let ([x 2])
+  (+ x (begin (set! x 40) x)))
+\end{lstlisting}
+The result of this program is \code{42} because the first read from
+\code{x} produces \code{2} and the second produces \code{40}. However,
+if we naively apply the \code{remove\_complex\_operands} pass to this
+example we obtain the following program whose result is \code{80}!
+\begin{lstlisting}
+(let ([x 2])
+  (let ([tmp (begin (set! x 40) x)])
+    (+ x tmp)))
+\end{lstlisting}
+The problem is that, with mutable variables, the ordering between
+reads and writes is important, and the
+\code{remove\_complex\_operands} pass moved the \code{set!} to happen
+before the first read of \code{x}.
+
+We recommend solving this problem by giving special treatment to reads
+from mutable variables, that is, variables that occur on the left-hand
+side of a \code{set!}. We mark each read from a mutable variable with
+the form \code{get!} (\code{GetBang} in abstract syntax) to indicate
+that the read operation is effectful in that it can produce different
+results at different points in time. Let's apply this idea to the
+following variation that also involves a variable that is not mutated.
+\begin{lstlisting}
+(let ([x 2])
+  (let ([y 0])
+    (+ y (+ x (begin (set! x 40) x)))))
+\end{lstlisting}
+We analyze the above program to discover that variable \code{x} is
+mutable but \code{y} is not. We then transform the program as follows,
+replacing each occurence of \code{x} with \code{(get! x)}.
+\begin{lstlisting}
+(let ([x 2])
+  (let ([y 0])
+    (+ y (+ (get! x) (begin (set! x 40) (get! x))))))
+\end{lstlisting}
+Now that we have a clear distinction between reads from mutable and
+immutable variables, we can apply the \code{remove\_complex\_operands}
+pass, where reads from immutable variables are still classified as
+atomic expressions but reads from mutable variables are classified as
+complex.  Thus, \code{remove\_complex\_operands} yields the following
+program.
+\begin{lstlisting}
+(let ([x 2])
+  (let ([y 0])
+    (+ y (let ([t1 (get! x)])
+           (let ([t2 (begin (set! x 40) (get! x))])
+             (+ t1 t2))))))
+\end{lstlisting}
+The temporary variable \code{t1} gets the value of \code{x} before the
+\code{set!}, so it is \code{2}.  The temporary variable \code{t2} gets
+the value of \code{x} after the \code{set!}, so it is \code{40}.  We
+do not generate a temporary variable for the occurence of \code{y}
+because it's an immutable variable. The result of this program is
+\code{42}, the same as the result prior to
+\code{remove\_complex\_operands}.
+
+The approach that we've sketched above requires only a small
+modification to \code{remove\_complex\_operands} to handle
+\code{get!}. However, it requires a new pass, called
+\code{uncover-get!}, that we discuss in
+Section~\ref{sec:uncover-get-bang}.
+
+As an aside, this problematic interaction between \code{set!}  and
+\code{remove\_complex\_operands} is particular to Racket and not its
+predecessor, the Scheme language. The key difference is that Scheme
+does not specify an order of evaluation for the arguments of an
+operator or function call. Thus, a compiler for Scheme is free to
+choose any ordering: both \code{42} and \code{80} are correct results
+of the example program.
+
+\fi} % racket
+
 Having discussed the complications that arise from adding support for
 assignment and loops, we turn to discussing the significant changes to
 existing passes.
 
 
+{\if\edition\racketEd
+\section{Uncover \texttt{get!}}
+\label{sec:uncover-get-bang}
+
+UNDER CONSTRUCTION
+
+
+\fi}
 
 \section{Remove Complex Operands}
 \label{sec:rco-loop}
