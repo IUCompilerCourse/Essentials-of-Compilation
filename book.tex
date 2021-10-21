@@ -9973,6 +9973,7 @@ the form \code{get!} (\code{GetBang} in abstract syntax) to indicate
 that the read operation is effectful in that it can produce different
 results at different points in time. Let's apply this idea to the
 following variation that also involves a variable that is not mutated.
+% loop_test_24.rkt
 \begin{lstlisting}
 (let ([x 2])
   (let ([y 0])
@@ -10003,8 +10004,10 @@ The temporary variable \code{t1} gets the value of \code{x} before the
 \code{set!}, so it is \code{2}.  The temporary variable \code{t2} gets
 the value of \code{x} after the \code{set!}, so it is \code{40}.  We
 do not generate a temporary variable for the occurence of \code{y}
-because it's an immutable variable. The result of this program is
-\code{42}, the same as the result prior to
+because it's an immutable variable. We want to avoid such unnecessary
+extra temporaries because they would needless increase the number of
+variables, making it more likely for some of them to be spilled.  The
+result of this program is \code{42}, the same as the result prior to
 \code{remove\_complex\_operands}.
 
 The approach that we've sketched above requires only a small
@@ -10018,8 +10021,8 @@ As an aside, this problematic interaction between \code{set!}  and
 predecessor, the Scheme language. The key difference is that Scheme
 does not specify an order of evaluation for the arguments of an
 operator or function call. Thus, a compiler for Scheme is free to
-choose any ordering: both \code{42} and \code{80} are correct results
-of the example program.
+choose any ordering: both \code{42} and \code{80} would be correct
+results for the example program.
 
 \fi} % racket
 
@@ -10032,7 +10035,57 @@ existing passes.
 \section{Uncover \texttt{get!}}
 \label{sec:uncover-get-bang}
 
-UNDER CONSTRUCTION
+The goal of this pass it to mark uses of mutable variables so that
+\code{remove\_complex\_operands} can treat them as complex
+expressions. So the first step is to collect all the mutable
+variables. We recommend creating an auxilliary function for this,
+named \code{collect-set!}, that recursively traverses expressions,
+returning a set of all variables that occur on the left-hand side of a
+\code{set!}. Here's an exerpt of its implementation.
+\begin{center}
+\begin{minipage}{\textwidth}
+\begin{lstlisting}
+(define (collect-set! e)
+  (match e
+    [(Var x) (set)]
+    [(Int n) (set)]
+    [(Let x rhs body)
+      (set-union (collect-set! rhs) (collect-set! body))]
+    [(SetBang var rhs)
+      (set-union (set var) (collect-set! rhs))]
+    ...))
+\end{lstlisting}
+\end{minipage}
+\end{center}
+By placing this pass after \code{uniquify}, we need not worry about
+variable shadowing and our logic for \code{let} can remain simple, as
+in the exerpt above.
+
+The second step is to mark the occurences of the mutable variables
+with the new \code{GetBang} AST node. The following is an exerpt of
+the \code{uncover-get!-exp} function, which takes two parameters: the
+set of mutable varaibles \code{set!-vars}, and the expression \code{e}
+to be processed. The case for \code{(Var x)} replaces it with
+\code{(GetBang x)} if it is a mutable variable or leaves it alone if
+not.
+\begin{center}
+\begin{minipage}{\textwidth}
+\begin{lstlisting}
+(define ((uncover-get!-exp set!-vars) e)
+  (match e
+    [(Var x)
+     (if (set-member? set!-vars x)
+         (GetBang x)
+         (Var x))]
+    ...))
+\end{lstlisting}
+\end{minipage}
+\end{center}
+
+To wrap things up, define the \code{uncover-get!} function for
+processing a whole program, using \code{collect-set!} to obtain the
+set of mutable variables and then \code{uncover-get!-exp} to replace
+their occurences with \code{GetBang}.
 
 
 \fi}
