@@ -454,7 +454,7 @@ that efficiently supports the operations that the compiler needs to
 perform.\index{subject}{concrete syntax}\index{subject}{abstract syntax}\index{subject}{abstract
   syntax tree}\index{subject}{AST}\index{subject}{program}\index{subject}{parse} The translation
 from concrete syntax to abstract syntax is a process called
-\emph{parsing}~\citep{Aho:1986qf}. We do not cover the theory and
+\emph{parsing}~\citep{Aho:2006wb}. We do not cover the theory and
 implementation of parsing in this book.
 %
 \racket{A parser is provided in the support code for translating from
@@ -2565,12 +2565,12 @@ to bridge those differences. What are the differences between \LangVar{}
 and x86 assembly? Here are some of the most important ones:
 
 \begin{enumerate}
-\item x86 arithmetic instructions typically have two arguments
-  and update the second argument in place. In contrast, \LangVar{}
+\item x86 arithmetic instructions typically have two arguments and
+  update the second argument in place. In contrast, \LangVar{}
   arithmetic operations take two arguments and produce a new value.
   An x86 instruction may have at most one memory-accessing argument.
-  Furthermore, some instructions place special restrictions on their
-  arguments.
+  Furthermore, some x86 instructions place special restrictions on
+  their arguments.
 
 \item An argument of an \LangVar{} operator can be a deeply-nested
   expression, whereas x86 instructions restrict their arguments to be
@@ -2592,13 +2592,17 @@ and x86 assembly? Here are some of the most important ones:
 \fi}  
 \end{enumerate}
 
-We ease the challenge of compiling from \LangVar{} to x86 by breaking down
-the problem into several steps, dealing with the above differences one
-at a time.  Each of these steps is called a \emph{pass} of the
-compiler.\index{subject}{pass}\index{subject}{compiler pass}
+We ease the challenge of compiling from \LangVar{} to x86 by breaking
+down the problem into several steps, dealing with the above
+differences one at a time. Each of these steps is called a \emph{pass}
+of the compiler.\index{subject}{pass}\index{subject}{compiler pass}
 %
-This terminology comes from the way each step passes over the AST of
-the program.
+This terminology comes from the way each step passes over, that is,
+traverses the AST of the program.
+%
+Furthermore, we follow the nanopass approach, which means we strive
+for each pass to accomplish one clear objective (not two or three at
+the same time).
 %
 We begin by sketching how we might implement each pass, and give them
 names.  We then figure out an ordering of the passes and the
@@ -2611,6 +2615,8 @@ our own design.  Finally, to implement each pass we write one
 recursive function per non-terminal in the grammar of the input
 language of the pass.  \index{subject}{intermediate language}
 
+Our compiler for \LangVar{} consists of the following passes.
+%
 \begin{description}
 {\if\edition\racketEd
 \item[\key{uniquify}] deals with the shadowing of variables by
@@ -2627,7 +2633,7 @@ language of the pass.  \index{subject}{intermediate language}
   
 {\if\edition\racketEd
 \item[\key{explicate\_control}] makes the execution order of the
-  program explicit. It convert the abstract syntax tree representation
+  program explicit. It converts the abstract syntax tree representation
   into a control-flow graph in which each node contains a sequence of
   statements and the edges between nodes say which nodes contain jumps
   to other nodes.
@@ -2638,9 +2644,18 @@ language of the pass.  \index{subject}{intermediate language}
   \LangVar{} operation to a short sequence of instructions that
   accomplishes the same task.
 
-\item[\key{assign\_homes}] replaces the variables in \LangVar{} with
-  registers or stack locations in x86.
+\item[\key{assign\_homes}] replaces variables with registers or stack
+  locations.
 \end{description}
+%
+{\if\edition\racketEd
+%
+Our treatment of \code{remove\_complex\_operands} and
+\code{explicate\_control} as separate passes is an example of the
+nanopass approach. The traditional approach is to combine them into a
+single step~\citep{Aho:2006wb}.
+%  
+\fi}
 
 The next question is: in what order should we apply these passes? This
 question can be challenging because it is difficult to know ahead of
@@ -2680,10 +2695,9 @@ be forced to assign both arguments to memory locations.
 %
 A sophisticated approach is to iteratively repeat the two passes until
 a solution is found. However, to reduce implementation complexity we
-recommend a simpler approach in which \key{select\_instructions} comes
-first, followed by the \key{assign\_homes}, then a third pass named
-\key{patch\_instructions} that uses a reserved register to fix
-outstanding problems.
+recommend placing \key{select\_instructions} first, followed by the
+\key{assign\_homes}, then a third pass named \key{patch\_instructions}
+that uses a reserved register to fix outstanding problems.
 
 \begin{figure}[tbp]
 {\if\edition\racketEd  
@@ -2767,6 +2781,10 @@ of each of the compiler passes in Figure~\ref{fig:Lvar-passes}.
 The output of \code{explicate\_control} is similar to the $C$
 language~\citep{Kernighan:1988nx} in that it has separate syntactic
 categories for expressions and statements, so we name it \LangCVar{}.
+This style of intermediate language is also known as
+\emph{three-address code}, to emphasize that the typical form of a
+statement is \CASSIGN{\key{x}}{\CADD{\key{y}}{\key{z}}} involves three
+addresses~\citep{Aho:2006wb}.
 
 The concrete syntax for \LangCVar{} is defined in
 Figure~\ref{fig:c0-concrete-syntax} and the abstract syntax for
@@ -3038,8 +3056,7 @@ Figure~\ref{fig:Lvar-anf-syntax} presents the grammar for the output
 of this pass, the language \LangVarANF{}. The only difference is that
 operator arguments are restricted to be atomic expressions that are
 defined by the \Atm{} non-terminal. In particular, integer constants
-and variables are atomic. This restriction brings us closer to what is
-known as a \emph{three-address code}~\citep{Aho:1986qf} language.
+and variables are atomic.
 
 The atomic expressions are pure (they do not cause side-effects or
 depend on them) whereas complex expressions may have side effects,
@@ -3053,7 +3070,8 @@ between atomic expressions and complex expressions can change and
 often does. The reason that these changes are behaviour preserving is
 that the atomic expressions are pure.
 
-Another well-known form is the \emph{administrative normal form}
+Another well-known form for intermediate languages is the
+\emph{administrative normal form}
 (ANF)~\citep{Danvy:1991fk,Flanagan:1993cg}.
 \index{subject}{administrative normal form} \index{subject}{ANF}
 %
@@ -7487,7 +7505,7 @@ R^{\mathsf{ANF}}_{\mathsf{if}}  &::=& \PROGRAM{\code{()}}{\Exp}
 \fi}
 \end{minipage}
 }
-\caption{\LangIfANF{} is \LangIf{} in administrative normal form (ANF).}
+\caption{\LangIfANF{} is \LangIf{} in monadic normal form.}
 \label{fig:Lif-anf-syntax}
 \end{figure}
 
@@ -9283,12 +9301,14 @@ blocks on several test programs.
 \section{Further Reading}
 \label{sec:cond-further-reading}
 
-The algorithm for the \code{explicate\_control} pass comes from the
-course notes of \citet{Dybvig:2010aa} and it has several similarities
-to an algorithm of \citet{Danvy:2003fk}. The treatment of conditionals
-in the \code{explicate\_control} pass is similar to the case-of-case
-transformation of \citet{PeytonJones:1998} and to short-cut boolean
-evaluation~\citep{Logothetis:1981,Aho:1986qf,Clarke:1989,Danvy:2003fk}.
+The algorithm for the \code{explicate\_control} pass is based on the
+the \code{explose-basic-blocks} pass in course notes of
+\citet{Dybvig:2010aa}. It has several similarities to the algorithms
+of \citet{Danvy:2003fk} and \citet{Appel:2003fk}. The treatment of
+conditionals in the \code{explicate\_control} pass is similar to the
+case-of-case transformation of \citet{PeytonJones:1998} and to
+short-cut boolean
+evaluation~\citep{Logothetis:1981,Aho:2006wb,Clarke:1989,Danvy:2003fk}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Loops and Dataflow Analysis}
@@ -10168,7 +10188,7 @@ Figure~\ref{fig:Rwhile-anf-syntax} defines the output language
 \fi}
 \end{minipage}
 }
-\caption{\LangLoopANF{} is \LangLoop{} in administrative normal form (ANF).}
+\caption{\LangLoopANF{} is \LangLoop{} in monadic normal form.}
 \label{fig:Rwhile-anf-syntax}
 \end{figure}
 
@@ -11333,7 +11353,7 @@ should all be treated as complex operands.
 %% from its enclosing \code{HasType}.
 Figure~\ref{fig:Lvec-anf-syntax}
 shows the grammar for the output language \LangVecANF{} of this
-pass, which is \LangVec{} in administrative normal form.
+pass, which is \LangVec{} in monadic normal form.
 
 \begin{figure}[tp]
 \centering
@@ -11357,7 +11377,7 @@ pass, which is \LangVec{} in administrative normal form.
 \]
 \end{minipage}
 }
-\caption{\LangVecANF{} is \LangVec{} in administrative normal form (ANF).}
+\caption{\LangVecANF{} is \LangVec{} in monadic normal form.}
 \label{fig:Lvec-anf-syntax}
 \end{figure}
 
@@ -12954,7 +12974,7 @@ R^{\dagger}_4  &::=& \gray{ \PROGRAMDEFS{\code{'()}}{\Def} }
 \]
 \end{minipage}
 }
-\caption{\LangFunANF{} is \LangFun{} in administrative normal form (ANF).}
+\caption{\LangFunANF{} is \LangFunRefAlloc{} in monadic normal form.}
 \label{fig:Rfun-anf-syntax}
 \end{figure}
 
@@ -14229,15 +14249,15 @@ extract the $5$-bits starting at position $58$ from the tag.
 
 \begin{figure}[p]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (Rfun) at (0,2)  {\large \LangFun{}};
-\node (Rfun-2) at (3,2)  {\large \LangFun{}};
-\node (Rfun-3) at (6,2)  {\large \LangFun{}};
-\node (F1-0) at (9,2)  {\large \LangFunRef{}};
-\node (F1-1) at (12,0)  {\large \LangFunRef{}};
+\node (Rfun) at (0,2)  {\large \LangLam{}};
+\node (Rfun-2) at (3,2)  {\large \LangLam{}};
+\node (Rfun-3) at (6,2)  {\large \LangLam{}};
+\node (F1-0) at (9,2)  {\large \LangLamFunRef{}};
+\node (F1-1) at (12,0)  {\large \LangLamFunRef{}};
 \node (F1-2) at (9,0)  {\large \LangFunRef{}};
-\node (F1-3) at (6,0)  {\large $F_1$};
-\node (F1-4) at (3,0)  {\large $F_1$};
-\node (F1-5) at (0,0)  {\large $F^{\RCO}_1$};
+\node (F1-3) at (6,0)  {\large \LangFunRef{}};
+\node (F1-4) at (3,0)  {\large \LangFunRefAlloc{}};
+\node (F1-5) at (0,0)  {\large \LangFunANF{}};
 \node (C3-2) at (3,-2)  {\large \LangCFun{}};
 
 \node (x86-2) at (3,-4)  {\large \LangXIndCallVar{}};
