@@ -10477,7 +10477,7 @@ registers or on the procedure call stack.
 
 Sections~\ref{sec:expose-allocation} through \ref{sec:print-x86-gc}
 discuss all the necessary changes and additions to the compiler
-passes, including a new compiler pass named \code{expose-allocation}.
+passes, including a new compiler pass named \code{expose\_allocation}.
 
 \section{The \LangVec{} Language}
 \label{sec:r3}
@@ -11276,9 +11276,9 @@ of tuple creation.
 
 \fi}
 
-The \CCOLLECT{n} form runs the garbage collector, requesting $n$
+The \CCOLLECT{$n$} form runs the garbage collector, requesting $n$
 bytes. During instruction selection, it will become a call to the
-\code{collect} function in \code{runtime.c}.  The \CALLOCATE{n}{T}
+\code{collect} function in \code{runtime.c}.  The \CALLOCATE{$n$}{$T$}
 form creates a tuple with space for $n$ elements, but they are not
 initialized.  \index{subject}{allocate} The $T$ parameter is the type
 of the tuple:
@@ -11300,6 +11300,11 @@ expressions, 2) a conditional call to \code{collect}, 3) a call to
 \itm{len} placeholder refers to the length of the vector and
 \itm{bytes} is how many total bytes need to be allocated for the
 vector, which is 8 for the tag plus \itm{len} times 8.
+%
+\python{The \itm{type} needed for the second argument of the
+  \code{allocate} form can be obtained from the \code{has\_type} field
+  of the tuple expression, which is stored there by running the type
+  checker for \LangVec{} immediately before this pass.}
 %
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -11336,10 +11341,10 @@ vector, which is 8 for the tag plus \itm{len} times 8.
 \end{lstlisting}
 \fi}
 %
-The placement of the initializing expressions $e_0,\ldots,e_{n-1}$
-prior to the \code{allocate} is important, as those expressions may
-trigger garbage collection and we cannot have an allocated but
-uninitialized tuple on the heap during a collection.
+\noindent The placement of the initializing expressions
+$e_0,\ldots,e_{n-1}$ prior to the \code{allocate} is important, as
+those expressions may trigger garbage collection and we cannot have an
+allocated but uninitialized tuple on the heap during a collection.
 
 Figure~\ref{fig:expose-alloc-output} shows the output of the
 \code{expose\_allocation} pass on our running example.
@@ -11386,7 +11391,7 @@ where $T_1$ is
               0
           else:
               collect(16)
-          tmp.2 = allocate(1, tuple[tuple[int]])
+          tmp.2 = allocate(1, TupleType(TupleType([int])))
           tmp.2[0] = tmp.1
           tmp.2
 \end{lstlisting}
@@ -11398,7 +11403,7 @@ and $T_2$ is
               0
           else:
               collect(16)
-          tmp.4 = allocate(1, tuple[int])
+          tmp.4 = allocate(1, TupleType([int]))
           tmp.4[0] = tmp.3
           tmp.4
 \end{lstlisting}
@@ -11660,10 +11665,15 @@ being allocated, which is $8(\itm{len}+1)$ bytes because each element
 is 8 bytes (64 bits) and we use 8 bytes for the tag.  We then
 initialize the \itm{tag} and finally copy the address in \code{r11} to
 the left-hand-side. Refer to Figure~\ref{fig:tuple-rep} to see how the
-tag is organized. We recommend using the Racket operations
+tag is organized.
+%
+\racket{We recommend using the Racket operations
 \code{bitwise-ior} and \code{arithmetic-shift} to compute the tag
-during compilation.  The type annotation in the \code{vector} form is
-used to determine the pointer mask region of the tag.
+during compilation.}
+%
+The type annotation in the \code{allocate} form is used to determine
+the pointer mask region of the tag.
+%
 {\if\edition\racketEd
 \begin{lstlisting}
    |$\itm{lhs}$| = (allocate |$\itm{len}$| (Vector |$\itm{type} \ldots$|));
@@ -11676,7 +11686,7 @@ used to determine the pointer mask region of the tag.
 \fi}
 {\if\edition\pythonEd    
 \begin{lstlisting}
-   |$\itm{lhs}$| = allocate(|$\itm{len}$|, tuple[|$\itm{type}, \ldots$]|);
+   |$\itm{lhs}$| = allocate(|$\itm{len}$|, TupleType([|$\itm{type}, \ldots$])|);
    |$\Longrightarrow$|
    movq free_ptr(%rip), %r11
    addq |$8(\itm{len}+1)$|, free_ptr(%rip)
@@ -11829,24 +11839,30 @@ block40:
 
 As discussed earlier in this chapter, the garbage collector needs to
 access all the pointers in the root set, that is, all variables that
-are vectors. It will be the responsibility of the register allocator
+are tuple. It will be the responsibility of the register allocator
 to make sure that:
 \begin{enumerate}
-\item the root stack is used for spilling vector-typed variables, and
-\item if a vector-typed variable is live during a call to the
+\item the root stack is used for spilling tuple-typed variables, and
+\item if a tuple-typed variable is live during a call to the
   collector, it must be spilled to ensure it is visible to the
   collector.
 \end{enumerate}
 
 The later responsibility can be handled during construction of the
 interference graph, by adding interference edges between the call-live
-vector-typed variables and all the callee-saved registers. (They
-already interfere with the caller-saved registers.)  The type
-information for variables is in the \code{Program} form, so we
-recommend adding another parameter to the \code{build\_interference}
-function to communicate this alist.
+tuple-typed variables and all the callee-saved registers. (They
+already interfere with the caller-saved registers.)
+%
+\racket{The type information for variables is in the \code{Program}
+  form, so we recommend adding another parameter to the
+  \code{build\_interference} function to communicate this alist.}
+%
+\python{The type information for variables is generated by the type
+  checker for \LangCVec{}, stored a field named \code{var\_types} in
+  the \code{CProgram} AST mode. You'll need to propagate that
+  information so that it is available in this pass.}
 
-The spilling of vector-typed variables to the root stack can be
+The spilling of tuple-typed variables to the root stack can be
 handled after graph coloring, when choosing how to assign the colors
 (integers) to registers and stack locations. The \code{Program} output
 of this pass changes to also record the number of spills to the root
