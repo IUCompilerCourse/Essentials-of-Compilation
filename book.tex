@@ -454,7 +454,7 @@ that efficiently supports the operations that the compiler needs to
 perform.\index{subject}{concrete syntax}\index{subject}{abstract syntax}\index{subject}{abstract
   syntax tree}\index{subject}{AST}\index{subject}{program}\index{subject}{parse} The translation
 from concrete syntax to abstract syntax is a process called
-\emph{parsing}~\citep{Aho:1986qf}. We do not cover the theory and
+\emph{parsing}~\citep{Aho:2006wb}. We do not cover the theory and
 implementation of parsing in this book.
 %
 \racket{A parser is provided in the support code for translating from
@@ -2574,12 +2574,12 @@ to bridge those differences. What are the differences between \LangVar{}
 and x86 assembly? Here are some of the most important ones:
 
 \begin{enumerate}
-\item x86 arithmetic instructions typically have two arguments
-  and update the second argument in place. In contrast, \LangVar{}
+\item x86 arithmetic instructions typically have two arguments and
+  update the second argument in place. In contrast, \LangVar{}
   arithmetic operations take two arguments and produce a new value.
   An x86 instruction may have at most one memory-accessing argument.
-  Furthermore, some instructions place special restrictions on their
-  arguments.
+  Furthermore, some x86 instructions place special restrictions on
+  their arguments.
 
 \item An argument of an \LangVar{} operator can be a deeply-nested
   expression, whereas x86 instructions restrict their arguments to be
@@ -2601,13 +2601,17 @@ and x86 assembly? Here are some of the most important ones:
 \fi}  
 \end{enumerate}
 
-We ease the challenge of compiling from \LangVar{} to x86 by breaking down
-the problem into several steps, dealing with the above differences one
-at a time.  Each of these steps is called a \emph{pass} of the
-compiler.\index{subject}{pass}\index{subject}{compiler pass}
+We ease the challenge of compiling from \LangVar{} to x86 by breaking
+down the problem into several steps, dealing with the above
+differences one at a time. Each of these steps is called a \emph{pass}
+of the compiler.\index{subject}{pass}\index{subject}{compiler pass}
 %
-This terminology comes from the way each step passes over the AST of
-the program.
+This terminology comes from the way each step passes over, that is,
+traverses the AST of the program.
+%
+Furthermore, we follow the nanopass approach, which means we strive
+for each pass to accomplish one clear objective (not two or three at
+the same time).
 %
 We begin by sketching how we might implement each pass, and give them
 names.  We then figure out an ordering of the passes and the
@@ -2620,6 +2624,8 @@ our own design.  Finally, to implement each pass we write one
 recursive function per non-terminal in the grammar of the input
 language of the pass.  \index{subject}{intermediate language}
 
+Our compiler for \LangVar{} consists of the following passes.
+%
 \begin{description}
 {\if\edition\racketEd
 \item[\key{uniquify}] deals with the shadowing of variables by
@@ -2636,7 +2642,7 @@ language of the pass.  \index{subject}{intermediate language}
   
 {\if\edition\racketEd
 \item[\key{explicate\_control}] makes the execution order of the
-  program explicit. It convert the abstract syntax tree representation
+  program explicit. It converts the abstract syntax tree representation
   into a control-flow graph in which each node contains a sequence of
   statements and the edges between nodes say which nodes contain jumps
   to other nodes.
@@ -2647,9 +2653,20 @@ language of the pass.  \index{subject}{intermediate language}
   \LangVar{} operation to a short sequence of instructions that
   accomplishes the same task.
 
-\item[\key{assign\_homes}] replaces the variables in \LangVar{} with
-  registers or stack locations in x86.
+\item[\key{assign\_homes}] replaces variables with registers or stack
+  locations.
 \end{description}
+%
+{\if\edition\racketEd
+%
+Our treatment of \code{remove\_complex\_operands} and
+\code{explicate\_control} as separate passes is an example of the
+nanopass approach\footnote{For analogous decompositions of the
+  translation into continuation passing style, see the work of
+  \citet{Lawall:1993} and \citet{Hatcliff:1994ea}.}.  The traditional
+approach is to combine them into a single step~\citep{Aho:2006wb}.
+%  
+\fi}
 
 The next question is: in what order should we apply these passes? This
 question can be challenging because it is difficult to know ahead of
@@ -2689,10 +2706,9 @@ be forced to assign both arguments to memory locations.
 %
 A sophisticated approach is to iteratively repeat the two passes until
 a solution is found. However, to reduce implementation complexity we
-recommend a simpler approach in which \key{select\_instructions} comes
-first, followed by the \key{assign\_homes}, then a third pass named
-\key{patch\_instructions} that uses a reserved register to fix
-outstanding problems.
+recommend placing \key{select\_instructions} first, followed by the
+\key{assign\_homes}, then a third pass named \key{patch\_instructions}
+that uses a reserved register to fix outstanding problems.
 
 \begin{figure}[tbp]
 {\if\edition\racketEd  
@@ -2776,6 +2792,10 @@ of each of the compiler passes in Figure~\ref{fig:Lvar-passes}.
 The output of \code{explicate\_control} is similar to the $C$
 language~\citep{Kernighan:1988nx} in that it has separate syntactic
 categories for expressions and statements, so we name it \LangCVar{}.
+This style of intermediate language is also known as
+\emph{three-address code}, to emphasize that the typical form of a
+statement is \CASSIGN{\key{x}}{\CADD{\key{y}}{\key{z}}} involves three
+addresses~\citep{Aho:2006wb}.
 
 The concrete syntax for \LangCVar{} is defined in
 Figure~\ref{fig:c0-concrete-syntax} and the abstract syntax for
@@ -3043,14 +3063,31 @@ print(tmp_1)
 \label{fig:Lvar-anf-syntax}
 \end{figure}
 
-Figure~\ref{fig:Lvar-anf-syntax} presents the grammar for the output of
-this pass, the language \LangVarANF{}. The only difference is that
+Figure~\ref{fig:Lvar-anf-syntax} presents the grammar for the output
+of this pass, the language \LangVarANF{}. The only difference is that
 operator arguments are restricted to be atomic expressions that are
 defined by the \Atm{} non-terminal. In particular, integer constants
-and variables are atomic. In the literature, restricting arguments to
-be atomic expressions is one of the ideas in \emph{administrative
-normal form}, or ANF for short~\citep{Danvy:1991fk,Flanagan:1993cg}.
+and variables are atomic.
+
+The atomic expressions are pure (they do not cause side-effects or
+depend on them) whereas complex expressions may have side effects,
+such as \READ{}.  A language with this separation between pure versus
+side-effecting expressions is said to be in monadic normal
+form~\citep{Moggi:1991in,Danvy:2003fk} which explains the \textit{mon}
+in \LangVarANF{}. An important invariant of the
+\code{remove\_complex\_operands} pass is that the relative ordering
+among complex expressions is not changed, but the relative ordering
+between atomic expressions and complex expressions can change and
+often does. The reason that these changes are behaviour preserving is
+that the atomic expressions are pure.
+
+Another well-known form for intermediate languages is the
+\emph{administrative normal form}
+(ANF)~\citep{Danvy:1991fk,Flanagan:1993cg}.
 \index{subject}{administrative normal form} \index{subject}{ANF}
+%
+The \LangVarANF{} language is not quite in ANF because we allow the
+right-hand side of a \code{let} to be a complex expression.
 
 {\if\edition\racketEd
 We recommend implementing this pass with two mutually recursive
@@ -5544,7 +5581,7 @@ a multiple of 16 bytes!
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (Lvar) at (0,2)  {\large \LangVar{}};
 \node (Lvar-2) at (3,2)  {\large \LangVar{}};
-\node (Lvar-3) at (6,2)  {\large \LangVar{}};
+\node (Lvar-3) at (6,2)  {\large \LangVarANF{}};
 \node (Cvar-1) at (3,0)  {\large \LangCVar{}};
 
 \node (x86-2) at (3,-2)  {\large \LangXVar{}};
@@ -7479,7 +7516,7 @@ R^{\mathsf{ANF}}_{\mathsf{if}}  &::=& \PROGRAM{\code{()}}{\Exp}
 \fi}
 \end{minipage}
 }
-\caption{\LangIfANF{} is \LangIf{} in administrative normal form (ANF).}
+\caption{\LangIfANF{} is \LangIf{} in monadic normal form.}
 \label{fig:Lif-anf-syntax}
 \end{figure}
 
@@ -8755,7 +8792,7 @@ conclusion:
 \node (Lif-2) at (3,2)  {\large \LangIf{}};
 \node (Lif-3) at (6,2)  {\large \LangIf{}};
 \node (Lif-4) at (9,2)  {\large \LangIf{}};
-\node (Lif-5) at (12,2)  {\large \LangIf{}};
+\node (Lif-5) at (12,2)  {\large \LangIfANF{}};
 \node (C1-1) at (3,0)  {\large \LangCIf{}};
 
 \node (x86-2) at (3,-2)  {\large \LangXIfVar{}};
@@ -8782,7 +8819,7 @@ conclusion:
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (Lif-1) at (0,2)  {\large \LangIf{}};
 \node (Lif-2) at (3,2)  {\large \LangIf{}};
-\node (Lif-3) at (6,2)  {\large \LangIf{}};
+\node (Lif-3) at (6,2)  {\large \LangIfANF{}};
 \node (C-1) at (3,0)  {\large \LangCIf{}};
 
 \node (x86-1) at (3,-2)  {\large \LangXIfVar{}};
@@ -9275,12 +9312,19 @@ blocks on several test programs.
 \section{Further Reading}
 \label{sec:cond-further-reading}
 
-The algorithm for the \code{explicate\_control} pass comes from the
-course notes of \citet{Dybvig:2010aa}. The use of lazy evaluation in
-Section~\ref{sec:opt-jumps} to optimize basic blocks is new.  There
-are algorithms similar to \code{explicate\_control} in the literature,
-such as the case-of-case transformation of \citet{PeytonJones:1998}.
-
+The algorithm for the \code{explicate\_control} pass is based on the
+the \code{explose-basic-blocks} pass in the course notes of
+\citet{Dybvig:2010aa}.
+%
+It has similarities to the algorithms of \citet{Danvy:2003fk} and
+\citet{Appel:2003fk}, and is related to translations into continuation
+passing
+style~\citep{Wijngaarden:1966,Fischer:1972,reynolds72:_def_interp,Plotkin:1975,Friedman:2001}.
+%
+The treatment of conditionals in the \code{explicate\_control} pass is
+similar to short-cut boolean
+evaluation~\citep{Logothetis:1981,Aho:2006wb,Clarke:1989,Danvy:2003fk}
+and the case-of-case transformation of \citet{PeytonJones:1998}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Loops and Dataflow Analysis}
@@ -9739,12 +9783,13 @@ we are stuck.
 The way out of this impasse is to realize that we can compute an
 under-approximation of the live-before set by starting with empty
 live-after sets.  By \emph{under-approximation}, we mean that the set
-only contains variables that are really live, but it may be missing
-some.  Next, the under-approximations for each block can be improved
-by 1) updating the live-after set for each block using the approximate
-live-before sets from the other blocks and 2) perform liveness
-analysis again on each block.  In fact, by iterating this process, the
-under-approximations eventually become the correct solutions!
+only contains variables that are live for some execution of the
+program, but the set may be missing some variables.  Next, the
+under-approximations for each block can be improved by 1) updating the
+live-after set for each block using the approximate live-before sets
+from the other blocks and 2) perform liveness analysis again on each
+block.  In fact, by iterating this process, the under-approximations
+eventually become the correct solutions!
 %
 This approach of iteratively analyzing a control-flow graph is
 applicable to many static analysis problems and goes by the name
@@ -9758,10 +9803,7 @@ following mapping from label names to sets of locations (variables and
 registers).
 \begin{center}
 \begin{lstlisting}
-mainstart: {}
-block5: {}
-block7: {}
-block8: {}
+mainstart: {}, block5: {}, block7: {}, block8: {}
 \end{lstlisting}
 \end{center}
 Using the above live-before approximations, we determine the
@@ -9770,10 +9812,7 @@ block.  This produces our next approximation $m_1$ of the live-before
 sets.
 \begin{center}
   \begin{lstlisting}
-mainstart: {}
-block5: {i}
-block7: {i, sum}
-block8: {rsp, sum}
+mainstart: {}, block5: {i}, block7: {i, sum}, block8: {rsp, sum}
 \end{lstlisting}
 \end{center}
 
@@ -9790,10 +9829,7 @@ So the liveness analysis for \code{block7} remains \code{\{i,
 the live-before sets.
 \begin{center}
   \begin{lstlisting}
-mainstart: {}
-block5: {i, rsp, sum}
-block7: {i, sum}
-block8: {rsp, sum}
+mainstart: {}, block5: {i, rsp, sum}, block7: {i, sum}, block8: {rsp, sum}
 \end{lstlisting}
 \end{center}
 In the preceding iteration, only \code{block5} changed, so we can
@@ -9803,14 +9839,11 @@ for \code{mainstart} and \code{block7} are updated to include
 \code{rsp}, yielding the following approximation $m_3$.
 \begin{center}
   \begin{lstlisting}
-mainstart: {rsp}
-block5: {i, rsp, sum}
-block7: {i, rsp, sum}
-block8: {rsp, sum}
+mainstart: {rsp}, block5: {i,rsp,sum}, block7: {i,rsp,sum}, block8: {rsp,sum}
 \end{lstlisting}
 \end{center}
 Because \code{block7} changed, we analyze \code{block5} once more, but
-its live-before set remains \code{\{ i, rsp, sum \}}.  At this point
+its live-before set remains \code{\{i,rsp,sum\}}.  At this point
 our approximations have converged, so $m_3$ is the solution.
 
 This iteration process is guaranteed to converge to a solution by the
@@ -9845,9 +9878,9 @@ two mappings $m_i$ and $m_j$, $m_i \sqsubseteq_M m_j$ when $m_i(\ell)
 bottom element of $M$ is the mapping $\bot_M$ that sends every label
 to the empty set, i.e., $\bot_M(\ell) = \emptyset$.
 
-We can think of one iteration of liveness analysis as being a function
-$f$ on the lattice $M$. It takes a mapping as input and computes a new
-mapping.
+We can think of one iteration of liveness analysis applied to the
+whole program as being a function $f$ on the lattice $M$. It takes a
+mapping as input and computes a new mapping.
 \[
    f(m_i) = m_{i+1}
 \]
@@ -9872,7 +9905,7 @@ follows.\index{subject}{Kleene Fixed-Point Theorem}
   \sqsubseteq f^n(\bot) \sqsubseteq \cdots
 \]
 When a lattice contains only finitely-long ascending chains, then
-every Kleene chain tops out at some fixed point after a number of
+every Kleene chain tops out at some fixed point after some number of
 iterations of $f$.
 \[
 \bot \sqsubseteq f(\bot) \sqsubseteq f(f(\bot)) \sqsubseteq \cdots
@@ -9902,6 +9935,13 @@ function is then applied to obtain the \code{output} abstract
 state. If the output differs from the previous state for this block,
 the mapping for this block is updated and its successor nodes are
 pushed onto the work list.
+
+Note that the \code{analyze\_dataflow} function is formulated as a
+\emph{forward} dataflow analysis, that is, the inputs to the transfer
+function come from the predecessor nodes in the control-flow
+graph. However, liveness analysis is a \emph{backward} dataflow
+analysis, so in that case one must supply the \code{analyze\_dataflow}
+function with the transpose of the control-flow graph.
 
 \begin{figure}[tb]
 {\if\edition\racketEd    
@@ -10025,19 +10065,24 @@ modification to \code{remove\_complex\_operands} to handle
 \code{uncover-get!}, that we discuss in
 Section~\ref{sec:uncover-get-bang}.
 
-As an aside, this problematic interaction between \code{set!}  and
-\code{remove\_complex\_operands} is particular to Racket and not its
-predecessor, the Scheme language. The key difference is that Scheme
-does not specify an order of evaluation for the arguments of an
-operator or function call. Thus, a compiler for Scheme is free to
-choose any ordering: both \code{42} and \code{80} would be correct
-results for the example program.
+As an aside, this problematic interaction between \code{set!} and the
+pass \code{remove\_complex\_operands} is particular to Racket and not
+its predecessor, the Scheme language. The key difference is that
+Scheme does not specify an order of evaluation for the arguments of an
+operator or function call~\citep{SPERBER:2009aa}. Thus, a compiler for
+Scheme is free to choose any ordering: both \code{42} and \code{80}
+would be correct results for the example program. Interestingly,
+Racket is implemented on top of the Chez Scheme
+compiler~\citep{Dybvig:2006aa} and an approach similar to the one
+presented in this section (using extra \code{let} bindings to control
+the order of evaluation) is used in the translation from Racket to
+Scheme~\citep{Flatt:2019tb}.
 
 \fi} % racket
 
 Having discussed the complications that arise from adding support for
-assignment and loops, we turn to discussing the significant changes to
-existing passes.
+assignment and loops, we turn to discussing the individual compilation
+passes.
 
 
 {\if\edition\racketEd
@@ -10045,8 +10090,9 @@ existing passes.
 \label{sec:uncover-get-bang}
 
 The goal of this pass it to mark uses of mutable variables so that
-\code{remove\_complex\_operands} can treat them as complex
-expressions. So the first step is to collect all the mutable
+\code{remove\_complex\_operands} can treat them as complex expressions
+and thereby preserve their ordering relative to the side-effects in
+other operands. So the first step is to collect all the mutable
 variables. We recommend creating an auxilliary function for this,
 named \code{collect-set!}, that recursively traverses expressions,
 returning a set of all variables that occur on the left-hand side of a
@@ -10158,7 +10204,7 @@ Figure~\ref{fig:Rwhile-anf-syntax} defines the output language
 \fi}
 \end{minipage}
 }
-\caption{\LangLoopANF{} is \LangLoop{} in administrative normal form (ANF).}
+\caption{\LangLoopANF{} is \LangLoop{} in monadic normal form.}
 \label{fig:Rwhile-anf-syntax}
 \end{figure}
 
@@ -10348,7 +10394,7 @@ The \code{analyze\_dataflow} function has four parameters.
 %\node (F1-2) at (9,0)  {\large \LangLoopFunRef{}};
 %\node (F1-3) at (6,0)  {\large \LangLoopFunRef{}};
 \node (F1-4) at (6,2)  {\large \LangLoop{}};
-\node (F1-5) at (9,2)  {\large \LangLoop{}};
+\node (F1-5) at (9,2)  {\large \LangLoopANF{}};
 \node (C3-2) at (3,0)  {\large \racket{\LangCLoop{}}\python{\LangCIf{}}};
 
 \node (x86-2) at (3,-2)  {\large \LangXIfVar{}};
@@ -10461,14 +10507,31 @@ Figure~\ref{fig:Lvec-concrete-syntax} defines the concrete syntax for
   operator, and 4) obtaining the number of elements (the length) of a
   tuple.}
 %
-The program in Figure~\ref{fig:vector-eg} shows an example use of
-tuples. It creates a 3-tuple \code{t} and a 1-tuple that is stored at
-index $2$ of the 3-tuple, demonstrating that tuples are first-class
-values.  The element at index $1$ of \code{t} is
-\racket{\code{\#t}}\python{True}, so the ``then'' branch of the
-\key{if} is taken.  The element at index $0$ of \code{t} is \code{40},
-to which we add \code{2}, the element at index $0$ of the 1-tuple. So
-the result of the program is \code{42}.
+The program below shows an example use of tuples. It creates a 3-tuple
+\code{t} and a 1-tuple that is stored at index $2$ of the 3-tuple,
+demonstrating that tuples are first-class values.  The element at
+index $1$ of \code{t} is \racket{\code{\#t}}\python{\code{True}}, so the
+``then'' branch of the \key{if} is taken.  The element at index $0$ of
+\code{t} is \code{40}, to which we add \code{2}, the element at index
+$0$ of the 1-tuple. So the result of the program is \code{42}.
+%
+{\if\edition\racketEd      
+\begin{lstlisting}
+    (let ([t (vector 40 #t (vector 2))])
+      (if (vector-ref t 1)
+          (+ (vector-ref t 0)
+             (vector-ref (vector-ref t 2) 0))
+          44))
+\end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+t = 40, True, (2,)
+print( t[0] + t[2][0] if t[1] else 44 )
+\end{lstlisting}
+\fi}
+
+
 
 \begin{figure}[tbp]
 \centering
@@ -10519,26 +10582,6 @@ the result of the program is \code{42}.
 \caption{The concrete syntax of \LangVec{}, extending \LangLoop{}
   (Figure~\ref{fig:Lwhile-concrete-syntax}).}
 \label{fig:Lvec-concrete-syntax}
-\end{figure}
-
-\begin{figure}[tbp]
-{\if\edition\racketEd      
-\begin{lstlisting}
-    (let ([t (vector 40 #t (vector 2))])
-      (if (vector-ref t 1)
-          (+ (vector-ref t 0)
-             (vector-ref (vector-ref t 2) 0))
-          44))
-\end{lstlisting}
-\fi}
-{\if\edition\pythonEd
-\begin{lstlisting}
-t = 40, True, (2,)
-print( t[0] + t[2][0] if t[1] else 44 )
-\end{lstlisting}
-\fi}
-\caption{Example program that creates tuples and reads from them.}
-\label{fig:vector-eg}
 \end{figure}
 
 \begin{figure}[tp]
@@ -10685,7 +10728,7 @@ print( t[0] )
 \fi}
 %
 From the perspective of programmer-observable behavior, tuples live
-forever. Of course, if they really lived forever, then many programs
+forever. Of course, if they really lived forever then many programs
 would run out of memory. The language's runtime system must therefore
 perform automatic garbage collection.
 
@@ -11036,11 +11079,11 @@ are several ways to accomplish this.
   guide the
   collector~\citep{Appel:1989aa,Goldberg:1991aa,Diwan:1992aa}.
 \end{enumerate}
-Dynamically typed languages, such as Lisp, need to tag objects
-anyways, so option 1 is a natural choice for those languages.
-However, \LangVec{} is a statically typed language, so it would be
-unfortunate to require tags on every object, especially small and
-pervasive objects like integers and Booleans.  Option 3 is the
+Dynamically typed languages, such as \racket{Racket}\python{Python},
+need to tag objects anyways, so option 1 is a natural choice for those
+languages.  However, \LangVec{} is a statically typed language, so it
+would be unfortunate to require tags on every object, especially small
+and pervasive objects like integers and Booleans.  Option 3 is the
 best-performing choice for statically typed languages, but comes with
 a relatively high implementation complexity. To keep this chapter
 within a 2-week time budget, we recommend a combination of options 1
@@ -11181,7 +11224,7 @@ significant changes to \code{select\_instructions},
 following program will serve as our running example.  It creates two
 tuples, one nested inside the other. Both tuples have length one. The
 program accesses the element in the inner tuple tuple.
-% tests/s2_17.rkt
+% tests/vectors_test_17.rkt
 {\if\edition\racketEd
 \begin{lstlisting}
 (vector-ref (vector-ref (vector (vector 42)) 0) 0)
@@ -11189,7 +11232,7 @@ program accesses the element in the inner tuple tuple.
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
-((42,),)[0][0]
+print( ((42,),)[0][0] )
 \end{lstlisting}
 \fi}
 
@@ -11209,45 +11252,65 @@ to wrap \code{HasType} around each AST node that it generates.
 \section{Expose Allocation}
 \label{sec:expose-allocation}
 
-\python{UNDER CONSTRUCTION}
-
-The pass \code{expose-allocation} lowers the \code{vector} creation
-form into a conditional call to the collector followed by the
-allocation.  We choose to place the \code{expose-allocation} pass
+The pass \code{expose\_allocation} lowers tuple creation
+into a conditional call to the collector followed by the
+allocation.  We choose to place the \code{expose\_allocation} pass
 before \code{remove\_complex\_operands} because the code generated by
-\code{expose-allocation} contains complex operands.  We also place
-\code{expose-allocation} before \code{explicate\_control} because
-\code{expose-allocation} introduces new variables using \code{let},
-but \code{let} is gone after \code{explicate\_control}.
+\code{expose\_allocation} contains complex operands.
 
-The output of \code{expose-allocation} is a language \LangAlloc{} that
-extends \LangVec{} with the three new forms that we use in the translation
-of the \code{vector} form.
+The output of \code{expose\_allocation} is a language \LangAlloc{}
+that extends \LangVec{} with new forms that we use in the translation
+of tuple creation.
+%
+{\if\edition\racketEd
 \[
 \begin{array}{lcl}
   \Exp &::=& \cdots
       \MID (\key{collect} \,\itm{int})
       \MID (\key{allocate} \,\itm{int}\,\itm{type})
-      \MID (\key{global-value} \,\itm{name})
+      \MID (\key{global-value} \,\itm{name}) 
 \end{array}
 \]
-The $(\key{collect}\,n)$ form runs the garbage collector, requesting
-$n$ bytes. It will become a call to the \code{collect} function in
-\code{runtime.c} in \code{select\_instructions}.  The
-$(\key{allocate}\,n\,T)$ form creates an tuple of $n$ elements.
-\index{subject}{allocate}
-The $T$ parameter is the type of the tuple: \code{(Vector $\Type_1 \ldots
-  \Type_n$)} where $\Type_i$ is the type of the $i$th element in the
-tuple. The $(\key{global-value}\,\itm{name})$ form reads the value of
-a global variable, such as \code{free\_ptr}.
+\fi}
+{\if\edition\pythonEd
+\[
+\begin{array}{lcl}
+  \Exp &::=& \cdots\\
+      &\MID& \key{collect}(\itm{int})
+      \MID \key{allocate}(\itm{int},\itm{type})
+      \MID \key{global\_value}(\itm{name}) \\
+      &\MID& \key{begin:} ~ \Stmt^{*} ~ \Exp
+\end{array}
+\]
 
-In the following, we show the transformation for the \code{vector}
-form into 1) a sequence of let-bindings for the initializing
+\fi}
+
+The \CCOLLECT{n} form runs the garbage collector, requesting $n$
+bytes. During instruction selection, it will become a call to the
+\code{collect} function in \code{runtime.c}.  The \CALLOCATE{n}{T}
+form creates a tuple with space for $n$ elements, but they are not
+initialized.  \index{subject}{allocate} The $T$ parameter is the type
+of the tuple:
+%
+\VECTY{\racket{$\Type_1 \ldots \Type_n$}\python{$\Type_1, \ldots, \Type_n$}}
+%
+where $\Type_i$ is the type of the $i$th element in the tuple. The
+\CGLOBAL{\itm{name}} form reads the value of a global variable, such
+as \code{free\_ptr}.
+%
+\python{The \code{begin} form is an expression that executes a
+  sequence of statements and then produces the value of the expression
+  at the end.}
+
+The following shows the transformation of tuple creation into 1) a
+sequence of temporary variables bindings for the initializing
 expressions, 2) a conditional call to \code{collect}, 3) a call to
-\code{allocate}, and 4) the initialization of the vector. In the
-following, \itm{len} refers to the length of the vector and
+\code{allocate}, and 4) the initialization of the vector. The
+\itm{len} placeholder refers to the length of the vector and
 \itm{bytes} is how many total bytes need to be allocated for the
 vector, which is 8 for the tag plus \itm{len} times 8.
+%
+{\if\edition\racketEd
 \begin{lstlisting}
   (has-type (vector |$e_0 \ldots e_{n-1}$|) |\itm{type}|)
 |$\Longrightarrow$|
@@ -11261,18 +11324,38 @@ vector, which is 8 for the tag plus \itm{len} times 8.
   (let ([_ (vector-set! |$v$| |$n-1$| |$x_{n-1}$|)])
      |$v$|) ... )))) ...)
 \end{lstlisting}
-In the above, we suppressed all of the \code{has-type} forms in the
-output for the sake of readability.  The placement of the initializing
-expressions $e_0,\ldots,e_{n-1}$ prior to the \code{allocate} and the
-sequence of \code{vector-set!} is important, as those expressions may
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+  (|$e_0$|, |$\ldots$|, |$e_{n-1}$|)
+|$\Longrightarrow$|
+  begin:
+      |$x_0$| = |$e_0$|
+           |$\vdots$|
+      |$x_{n-1}$| = |$e_{n-1}$|
+      if global_value(free_ptr) + |\itm{bytes}| < global_value(fromspace_end):
+          0
+      else:
+          collect(|\itm{bytes}|)
+      |$v$| = allocate(|\itm{len}|, |\itm{type}|)
+      |$v$|[0] = |$x_0$|
+           |$\vdots$|
+      |$v$|[|$n-1$|] = |$x_{n-1}$|
+      |$v$|
+\end{lstlisting}
+\fi}
+%
+The placement of the initializing expressions $e_0,\ldots,e_{n-1}$
+prior to the \code{allocate} is important, as those expressions may
 trigger garbage collection and we cannot have an allocated but
 uninitialized tuple on the heap during a collection.
 
 Figure~\ref{fig:expose-alloc-output} shows the output of the
-\code{expose-allocation} pass on our running example.
+\code{expose\_allocation} pass on our running example.
 
 \begin{figure}[tbp]
-% tests/s2_17.rkt
+  % tests/s2_17.rkt
+{\if\edition\racketEd
 \begin{lstlisting}
 (vector-ref
  (vector-ref
@@ -11286,11 +11369,7 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
                       )])
              (let ([alloc7971 (allocate 1 (Vector Integer))])
                (let ([initret7973 (vector-set! alloc7971 0 vecinit7972)])
-                 alloc7971)
-               )
-             )
-           )
-         ])
+                 alloc7971))))])
     (let ([collectret7978
            (if (< (+ (global-value free_ptr) 16)
                   (global-value fromspace_end))
@@ -11299,15 +11378,41 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
                )])
       (let ([alloc7975 (allocate 1 (Vector (Vector Integer)))])
         (let ([initret7977 (vector-set! alloc7975 0 vecinit7976)])
-          alloc7975)
-        )
-      )
-    )
+          alloc7975))))
   0)
  0)
 \end{lstlisting}
-\caption{Output of the \code{expose-allocation} pass, minus
-  all of the \code{has-type} forms.}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+print( |$T_1$|[0][0] )
+\end{lstlisting}
+where $T_1$ is
+\begin{lstlisting}
+    begin:
+          tmp.1 = |$T_2$|
+          if global_value(free_ptr) + 16 < global_value(fromspace_end):
+              0
+          else:
+              collect(16)
+          tmp.2 = allocate(1, tuple[tuple[int]])
+          tmp.2[0] = tmp.1
+          tmp.2
+\end{lstlisting}
+and $T_2$ is
+\begin{lstlisting}
+    begin:
+          tmp.3 = 42
+          if global_value(free_ptr) + 16 < global_value(fromspace_end):
+              0
+          else:
+              collect(16)
+          tmp.4 = allocate(1, tuple[int])
+          tmp.4[0] = tmp.3
+          tmp.4
+\end{lstlisting}
+\fi}
+\caption{Output of the \code{expose\_allocation} pass.}
 \label{fig:expose-alloc-output}
 \end{figure}
 
@@ -11315,39 +11420,83 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
 \section{Remove Complex Operands}
 \label{sec:remove-complex-opera-Lvec}
 
-The new forms \code{collect}, \code{allocate}, and \code{global-value}
-should all be treated as complex operands.
+{\if\edition\racketEd
+%
+The forms \code{collect}, \code{allocate}, and \code{global\_value}
+should be treated as complex operands.
+%
+\fi}
+%
+{\if\edition\pythonEd
+%
+The expressions \code{Allocate}, \code{GlobalValue}, \code{Begin}, and
+\code{Subscript} should be treated as complex operands.  The
+sub-expressions of \code{Subscript} must be atomic.
+%
+\fi}
 %% A new case for
 %% \code{HasType} is needed and the case for \code{Prim} needs to be
 %% handled carefully to prevent the \code{Prim} node from being separated
 %% from its enclosing \code{HasType}.
 Figure~\ref{fig:Lvec-anf-syntax}
 shows the grammar for the output language \LangVecANF{} of this
-pass, which is \LangVec{} in administrative normal form.
+pass, which is \LangVec{} in monadic normal form.
 
 \begin{figure}[tp]
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \small
+{\if\edition\racketEd    
 \[
 \begin{array}{rcl}
-  \Atm &::=& \gray{ \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} }
-       \MID \VOID{} \\
+  \Atm &::=& \gray{ \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} 
+       \MID \VOID{} } \\
 \Exp &::=& \gray{ \Atm \MID \READ{} } \\
    &\MID& \gray{ \NEG{\Atm} \MID \ADD{\Atm}{\Atm} } \\
    &\MID& \gray{ \LET{\Var}{\Exp}{\Exp} } \\
    &\MID& \gray{ \UNIOP{\key{'not}}{\Atm} } \\
    &\MID& \gray{ \BINOP{\itm{cmp}}{\Atm}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} }\\
-   &\MID& \LP\key{Collect}~\Int\RP \MID \LP\key{Allocate}~\Int~\Type\RP
-   \MID \LP\key{GlobalValue}~\Var\RP\\
+   &\MID& \COLLECT{\Int} \RP \MID \ALLOCATE{\Int}{\Type}
+   \MID \GLOBALVALUE{\Var}\\
 %  &\MID& \LP\key{HasType}~\Exp~\Type\RP \\
 \LangVecANFM{}  &::=& \gray{ \PROGRAM{\code{'()}}{\Exp} }
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd
+\[
+\begin{array}{lcl}
+\itm{binop} &::=& \code{Add()} \MID \code{Sub()} \\
+\itm{boolop} &::=& \code{And()} \MID \code{Or()} \\
+\itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \MID \code{Is()} \\
+\itm{uniop} &::=& \code{USub()} \MID \code{Not()} \\
+\itm{bool} &::=& \code{True} \MID \code{False} \\
+\Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} \\
+\Exp &::=& \Atm \MID \READ{} \MID \\
+     &\MID& \BINOP{\Exp}{\itm{binop}}{\Exp}
+     \MID \UNIOP{\itm{uniop}}{\Exp}\\
+     &\MID& \CMP{\Exp}{\itm{cmp}}{\Exp} 
+     \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp}\\
+     &\MID& \IF{\Exp}{\Exp}{\Exp} \\
+     &\MID& \GET{\Atm}{\Atm} \\
+     &\MID& \LEN{\Exp}\\
+   &\MID& \ALLOCATE{\Int}{\Type}
+     \MID \GLOBALVALUE{\Var}\RP\\
+   &\MID& \BEGIN{\Stmt^{*}}{\Exp} \\
+\Stmt{} &::=& \PRINT{\Exp} \MID \EXPR{\Exp} \\
+  &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \\
+  &\MID& \ASSIGN{\PUT{\Atm}{\Atm}}{\Exp} \\
+  &\MID& \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
+  &\MID& \WHILESTMT{\Exp}{\Stmt^{+}}
+   \MID \COLLECT{\Int}  \\
+\LangLoopM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
+\end{array}
+\]
+\fi}
 \end{minipage}
 }
-\caption{\LangVecANF{} is \LangVec{} in administrative normal form (ANF).}
+\caption{\LangVecANF{} is \LangVec{} in monadic normal form.}
 \label{fig:Lvec-anf-syntax}
 \end{figure}
 
@@ -11360,6 +11509,7 @@ pass, which is \LangVec{} in administrative normal form.
 \fbox{
   \begin{minipage}{0.96\textwidth}
     \small
+{\if\edition\racketEd    
 \[
 \begin{array}{lcl}
 \Atm &::=& \gray{ \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} }\\
@@ -11379,6 +11529,29 @@ pass, which is \LangVec{} in administrative normal form.
 \LangCVecM{} & ::= & \gray{ \CPROGRAM{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP} }
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd
+\[
+\begin{array}{lcl}
+\Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} \\
+\Exp &::= & \Atm \MID \READ{} \\
+     &\MID& \BINOP{\Atm}{\itm{binop}}{\Atm}
+     \MID \UNIOP{\itm{uniop}}{\Atm} \\
+     &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} 
+     \MID \BOOLOP{\itm{boolop}}{\Atm}{\Atm} \\
+     &\MID& \GET{\Atm}{\Atm}
+     \MID \ALLOCATE{\Int}{\Type} \MID \GLOBALVALUE{\Var}\RP\\
+     &\MID& \LEN{\Atm} \\
+\Stmt &::=& \PRINT{\Exp} \MID \EXPR{\Exp} \\
+     &\MID& \ASSIGN{\VAR{\Var}}{\Exp}  
+     \MID \RETURN{\Exp} \MID \GOTO{\itm{label}} \\
+     &\MID& \IFSTMT{\CMP{\Atm}{\itm{cmp}}{\Atm}}{\LS\GOTO{\itm{label}}\RS}{\LS\GOTO{\itm{label}}\RS} \\
+     &\MID& \COLLECT{\Int} \\
+     &\MID& \ASSIGN{\PUT{\Atm}{\Atm}}{\Atm} \\
+\LangCVecM{} & ::= & \CPROGRAM{\itm{info}}{\LC\itm{label}\,\key{:}\,\Stmt^{*}, \ldots \RC}
+\end{array}
+\]
+\fi}
 \end{minipage}
 }
 \caption{The abstract syntax of \LangCVec{}, extending \LangCIf{}
@@ -11388,13 +11561,23 @@ pass, which is \LangVec{} in administrative normal form.
 
 The output of \code{explicate\_control} is a program in the
 intermediate language \LangCVec{}, whose abstract syntax is defined in
-Figure~\ref{fig:c2-syntax}.  (The concrete syntax is defined in
-Figure~\ref{fig:c2-concrete-syntax} of the Appendix.)  The new forms
-of \LangCVec{} include the \key{allocate}, \key{vector-ref}, and
-\key{vector-set!}, and \key{global-value} expressions and the
-\code{collect} statement.  The \code{explicate\_control} pass can treat
-these new forms much like the other expression forms that we've
-already encoutered.
+Figure~\ref{fig:c2-syntax}.  \racket{(The concrete syntax is defined
+  in Figure~\ref{fig:c2-concrete-syntax} of the Appendix.)}  The new
+expressions of \LangCVec{} include \key{allocate},
+%
+\racket{\key{vector-ref}, and \key{vector-set!},}
+%
+\python{accessing tuple elements,}
+%
+and \key{global\_value}.
+%
+\python{It also includes the \code{collect} statment and
+assignment to a tuple element.}
+%
+\racket{It also includes the new \code{collect} statement.}
+%
+The \code{explicate\_control} pass can treat these new forms much like
+the other forms that we've already encoutered.
 
 
 \section{Select Instructions and the \LangXGlobal{} Language}
@@ -11410,29 +11593,50 @@ already encoutered.
 
 In this pass we generate x86 code for most of the new operations that
 were needed to compile tuples, including \code{Allocate},
-\code{Collect}, \code{vector-ref}, \code{vector-set!}, and
-\code{void}. We compile \code{GlobalValue} to \code{Global} because
-the later has a different concrete syntax (see
-Figures~\ref{fig:x86-2-concrete} and \ref{fig:x86-2}).
-\index{subject}{x86}
+\code{Collect}, and accessing tuple elements.
+%
+We compile \code{GlobalValue} to \code{Global} because the later has a
+different concrete syntax (see Figures~\ref{fig:x86-2-concrete} and
+\ref{fig:x86-2}).  \index{subject}{x86}
 
-The \code{vector-ref} and \code{vector-set!} forms translate into
-\code{movq} instructions.  (The plus one in the offset is to get past
-the tag at the beginning of the tuple representation.)
+The tuple read and write forms translate into \code{movq}
+instructions.  (The plus one in the offset is to get past the tag at
+the beginning of the tuple representation.)
+%
+\begin{center}
+\begin{minipage}{\textwidth}
+{\if\edition\racketEd    
 \begin{lstlisting}
-|$\itm{lhs}$| = (vector-ref |$\itm{vec}$| |$n$|);
+|$\itm{lhs}$| = (vector-ref |$\itm{tup}$| |$n$|);
 |$\Longrightarrow$|
-movq |$\itm{vec}'$|, %r11
+movq |$\itm{tup}'$|, %r11
 movq |$8(n+1)$|(%r11), |$\itm{lhs'}$|
 
-|$\itm{lhs}$| = (vector-set! |$\itm{vec}$| |$n$| |$\itm{arg}$|);
+|$\itm{lhs}$| = (vector-set! |$\itm{tup}$| |$n$| |$\itm{rhs}$|);
 |$\Longrightarrow$|
-movq |$\itm{vec}'$|, %r11
-movq |$\itm{arg}'$|, |$8(n+1)$|(%r11)
+movq |$\itm{tup}'$|, %r11
+movq |$\itm{rhs}'$|, |$8(n+1)$|(%r11)
 movq $0, |$\itm{lhs'}$|
 \end{lstlisting}
-The $\itm{lhs}'$, $\itm{vec}'$, and $\itm{arg}'$ are obtained by
-translating $\itm{vec}$ and $\itm{arg}$ to x86.  The move of $\itm{vec}'$ to
+\fi}
+{\if\edition\pythonEd    
+\begin{lstlisting}
+|$\itm{lhs}$| = |$\itm{tup}$|[|$n$|]
+|$\Longrightarrow$|
+movq |$\itm{tup}'$|, %r11
+movq |$8(n+1)$|(%r11), |$\itm{lhs'}$|
+
+|$\itm{tup}$|[|$n$|] = |$\itm{rhs}$|
+|$\Longrightarrow$|
+movq |$\itm{tup}'$|, %r11
+movq |$\itm{rhs}'$|, |$8(n+1)$|(%r11)
+movq $0, |$\itm{lhs'}$|
+\end{lstlisting}
+\fi}
+\end{minipage}
+\end{center}
+The $\itm{lhs}'$, $\itm{tup}'$, and $\itm{rhs}'$ are obtained by
+translating $\itm{tup}$ and $\itm{rhs}$ to x86.  The move of $\itm{tup}'$ to
 register \code{r11} ensures that offset expression
 \code{$-8(n+1)$(\%r11)} contains a register operand.  This requires
 removing \code{r11} from consideration by the register allocating.
@@ -11440,22 +11644,22 @@ removing \code{r11} from consideration by the register allocating.
 Why not use \code{rax} instead of \code{r11}? Suppose we instead used
 \code{rax}. Then the generated code for \code{vector-set!} would be
 \begin{lstlisting}
-movq |$\itm{vec}'$|, %rax
-movq |$\itm{arg}'$|, |$8(n+1)$|(%rax)
+movq |$\itm{tup}'$|, %rax
+movq |$\itm{rhs}'$|, |$8(n+1)$|(%rax)
 movq $0, |$\itm{lhs}'$|
 \end{lstlisting}
-Next, suppose that $\itm{arg}'$ ends up as a stack location, so
+Next, suppose that $\itm{rhs}'$ ends up as a stack location, so
 \code{patch\_instructions} would insert a move through \code{rax}
 as follows.
 \begin{lstlisting}
-movq |$\itm{vec}'$|, %rax
-movq |$\itm{arg}'$|, %rax
+movq |$\itm{tup}'$|, %rax
+movq |$\itm{rhs}'$|, %rax
 movq %rax, |$8(n+1)$|(%rax)
 movq $0, |$\itm{lhs}'$|
 \end{lstlisting}
 But the above sequence of instructions does not work because we're
-trying to use \code{rax} for two different values ($\itm{vec}'$ and
-$\itm{arg}'$) at the same time!
+trying to use \code{rax} for two different values ($\itm{tup}'$ and
+$\itm{rhs}'$) at the same time!
 
 We compile the \code{allocate} form to operations on the
 \code{free\_ptr}, as shown below. The address in the \code{free\_ptr}
@@ -11469,6 +11673,7 @@ tag is organized. We recommend using the Racket operations
 \code{bitwise-ior} and \code{arithmetic-shift} to compute the tag
 during compilation.  The type annotation in the \code{vector} form is
 used to determine the pointer mask region of the tag.
+{\if\edition\racketEd
 \begin{lstlisting}
    |$\itm{lhs}$| = (allocate |$\itm{len}$| (Vector |$\itm{type} \ldots$|));
    |$\Longrightarrow$|
@@ -11477,13 +11682,24 @@ used to determine the pointer mask region of the tag.
    movq $|$\itm{tag}$|, 0(%r11)
    movq %r11, |$\itm{lhs}'$|
 \end{lstlisting}
-
+\fi}
+{\if\edition\pythonEd    
+\begin{lstlisting}
+   |$\itm{lhs}$| = allocate(|$\itm{len}$|, tuple[|$\itm{type}, \ldots$]|);
+   |$\Longrightarrow$|
+   movq free_ptr(%rip), %r11
+   addq |$8(\itm{len}+1)$|, free_ptr(%rip)
+   movq $|$\itm{tag}$|, 0(%r11)
+   movq %r11, |$\itm{lhs}'$|
+\end{lstlisting}
+\fi}
 The \code{collect} form is compiled to a call to the \code{collect}
 function in the runtime. The arguments to \code{collect} are 1) the
 top of the root stack and 2) the number of bytes that need to be
 allocated.  We use another dedicated register, \code{r15}, to
 store the pointer to the top of the root stack. So \code{r15} is not
 available for use by the register allocator.
+{\if\edition\racketEd
 \begin{lstlisting}
    (collect |$\itm{bytes}$|)
    |$\Longrightarrow$|
@@ -11491,7 +11707,16 @@ available for use by the register allocator.
    movq $|\itm{bytes}|, %rsi
    callq collect
 \end{lstlisting}
-
+\fi}
+{\if\edition\pythonEd    
+\begin{lstlisting}
+   collect(|$\itm{bytes}$|)
+   |$\Longrightarrow$|
+   movq %r15, %rdi
+   movq $|\itm{bytes}|, %rsi
+   callq collect
+\end{lstlisting}
+\fi}
 
 
 \begin{figure}[tp]
@@ -11518,7 +11743,7 @@ available for use by the register allocator.
 \begin{array}{lcl}
   \Arg &::=&  \gray{  \INT{\Int} \MID \REG{\Reg} \MID \DEREF{\Reg}{\Int}
    \MID \BYTEREG{\Reg}} \\
-   &\MID& (\key{Global}~\Var) \\
+   &\MID& \GLOBAL{\Var} \\
 \LangXGlobalM{} &::= & \gray{ \XPROGRAM{\itm{info}}{\LP\LP\itm{label} \,\key{.}\, \Block \RP\ldots\RP} }
 \end{array}
 \]
@@ -11677,6 +11902,7 @@ accomplishes this task. The garbage collector tests each root to see
 if it is null prior to dereferencing it.
 
 \begin{figure}[htbp]
+  % TODO: Python Version -Jeremy
 \begin{minipage}[t]{0.5\textwidth}
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
 block35:
@@ -11760,7 +11986,7 @@ conclusion:
 	retq
 \end{lstlisting}
 \end{minipage}
-\caption{Output of the \code{print\_x86} pass.}
+\caption{Output of the \code{prelude\_and\_conclusion} pass.}
 \label{fig:print-x86-output-gc}
 \end{figure}
 
@@ -11771,7 +11997,7 @@ conclusion:
 \node (Lvec-2) at (3,2)  {\large \LangVec{}};
 \node (Lvec-3) at (6,2)  {\large \LangVec{}};
 \node (Lvec-4) at (9,2)  {\large \LangVec{}};
-\node (Lvec-5) at (12,2)  {\large \LangAlloc{}};
+\node (Lvec-5) at (12,2)  {\large \LangAllocANF{}};
 \node (C2-4) at (3,0)  {\large \LangCVec{}};
 
 \node (x86-2) at (3,-2)  {\large \LangXGlobalVar{}};
@@ -11802,6 +12028,7 @@ conclusion:
 Figure~\ref{fig:Lvec-passes} gives an overview of all the passes needed
 for the compilation of \LangVec{}.
 
+{\if\edition\racketEd
 \section{Challenge: Simple Structures}
 \label{sec:simple-structures}
 \index{subject}{struct}
@@ -11885,7 +12112,6 @@ mark. The following example uses \code{set-point-x!} to change the
   \LangStruct{} to x86 assembly code. Create five new test cases that use
   structures and test your compiler.
 \end{exercise}
-
 
 \section{Challenge: Arrays}
 \label{sec:arrays}
@@ -12288,6 +12514,8 @@ from the set.
   pointer recording. Make sure that your new compiler and runtime
   passes your test suite.
 \end{exercise}
+
+\fi}
 
 % Further Reading
 
@@ -12944,7 +13172,7 @@ R^{\dagger}_4  &::=& \gray{ \PROGRAMDEFS{\code{'()}}{\Def} }
 \]
 \end{minipage}
 }
-\caption{\LangFunANF{} is \LangFun{} in administrative normal form (ANF).}
+\caption{\LangFunANF{} is \LangFunRefAlloc{} in monadic normal form.}
 \label{fig:Rfun-anf-syntax}
 \end{figure}
 
@@ -13314,7 +13542,7 @@ previously created test programs.
 \node (F1-1) at (12,0)  {\large \LangFunRef{}};
 \node (F1-2) at (9,0)  {\large \LangFunRef{}};
 \node (F1-3) at (6,0)  {\large \LangFunRefAlloc{}};
-\node (F1-4) at (3,0)  {\large \LangFunRefAlloc{}};
+\node (F1-4) at (3,0)  {\large \LangFunANF{}};
 \node (C3-2) at (3,-2)  {\large \LangCFun{}};
 
 \node (x86-2) at (3,-4)  {\large \LangXIndCallVar{}};
@@ -14219,15 +14447,15 @@ extract the $5$-bits starting at position $58$ from the tag.
 
 \begin{figure}[p]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (Rfun) at (0,2)  {\large \LangFun{}};
-\node (Rfun-2) at (3,2)  {\large \LangFun{}};
-\node (Rfun-3) at (6,2)  {\large \LangFun{}};
-\node (F1-0) at (9,2)  {\large \LangFunRef{}};
-\node (F1-1) at (12,0)  {\large \LangFunRef{}};
+\node (Rfun) at (0,2)  {\large \LangLam{}};
+\node (Rfun-2) at (3,2)  {\large \LangLam{}};
+\node (Rfun-3) at (6,2)  {\large \LangLam{}};
+\node (F1-0) at (9,2)  {\large \LangLamFunRef{}};
+\node (F1-1) at (12,0)  {\large \LangLamFunRef{}};
 \node (F1-2) at (9,0)  {\large \LangFunRef{}};
-\node (F1-3) at (6,0)  {\large $F_1$};
-\node (F1-4) at (3,0)  {\large $F_1$};
-\node (F1-5) at (0,0)  {\large $F_1$};
+\node (F1-3) at (6,0)  {\large \LangFunRef{}};
+\node (F1-4) at (3,0)  {\large \LangFunRefAlloc{}};
+\node (F1-5) at (0,0)  {\large \LangFunANF{}};
 \node (C3-2) at (3,-2)  {\large \LangCFun{}};
 
 \node (x86-2) at (3,-4)  {\large \LangXIndCallVar{}};
@@ -15513,11 +15741,13 @@ for the compilation of \LangDyn{}.
 \fi % racketEd
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+{\if\edition\pythonEd
 \chapter{Objects}
 \label{ch:Robject}
 \index{subject}{objects}
 \index{subject}{classes}
 
+\fi}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -16458,8 +16688,8 @@ the target type is \code{PVector}.  Instead of using
 |$\Rightarrow$|
 (let |$\itm{tmp}$| |$e'$|
    (if (eq? (tag-of-any |$\itm{tmp}$| 2))
-      (let |$\itm{vec}$| (value-of |$\itm{tmp}$| (PVector Any |$\ldots$| Any))
-        (if (eq? (proxy-vector-length |$\itm{vec}$|) |$n$|) |$\itm{vec}$| (exit)))
+      (let |$\itm{tup}$| (value-of |$\itm{tmp}$| (PVector Any |$\ldots$| Any))
+        (if (eq? (proxy-vector-length |$\itm{tup}$|) |$n$|) |$\itm{tup}$| (exit)))
       (exit)))
 \end{lstlisting}
 
