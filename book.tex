@@ -6488,21 +6488,23 @@ operators to include
 
 \newcommand{\LifGrammarPython}{
 \begin{array}{rcl}
-  \itm{binaryop} &::= & \key{and} \MID \key{or} \MID \key{==} \MID \key{!=} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=} \\
-  \itm{unaryop} &::= & \key{not} \\
-  \Exp &::=& \TRUE \MID \FALSE \MID \CIF{\Exp}{\Exp}{\Exp} \\
+  \itm{cmp} &::= & \key{==} \MID \key{!=} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=} \\
+\Exp &::=& \TRUE \MID \FALSE \MID \CAND{\Exp}{\Exp} \MID \COR{\Exp}{\Exp}
+  \MID \key{not}~\Exp \\
+  &\MID& \Exp ~\itm{cmp} ~\Exp
+  \MID \CIF{\Exp}{\Exp}{\Exp} \\
   \Stmt &::=& \key{if}~ \Exp \key{:}~ \Stmt^{+} ~\key{else:}~ \Stmt^{+}
 \end{array}
 }
 \newcommand{\LifASTPython}{
 \begin{array}{lcl}
 \itm{boolop} &::=& \code{And()} \MID \code{Or()} \\
-\itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \\
 \itm{unaryop} &::=& \code{Not()} \\
+\itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \\
 \itm{bool} &::=& \code{True} \MID \code{False} \\
-\Exp &::=& \CMP{\Exp}{\itm{cmp}}{\Exp} 
+\Exp &::=& \BOOL{\itm{bool}} 
      \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp}\\
-     &\MID& \BOOL{\itm{bool}} \MID \IF{\Exp}{\Exp}{\Exp} \\
+     &\MID& \CMP{\Exp}{\itm{cmp}}{\Exp}  \MID \IF{\Exp}{\Exp}{\Exp} \\
 \Stmt{} &::=& \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}
 \end{array}
 }
@@ -6529,7 +6531,7 @@ operators to include
 \begin{array}{l}
   \gray{\LintGrammarPython} \\ \hline
   \gray{\LvarGrammarPython}  \\ \hline
-\LifGrammarPython \\  
+  \LifGrammarPython \\  
 \begin{array}{rcl}
   \LangIfM{} &::=& \Stmt^{*}
 \end{array}
@@ -9476,6 +9478,17 @@ the condition remains true.
 \end{array}
 }
 
+\newcommand{\LwhileGrammarPython}{
+\begin{array}{rcl}
+  \Stmt &::=& \key{while}~ \Exp \key{:}~ \Stmt^{+}
+\end{array}
+}
+\newcommand{\LwhileASTPython}{
+\begin{array}{lcl}
+\Stmt{} &::=& \WHILESTMT{\Exp}{\Stmt^{+}}
+\end{array}
+}
+
 \begin{figure}[tp]
 \centering
 \fbox{
@@ -9496,15 +9509,14 @@ the condition remains true.
 \fi}
 {\if\edition\pythonEd
 \[
+\begin{array}{l}
+  \gray{\LintGrammarPython} \\ \hline
+  \gray{\LvarGrammarPython}  \\ \hline
+  \gray{\LifGrammarPython} \\ \hline
+  \LwhileGrammarPython \\
 \begin{array}{rcl}
-  \itm{binaryop} &::= & \key{+} \MID \key{-} \MID \key{and} \MID \key{or} \MID \key{==} \MID \key{!=} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=} \\
-  \itm{unaryop} &::= & \key{-} \MID \key{not} \\
-  \Exp &::=& \Int \MID \key{input\_int}\LP\RP \MID \CUNIOP{\itm{unaryop}}{\Exp} \MID \CBINOP{\itm{binaryop}}{\Exp}{\Exp} \MID \Var{} \\
-       &\MID&  \TRUE \MID \FALSE \MID \CIF{\Exp}{\Exp}{\Exp} \\
-  \Stmt &::=& \key{print}\LP \Exp \RP \MID \Exp \MID \CASSIGN{\Var}{\Exp}
-         \MID \key{if}~ \Exp \key{:}~ \Stmt^{+} ~\key{else:}~ \Stmt^{+}\\
-        &\MID& \key{while}~ \Exp \key{:}~ \Stmt^{+}\\
   \LangLoopM{} &::=& \Stmt^{*}
+\end{array}
 \end{array}
 \]
 \fi}
@@ -9527,13 +9539,6 @@ the condition remains true.
   \gray{\LifAST{}} \\ \hline
   \LwhileAST{} \\
 \begin{array}{lcl}
-  %% \Exp &::=& \gray{ \INT{\Int} \VAR{\Var} \MID \LET{\Var}{\Exp}{\Exp} } \\
-  %%      &\MID& \gray{ \PRIM{\itm{op}}{\Exp\ldots} }\\
-  %%    &\MID& \gray{ \BOOL{\itm{bool}}
-  %%     \MID \IF{\Exp}{\Exp}{\Exp} } \\
-  %% &\MID& \SETBANG{\Var}{\Exp} \MID \BEGIN{\LP\Exp\ldots\RP}{\Exp}
-  %%   \MID \WHILE{\Exp}{\Exp} \\
-  %%   &\MID& \VOID{}  \\
   \LangLoopM{} &::=& \gray{ \PROGRAM{\code{'()}}{\Exp} }
 \end{array}
 \end{array}
@@ -9541,22 +9546,14 @@ the condition remains true.
 \fi}
 {\if\edition\pythonEd
 \[
+\begin{array}{l}
+  \gray{\LintASTPython} \\ \hline
+  \gray{\LvarASTPython}  \\ \hline
+  \gray{\LifASTPython} \\ \hline
+  \LwhileASTPython \\
 \begin{array}{lcl}
-\itm{binaryop} &::=& \code{Add()} \MID \code{Sub()} \\
-\itm{boolop} &::=& \code{And()} \MID \code{Or()} \\
-\itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \\
-\itm{unaryop} &::=& \code{USub()} \MID \code{Not()} \\
-\itm{bool} &::=& \code{True} \MID \code{False} \\
-\Exp &::=& \INT{\Int} \MID \READ{} \MID \VAR{\Var} \\
-     &\MID& \BINOP{\Exp}{\itm{binaryop}}{\Exp}
-     \MID \UNIOP{\itm{unaryop}}{\Exp}\\
-     &\MID& \CMP{\Exp}{\itm{cmp}}{\Exp} 
-     \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp}\\
-     &\MID& \BOOL{\itm{bool}} \MID \IF{\Exp}{\Exp}{\Exp} \\
-\Stmt{} &::=& \PRINT{\Exp} \MID \EXPR{\Exp} \\
-     &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
-     &\MID& \WHILESTMT{\Exp}{\Stmt^{+}}\\
 \LangLoopM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
+\end{array}
 \end{array}
 \]
 \fi}
@@ -10607,7 +10604,7 @@ print( t[0] + t[2][0] if t[1] else 44 )
    \MID \LP\key{vector-set!}\;\Exp\;\Int\;\Exp\RP 
 \end{array}
 }
-\newcommand{\LtupAST}{
+\newcommand{\LtupASTRacket}{
 \begin{array}{lcl}
  \Type &::=& \LP\key{Vector}\;\Type\ldots\RP \\
 \itm{op} &::=& \code{vector} \MID \code{vector-length} \\
@@ -10616,7 +10613,21 @@ print( t[0] + t[2][0] if t[1] else 44 )
      &\MID& \LP\key{HasType}~\Exp~\Type \RP 
 \end{array}
 }
+\newcommand{\LtupGrammarPython}{
+\begin{array}{rcl}
+  \itm{cmp} &::= & \key{is} \\
+  \Exp &::=& \Exp \key{,} \ldots \key{,} \Exp \MID \CGET{\Exp}{\Exp} \MID \CLEN{\Exp} 
+\end{array}
+}
+\newcommand{\LtupASTPython}{
+\begin{array}{lcl}
+\itm{cmp} &::= & \code{Is()} \\
+\Exp &::=& \TUPLE{\Exp^{+}} \MID \GET{\Exp}{\Exp} \\
+     &\MID& \LEN{\Exp}
+\end{array}
+}
 
+  
 \begin{figure}[tbp]
 \centering
 \fbox{
@@ -10630,24 +10641,6 @@ print( t[0] + t[2][0] if t[1] else 44 )
   \gray{\LwhileGrammarRacket} \\ \hline
   \LtupGrammarRacket \\  
   \begin{array}{lcl}
-  %% \Type &::=& \gray{\key{Integer} \MID \key{Boolean}}
-  %% \MID \LP\key{Vector}\;\Type\ldots\RP \MID \key{Void}\\
-  %% \Exp &::=& \gray{  \Int \MID \CREAD{} \MID \CNEG{\Exp} \MID \CADD{\Exp}{\Exp} \MID \CSUB{\Exp}{\Exp} }  \\
-  %% &\MID&  \gray{  \Var \MID \CLET{\Var}{\Exp}{\Exp}  }\\
-  %% &\MID& \gray{ \key{\#t} \MID \key{\#f} 
-  %%  \MID \LP\key{and}\;\Exp\;\Exp\RP 
-  %%  \MID \LP\key{or}\;\Exp\;\Exp\RP
-  %%  \MID \LP\key{not}\;\Exp\RP } \\
-  %% &\MID& \gray{  \LP\itm{cmp}\;\Exp\;\Exp\RP 
-  %%  \MID \CIF{\Exp}{\Exp}{\Exp}  } \\
-  %%  &\MID& \gray{ \CSETBANG{\Var}{\Exp}
-  %%   \MID \CBEGIN{\Exp\ldots}{\Exp}
-  %%   \MID \CWHILE{\Exp}{\Exp} \MID \LP\key{void}\RP } \\
-  %% &\MID& \LP\key{vector}\;\Exp\ldots\RP 
-  %%  \MID \LP\key{vector-length}\;\Exp\RP \\
-  %% &\MID& \LP\key{vector-ref}\;\Exp\;\Int\RP
-  %%  \MID \LP\key{vector-set!}\;\Exp\;\Int\;\Exp\RP \\
-  %% &\MID& \LP\key{has-type}~\Exp~\Type\RP\\
     \LangVecM{} &::=& \Exp
   \end{array}
 \end{array}
@@ -10655,16 +10648,15 @@ print( t[0] + t[2][0] if t[1] else 44 )
 \fi}
 {\if\edition\pythonEd
 \[
+\begin{array}{l}
+  \gray{\LintGrammarPython{}} \\ \hline
+  \gray{\LvarGrammarPython{}} \\ \hline
+  \gray{\LifGrammarPython{}} \\ \hline
+  \gray{\LwhileGrammarPython} \\ \hline
+  \LtupGrammarPython \\  
 \begin{array}{rcl}
-  \itm{binaryop} &::= & \key{+} \MID \key{-} \MID \key{and} \MID \key{or} \MID \key{==} \MID \key{!=} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=} \MID \key{is} \\
-  \itm{unaryop} &::= & \key{-} \MID \key{not} \\
-  \Exp &::=& \Int \MID \key{input\_int}\LP\RP \MID \CUNIOP{\itm{unaryop}}{\Exp} \MID \CBINOP{\itm{binaryop}}{\Exp}{\Exp} \MID \Var{} \\
-  &\MID&  \TRUE \MID \FALSE \MID \CIF{\Exp}{\Exp}{\Exp} \\
-  &\MID& \Exp \key{,} \ldots \key{,} \Exp \MID \CGET{\Exp}{\Exp} \MID \CLEN{\Exp} \\
-  \Stmt &::=& \key{print}\LP \Exp \RP \MID \Exp \MID \CASSIGN{\Var}{\Exp}
-         \MID \key{if}~ \Exp \key{:}~ \Stmt^{+} ~\key{else:}~ \Stmt^{+}\\
-        &\MID& \key{while}~ \Exp \key{:}~ \Stmt^{+}\\
   \LangVecM{} &::=& \Stmt^{*}
+\end{array}
 \end{array}
 \]
 \fi}
@@ -10686,15 +10678,8 @@ print( t[0] + t[2][0] if t[1] else 44 )
   \gray{\LvarAST{}} \\ \hline
   \gray{\LifAST{}} \\ \hline
   \gray{\LwhileAST{}} \\ \hline
-  \LtupAST{} \\
+  \LtupASTRacket{} \\
 \begin{array}{lcl}
-%% \Exp &::=& \gray{ \INT{\Int} \MID \VAR{\Var} \MID \LET{\Var}{\Exp}{\Exp} } \\
-%%      &\MID& \gray{ \PRIM{\itm{op}}{\Exp\ldots}
-%%       \MID \BOOL{\itm{bool}}
-%%       \MID \IF{\Exp}{\Exp}{\Exp} } \\
-%%     &\MID& \VECREF{\Exp}{\INT{\Int}}\\
-%%     &\MID& \VECSET{\Exp}{\INT{\Int}}{\Exp} \\
-%%      &\MID& \LP\key{HasType}~\Exp~\Type \RP \\
   \LangVecM{} &::=& \PROGRAM{\key{'()}}{\Exp}
 \end{array}
 \end{array}
@@ -10702,24 +10687,15 @@ print( t[0] + t[2][0] if t[1] else 44 )
 \fi}
 {\if\edition\pythonEd
 \[
-\begin{array}{lcl}
-\itm{binaryop} &::=& \code{Add()} \MID \code{Sub()} \\
-\itm{boolop} &::=& \code{And()} \MID \code{Or()} \\
-\itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \MID \code{Is()} \\
-\itm{unaryop} &::=& \code{USub()} \MID \code{Not()} \\
-\itm{bool} &::=& \code{True} \MID \code{False} \\
-\Exp &::=& \INT{\Int} \MID \READ{} \MID \VAR{\Var} \\
-     &\MID& \BINOP{\Exp}{\itm{binaryop}}{\Exp}
-     \MID \UNIOP{\itm{unaryop}}{\Exp}\\
-     &\MID& \CMP{\Exp}{\itm{cmp}}{\Exp} 
-     \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp}\\
-     &\MID& \BOOL{\itm{bool}} \MID \IF{\Exp}{\Exp}{\Exp} \\
-     &\MID& \TUPLE{\Exp^{+}} \MID \GET{\Exp}{\Exp} \\
-     &\MID& \LEN{\Exp}\\
-\Stmt{} &::=& \PRINT{\Exp} \MID \EXPR{\Exp} \\
-     &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
-     &\MID& \WHILESTMT{\Exp}{\Stmt^{+}}\\
-\LangLoopM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
+\begin{array}{l}
+  \gray{\LintASTPython} \\ \hline
+  \gray{\LvarASTPython} \\ \hline
+  \gray{\LifASTPython} \\ \hline
+  \gray{\LwhileASTPython} \\ \hline
+  \LtupASTPython \\
+  \begin{array}{lcl}
+    \LangLoopM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
+  \end{array}
 \end{array}
 \]
 \fi}
@@ -12692,7 +12668,7 @@ inside each other.
    \Def &::=& \CDEF{\Var}{\LS\Var \key{:} \Type\RS \ldots}{\Type}{\Exp} \\
   \end{array}
 }
-\newcommand{\LfunAST}{
+\newcommand{\LfunASTRacket}{
   \begin{array}{lcl}
   \Type &::=& (\Type \ldots \; \key{->}\; \Type) \\
   \Exp &::=& \APPLY{\Exp}{\Exp\ldots}\\
@@ -12751,8 +12727,8 @@ inside each other.
   \gray{\LvarAST{}} \\ \hline
   \gray{\LifAST{}} \\ \hline
   \gray{\LwhileAST{}} \\ \hline
-  \gray{\LtupAST{}} \\ \hline
-  \LfunAST \\
+  \gray{\LtupASTRacket{}} \\ \hline
+  \LfunASTRacket \\
   \begin{array}{lcl}
 %% \Exp &::=& \gray{ \INT{\Int} \MID \VAR{\Var} \MID \LET{\Var}{\Exp}{\Exp} } \\
 %%      &\MID& \gray{ \PRIM{\itm{op}}{\Exp\ldots} }\\
@@ -13987,7 +13963,7 @@ syntax for function application.
     &\MID& \CLAMBDA{\LP\LS\Var \key{:} \Type\RS\ldots\RP}{\Type}{\Exp} 
   \end{array}
 }
-\newcommand{\LlambdaAST}{
+\newcommand{\LlambdaASTRacket}{
   \begin{array}{lcl}
   \itm{op} &::=& \code{procedure-arity} \\
   \Exp &::=& \LAMBDA{\LP\LS\Var\code{:}\Type\RS\ldots\RP}{\Type}{\Exp}
@@ -14049,9 +14025,9 @@ syntax for function application.
   \gray{\LvarAST{}} \\ \hline
   \gray{\LifAST{}} \\ \hline
   \gray{\LwhileAST{}} \\ \hline
-  \gray{\LtupAST{}} \\ \hline
-  \gray{\LfunAST} \\ \hline
-  \LlambdaAST \\
+  \gray{\LtupASTRacket{}} \\ \hline
+  \gray{\LfunASTRacket} \\ \hline
+  \LlambdaASTRacket \\
   \begin{array}{lcl}
  %%  \itm{op} &::=& \ldots \MID \code{procedure-arity} \\
  %%  \Exp &::=& \gray{ \INT{\Int} \VAR{\Var} \MID \LET{\Var}{\Exp}{\Exp} } \\
@@ -15157,9 +15133,9 @@ in greater detail.
   \gray{\LvarAST{}} \\ \hline
   \gray{\LifAST{}} \\ \hline
   \gray{\LwhileAST{}} \\ \hline
-  \gray{\LtupAST{}} \\ \hline
-  \gray{\LfunAST} \\ \hline
-  \gray{\LlambdaAST} \\ \hline
+  \gray{\LtupASTRacket{}} \\ \hline
+  \gray{\LfunASTRacket} \\ \hline
+  \gray{\LlambdaASTRacket} \\ \hline
   \LAnyAST \\
 \begin{array}{lcl}
 %% \Type &::= & \ldots \MID \key{Any} \\
