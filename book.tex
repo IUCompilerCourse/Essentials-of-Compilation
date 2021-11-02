@@ -748,6 +748,15 @@ If you have an AST node that matches the
 right-hand-side, then you can categorize it according to the
 left-hand-side.
 %
+Symbols in typewriter font are \emph{terminal} symbols and must
+literally appear in the program for the rule to be applicable.
+\index{subject}{terminal}
+%
+Our grammars do not mention \emph{white-space}, that is, separating characters
+like spaces, tabulators, and newlines. White-space may be inserted
+between symbols for disambiguation and to improve readability.
+\index{subject}{white-space}
+%
 A name such as $\Exp$ that is defined by the grammar rules is a
 \emph{non-terminal}.  \index{subject}{non-terminal}
 %
@@ -760,7 +769,7 @@ the representation of integers using 63 bits, which simplifies several
 aspects of compilation. \racket{Thus, these integers corresponds to
   the Racket \texttt{fixnum} datatype on a 64-bit machine.}
 \python{In contrast, integers in Python have unlimited precision, but
-  the techniques need to handle unlimited precision fall outside the
+  the techniques needed to handle unlimited precision fall outside the
   scope of this book.}
 
 The second grammar rule is the \READOP{} operation that receives an
@@ -774,9 +783,6 @@ node is also an $\Exp$.
 \begin{equation}
   \Exp ::= \NEG{\Exp}  \label{eq:arith-neg}
 \end{equation}
-Symbols in typewriter font are \emph{terminal} symbols and must
-literally appear in the program for the rule to be applicable.
-\index{subject}{terminal}
 
 We can apply these rules to categorize the ASTs that are in the
 \LangInt{} language. For example, by rule \eqref{eq:arith-int}
@@ -901,7 +907,7 @@ defined in Figure~\ref{fig:r0-concrete-syntax}.
 }
 \newcommand{\LintGrammarPython}{
 \begin{array}{rcl}
-  \Exp &::=& \Int \MID \key{input\_int}\LP\RP \MID \key{-}\;\Exp \MID \Exp \; \key{+} \; \Exp \MID \Exp \; \key{-} \; \Exp \\
+  \Exp &::=& \Int \MID \key{input\_int}\LP\RP \MID \key{-}\;\Exp \MID \Exp \; \key{+} \; \Exp \MID \Exp \; \key{-} \; \Exp \MID \LP\Exp\RP \\
   \Stmt &::=& \key{print}\LP \Exp \RP \MID \Exp
 \end{array}
 }
@@ -1007,7 +1013,7 @@ match ast1_1:
 {\if\edition\racketEd
 %
 In the above example, the \texttt{match} form checks whether the AST
-\eqref{eq:arith-prog} is a binary operator and binds its parts to the
+\eqref{eq:arith-prog} is a binary operator, binds its parts to the
 three pattern variables \texttt{op}, \texttt{child1}, and
 \texttt{child2}, and then prints out the operator. In general, a match
 clause consists of a \emph{pattern} and a
@@ -1208,7 +1214,7 @@ def exp(e):
 
 def stmt(s):
   match s:
-    case Call(Name('print'), [e]):
+    case Expr(Call(Name('print'), [e])):
       return exp(e)
     case Expr(e):
       return exp(e)
@@ -1367,7 +1373,7 @@ print(10 + 32)
 \fi}
 The result is \key{42}, the answer to life, the universe, and
 everything: \code{42}!\footnote{\emph{The Hitchhiker's Guide to the
-    Galaxy} by Douglas Adams.}.
+    Galaxy} by Douglas Adams.}
 %
 We wrote the above program in concrete syntax whereas the parsed
 abstract syntax is:
@@ -1656,7 +1662,7 @@ to x86 into a handful of steps (Section~\ref{sec:plan-s0-x86}).  The
 rest of the sections in this chapter give detailed hints regarding
 each step.  We hope to give enough hints that the well-prepared
 reader, together with a few friends, can implement a compiler from
-\LangVar{} to x86 in a couple weeks.  To give the reader a feeling for
+\LangVar{} to x86 in a short time.  To give the reader a feeling for
 the scale of this first compiler, the instructor solution for the
 \LangVar{} compiler is approximately \racket{500}\python{300} lines of
 code.
@@ -2343,6 +2349,9 @@ its caller.
 We discuss procedure calls in more detail later in this chapter and in
 Chapter~\ref{ch:Rfun}.
 %
+The last letter \key{q} indicates that these instructions operate on
+quadwords, i.e., 64-bit values.
+%
 \racket{The instruction $\key{jmp}\,\itm{label}$ updates the program
   counter to the address of the instruction after the specified
   label.}
@@ -2473,9 +2482,9 @@ by 16 bytes prior to the execution of any \code{callq} instruction, so
 when control arrives at \code{main}, the \code{rsp} is 8 bytes out of
 alignment (because the \code{callq} pushed the return address).  The
 first three instructions are the typical \emph{prelude}\index{subject}{prelude}
-for a procedure.  The instruction \code{pushq \%rbp} saves the base
-pointer for the caller onto the stack and subtracts $8$ from the stack
-pointer. The next instruction \code{movq \%rsp, \%rbp} sets the
+for a procedure.  The instruction \code{pushq \%rbp} first subtracts $8$ from the stack
+pointer and then saves the base pointer of the caller at address
+\code{rsp} on the stack. The next instruction \code{movq \%rsp, \%rbp} sets the
 base pointer to the current stack pointer, which is pointing at the location
 of the old base pointer. The instruction \code{subq \$16, \%rsp} moves the stack
 pointer down to make enough room for storing variables.  This program
