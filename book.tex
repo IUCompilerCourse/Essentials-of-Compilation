@@ -1,5 +1,8 @@
 \documentclass[7x10]{TimesAPriori_MIT}%%7x10
 
+% TODO:
+% move binary subtraction from Lif to Lint
+
 \usepackage[utf8]{inputenc}
 %% \usepackage{setspace}
 %% \doublespacing
@@ -22,7 +25,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{0}
+\def\edition{1}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd{#1}\fi}}
@@ -802,10 +805,11 @@ following AST is an $\Exp$.
 \end{minipage}
 \end{center}
 
-The next grammar rule is for addition expressions:
-\begin{equation}
-  \Exp ::= \ADD{\Exp}{\Exp} \label{eq:arith-add}
-\end{equation}
+The next grammar rules are for addition and subtraction expressions:
+\begin{align}
+  \Exp &::= \ADD{\Exp}{\Exp} \label{eq:arith-add}\\
+  \Exp &::= \SUB{\Exp}{\Exp} \label{eq:arith-sub}
+\end{align}
 We can now justify that the AST \eqref{eq:arith-prog} is an $\Exp$ in
 \LangInt{}.  We know that \READ{} is an $\Exp$ by rule
 \eqref{eq:arith-read} and we have already categorized
@@ -817,11 +821,11 @@ to show that
 is an $\Exp$ in the \LangInt{} language.
 
 If you have an AST for which the above rules do not apply, then the
-AST is not in \LangInt{}. For example, the program \racket{\code{(-
-    (read) 8)}} \python{\code{input\_int() - 8}} is not in \LangInt{}
-because there are no rules for the \key{-} operator with two
-arguments.  Whenever we define a language with a grammar, the language
-only includes those programs that are justified by the grammar rules.
+AST is not in \LangInt{}. For example, the program \racket{\code{(*
+    (read) 8)}} \python{\code{input\_int() * 8}} is not in \LangInt{}
+because there are no rules for the \key{*} operator.  Whenever we
+define a language with a grammar, the language only includes those
+programs that are justified by the grammar rules.
 
 {\if\edition\pythonEd
 The language \LangInt{} includes a second non-terminal $\Stmt$ for statements.
@@ -888,26 +892,59 @@ defined in Figure~\ref{fig:r0-concrete-syntax}.
   converts the concrete syntax (represented as a string) into an
   abstract syntax tree.}
 
+\newcommand{\LintGrammarRacket}{
+  \begin{array}{rcl}
+    \Type &::=& \key{Integer} \\
+    \Exp{} &::=& \Int{} \MID \LP\key{read}\RP \MID \LP\key{-}\;\Exp\RP \MID \LP\key{+} \; \Exp{}\;\Exp{}\RP
+  \end{array}
+}
+\newcommand{\LintASTRacket}{
+  \begin{array}{rcl}
+    \Type &::=& \key{Integer} \\
+    \Exp{} &::=& \INT{\Int} \MID \READ{} \\
+           &\MID& \NEG{\Exp} \MID \ADD{\Exp}{\Exp}
+  \end{array}
+}
+\newcommand{\LintGrammarPython}{
+\begin{array}{rcl}
+  \Exp &::=& \Int \MID \key{input\_int}\LP\RP \MID \key{-}\;\Exp \MID \Exp \; \key{+} \; \Exp \MID \Exp \; \key{-} \; \Exp  \MID \LP\Exp\RP\\
+  \Stmt &::=& \key{print}\LP \Exp \RP \MID \Exp
+\end{array}
+}
+\newcommand{\LintASTPython}{
+  \begin{array}{rcl}
+  \itm{binaryop} &::= & \code{Add()} \MID \code{Sub()} \\
+  \itm{unaryop} &::= & \code{USub()} \\
+  \Exp{} &::=& \INT{\Int} \MID \READ{} \\
+        &\MID& \UNIOP{\itm{unaryop}}{\Exp} \MID  \BINOP{\itm{binaryop}}{\Exp}{\Exp}  \\
+  \Stmt{} &::=& \PRINT{\Exp} \MID \EXPR{\Exp} 
+\end{array}
+}
+
+  
 \begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
 {\if\edition\racketEd    
 \[
-\begin{array}{rcl}
-  \Exp &::=& \Int \MID \LP\key{read}\RP \MID \LP\key{-}\;\Exp\RP \MID \LP\key{+} \; \Exp\;\Exp\RP\\
-  \LangInt{} &::=& \Exp
+\begin{array}{l}  
+  \LintGrammarRacket \\
+  \begin{array}{rcl}
+    \LangInt{} &::=& \Exp
+  \end{array}
 \end{array}
 \]
 \fi}
 
 {\if\edition\pythonEd
-\[
-\begin{array}{rcl}
-  \Exp &::=& \Int \MID \key{input\_int}\LP\RP \MID \key{-}\;\Exp \MID \Exp \; \key{+} \; \Exp \MID \LP\Exp\RP\\
-  \Stmt &::=& \key{print}\LP \Exp \RP \MID \Exp\\
-  \LangInt{} &::=& \Stmt^{*}
-\end{array}
-\]
+  \[
+  \begin{array}{l}
+    \LintGrammarPython  \\
+    \begin{array}{rcl}
+      \LangInt{} &::=& \Stmt^{*}
+    \end{array}
+  \end{array}
+  \]
 \fi}
 
 \end{minipage}
@@ -921,21 +958,22 @@ defined in Figure~\ref{fig:r0-concrete-syntax}.
 \begin{minipage}{0.96\textwidth}
 {\if\edition\racketEd
 \[
-\begin{array}{rcl}
-\Exp &::=& \INT{\Int} \MID \READ{} \MID \NEG{\Exp} \\
-     &\MID&  \ADD{\Exp}{\Exp}  \\
-\LangInt{}  &::=& \PROGRAM{\code{'()}}{\Exp}
+\begin{array}{l}
+  \LintASTRacket{} \\
+  \begin{array}{rcl}
+    \LangInt{}  &::=& \PROGRAM{\code{'()}}{\Exp}
+  \end{array}
 \end{array}
 \]
 \fi}
 
 {\if\edition\pythonEd
 \[
+\begin{array}{l}
+  \LintASTPython\\
 \begin{array}{rcl}
-  \Exp{} &::=& \INT{\Int} \MID \READ{} \\
-      &\MID& \NEG{\Exp} \MID  \ADD{\Exp}{\Exp}  \\
-\Stmt{} &::=& \PRINT{\Exp} \MID \EXPR{\Exp} \\
 \LangInt{}  &::=& \PROGRAM{}{\Stmt^{*}}
+\end{array}
 \end{array}
 \]
 \fi}
@@ -1120,22 +1158,22 @@ determines whether or not it is an expression in \LangInt{}.
 %
 We say that a function is defined by \emph{structural recursion} when
 it is defined using a sequence of match \racket{clauses}\python{cases}
-that correspond to a grammar, and the body of each \racket{clause}\python{case}
-makes a recursive call on each
-child node.\footnote{This principle of structuring code according to
-  the data definition is advocated in the book \emph{How to Design
+that correspond to a grammar, and the body of each
+\racket{clause}\python{case} makes a recursive call on each child
+node.\footnote{This principle of structuring code according to the
+  data definition is advocated in the book \emph{How to Design
     Programs} \url{https://htdp.org/2020-8-1/Book/index.html}.}
-\python{We define a second function, named \code{stmt}, that recognizes
-whether a value is a \LangInt{} statement.}
-\python{Finally, }
-Figure~\ref{fig:exp-predicate} \racket{also} defines \code{Lint}, which
-determines whether an AST is a program in \LangInt{}.  In general we can
-expect to write one recursive function to handle each non-terminal in
-a grammar.\index{subject}{structural recursion}
+\python{We define a second function, named \code{stmt}, that
+  recognizes whether a value is a \LangInt{} statement.}
+\python{Finally, } Figure~\ref{fig:exp-predicate} \racket{also}
+defines \code{Lint}, which determines whether an AST is a program in
+\LangInt{}.  In general we can expect to write one recursive function
+to handle each non-terminal in a grammar.\index{subject}{structural
+  recursion} Of the two examples at the bottom of the figure, the
+first is in \code{Lint} and the second is not.
 
 \begin{figure}[tp]
 {\if\edition\racketEd
-\begin{minipage}{0.7\textwidth}
 \begin{lstlisting}
 (define (exp ast)
   (match ast
@@ -1156,30 +1194,8 @@ a grammar.\index{subject}{structural recursion}
        (Prim '- (list (Prim 'read '())
                       (Prim '+ (list (Num 8)))))))
 \end{lstlisting}
-\end{minipage}
-\vrule
-\begin{minipage}{0.25\textwidth}
-\begin{lstlisting}
-
-
-
-
-
-
-
-
-
-
-
-
-
-   #t
-   #f
-\end{lstlisting}
-\end{minipage}
 \fi}
 {\if\edition\pythonEd
-\begin{minipage}{0.7\textwidth}
 \begin{lstlisting}
 def exp(e):
   match e:
@@ -1190,6 +1206,8 @@ def exp(e):
     case UnaryOp(USub(), e1):
       return exp(e1)
     case BinOp(e1, Add(), e2):
+      return exp(e1) and exp(e2)
+    case BinOp(e1, Sub(), e2):
       return exp(e1) and exp(e2)
     case _:
       return False
@@ -1214,40 +1232,6 @@ print(Lint(Module([Expr(ast1_1)])))
 print(Lint(Module([Expr(BinOp(read, Sub(),
                   UnaryOp(Add(), Constant(8))))])))
 \end{lstlisting}
-\end{minipage}
-\vrule
-\begin{minipage}{0.25\textwidth}
-\begin{lstlisting}
-
-
-
-
-
-
-  
-
-
-
-
-
-
-
-
-  
-
-
-
-
-
-
-
-
-
-
-   True
-   False
-\end{lstlisting}
-\end{minipage}
 \fi}
 
 \caption{Example of recursive functions for \LangInt{}. These functions
@@ -1345,9 +1329,11 @@ function is defined in Figure~\ref{fig:interp_Lint}.
 def interp_exp(e):
     match e:
         case BinOp(left, Add(), right):
-            l = interp_exp(left)
-            r = interp_exp(right)
+            l = interp_exp(left); r = interp_exp(right)
             return l + r
+        case BinOp(left, Sub(), right):
+            l = interp_exp(left); r = interp_exp(right)
+            return l - r
         case UnaryOp(USub(), v):
             return - interp_exp(v)
         case Constant(value):
@@ -1586,10 +1572,19 @@ def pe_add(r1, r2):
     case _:
       return BinOp(r1, Add(), r2)
 
+def pe_sub(r1, r2):
+  match (r1, r2):
+    case (Constant(n1), Constant(n2)):
+      return Constant(n1 - n2)
+    case _:
+      return BinOp(r1, Sub(), r2)
+      
 def pe_exp(e):
   match e:
     case BinOp(left, Add(), right):
       return pe_add(pe_exp(left), pe_exp(right))
+    case BinOp(left, Sub(), right):
+      return pe_sub(pe_exp(left), pe_exp(right))
     case UnaryOp(USub(), v):
       return pe_neg(pe_exp(v))
     case Constant(value):
@@ -1693,25 +1688,52 @@ program.
 Despite the simplicity of the \LangVar{} language, it is rich enough to
 exhibit several compilation techniques.
 
+\newcommand{\LvarGrammarRacket}{
+  \begin{array}{rcl}
+    \Exp &::=& \Var \MID \CLET{\Var}{\Exp}{\Exp}
+  \end{array}
+}
+\newcommand{\LvarAST}{
+  \begin{array}{rcl}
+    \Exp &::=& \VAR{\Var} \MID \LET{\Var}{\Exp}{\Exp} 
+  \end{array}
+}
+\newcommand{\LvarGrammarPython}{
+\begin{array}{rcl}
+  \Exp &::=& \Var{} \\
+  \Stmt &::=& \Var\mathop{\key{=}}\Exp
+\end{array}
+}
+\newcommand{\LvarASTPython}{
+  \begin{array}{rcl}
+\Exp{} &::=& \VAR{\Var{}} \\
+\Stmt{} &::=& \ASSIGN{\VAR{\Var}}{\Exp}
+  \end{array}
+}
+  
 \begin{figure}[tp]
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
 {\if\edition\racketEd
 \[
-\begin{array}{rcl}
-  \Exp &::=& \Int{} \MID \CREAD{} \MID \CNEG{\Exp} \MID \CADD{\Exp}{\Exp}\\
-       &\MID& \Var{} \MID \CLET{\Var}{\Exp}{\Exp} \\
-  \LangVarM{} &::=& \Exp
+\begin{array}{l}
+   \gray{\LintGrammarRacket{}} \\ \hline
+   \LvarGrammarRacket{}  \\
+  \begin{array}{rcl}
+    \LangVarM{} &::=& \Exp
+  \end{array}
 \end{array}
 \]
 \fi}
 {\if\edition\pythonEd
 \[
+\begin{array}{l}
+  \gray{\LintGrammarPython} \\ \hline
+  \LvarGrammarPython \\
 \begin{array}{rcl}
-  \Exp &::=& \Int \MID \key{input\_int}\LP\RP \MID \key{-}\;\Exp \MID \Exp \; \key{+} \; \Exp \MID \LP\Exp\RP \MID \Var{} \\
-  \Stmt &::=& \key{print}\LP \Exp \RP \MID \Exp \MID \Var\mathop{\key{=}}\Exp\\
   \LangVarM{} &::=& \Stmt^{*}
+\end{array}
 \end{array}
 \]
 \fi}
@@ -1727,22 +1749,23 @@ exhibit several compilation techniques.
 \begin{minipage}{0.96\textwidth}
 {\if\edition\racketEd
 \[
-\begin{array}{rcl}
-\Exp &::=& \INT{\Int} \MID \READ{} \\
-     &\MID& \NEG{\Exp} \MID \ADD{\Exp}{\Exp}  \\
-     &\MID&  \VAR{\Var} \MID \LET{\Var}{\Exp}{\Exp} \\
-\LangVarM{} &::=& \PROGRAM{\code{'()}}{\Exp}
+\begin{array}{l}
+  \gray{\LintASTRacket{}} \\ \hline
+  \LvarAST \\
+  \begin{array}{rcl}
+    \LangVarM{} &::=& \PROGRAM{\code{'()}}{\Exp}
+  \end{array}
 \end{array}
 \]
 \fi}
 {\if\edition\pythonEd
-\[
+  \[
+  \begin{array}{l}
+  \gray{\LintASTPython}\\ \hline
+  \LvarASTPython \\
 \begin{array}{rcl}
-\Exp{} &::=& \INT{\Int} \MID \READ{} \\
-       &\MID& \NEG{\Exp} \MID  \ADD{\Exp}{\Exp} \MID \VAR{\Var{}} \\
-\Stmt{} &::=& \PRINT{\Exp} \MID \EXPR{\Exp} \\
-        &\MID& \ASSIGN{\VAR{\Var}}{\Exp}\\
 \LangVarM{}  &::=& \PROGRAM{}{\Stmt^{*}}
+\end{array}
 \end{array}
 \]
 \fi}
@@ -6444,35 +6467,83 @@ operators to include
   arguments. That responsibility is moved to the type checker for
   \LangIf{}, which we introduce in Section~\ref{sec:type-check-Lif}.}
 
+
+\newcommand{\LifGrammarRacket}{
+  \begin{array}{lcl}
+   \Type &::=& \key{Boolean} \\
+    \itm{bool} &::=& \TRUE \MID \FALSE \\  
+    \itm{cmp} &::= & \key{eq?} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=} \\
+    \Exp &::=& \CSUB{\Exp}{\Exp} \MID \itm{bool}
+        \MID (\key{and}\;\Exp\;\Exp) \MID (\key{or}\;\Exp\;\Exp)
+        \MID (\key{not}\;\Exp) \\
+        &\MID& (\itm{cmp}\;\Exp\;\Exp) \MID \CIF{\Exp}{\Exp}{\Exp} 
+  \end{array}
+}
+\newcommand{\LifAST}{
+\begin{array}{lcl}
+   \Type &::=& \key{Boolean} \\
+  \itm{bool} &::=& \code{\#t} \MID \code{\#f} \\
+  \itm{cmp} &::= & \code{eq?} \MID \code{<} \MID \code{<=} \MID \code{>} \MID \code{>=} \\
+  \itm{op} &::= & \itm{cmp} \MID \code{and} \MID \code{or} \MID \code{not} \\
+  \Exp &::=& \BOOL{\itm{bool}} \MID \IF{\Exp}{\Exp}{\Exp} 
+\end{array}
+}
+\newcommand{\LintOpAST}{
+  \begin{array}{rcl}
+    \itm{op} &::= & \code{read} \MID \code{+} \MID \code{-}\\
+    \Exp{} &::=& \INT{\Int} \MID \PRIM{\itm{op}}{\Exp\ldots}    
+  \end{array}
+}
+
+\newcommand{\LifGrammarPython}{
+\begin{array}{rcl}
+  \itm{cmp} &::= & \key{==} \MID \key{!=} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=} \\
+\Exp &::=& \TRUE \MID \FALSE \MID \CAND{\Exp}{\Exp} \MID \COR{\Exp}{\Exp}
+  \MID \key{not}~\Exp \\
+  &\MID& \Exp ~\itm{cmp} ~\Exp
+  \MID \CIF{\Exp}{\Exp}{\Exp} \\
+  \Stmt &::=& \key{if}~ \Exp \key{:}~ \Stmt^{+} ~\key{else:}~ \Stmt^{+}
+\end{array}
+}
+\newcommand{\LifASTPython}{
+\begin{array}{lcl}
+\itm{boolop} &::=& \code{And()} \MID \code{Or()} \\
+\itm{unaryop} &::=& \code{Not()} \\
+\itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \\
+\itm{bool} &::=& \code{True} \MID \code{False} \\
+\Exp &::=& \BOOL{\itm{bool}} 
+     \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp}\\
+     &\MID& \CMP{\Exp}{\itm{cmp}}{\Exp}  \MID \IF{\Exp}{\Exp}{\Exp} \\
+\Stmt{} &::=& \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}
+\end{array}
+}
+
+
 \begin{figure}[tp]
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
 {\if\edition\racketEd    
 \[
-\begin{array}{lcl}
-  \itm{bool} &::=& \TRUE \MID \FALSE \\  
-  \itm{cmp} &::= & \key{eq?} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=} \\
-  \Exp &::=& \gray{ \Int \MID \CREAD{} \MID \CNEG{\Exp} \MID \CADD{\Exp}{\Exp} }  \MID \CSUB{\Exp}{\Exp} \\
-     &\MID&  \gray{ \Var \MID \CLET{\Var}{\Exp}{\Exp} } \\
-     &\MID& \itm{bool}
-      \MID (\key{and}\;\Exp\;\Exp) \MID (\key{or}\;\Exp\;\Exp)
-      \MID (\key{not}\;\Exp) \\
-      &\MID& (\itm{cmp}\;\Exp\;\Exp) \MID \CIF{\Exp}{\Exp}{\Exp} \\
-  \LangIfM{} &::=& \Exp
+\begin{array}{l}
+  \gray{\LintGrammarRacket{}} \\ \hline
+  \gray{\LvarGrammarRacket{}} \\ \hline
+  \LifGrammarRacket{} \\ 
+  \begin{array}{lcl}
+    \LangIfM{} &::=& \Exp
+  \end{array}
 \end{array}
 \]
 \fi}
 {\if\edition\pythonEd
 \[
+\begin{array}{l}
+  \gray{\LintGrammarPython} \\ \hline
+  \gray{\LvarGrammarPython}  \\ \hline
+  \LifGrammarPython \\  
 \begin{array}{rcl}
-  \itm{binop} &::= & \key{+} \MID \key{-} \MID \key{and} \MID \key{or} \MID \key{==} \MID \key{!=} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=} \\
-  \itm{uniop} &::= & \key{-} \MID \key{not} \\
-  \Exp &::=& \Int \MID \key{input\_int}\LP\RP \MID \CUNIOP{\itm{uniop}}{\Exp} \MID \CBINOP{\itm{binop}}{\Exp}{\Exp} \MID \Var{} \\
-  &\MID&  \TRUE \MID \FALSE \MID \CIF{\Exp}{\Exp}{\Exp} \\
-  \Stmt &::=& \key{print}\LP \Exp \RP \MID \Exp \MID \CASSIGN{\Var}{\Exp}
-      \MID \key{if}~ \Exp \key{:}~ \Stmt^{+} ~\key{else:}~ \Stmt^{+}\\
   \LangIfM{} &::=& \Stmt^{*}
+\end{array}
 \end{array}
 \]
 \fi}
@@ -6489,35 +6560,25 @@ operators to include
 \begin{minipage}{0.96\textwidth}
 {\if\edition\racketEd    
 \[
-\begin{array}{lcl}
-  \itm{bool} &::=& \code{\#t} \MID \code{\#f} \\
-  \itm{cmp} &::= & \code{eq?} \MID \code{<} \MID \code{<=} \MID \code{>} \MID \code{>=} \\
-  \itm{op} &::= & \itm{cmp} \MID \code{read} \MID \code{+} \MID \code{-}
-    \MID \code{and} \MID \code{or} \MID \code{not} \\
-  \Exp &::=& \gray{ \INT{\Int} \MID \VAR{\Var} \MID \LET{\Var}{\Exp}{\Exp} } \\
-     &\MID& \PRIM{\itm{op}}{\Exp\ldots}\\
-     &\MID& \BOOL{\itm{bool}} \MID \IF{\Exp}{\Exp}{\Exp} \\
-  \LangIfM{} &::=& \PROGRAM{\code{'()}}{\Exp}
+\begin{array}{l}
+  \gray{\LintOpAST} \\ \hline
+  \gray{\LvarAST{}} \\ \hline
+  \LifAST{} \\ 
+  \begin{array}{lcl}
+    \LangIfM{} &::=& \PROGRAM{\code{'()}}{\Exp}
+  \end{array}
 \end{array}
 \]
 \fi}
 {\if\edition\pythonEd
 \[
+\begin{array}{l}
+  \gray{\LintASTPython} \\ \hline
+  \gray{\LvarASTPython} \\ \hline
+  \LifASTPython \\
 \begin{array}{lcl}
-\itm{binop} &::=& \code{Add()} \MID \code{Sub()} \\
-\itm{boolop} &::=& \code{And()} \MID \code{Or()} \\
-\itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \\
-\itm{uniop} &::=& \code{USub()} \MID \code{Not()} \\
-\itm{bool} &::=& \code{True} \MID \code{False} \\
-\Exp &::=& \INT{\Int} \MID \READ{} \MID \VAR{\Var} \\
-     &\MID& \BINOP{\Exp}{\itm{binop}}{\Exp}
-     \MID \UNIOP{\itm{uniop}}{\Exp}\\
-     &\MID& \CMP{\Exp}{\itm{cmp}}{\Exp} 
-     \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp}\\
-     &\MID& \BOOL{\itm{bool}} \MID \IF{\Exp}{\Exp}{\Exp} \\
-\Stmt{} &::=& \PRINT{\Exp} \MID \EXPR{\Exp} \\
-        &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
 \LangIfM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
+\end{array}
 \end{array}
 \]
 \fi}
@@ -7171,8 +7232,8 @@ an assignment statement followed by a $\Tail$ expression, a
 \begin{array}{lcl}
 \Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} \\
 \Exp &::= & \Atm \MID \READ{} \\
-     &\MID& \BINOP{\Atm}{\itm{binop}}{\Atm}
-     \MID \UNIOP{\itm{uniop}}{\Atm} \\
+     &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm}
+     \MID \UNIOP{\itm{unaryop}}{\Atm} \\
      &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} 
      \MID \BOOLOP{\itm{boolop}}{\Atm}{\Atm} \\
 \Stmt &::=& \PRINT{\Exp} \MID \EXPR{\Exp} \\
@@ -7499,13 +7560,13 @@ R^{\mathsf{ANF}}_{\mathsf{if}}  &::=& \PROGRAM{\code{()}}{\Exp}
 {\if\edition\pythonEd
 \[
 \begin{array}{rcl}
-\itm{binop} &::=& \code{Add()} \MID \code{Sub()} \\
+\itm{binaryop} &::=& \code{Add()} \MID \code{Sub()} \\
 \itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \\
-\itm{uniop} &::=& \code{USub()} \MID \code{Not()} \\
+\itm{unaryop} &::=& \code{USub()} \MID \code{Not()} \\
 \itm{bool} &::=& \code{True} \MID \code{False} \\
 \Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}}\\
 \Exp &::=& \Atm \MID \READ{} \\
-  &\MID& \BINOP{\itm{binop}}{\Atm}{\Atm} \MID \UNIOP{\key{uniop}}{\Atm} \\
+  &\MID& \BINOP{\itm{binaryop}}{\Atm}{\Atm} \MID \UNIOP{\key{unaryop}}{\Atm} \\
   &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} \\
   &\MID& \LET{\Var}{\Exp}{\Exp}\\
 \Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
@@ -9410,6 +9471,33 @@ the condition remains true.
 
 \section{The \LangLoop{} Language}
 
+\newcommand{\LwhileGrammarRacket}{
+  \begin{array}{lcl}
+   \Type &::=& \key{Void}\\
+   \Exp &::=& \CSETBANG{\Var}{\Exp}
+      \MID \CBEGIN{\Exp\ldots}{\Exp}
+      \MID \CWHILE{\Exp}{\Exp} \MID \LP\key{void}\RP 
+  \end{array}
+}
+\newcommand{\LwhileAST}{
+\begin{array}{lcl}
+  \Type &::=& \key{Void}\\
+  \Exp &::=& \SETBANG{\Var}{\Exp} \MID \BEGIN{\LP\Exp\ldots\RP}{\Exp}\\
+    &\MID& \WHILE{\Exp}{\Exp} \MID \VOID{}  
+\end{array}
+}
+
+\newcommand{\LwhileGrammarPython}{
+\begin{array}{rcl}
+  \Stmt &::=& \key{while}~ \Exp \key{:}~ \Stmt^{+}
+\end{array}
+}
+\newcommand{\LwhileASTPython}{
+\begin{array}{lcl}
+\Stmt{} &::=& \WHILESTMT{\Exp}{\Stmt^{+}}
+\end{array}
+}
+
 \begin{figure}[tp]
 \centering
 \fbox{
@@ -9417,33 +9505,27 @@ the condition remains true.
     \small
 {\if\edition\racketEd    
 \[
-\begin{array}{lcl}
-  \Exp &::=& \gray{ \Int \MID \CREAD{} \MID \CNEG{\Exp}
-     \MID \CADD{\Exp}{\Exp} \MID \CSUB{\Exp}{\Exp} }  \\
-    &\MID&  \gray{ \Var \MID \CLET{\Var}{\Exp}{\Exp} }\\
-    &\MID& \gray{\itm{bool} 
-     \MID (\key{and}\;\Exp\;\Exp) 
-     \MID (\key{or}\;\Exp\;\Exp) 
-     \MID (\key{not}\;\Exp) } \\
-    &\MID& \gray{ (\itm{cmp}\;\Exp\;\Exp) \MID \CIF{\Exp}{\Exp}{\Exp} } \\
-   &\MID& \CSETBANG{\Var}{\Exp}
-  \MID \CBEGIN{\Exp\ldots}{\Exp}
-  \MID \CWHILE{\Exp}{\Exp} \MID \LP\key{void}\RP \\
-  \LangLoopM{} &::=& \gray{\Exp}
+\begin{array}{l}
+  \gray{\LintGrammarRacket{}} \\ \hline
+  \gray{\LvarGrammarRacket{}} \\ \hline
+  \gray{\LifGrammarRacket{}} \\ \hline
+  \LwhileGrammarRacket \\
+  \begin{array}{lcl}
+  \LangLoopM{} &::=& \Exp
+\end{array}
 \end{array}
 \]
 \fi}
 {\if\edition\pythonEd
 \[
+\begin{array}{l}
+  \gray{\LintGrammarPython} \\ \hline
+  \gray{\LvarGrammarPython}  \\ \hline
+  \gray{\LifGrammarPython} \\ \hline
+  \LwhileGrammarPython \\
 \begin{array}{rcl}
-  \itm{binop} &::= & \key{+} \MID \key{-} \MID \key{and} \MID \key{or} \MID \key{==} \MID \key{!=} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=} \\
-  \itm{uniop} &::= & \key{-} \MID \key{not} \\
-  \Exp &::=& \Int \MID \key{input\_int}\LP\RP \MID \CUNIOP{\itm{uniop}}{\Exp} \MID \CBINOP{\itm{binop}}{\Exp}{\Exp} \MID \Var{} \\
-       &\MID&  \TRUE \MID \FALSE \MID \CIF{\Exp}{\Exp}{\Exp} \\
-  \Stmt &::=& \key{print}\LP \Exp \RP \MID \Exp \MID \CASSIGN{\Var}{\Exp}
-         \MID \key{if}~ \Exp \key{:}~ \Stmt^{+} ~\key{else:}~ \Stmt^{+}\\
-        &\MID& \key{while}~ \Exp \key{:}~ \Stmt^{+}\\
   \LangLoopM{} &::=& \Stmt^{*}
+\end{array}
 \end{array}
 \]
 \fi}
@@ -9460,36 +9542,27 @@ the condition remains true.
     \small
 {\if\edition\racketEd    
 \[
+\begin{array}{l}
+  \gray{\LintOpAST} \\ \hline
+  \gray{\LvarAST{}} \\ \hline
+  \gray{\LifAST{}} \\ \hline
+  \LwhileAST{} \\
 \begin{array}{lcl}
-  \Exp &::=& \gray{ \INT{\Int} \VAR{\Var} \MID \LET{\Var}{\Exp}{\Exp} } \\
-       &\MID& \gray{ \PRIM{\itm{op}}{\Exp\ldots} }\\
-     &\MID& \gray{ \BOOL{\itm{bool}}
-      \MID \IF{\Exp}{\Exp}{\Exp} } \\
-  &\MID& \SETBANG{\Var}{\Exp} \MID \BEGIN{\LP\Exp\ldots\RP}{\Exp}
-    \MID \WHILE{\Exp}{\Exp} \\
-    &\MID& \VOID{}  \\
   \LangLoopM{} &::=& \gray{ \PROGRAM{\code{'()}}{\Exp} }
+\end{array}
 \end{array}
 \]
 \fi}
 {\if\edition\pythonEd
 \[
+\begin{array}{l}
+  \gray{\LintASTPython} \\ \hline
+  \gray{\LvarASTPython}  \\ \hline
+  \gray{\LifASTPython} \\ \hline
+  \LwhileASTPython \\
 \begin{array}{lcl}
-\itm{binop} &::=& \code{Add()} \MID \code{Sub()} \\
-\itm{boolop} &::=& \code{And()} \MID \code{Or()} \\
-\itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \\
-\itm{uniop} &::=& \code{USub()} \MID \code{Not()} \\
-\itm{bool} &::=& \code{True} \MID \code{False} \\
-\Exp &::=& \INT{\Int} \MID \READ{} \MID \VAR{\Var} \\
-     &\MID& \BINOP{\Exp}{\itm{binop}}{\Exp}
-     \MID \UNIOP{\itm{uniop}}{\Exp}\\
-     &\MID& \CMP{\Exp}{\itm{cmp}}{\Exp} 
-     \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp}\\
-     &\MID& \BOOL{\itm{bool}} \MID \IF{\Exp}{\Exp}{\Exp} \\
-\Stmt{} &::=& \PRINT{\Exp} \MID \EXPR{\Exp} \\
-     &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
-     &\MID& \WHILESTMT{\Exp}{\Stmt^{+}}\\
 \LangLoopM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
+\end{array}
 \end{array}
 \]
 \fi}
@@ -10192,7 +10265,7 @@ Figure~\ref{fig:Rwhile-anf-syntax} defines the output language
 \begin{array}{rcl}
 \Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}}\\
 \Exp &::=& \Atm \MID \READ{} \\
-  &\MID& \BINOP{\itm{binop}}{\Atm}{\Atm} \MID \UNIOP{\key{uniop}}{\Atm} \\
+  &\MID& \BINOP{\itm{binaryop}}{\Atm}{\Atm} \MID \UNIOP{\key{unaryop}}{\Atm} \\
   &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} \\
 %  &\MID& \LET{\Var}{\Exp}{\Exp}\\
 \Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
@@ -10531,49 +10604,68 @@ print( t[0] + t[2][0] if t[1] else 44 )
 \end{lstlisting}
 \fi}
 
+\newcommand{\LtupGrammarRacket}{
+\begin{array}{lcl}
+  \Type &::=& \LP\key{Vector}\;\Type\ldots\RP \\
+  \Exp &::=& \LP\key{vector}\;\Exp\ldots\RP 
+   \MID \LP\key{vector-length}\;\Exp\RP \\
+  &\MID& \LP\key{vector-ref}\;\Exp\;\Int\RP
+   \MID \LP\key{vector-set!}\;\Exp\;\Int\;\Exp\RP 
+\end{array}
+}
+\newcommand{\LtupASTRacket}{
+\begin{array}{lcl}
+ \Type &::=& \LP\key{Vector}\;\Type\ldots\RP \\
+\itm{op} &::=& \code{vector} \MID \code{vector-length} \\
+\Exp &::=& \VECREF{\Exp}{\INT{\Int}} \\
+     &\MID& \VECSET{\Exp}{\INT{\Int}}{\Exp} \\
+     &\MID& \LP\key{HasType}~\Exp~\Type \RP 
+\end{array}
+}
+\newcommand{\LtupGrammarPython}{
+\begin{array}{rcl}
+  \itm{cmp} &::= & \key{is} \\
+  \Exp &::=& \Exp \key{,} \ldots \key{,} \Exp \MID \CGET{\Exp}{\Exp} \MID \CLEN{\Exp} 
+\end{array}
+}
+\newcommand{\LtupASTPython}{
+\begin{array}{lcl}
+\itm{cmp} &::= & \code{Is()} \\
+\Exp &::=& \TUPLE{\Exp^{+}} \MID \GET{\Exp}{\Exp} \\
+     &\MID& \LEN{\Exp}
+\end{array}
+}
 
-
+  
 \begin{figure}[tbp]
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
 {\if\edition\racketEd    
 \[
-\begin{array}{lcl}
-  \Type &::=& \gray{\key{Integer} \MID \key{Boolean}}
-  \MID \LP\key{Vector}\;\Type\ldots\RP \MID \key{Void}\\
-  \Exp &::=& \gray{  \Int \MID \CREAD{} \MID \CNEG{\Exp} \MID \CADD{\Exp}{\Exp} \MID \CSUB{\Exp}{\Exp} }  \\
-  &\MID&  \gray{  \Var \MID \CLET{\Var}{\Exp}{\Exp}  }\\
-  &\MID& \gray{ \key{\#t} \MID \key{\#f} 
-   \MID \LP\key{and}\;\Exp\;\Exp\RP 
-   \MID \LP\key{or}\;\Exp\;\Exp\RP
-   \MID \LP\key{not}\;\Exp\RP } \\
-  &\MID& \gray{  \LP\itm{cmp}\;\Exp\;\Exp\RP 
-   \MID \CIF{\Exp}{\Exp}{\Exp}  } \\
-   &\MID& \gray{ \CSETBANG{\Var}{\Exp}
-    \MID \CBEGIN{\Exp\ldots}{\Exp}
-    \MID \CWHILE{\Exp}{\Exp} \MID \LP\key{void}\RP } \\
-  &\MID& \LP\key{vector}\;\Exp\ldots\RP 
-   \MID \LP\key{vector-length}\;\Exp\RP \\
-  &\MID& \LP\key{vector-ref}\;\Exp\;\Int\RP
-   \MID \LP\key{vector-set!}\;\Exp\;\Int\;\Exp\RP \\
-  &\MID& \LP\key{has-type}~\Exp~\Type\RP\\
-  \LangVecM{} &::=& \Exp
+\begin{array}{l}
+  \gray{\LintGrammarRacket{}} \\ \hline
+  \gray{\LvarGrammarRacket{}} \\ \hline
+  \gray{\LifGrammarRacket{}} \\ \hline
+  \gray{\LwhileGrammarRacket} \\ \hline
+  \LtupGrammarRacket \\  
+  \begin{array}{lcl}
+    \LangVecM{} &::=& \Exp
+  \end{array}
 \end{array}
 \]
 \fi}
 {\if\edition\pythonEd
 \[
+\begin{array}{l}
+  \gray{\LintGrammarPython{}} \\ \hline
+  \gray{\LvarGrammarPython{}} \\ \hline
+  \gray{\LifGrammarPython{}} \\ \hline
+  \gray{\LwhileGrammarPython} \\ \hline
+  \LtupGrammarPython \\  
 \begin{array}{rcl}
-  \itm{binop} &::= & \key{+} \MID \key{-} \MID \key{and} \MID \key{or} \MID \key{==} \MID \key{!=} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=} \MID \key{is} \\
-  \itm{uniop} &::= & \key{-} \MID \key{not} \\
-  \Exp &::=& \Int \MID \key{input\_int}\LP\RP \MID \CUNIOP{\itm{uniop}}{\Exp} \MID \CBINOP{\itm{binop}}{\Exp}{\Exp} \MID \Var{} \\
-  &\MID&  \TRUE \MID \FALSE \MID \CIF{\Exp}{\Exp}{\Exp} \\
-  &\MID& \Exp \key{,} \ldots \key{,} \Exp \MID \CGET{\Exp}{\Exp} \MID \CLEN{\Exp} \\
-  \Stmt &::=& \key{print}\LP \Exp \RP \MID \Exp \MID \CASSIGN{\Var}{\Exp}
-         \MID \key{if}~ \Exp \key{:}~ \Stmt^{+} ~\key{else:}~ \Stmt^{+}\\
-        &\MID& \key{while}~ \Exp \key{:}~ \Stmt^{+}\\
   \LangVecM{} &::=& \Stmt^{*}
+\end{array}
 \end{array}
 \]
 \fi}
@@ -10590,39 +10682,29 @@ print( t[0] + t[2][0] if t[1] else 44 )
 \begin{minipage}{0.96\textwidth}
 {\if\edition\racketEd    
 \[
+\begin{array}{l}
+  \gray{\LintOpAST} \\ \hline
+  \gray{\LvarAST{}} \\ \hline
+  \gray{\LifAST{}} \\ \hline
+  \gray{\LwhileAST{}} \\ \hline
+  \LtupASTRacket{} \\
 \begin{array}{lcl}
-  \itm{op} &::=& \ldots \MID \code{vector} \MID \code{vector-length} \\
-\Exp &::=& \gray{ \INT{\Int} \MID \VAR{\Var} \MID \LET{\Var}{\Exp}{\Exp} } \\
-     &\MID& \gray{ \PRIM{\itm{op}}{\Exp\ldots}
-      \MID \BOOL{\itm{bool}}
-      \MID \IF{\Exp}{\Exp}{\Exp} } \\
-    &\MID& \VECREF{\Exp}{\INT{\Int}}\\
-    &\MID& \VECSET{\Exp}{\INT{\Int}}{\Exp} \\
-     &\MID& \LP\key{HasType}~\Exp~\Type \RP \\
   \LangVecM{} &::=& \PROGRAM{\key{'()}}{\Exp}
+\end{array}
 \end{array}
 \]
 \fi}
 {\if\edition\pythonEd
 \[
-\begin{array}{lcl}
-\itm{binop} &::=& \code{Add()} \MID \code{Sub()} \\
-\itm{boolop} &::=& \code{And()} \MID \code{Or()} \\
-\itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \MID \code{Is()} \\
-\itm{uniop} &::=& \code{USub()} \MID \code{Not()} \\
-\itm{bool} &::=& \code{True} \MID \code{False} \\
-\Exp &::=& \INT{\Int} \MID \READ{} \MID \VAR{\Var} \\
-     &\MID& \BINOP{\Exp}{\itm{binop}}{\Exp}
-     \MID \UNIOP{\itm{uniop}}{\Exp}\\
-     &\MID& \CMP{\Exp}{\itm{cmp}}{\Exp} 
-     \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp}\\
-     &\MID& \BOOL{\itm{bool}} \MID \IF{\Exp}{\Exp}{\Exp} \\
-     &\MID& \TUPLE{\Exp^{+}} \MID \GET{\Exp}{\Exp} \\
-     &\MID& \LEN{\Exp}\\
-\Stmt{} &::=& \PRINT{\Exp} \MID \EXPR{\Exp} \\
-     &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
-     &\MID& \WHILESTMT{\Exp}{\Stmt^{+}}\\
-\LangLoopM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
+\begin{array}{l}
+  \gray{\LintASTPython} \\ \hline
+  \gray{\LvarASTPython} \\ \hline
+  \gray{\LifASTPython} \\ \hline
+  \gray{\LwhileASTPython} \\ \hline
+  \LtupASTPython \\
+  \begin{array}{lcl}
+    \LangLoopM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
+  \end{array}
 \end{array}
 \]
 \fi}
@@ -11477,15 +11559,15 @@ pass, which is \LangVec{} in monadic normal form.
 {\if\edition\pythonEd
 \[
 \begin{array}{lcl}
-\itm{binop} &::=& \code{Add()} \MID \code{Sub()} \\
+\itm{binaryop} &::=& \code{Add()} \MID \code{Sub()} \\
 \itm{boolop} &::=& \code{And()} \MID \code{Or()} \\
 \itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \MID \code{Is()} \\
-\itm{uniop} &::=& \code{USub()} \MID \code{Not()} \\
+\itm{unaryop} &::=& \code{USub()} \MID \code{Not()} \\
 \itm{bool} &::=& \code{True} \MID \code{False} \\
 \Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} \\
 \Exp &::=& \Atm \MID \READ{} \MID \\
-     &\MID& \BINOP{\Exp}{\itm{binop}}{\Exp}
-     \MID \UNIOP{\itm{uniop}}{\Exp}\\
+     &\MID& \BINOP{\Exp}{\itm{binaryop}}{\Exp}
+     \MID \UNIOP{\itm{unaryop}}{\Exp}\\
      &\MID& \CMP{\Exp}{\itm{cmp}}{\Exp} 
      \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp}\\
      &\MID& \IF{\Exp}{\Exp}{\Exp} \\
@@ -11545,8 +11627,8 @@ pass, which is \LangVec{} in monadic normal form.
 \begin{array}{lcl}
 \Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} \\
 \Exp &::= & \Atm \MID \READ{} \\
-     &\MID& \BINOP{\Atm}{\itm{binop}}{\Atm}
-     \MID \UNIOP{\itm{uniop}}{\Atm} \\
+     &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm}
+     \MID \UNIOP{\itm{unaryop}}{\Atm} \\
      &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} 
      \MID \BOOLOP{\itm{boolop}}{\Atm}{\Atm} \\
      &\MID& \GET{\Atm}{\Atm}
@@ -12588,30 +12670,53 @@ referenced from inside a function body are other globally-defined
 functions. The syntax of \LangFun{} prevents functions from being nested
 inside each other.
 
+\newcommand{\LfunGrammarRacket}{
+  \begin{array}{lcl}
+   \Type &::=& (\Type \ldots \; \key{->}\; \Type) \\
+   \Exp &::=& \LP\Exp \; \Exp \ldots\RP \\
+   \Def &::=& \CDEF{\Var}{\LS\Var \key{:} \Type\RS \ldots}{\Type}{\Exp} \\
+  \end{array}
+}
+\newcommand{\LfunASTRacket}{
+  \begin{array}{lcl}
+  \Type &::=& (\Type \ldots \; \key{->}\; \Type) \\
+  \Exp &::=& \APPLY{\Exp}{\Exp\ldots}\\
+  \Def &::=& \FUNDEF{\Var}{\LP[\Var \code{:} \Type]\ldots\RP}{\Type}{\code{'()}}{\Exp}
+  \end{array}
+}
+
 \begin{figure}[tp]
 \centering
 \fbox{
   \begin{minipage}{0.96\textwidth}
     \small
 \[
-\begin{array}{lcl}
-  \Type &::=& \gray{ \key{Integer} \MID \key{Boolean}
-         \MID (\key{Vector}\;\Type\ldots) \MID \key{Void}  } \MID (\Type \ldots \; \key{->}\; \Type) \\
-\itm{cmp} &::= & \gray{  \key{eq?} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=}  } \\
-  \Exp &::=& \gray{ \Int \MID \CREAD{} \MID \CNEG{\Exp} \MID \CADD{\Exp}{\Exp} \MID \CSUB{\Exp}{\Exp} } \\
-    &\MID&  \gray{ \Var \MID \CLET{\Var}{\Exp}{\Exp} }\\
-    &\MID& \gray{ \key{\#t} \MID \key{\#f} 
-    \MID (\key{and}\;\Exp\;\Exp)
-    \MID (\key{or}\;\Exp\;\Exp)
-    \MID (\key{not}\;\Exp)} \\
-   &\MID& \gray{(\itm{cmp}\;\Exp\;\Exp) \MID \CIF{\Exp}{\Exp}{\Exp} } \\
-  &\MID& \gray{(\key{vector}\;\Exp\ldots) \MID
-    (\key{vector-ref}\;\Exp\;\Int)} \\
-  &\MID& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\MID (\key{void})
-      \MID \LP\key{has-type}~\Exp~\Type\RP } \\
-  &\MID& \LP\Exp \; \Exp \ldots\RP \\
-  \Def &::=& \CDEF{\Var}{\LS\Var \key{:} \Type\RS \ldots}{\Type}{\Exp} \\
+\begin{array}{l}
+  \gray{\LintGrammarRacket{}} \\ \hline
+  \gray{\LvarGrammarRacket{}} \\ \hline
+  \gray{\LifGrammarRacket{}} \\ \hline
+  \gray{\LwhileGrammarRacket} \\ \hline
+  \gray{\LtupGrammarRacket} \\   \hline
+  \LfunGrammarRacket \\  
+  \begin{array}{lcl}
+%%   \Type &::=& \gray{ \key{Integer} \MID \key{Boolean}
+%%          \MID (\key{Vector}\;\Type\ldots) \MID \key{Void}  } \MID (\Type \ldots \; \key{->}\; \Type) \\
+%% \itm{cmp} &::= & \gray{  \key{eq?} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=}  } \\
+%%   \Exp &::=& \gray{ \Int \MID \CREAD{} \MID \CNEG{\Exp} \MID \CADD{\Exp}{\Exp} \MID \CSUB{\Exp}{\Exp} } \\
+%%     &\MID&  \gray{ \Var \MID \CLET{\Var}{\Exp}{\Exp} }\\
+%%     &\MID& \gray{ \key{\#t} \MID \key{\#f} 
+%%     \MID (\key{and}\;\Exp\;\Exp)
+%%     \MID (\key{or}\;\Exp\;\Exp)
+%%     \MID (\key{not}\;\Exp)} \\
+%%    &\MID& \gray{(\itm{cmp}\;\Exp\;\Exp) \MID \CIF{\Exp}{\Exp}{\Exp} } \\
+%%   &\MID& \gray{(\key{vector}\;\Exp\ldots) \MID
+%%     (\key{vector-ref}\;\Exp\;\Int)} \\
+%%   &\MID& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\MID (\key{void})
+%%       \MID \LP\key{has-type}~\Exp~\Type\RP } \\
+%%   &\MID& \LP\Exp \; \Exp \ldots\RP \\
+%%   \Def &::=& \CDEF{\Var}{\LS\Var \key{:} \Type\RS \ldots}{\Type}{\Exp} \\
   \LangFunM{} &::=& \Def \ldots \; \Exp
+  \end{array}
 \end{array}
 \]
 \end{minipage}
@@ -12626,15 +12731,23 @@ inside each other.
   \begin{minipage}{0.96\textwidth}
     \small
 \[
-\begin{array}{lcl}
-\Exp &::=& \gray{ \INT{\Int} \MID \VAR{\Var} \MID \LET{\Var}{\Exp}{\Exp} } \\
-     &\MID& \gray{ \PRIM{\itm{op}}{\Exp\ldots} }\\
-     &\MID& \gray{ \BOOL{\itm{bool}} 
-      \MID \IF{\Exp}{\Exp}{\Exp} } \\
-     &\MID& \gray{ \VOID{} \MID \LP\key{HasType}~\Exp~\Type \RP } 
-     \MID \APPLY{\Exp}{\Exp\ldots}\\
- \Def &::=& \FUNDEF{\Var}{\LP[\Var \code{:} \Type]\ldots\RP}{\Type}{\code{'()}}{\Exp}\\
+\begin{array}{l}
+  \gray{\LintOpAST} \\ \hline
+  \gray{\LvarAST{}} \\ \hline
+  \gray{\LifAST{}} \\ \hline
+  \gray{\LwhileAST{}} \\ \hline
+  \gray{\LtupASTRacket{}} \\ \hline
+  \LfunASTRacket \\
+  \begin{array}{lcl}
+%% \Exp &::=& \gray{ \INT{\Int} \MID \VAR{\Var} \MID \LET{\Var}{\Exp}{\Exp} } \\
+%%      &\MID& \gray{ \PRIM{\itm{op}}{\Exp\ldots} }\\
+%%      &\MID& \gray{ \BOOL{\itm{bool}} 
+%%       \MID \IF{\Exp}{\Exp}{\Exp} } \\
+%%      &\MID& \gray{ \VOID{} \MID \LP\key{HasType}~\Exp~\Type \RP } 
+%%      \MID \APPLY{\Exp}{\Exp\ldots}\\
+%%  \Def &::=& \FUNDEF{\Var}{\LP[\Var \code{:} \Type]\ldots\RP}{\Type}{\code{'()}}{\Exp}\\
   \LangFunM{} &::=& \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP)}{\Exp}
+  \end{array}
 \end{array}
 \]
 \end{minipage}
@@ -12826,13 +12939,14 @@ and where the \code{rip} would be at that moment and then changes
 \code{add1(\%rip)} to \code{$d$(\%rip)}, which at runtime will compute
 the address of \code{add1}.
 
-In Section~\ref{sec:x86} we used of the \code{callq} instruction to
-jump to a function whose location is given by a label. To support
-function calls in this chapter we instead will be jumping to a
-function whose location is given by an address in a register, that is,
-we need to make an \emph{indirect function call}. The x86 syntax for
-this is a \code{callq} instruction but with an asterisk before the
-register name.\index{subject}{indirect function call}
+In Section~\ref{sec:x86} we used the \code{callq} instruction to jump
+to functions whose locations were given by a label, such as
+\code{read\_int}. To support function calls in this chapter we instead
+will be jumping to functions whose location are given by an address in
+a register, that is, we need to make an \emph{indirect function
+call}. The x86 syntax for this is a \code{callq} instruction but with
+an asterisk before the register name.\index{subject}{indirect function
+  call}
 \begin{lstlisting}
    callq *%rbx
 \end{lstlisting}
@@ -12869,16 +12983,16 @@ the function.
 
 \index{subject}{prelude}\index{subject}{conclusion}
 
-Regarding (2) frames \index{subject}{frame} and the procedure call stack,
-\index{subject}{procedure call stack} recall from Section~\ref{sec:x86} that
-the stack grows down, with each function call using a chunk of space
-called a frame. The caller sets the stack pointer, register
-\code{rsp}, to the last data item in its frame. The callee must not
-change anything in the caller's frame, that is, anything that is at or
-above the stack pointer. The callee is free to use locations that are
-below the stack pointer.
+Regarding (2) frames \index{subject}{frame} and the procedure call
+stack, \index{subject}{procedure call stack} recall from
+Section~\ref{sec:x86} that the stack grows down and each function call
+uses a chunk of space on the stack called a frame. The caller sets the
+stack pointer, register \code{rsp}, to the last data item in its
+frame. The callee must not change anything in the caller's frame, that
+is, anything that is at or above the stack pointer. The callee is free
+to use locations that are below the stack pointer.
 
-Recall that we are storing variables of vector type on the root stack.
+Recall that we are storing variables of tuple type on the root stack.
 So the prelude needs to move the root stack pointer \code{r15} up and
 the conclusion needs to move the root stack pointer back down.  Also,
 the prelude must initialize to \code{0} this frame's slots in the root
@@ -12906,7 +13020,7 @@ then the prelude of the \code{main} function must save that register
 to the stack and the conclusion of \code{main} must restore it.  This
 recommendation now generalizes to all functions.
 
-Also recall that the base pointer, register \code{rbp}, is used as a
+Recall that the base pointer, register \code{rbp}, is used as a
 point-of-reference within a frame, so that each local variable can be
 accessed at a fixed offset from the base pointer
 (Section~\ref{sec:x86}).
@@ -12979,44 +13093,44 @@ $-8(j+k)$(\key{\%rbp}) &  & local variable $k$ \\
 In general, the amount of stack space used by a program is determined
 by the longest chain of nested function calls. That is, if function
 $f_1$ calls $f_2$, $f_2$ calls $f_3$, $\ldots$, and $f_{n-1}$ calls
-$f_n$, then the amount of stack space is bounded by $O(n)$.  The depth
-$n$ can grow quite large in the case of recursive or mutually
-recursive functions. However, in some cases we can arrange to use only
-constant space, i.e. $O(1)$, instead of $O(n)$.
+$f_n$, then the amount of stack space is linear in $n$.  The depth $n$
+can grow quite large in the case of recursive or mutually recursive
+functions. However, in some cases we can arrange to use only a
+constant amount of space for a long chain of nested function calls.
 
 If a function call is the last action in a function body, then that
 call is said to be a \emph{tail call}\index{subject}{tail call}.
 For example, in the following
-program, the recursive call to \code{tail-sum} is a tail call.
+program, the recursive call to \code{tail\_sum} is a tail call.
 \begin{center}
 \begin{lstlisting}
-(define (tail-sum [n : Integer] [r : Integer]) : Integer
+(define (tail_sum [n : Integer] [r : Integer]) : Integer
   (if (eq? n 0) 
       r
-      (tail-sum (- n 1) (+ n r))))
+      (tail_sum (- n 1) (+ n r))))
 
-(+ (tail-sum 5 0) 27)
+(+ (tail_sum 5 0) 27)
 \end{lstlisting}
 \end{center}
-At a tail call, the frame of the caller is no longer needed, so we
-can pop the caller's frame before making the tail call. With this
+At a tail call, the frame of the caller is no longer needed, so we can
+pop the caller's frame before making the tail call. With this
 approach, a recursive function that only makes tail calls will only
-use $O(1)$ stack space.  Functional languages like Racket typically
-rely heavily on recursive functions, so they typically guarantee that
-all tail calls will be optimized in this way.
+use a constant amount of stack space.  Functional languages like
+Racket typically rely heavily on recursive functions, so they
+typically guarantee that all tail calls will be optimized in this way.
 \index{subject}{frame}
 
-However, some care is needed with regards to argument passing in tail
-calls.  As mentioned above, for arguments beyond the sixth, the
-convention is to use space in the caller's frame for passing
-arguments.  But for a tail call we pop the caller's frame and can no
-longer use it.  Another alternative is to use space in the callee's
-frame for passing arguments. However, this option is also problematic
-because the caller and callee's frame overlap in memory.  As we begin
-to copy the arguments from their sources in the caller's frame, the
-target locations in the callee's frame might overlap with the sources
-for later arguments! We solve this problem by using the heap instead
-of the stack for passing more than six arguments, as we describe in
+Some care is needed with regards to argument passing in tail calls.
+As mentioned above, for arguments beyond the sixth, the convention is
+to use space in the caller's frame for passing arguments.  But for a
+tail call we pop the caller's frame and can no longer use it.  An
+alternative is to use space in the callee's frame for passing
+arguments. However, this option is also problematic because the caller
+and callee's frames overlap in memory.  As we begin to copy the
+arguments from their sources in the caller's frame, the target
+locations in the callee's frame might collide with the sources for
+later arguments! We solve this problem by using the heap instead of
+the stack for passing more than six arguments, which we describe in
 the Section~\ref{sec:limit-functions-r4}.
 
 As mentioned above, for a tail call we pop the caller's frame prior to
@@ -13024,8 +13138,8 @@ making the tail call. The instructions for popping a frame are the
 instructions that we usually place in the conclusion of a
 function. Thus, we also need to place such code immediately before
 each tail call. These instructions include restoring the callee-saved
-registers, so it is good that the argument passing registers are all
-caller-saved registers.
+registers, so it is fortunate that the argument passing registers are
+all caller-saved registers!
 
 One last note regarding which instruction to use to make the tail
 call. When the callee is finished, it should not return to the current
@@ -13034,10 +13148,10 @@ one. Thus, the return address that is already on the stack is the
 right one, and we should not use \key{callq} to make the tail call, as
 that would unnecessarily overwrite the return address. Instead we can
 simply use the \key{jmp} instruction. Like the indirect function call,
-we write an \emph{indirect jump}\index{subject}{indirect jump} with a register
-prefixed with an asterisk.  We recommend using \code{rax} to hold the
-jump target because the preceding conclusion overwrites just about
-everything else.
+we write an \emph{indirect jump}\index{subject}{indirect jump} with a
+register prefixed with an asterisk.  We recommend using \code{rax} to
+hold the jump target because the preceding conclusion can overwrite
+just about everything else.
 \begin{lstlisting}
    jmp *%rax
 \end{lstlisting}
@@ -13069,7 +13183,7 @@ function name differently than the use of a local variable; we need to
 use \code{leaq} to convert the function name (a label in x86) to an
 address in a register.  Thus, it is a good idea to create a new pass
 that changes function references from just a symbol $f$ to
-$\FUNREF{f}$. This pass is named \code{reveal-functions} and the
+$\FUNREF{f}$. This pass is named \code{reveal\_functions} and the
 output language, \LangFunRef{}, is defined in Figure~\ref{fig:f1-syntax}.
 The concrete syntax for a function reference is $\CFUNREF{f}$.
 
@@ -13098,9 +13212,9 @@ The concrete syntax for a function reference is $\CFUNREF{f}$.
 
 Placing this pass after \code{uniquify} will make sure that there are
 no local variables and functions that share the same name. On the
-other hand, \code{reveal-functions} needs to come before the
-\code{explicate\_control} pass because that pass helps us compile
-\code{FunRef} forms into assignment statements.
+other hand, \code{reveal\_functions} needs to come before the
+\code{remove\_complex\_operands} pass because function references
+should be categorized as complex expressions.
 
 \section{Limit Functions}
 \label{sec:limit-functions-r4}
@@ -13852,32 +13966,54 @@ Figures~\ref{fig:Rlam-concrete-syntax} and ~\ref{fig:Rlam-syntax}. It adds
 the \key{lambda} form to the grammar for \LangFun{}, which already has
 syntax for function application.
 
+\newcommand{\LlambdaGrammarRacket}{
+  \begin{array}{lcl}
+  \Exp &::=& \LP \key{procedure-arity}~\Exp\RP \\
+    &\MID& \CLAMBDA{\LP\LS\Var \key{:} \Type\RS\ldots\RP}{\Type}{\Exp} 
+  \end{array}
+}
+\newcommand{\LlambdaASTRacket}{
+  \begin{array}{lcl}
+  \itm{op} &::=& \code{procedure-arity} \\
+  \Exp &::=& \LAMBDA{\LP\LS\Var\code{:}\Type\RS\ldots\RP}{\Type}{\Exp}
+  \end{array}
+}
+
 \begin{figure}[tp]
 \centering
 \fbox{
   \begin{minipage}{0.96\textwidth}
     \small
 \[
-\begin{array}{lcl}
-  \Type &::=& \gray{\key{Integer} \MID \key{Boolean}
-     \MID (\key{Vector}\;\Type\ldots) \MID \key{Void}
-     \MID (\Type\ldots \; \key{->}\; \Type)} \\
-  \Exp &::=& \gray{ \Int \MID \CREAD{} \MID \CNEG{\Exp}
-     \MID \CADD{\Exp}{\Exp} \MID \CSUB{\Exp}{\Exp} }  \\
-    &\MID&  \gray{ \Var \MID \CLET{\Var}{\Exp}{\Exp} }\\
-    &\MID& \gray{\key{\#t} \MID \key{\#f} 
-     \MID (\key{and}\;\Exp\;\Exp) 
-     \MID (\key{or}\;\Exp\;\Exp) 
-     \MID (\key{not}\;\Exp) } \\
-    &\MID& \gray{ (\key{eq?}\;\Exp\;\Exp) \MID \CIF{\Exp}{\Exp}{\Exp} } \\
-    &\MID& \gray{ (\key{vector}\;\Exp\ldots) \MID
-          (\key{vector-ref}\;\Exp\;\Int)} \\
-    &\MID& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\MID (\key{void})
-    \MID (\Exp \; \Exp\ldots) } \\
-    &\MID& \LP \key{procedure-arity}~\Exp\RP \\
-    &\MID& \CLAMBDA{\LP\LS\Var \key{:} \Type\RS\ldots\RP}{\Type}{\Exp} \\
-  \Def &::=& \gray{ \CDEF{\Var}{\LS\Var \key{:} \Type\RS\ldots}{\Type}{\Exp} } \\
-  \LangLamM{} &::=& \gray{\Def\ldots \; \Exp}
+\begin{array}{l}
+  \gray{\LintGrammarRacket{}} \\ \hline
+  \gray{\LvarGrammarRacket{}} \\ \hline
+  \gray{\LifGrammarRacket{}} \\ \hline
+  \gray{\LwhileGrammarRacket} \\ \hline
+  \gray{\LtupGrammarRacket} \\   \hline
+  \gray{\LfunGrammarRacket} \\   \hline
+  \LlambdaGrammarRacket \\
+  \begin{array}{lcl}
+  %% \Type &::=& \gray{\key{Integer} \MID \key{Boolean}
+  %%    \MID (\key{Vector}\;\Type\ldots) \MID \key{Void}
+  %%    \MID (\Type\ldots \; \key{->}\; \Type)} \\
+  %% \Exp &::=& \gray{ \Int \MID \CREAD{} \MID \CNEG{\Exp}
+  %%    \MID \CADD{\Exp}{\Exp} \MID \CSUB{\Exp}{\Exp} }  \\
+  %%   &\MID&  \gray{ \Var \MID \CLET{\Var}{\Exp}{\Exp} }\\
+  %%   &\MID& \gray{\key{\#t} \MID \key{\#f} 
+  %%    \MID (\key{and}\;\Exp\;\Exp) 
+  %%    \MID (\key{or}\;\Exp\;\Exp) 
+  %%    \MID (\key{not}\;\Exp) } \\
+  %%   &\MID& \gray{ (\key{eq?}\;\Exp\;\Exp) \MID \CIF{\Exp}{\Exp}{\Exp} } \\
+  %%   &\MID& \gray{ (\key{vector}\;\Exp\ldots) \MID
+  %%         (\key{vector-ref}\;\Exp\;\Int)} \\
+  %%   &\MID& \gray{(\key{vector-set!}\;\Exp\;\Int\;\Exp)\MID (\key{void})
+  %%   \MID (\Exp \; \Exp\ldots) } \\
+  %%   &\MID& \LP \key{procedure-arity}~\Exp\RP \\
+  %%   &\MID& \CLAMBDA{\LP\LS\Var \key{:} \Type\RS\ldots\RP}{\Type}{\Exp} \\
+  %% \Def &::=& \gray{ \CDEF{\Var}{\LS\Var \key{:} \Type\RS\ldots}{\Type}{\Exp} } \\
+  \LangLamM{} &::=& \Def\ldots \; \Exp
+  \end{array}
 \end{array}
 \]
 \end{minipage}
@@ -13893,17 +14029,26 @@ syntax for function application.
   \begin{minipage}{0.96\textwidth}
     \small
 \[
-\begin{array}{lcl}
-  \itm{op} &::=& \ldots \MID \code{procedure-arity} \\
-  \Exp &::=& \gray{ \INT{\Int} \VAR{\Var} \MID \LET{\Var}{\Exp}{\Exp} } \\
-       &\MID& \gray{ \PRIM{\itm{op}}{\Exp\ldots} }\\
-     &\MID& \gray{ \BOOL{\itm{bool}}
-      \MID \IF{\Exp}{\Exp}{\Exp} } \\
-     &\MID& \gray{ \VOID{} \MID \LP\key{HasType}~\Exp~\Type \RP 
-     \MID \APPLY{\Exp}{\Exp\ldots} }\\
-     &\MID& \LAMBDA{\LP\LS\Var\code{:}\Type\RS\ldots\RP}{\Type}{\Exp}\\
- \Def &::=& \gray{ \FUNDEF{\Var}{\LP\LS\Var \code{:} \Type\RS\ldots\RP}{\Type}{\code{'()}}{\Exp} }\\
+\begin{array}{l}
+  \gray{\LintOpAST} \\ \hline
+  \gray{\LvarAST{}} \\ \hline
+  \gray{\LifAST{}} \\ \hline
+  \gray{\LwhileAST{}} \\ \hline
+  \gray{\LtupASTRacket{}} \\ \hline
+  \gray{\LfunASTRacket} \\ \hline
+  \LlambdaASTRacket \\
+  \begin{array}{lcl}
+ %%  \itm{op} &::=& \ldots \MID \code{procedure-arity} \\
+ %%  \Exp &::=& \gray{ \INT{\Int} \VAR{\Var} \MID \LET{\Var}{\Exp}{\Exp} } \\
+ %%       &\MID& \gray{ \PRIM{\itm{op}}{\Exp\ldots} }\\
+ %%     &\MID& \gray{ \BOOL{\itm{bool}}
+ %%      \MID \IF{\Exp}{\Exp}{\Exp} } \\
+ %%     &\MID& \gray{ \VOID{} \MID \LP\key{HasType}~\Exp~\Type \RP 
+ %%     \MID \APPLY{\Exp}{\Exp\ldots} }\\
+ %%     &\MID& \LAMBDA{\LP\LS\Var\code{:}\Type\RS\ldots\RP}{\Type}{\Exp}\\
+ %% \Def &::=& \gray{ \FUNDEF{\Var}{\LP\LS\Var \code{:} \Type\RS\ldots\RP}{\Type}{\code{'()}}{\Exp} }\\
   \LangLamM{} &::=& \gray{ \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp} }
+  \end{array}
 \end{array}
 \]
 \end{minipage}
@@ -14096,7 +14241,7 @@ that we box those variables that are both assigned-to and that appear
 free inside a \code{lambda}. The purpose of the
 \code{convert-assignments} pass is to carry out that transformation.
 We recommend placing this pass after \code{uniquify} but before
-\code{reveal-functions}.
+\code{reveal\_functions}.
 
 Consider again the first example from
 Section~\ref{sec:assignment-scoping}:
@@ -14253,7 +14398,7 @@ function \code{f}.
 
 The compiling of lexically-scoped functions into top-level function
 definitions is accomplished in the pass \code{convert-to-closures}
-that comes after \code{reveal-functions} and before
+that comes after \code{reveal\_functions} and before
 \code{limit-functions}. 
 
 As usual, we implement the pass as a recursive function over the
@@ -14351,7 +14496,7 @@ an extra closure parameter.
 \label{sec:example-lambda}
 
 Figure~\ref{fig:lexical-functions-example} shows the result of
-\code{reveal-functions} and \code{convert-to-closures} for the example
+\code{reveal\_functions} and \code{convert-to-closures} for the example
 program demonstrating lexical scoping that we discussed at the
 beginning of this chapter.
 
@@ -14532,19 +14677,19 @@ for the compilation of \LangLam{}.
 In this chapter we compiled lexically-scoped functions into a
 relatively efficient representation: flat closures. However, even this
 representation comes with some overhead. For example, consider the
-following program with a function \code{tail-sum} that does not have
-any free variables and where all the uses of \code{tail-sum} are in
-applications where we know that only \code{tail-sum} is being applied
+following program with a function \code{tail\_sum} that does not have
+any free variables and where all the uses of \code{tail\_sum} are in
+applications where we know that only \code{tail\_sum} is being applied
 (and not any other functions).
 \begin{center}
 \begin{minipage}{0.95\textwidth}
 \begin{lstlisting}
-(define (tail-sum [n : Integer] [r : Integer]) : Integer
+(define (tail_sum [n : Integer] [r : Integer]) : Integer
   (if (eq? n 0)
       r
-      (tail-sum (- n 1) (+ n r))))
+      (tail_sum (- n 1) (+ n r))))
 
-(+ (tail-sum 5 0) 27)
+(+ (tail_sum 5 0) 27)
 \end{lstlisting}
 \end{minipage}
 \end{center}
@@ -14567,9 +14712,9 @@ all functions, obtaining the following output for this program.
 \end{center}
 
 In the previous Chapter, there would be no allocation in the program
-and the calls to \code{tail-sum} would be direct calls. In contrast,
+and the calls to \code{tail\_sum} would be direct calls. In contrast,
 the above program allocates memory for each \code{closure} and the
-calls to \code{tail-sum} are indirect. These two differences incur
+calls to \code{tail\_sum} are indirect. These two differences incur
 considerable overhead in a program such as this one, where the
 allocations and indirect calls occur inside a tight loop.
 
@@ -14975,23 +15120,44 @@ in greater detail.
 \section{The \LangAny{} Language}
 \label{sec:Rany-lang}
 
+\newcommand{\LAnyAST}{
+\begin{array}{lcl}
+\Type &::= & \key{Any} \\
+\itm{op} &::= & \code{any-vector-length}
+     \MID \code{any-vector-ref} \MID \code{any-vector-set!}\\
+    &\MID& \code{boolean?} \MID \code{integer?} \MID \code{vector?}
+     \MID \code{procedure?} \MID \code{void?} \\
+  \Exp &::=& \INJECT{\Exp}{\FType} \MID \PROJECT{\Exp}{\FType} 
+\end{array}
+}
+
 \begin{figure}[tp]
 \centering
 \fbox{
   \begin{minipage}{0.96\textwidth}
     \small
 \[
+\begin{array}{l}
+  \gray{\LintOpAST} \\ \hline
+  \gray{\LvarAST{}} \\ \hline
+  \gray{\LifAST{}} \\ \hline
+  \gray{\LwhileAST{}} \\ \hline
+  \gray{\LtupASTRacket{}} \\ \hline
+  \gray{\LfunASTRacket} \\ \hline
+  \gray{\LlambdaASTRacket} \\ \hline
+  \LAnyAST \\
 \begin{array}{lcl}
-\Type &::= & \ldots \MID \key{Any} \\
-\itm{op} &::= & \ldots \MID \code{any-vector-length}
-     \MID \code{any-vector-ref} \MID \code{any-vector-set!}\\
-    &\MID& \code{boolean?} \MID \code{integer?} \MID \code{vector?}
-     \MID \code{procedure?} \MID \code{void?} \\
-\Exp &::=& \ldots
-     \MID \gray{ \PRIM{\itm{op}}{\Exp\ldots} } \\
-    &\MID& \INJECT{\Exp}{\FType} \MID \PROJECT{\Exp}{\FType} \\
- \Def &::=& \gray{ \FUNDEF{\Var}{\LP[\Var \code{:} \Type]\ldots\RP}{\Type}{\code{'()}}{\Exp} }\\
-  \LangAnyM{} &::=& \gray{ \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp} }
+%% \Type &::= & \ldots \MID \key{Any} \\
+%% \itm{op} &::= & \ldots \MID \code{any-vector-length}
+%%      \MID \code{any-vector-ref} \MID \code{any-vector-set!}\\
+%%     &\MID& \code{boolean?} \MID \code{integer?} \MID \code{vector?}
+%%      \MID \code{procedure?} \MID \code{void?} \\
+%% \Exp &::=& \ldots
+%%      \MID \gray{ \PRIM{\itm{op}}{\Exp\ldots} } \\
+%%     &\MID& \INJECT{\Exp}{\FType} \MID \PROJECT{\Exp}{\FType} \\
+%%  \Def &::=& \gray{ \FUNDEF{\Var}{\LP[\Var \code{:} \Type]\ldots\RP}{\Type}{\code{'()}}{\Exp} }\\
+  \LangAnyM{} &::=& \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp}
+\end{array}
 \end{array}
 \]
 \end{minipage}
