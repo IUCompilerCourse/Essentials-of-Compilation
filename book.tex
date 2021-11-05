@@ -25,7 +25,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{0}
+\def\edition{1}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd{#1}\fi}}
@@ -422,16 +422,16 @@ on.
 
 We thank the many students who served as teaching assistants for the
 compiler course at IU and made suggestions for improving the book
-including Carl Factora, Ryan Scott, and Cameron Swords. We especially
-thank Andre Kuhlenschmidt for his work on the garbage collector,
-Michael Vollmer for his work on efficient tail calls, and Michael
-Vitousek for his help running the first offering of the incremental
-compiler course at IU.
+including Carl Factora, Ryan Scott, Cameron Swords, and Chris
+Wailes. We thank Andre Kuhlenschmidt for work on the garbage
+collector, Michael Vollmer for work on efficient tail calls, and
+Michael Vitousek for help running the first offering of the
+incremental compiler course at IU.
 
 We thank professors Bor-Yuh Chang, John Clements, Jay McCarthy, Joseph
-Near, Ryan Newton, Nate Nystrom, Andrew Tolmach, and Michael Wollowski
-for teaching courses based on drafts of this book and for their
-invaluable feedback.
+Near, Ryan Newton, Nate Nystrom, Peter Thiemann, Andrew Tolmach, and
+Michael Wollowski for teaching courses based on drafts of this book
+and for their feedback.
 
 We thank Ronald Garcia for helping Jeremy survive Dybvig's compiler
 course in the early 2000's and especially for finding the bug that
@@ -895,7 +895,7 @@ defined in Figure~\ref{fig:r0-concrete-syntax}.
 \newcommand{\LintGrammarRacket}{
   \begin{array}{rcl}
     \Type &::=& \key{Integer} \\
-    \Exp{} &::=& \Int{} \MID \LP\key{read}\RP \MID \LP\key{-}\;\Exp\RP \MID \LP\key{+} \; \Exp{}\;\Exp{}\RP
+    \Exp{} &::=& \Int{} \MID \CREAD \RP \MID \CNEG{\Exp} \MID \CADD{\Exp}{\Exp}
   \end{array}
 }
 \newcommand{\LintASTRacket}{
@@ -1693,7 +1693,7 @@ exhibit several compilation techniques.
     \Exp &::=& \Var \MID \CLET{\Var}{\Exp}{\Exp}
   \end{array}
 }
-\newcommand{\LvarAST}{
+\newcommand{\LvarASTRacket}{
   \begin{array}{rcl}
     \Exp &::=& \VAR{\Var} \MID \LET{\Var}{\Exp}{\Exp} 
   \end{array}
@@ -1751,7 +1751,7 @@ exhibit several compilation techniques.
 \[
 \begin{array}{l}
   \gray{\LintASTRacket{}} \\ \hline
-  \LvarAST \\
+  \LvarASTRacket \\
   \begin{array}{rcl}
     \LangVarM{} &::=& \PROGRAM{\code{'()}}{\Exp}
   \end{array}
@@ -2809,6 +2809,24 @@ of each of the compiler passes in Figure~\ref{fig:Lvar-passes}.
 %% \key{patch-instructions}
 %% passes input and output variants of x86 assembly.
 
+\newcommand{\CvarGrammarRacket}{
+\begin{array}{lcl}
+\Atm &::=& \Int \MID \Var \\
+\Exp &::=& \Atm \MID \CREAD{} \MID \CNEG{\Atm} \MID \CADD{\Atm}{\Atm} \MID \CSUB{\Atm}{\Atm}\\
+\Stmt &::=& \CASSIGN{\Var}{\Exp} \\
+\Tail &::= & \CRETURN{\Exp} \MID \Stmt~\Tail 
+\end{array}
+}
+\newcommand{\CvarASTRacket}{
+\begin{array}{lcl}
+\Atm &::=& \INT{\Int} \MID \VAR{\Var} \\
+\Exp &::=& \Atm \MID \READ{} \MID \NEG{\Atm} \\
+ &\MID& \ADD{\Atm}{\Atm} \MID \SUB{\Atm}{\Atm}\\
+\Stmt &::=& \ASSIGN{\VAR{\Var}}{\Exp} \\
+\Tail &::= & \RETURN{\Exp} \MID \SEQ{\Stmt}{\Tail} 
+\end{array}
+}
+
 {\if\edition\racketEd  
 \subsection{The \LangCVar{} Intermediate Language}
 
@@ -2852,12 +2870,11 @@ assignment.
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \[
+\begin{array}{l}
+  \CvarGrammarRacket \\
 \begin{array}{lcl}
-\Atm &::=& \Int \MID \Var \\
-\Exp &::=& \Atm \MID \key{(read)} \MID \key{(-}~\Atm\key{)} \MID \key{(+}~\Atm~\Atm\key{)}\\
-\Stmt &::=& \Var~\key{=}~\Exp\key{;} \\
-\Tail &::= & \key{return}~\Exp\key{;} \MID \Stmt~\Tail \\
 \LangCVarM{} & ::= & (\itm{label}\key{:}~ \Tail)\ldots
+\end{array}
 \end{array}
 \]
 \end{minipage}
@@ -2871,13 +2888,11 @@ assignment.
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \[
+\begin{array}{l}
+  \CvarASTRacket \\
 \begin{array}{lcl}
-\Atm &::=& \INT{\Int} \MID \VAR{\Var} \\
-\Exp &::=& \Atm \MID \READ{} \MID \NEG{\Atm} \\
- &\MID& \ADD{\Atm}{\Atm}\\
-\Stmt &::=& \ASSIGN{\VAR{\Var}}{\Exp} \\
-\Tail &::= & \RETURN{\Exp} \MID \SEQ{\Stmt}{\Tail} \\
 \LangCVarM{} & ::= & \CPROGRAM{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP}
+\end{array}
 \end{array}
 \]
 \end{minipage}
@@ -6479,7 +6494,7 @@ operators to include
         &\MID& (\itm{cmp}\;\Exp\;\Exp) \MID \CIF{\Exp}{\Exp}{\Exp} 
   \end{array}
 }
-\newcommand{\LifAST}{
+\newcommand{\LifASTRacket}{
 \begin{array}{lcl}
    \Type &::=& \key{Boolean} \\
   \itm{bool} &::=& \code{\#t} \MID \code{\#f} \\
@@ -6500,7 +6515,7 @@ operators to include
   \itm{cmp} &::= & \key{==} \MID \key{!=} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=} \\
 \Exp &::=& \TRUE \MID \FALSE \MID \CAND{\Exp}{\Exp} \MID \COR{\Exp}{\Exp}
   \MID \key{not}~\Exp \\
-  &\MID& \Exp ~\itm{cmp} ~\Exp
+  &\MID& \CCMP{\itm{cmp}}{\Exp}{\Exp}
   \MID \CIF{\Exp}{\Exp}{\Exp} \\
   \Stmt &::=& \key{if}~ \Exp \key{:}~ \Stmt^{+} ~\key{else:}~ \Stmt^{+}
 \end{array}
@@ -6562,8 +6577,8 @@ operators to include
 \[
 \begin{array}{l}
   \gray{\LintOpAST} \\ \hline
-  \gray{\LvarAST{}} \\ \hline
-  \LifAST{} \\ 
+  \gray{\LvarASTRacket{}} \\ \hline
+  \LifASTRacket{} \\ 
   \begin{array}{lcl}
     \LangIfM{} &::=& \PROGRAM{\code{'()}}{\Exp}
   \end{array}
@@ -7182,24 +7197,78 @@ mapping labels to $\Tail$ expressions, which can be return statements,
 an assignment statement followed by a $\Tail$ expression, a
 \code{goto}, or a conditional \code{goto}.
 
+\newcommand{\CifGrammarRacket}{
+\begin{array}{lcl}
+\Atm &::=& \itm{bool} \\
+\itm{cmp} &::= & \code{eq?} \MID \code{<} \MID \code{<=} \MID \code{>} \MID \code{>=} \\
+\Exp &::=& \CNOT{\Atm} \MID \LP \itm{cmp}~\Atm~\Atm\RP \\
+\Tail &::= & \key{goto}~\itm{label}\key{;}\\
+   &\MID& \key{if}~\LP \itm{cmp}~\Atm~\Atm \RP~ \key{goto}~\itm{label}\key{;} ~\key{else}~\key{goto}~\itm{label}\key{;} 
+\end{array}
+}
 
+\newcommand{\CifASTRacket}{
+\begin{array}{lcl}
+\Atm &::=& \BOOL{\itm{bool}} \\
+\itm{cmp} &::= & \code{eq?} \MID \code{<} \MID \code{<=} \MID \code{>} \MID \code{>=} \\
+\Exp &::= & \UNIOP{\key{'not}}{\Atm} \MID \BINOP{\key{'}\itm{cmp}}{\Atm}{\Atm} \\
+\Tail &::= & \GOTO{\itm{label}} \\
+    &\MID& \IFSTMT{\BINOP{\itm{cmp}}{\Atm}{\Atm}}{\GOTO{\itm{label}}}{\GOTO{\itm{label}}} 
+\end{array}
+}
+
+\newcommand{\CifGrammarPython}{
+\begin{array}{lcl}
+\Atm &::=& \Int \MID \Var \MID \itm{bool} \\
+\Exp &::= & \Atm \MID \CREAD{} 
+     \MID \CBINOP{\itm{binaryop}}{\Atm}{\Atm}
+     \MID \CUNIOP{\itm{unaryop}}{\Atm} \\
+     &\MID& \CCMP{\itm{cmp}}{\Atm}{\Atm} \\
+\Stmt &::=& \CPRINT{\Exp} \MID \Exp \\
+     &\MID& \CASSIGN{\Var}{\Exp}  
+     \MID \CRETURN{\Exp} \MID \CGOTO{\itm{label}} \\
+    &\MID& \CIFSTMT{\CCMP{\itm{cmp}}{\Atm}{\Atm}}{\CGOTO{\itm{label}}}{\CGOTO{\itm{label}}} 
+\end{array}
+}
+\newcommand{\CifASTPython}{
+\begin{array}{lcl}
+\Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} \\
+\Exp &::= & \Atm \MID \READ{} \\
+     &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm}
+     \MID \UNIOP{\itm{unaryop}}{\Atm} \\
+     &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \\
+\Stmt &::=& \PRINT{\Exp} \MID \EXPR{\Exp} \\
+     &\MID& \ASSIGN{\VAR{\Var}}{\Exp}  
+     \MID \RETURN{\Exp} \MID \GOTO{\itm{label}} \\
+    &\MID& \IFSTMT{\CMP{\Atm}{\itm{cmp}}{\Atm}}{\LS\GOTO{\itm{label}}\RS}{\LS\GOTO{\itm{label}}\RS} 
+\end{array}
+}
+  
 \begin{figure}[tbp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
-\small    
+\small
+{\if\edition\racketEd      
 \[
+\begin{array}{l}
+  \gray{\CvarGrammarRacket} \\ \hline
+  \CifGrammarRacket \\
 \begin{array}{lcl}
-\Atm &::=& \gray{ \Int \MID \Var } \MID \itm{bool} \\
-\itm{cmp} &::= & \code{eq?} \MID \code{<} \MID \code{<=} \MID \code{>} \MID \code{>=} \\
-\Exp &::=& \gray{ \Atm \MID \key{(read)} \MID \key{(-}~\Atm\key{)} \MID \key{(+}~\Atm~\Atm\key{)} \MID \key{(-}~\Atm~\Atm\key{)} } \\
-   &\MID& \LP \key{not}~\Atm \RP \MID \LP \itm{cmp}~\Atm~\Atm\RP \\
-\Stmt &::=& \gray{ \Var~\key{=}~\Exp\key{;} } \\
-\Tail &::= & \gray{ \key{return}~\Exp\key{;} \MID \Stmt~\Tail } 
-   \MID \key{goto}~\itm{label}\key{;}\\
-   &\MID& \key{if}~\LP \itm{cmp}~\Atm~\Atm \RP~ \key{goto}~\itm{label}\key{;} ~\key{else}~\key{goto}~\itm{label}\key{;} \\
-\LangCIfM{} & ::= & \gray{ (\itm{label}\key{:}~ \Tail)\ldots }
+\LangCIfM{} & ::= & (\itm{label}\key{:}~ \Tail)\ldots 
+\end{array}
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd      
+\[
+\begin{array}{l}
+  \CifGrammarPython \\
+\begin{array}{lcl}
+\LangCIfM{} & ::= & (\itm{label}\code{:}~\Stmt^{*}) \ldots
+\end{array}
+\end{array}
+\]
+\fi}
 \end{minipage}
 }
 \caption{The concrete syntax of the \LangCIf{} intermediate language.}
@@ -7212,35 +7281,22 @@ an assignment statement followed by a $\Tail$ expression, a
 \small    
 {\if\edition\racketEd    
 \[
+\begin{array}{l}
+  \gray{\CvarASTRacket} \\ \hline
+  \CifASTRacket \\ 
 \begin{array}{lcl}
-\Atm &::=& \gray{\INT{\Int} \MID \VAR{\Var}} \MID \BOOL{\itm{bool}} \\
-\itm{cmp} &::= & \code{eq?} \MID \code{<} \MID \code{<=} \MID \code{>} \MID \code{>=} \\
-\Exp &::= & \gray{ \Atm \MID \READ{} }\\
-     &\MID& \gray{ \NEG{\Atm} \MID \ADD{\Atm}{\Atm} } \\
-     &\MID& \UNIOP{\key{'not}}{\Atm} 
-     \MID \BINOP{\key{'}\itm{cmp}}{\Atm}{\Atm} \\
-\Stmt &::=& \gray{ \ASSIGN{\VAR{\Var}}{\Exp} } \\
-\Tail &::= & \gray{\RETURN{\Exp} \MID \SEQ{\Stmt}{\Tail} } 
-    \MID \GOTO{\itm{label}} \\
-    &\MID& \IFSTMT{\BINOP{\itm{cmp}}{\Atm}{\Atm}}{\GOTO{\itm{label}}}{\GOTO{\itm{label}}} \\
-\LangCIfM{} & ::= & \gray{\CPROGRAM{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP}}
+\LangCIfM{} & ::= & \CPROGRAM{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP}
+\end{array}
 \end{array}
 \]
 \fi}
 {\if\edition\pythonEd
 \[
+\begin{array}{l}
+  \CifASTPython \\ 
 \begin{array}{lcl}
-\Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} \\
-\Exp &::= & \Atm \MID \READ{} \\
-     &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm}
-     \MID \UNIOP{\itm{unaryop}}{\Atm} \\
-     &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} 
-     \MID \BOOLOP{\itm{boolop}}{\Atm}{\Atm} \\
-\Stmt &::=& \PRINT{\Exp} \MID \EXPR{\Exp} \\
-     &\MID& \ASSIGN{\VAR{\Var}}{\Exp}  
-     \MID \RETURN{\Exp} \MID \GOTO{\itm{label}} \\
-    &\MID& \IFSTMT{\CMP{\Atm}{\itm{cmp}}{\Atm}}{\LS\GOTO{\itm{label}}\RS}{\LS\GOTO{\itm{label}}\RS} \\
-\LangCIfM{} & ::= & \CPROGRAM{\itm{info}}{\LC\itm{label}\,\key{:}\,\Stmt^{*}, \ldots \RC}
+\LangCIfM{} & ::= & \CPROGRAM{\itm{info}}{\LC\itm{label}\key{:}\,\Stmt^{*}, \ldots \RC}
+\end{array}
 \end{array}
 \]
 \fi}
@@ -9479,7 +9535,7 @@ the condition remains true.
       \MID \CWHILE{\Exp}{\Exp} \MID \LP\key{void}\RP 
   \end{array}
 }
-\newcommand{\LwhileAST}{
+\newcommand{\LwhileASTRacket}{
 \begin{array}{lcl}
   \Type &::=& \key{Void}\\
   \Exp &::=& \SETBANG{\Var}{\Exp} \MID \BEGIN{\LP\Exp\ldots\RP}{\Exp}\\
@@ -9544,9 +9600,9 @@ the condition remains true.
 \[
 \begin{array}{l}
   \gray{\LintOpAST} \\ \hline
-  \gray{\LvarAST{}} \\ \hline
-  \gray{\LifAST{}} \\ \hline
-  \LwhileAST{} \\
+  \gray{\LvarASTRacket{}} \\ \hline
+  \gray{\LifASTRacket{}} \\ \hline
+  \LwhileASTRacket{} \\
 \begin{array}{lcl}
   \LangLoopM{} &::=& \gray{ \PROGRAM{\code{'()}}{\Exp} }
 \end{array}
@@ -10684,9 +10740,9 @@ print( t[0] + t[2][0] if t[1] else 44 )
 \[
 \begin{array}{l}
   \gray{\LintOpAST} \\ \hline
-  \gray{\LvarAST{}} \\ \hline
-  \gray{\LifAST{}} \\ \hline
-  \gray{\LwhileAST{}} \\ \hline
+  \gray{\LvarASTRacket{}} \\ \hline
+  \gray{\LifASTRacket{}} \\ \hline
+  \gray{\LwhileASTRacket{}} \\ \hline
   \LtupASTRacket{} \\
 \begin{array}{lcl}
   \LangVecM{} &::=& \PROGRAM{\key{'()}}{\Exp}
@@ -11531,8 +11587,8 @@ sub-expressions of tuple access must be atomic.
 %% handled carefully to prevent the \code{Prim} node from being separated
 %% from its enclosing \code{HasType}.
 Figure~\ref{fig:Lvec-anf-syntax}
-shows the grammar for the output language \LangVecANF{} of this
-pass, which is \LangVec{} in monadic normal form.
+shows the grammar for the output language \LangAllocANF{} of this
+pass, which is \LangAlloc{} in monadic normal form.
 
 \begin{figure}[tp]
 \centering
@@ -11552,7 +11608,7 @@ pass, which is \LangVec{} in monadic normal form.
    &\MID& \COLLECT{\Int} \RP \MID \ALLOCATE{\Int}{\Type}
    \MID \GLOBALVALUE{\Var}\\
 %  &\MID& \LP\key{HasType}~\Exp~\Type\RP \\
-\LangVecANFM{}  &::=& \gray{ \PROGRAM{\code{'()}}{\Exp} }
+\LangAllocANFM{}  &::=& \gray{ \PROGRAM{\code{'()}}{\Exp} }
 \end{array}
 \]
 \fi}
@@ -11582,13 +11638,13 @@ pass, which is \LangVec{} in monadic normal form.
   &\MID& \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
   &\MID& \WHILESTMT{\Exp}{\Stmt^{+}}
    \MID \COLLECT{\Int}  \\
-\LangLoopM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
+\LangAllocANFM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
 \end{array}
 \]
 \fi}
 \end{minipage}
 }
-\caption{\LangVecANF{} is \LangVec{} in monadic normal form.}
+\caption{\LangAllocANF{} is \LangAlloc{} in monadic normal form.}
 \label{fig:Lvec-anf-syntax}
 \end{figure}
 
@@ -11653,9 +11709,12 @@ pass, which is \LangVec{} in monadic normal form.
 
 The output of \code{explicate\_control} is a program in the
 intermediate language \LangCVec{}, whose abstract syntax is defined in
-Figure~\ref{fig:c2-syntax}.  \racket{(The concrete syntax is defined
-  in Figure~\ref{fig:c2-concrete-syntax} of the Appendix.)}  The new
-expressions of \LangCVec{} include \key{allocate},
+Figure~\ref{fig:c2-syntax}.
+%
+\racket{(The concrete syntax is defined in
+  Figure~\ref{fig:c2-concrete-syntax} of the Appendix.)}
+%
+The new expressions of \LangCVec{} include \key{allocate},
 %
 \racket{\key{vector-ref}, and \key{vector-set!},}
 %
@@ -11974,9 +12033,9 @@ changes to also record the number of spills to the root stack.
 
 % don't change color-graph
 
-\section{Patch Instructions}
-
-[mention that global variables are memory references]
+% TODO:
+%\section{Patch Instructions}
+%[mention that global variables are memory references]
 
 \section{Prelude and Conclusion}
 \label{sec:print-x86-gc}
@@ -12095,7 +12154,7 @@ conclusion:
 \end{figure}
 
 
-\begin{figure}[p]
+\begin{figure}[tbp]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (Lvec) at (0,2)  {\large \LangVec{}};
 \node (Lvec-2) at (3,2)  {\large \LangVec{}};
@@ -12132,52 +12191,87 @@ conclusion:
 Figure~\ref{fig:Lvec-passes} gives an overview of all the passes needed
 for the compilation of \LangVec{}.
 
+\clearpage
+
 {\if\edition\racketEd
 \section{Challenge: Simple Structures}
 \label{sec:simple-structures}
 \index{subject}{struct}
 \index{subject}{structure}
 
-Figure~\ref{fig:r3s-concrete-syntax} defines the concrete syntax for
-\LangStruct{}, which extends \LangVec{} with support for simple structures.
-Recall that a \code{struct} in Typed Racket is a user-defined data
-type that contains named fields and that is heap allocated, similar to
-a vector. The following is an example of a structure definition, in
-this case the definition of a \code{point} type.
+The language \LangStruct{} extends \LangVec{} with support for simple
+structures. Its concrete syntax is defined in
+Figure~\ref{fig:Lstruct-concrete-syntax} and the abstract syntax is in
+Figure~\ref{fig:Lstruct-syntax}. Recall that a \code{struct} in Typed
+Racket is a user-defined data type that contains named fields and that
+is heap allocated, similar to a vector. The following is an example of
+a structure definition, in this case the definition of a \code{point}
+type.
 \begin{lstlisting}
 (struct point ([x : Integer] [y : Integer]) #:mutable)
 \end{lstlisting}
+
+\newcommand{\LstructGrammarRacket}{
+\begin{array}{lcl}
+  \Type &::=& \Var \\
+  \Exp &::=& (\Var\;\Exp \ldots)\\
+  \Def &::=& (\key{struct}\; \Var \; ([\Var \,\key{:}\, \Type] \ldots)\; \code{\#:mutable})\\
+\end{array}
+}
+\newcommand{\LstructASTRacket}{
+\begin{array}{lcl}
+  \Type &::=& \VAR{\Var} \\
+  \Exp &::=& \APPLY{\Var}{\Exp\ldots} \\
+  \Def &::=& \LP\key{StructDef}\; \Var \; \LP\LS\Var \,\key{:}\, \Type\RS \ldots\RP\RP 
+\end{array}
+}
 
 \begin{figure}[tbp]
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \[
+\begin{array}{l}
+  \gray{\LintGrammarRacket{}} \\ \hline
+  \gray{\LvarGrammarRacket{}} \\ \hline
+  \gray{\LifGrammarRacket{}} \\ \hline
+  \gray{\LwhileGrammarRacket} \\ \hline
+  \gray{\LtupGrammarRacket} \\  \hline
+  \LstructGrammarRacket \\
 \begin{array}{lcl}
-  \Type &::=& \gray{\key{Integer} \MID \key{Boolean}
-  \MID (\key{Vector}\;\Type \ldots) \MID \key{Void} } \MID \Var \\
-  \itm{cmp} &::= & \gray{ \key{eq?} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=} } \\
-  \Exp &::=& \gray{  \Int \MID (\key{read}) \MID (\key{-}\;\Exp) \MID (\key{+} \; \Exp\;\Exp) \MID (\key{-}\;\Exp\;\Exp) }  \\
-  &\MID&  \gray{  \Var \MID (\key{let}~([\Var~\Exp])~\Exp)  }\\
-  &\MID& \gray{ \key{\#t} \MID \key{\#f} 
-   \MID (\key{and}\;\Exp\;\Exp) 
-   \MID (\key{or}\;\Exp\;\Exp)
-   \MID (\key{not}\;\Exp) } \\
-  &\MID& \gray{  (\itm{cmp}\;\Exp\;\Exp) 
-   \MID (\key{if}~\Exp~\Exp~\Exp)  } \\
-  &\MID& \gray{ (\key{vector}\;\Exp \ldots) 
-   \MID (\key{vector-ref}\;\Exp\;\Int) } \\
-  &\MID& \gray{ (\key{vector-set!}\;\Exp\;\Int\;\Exp) }\\
-  &\MID& \gray{ (\key{void}) } \MID (\Var\;\Exp \ldots)\\
-  \Def &::=& (\key{struct}\; \Var \; ([\Var \,\key{:}\, \Type] \ldots)\; \code{\#:mutable})\\
   \LangStruct{} &::=& \Def \ldots \; \Exp
+\end{array}
 \end{array}
 \]
 \end{minipage}
 }
 \caption{The concrete syntax of \LangStruct{}, extending \LangVec{}
   (Figure~\ref{fig:Lvec-concrete-syntax}).}
-\label{fig:r3s-concrete-syntax}
+\label{fig:Lstruct-concrete-syntax}
+\end{figure}
+
+\begin{figure}[tbp]
+\centering
+\fbox{
+\begin{minipage}{0.96\textwidth}
+\[
+\begin{array}{l}
+  \gray{\LintASTRacket{}} \\ \hline
+  \gray{\LvarASTRacket{}} \\ \hline
+  \gray{\LifASTRacket{}} \\ \hline
+  \gray{\LwhileASTRacket} \\ \hline
+  \gray{\LtupASTRacket} \\  \hline
+  \LstructASTRacket \\
+\begin{array}{lcl}
+  \LangStruct{} &::=& \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP)}{\Exp}
+\end{array}
+\end{array}
+\]
+\end{minipage}
+}
+\caption{The abstract syntax of \LangStruct{}, extending \LangVec{}
+  (Figure~\ref{fig:Lvec-syntax}).}
+\label{fig:Lstruct-syntax}
 \end{figure}
 
 An instance of a structure is created using function call syntax, with
@@ -12218,7 +12312,7 @@ mark. The following example uses \code{set-point-x!} to change the
   five new test cases that use structures and test your compiler.
 \end{exercise}
 
-% TODO: show the abstract syntax with ProgramDefsExp
+% TODO: create an interpreter for L_struct
 
 \clearpage
 
@@ -12634,11 +12728,11 @@ from the set.
 \index{subject}{function}
 
 This chapter studies the compilation of functions similar to those
-found in the C language. This corresponds to a subset of Typed Racket
-in which only top-level function definitions are allowed. This kind of
-function is an important stepping stone to implementing
-lexically-scoped functions, that is, \key{lambda} abstractions, which
-is the topic of Chapter~\ref{ch:Rlam}.
+found in the C language. This corresponds to a subset of \racket{Typed
+  Racket} \python{Python} in which only top-level function definitions
+are allowed. This kind of function is an important stepping stone to
+implementing lexically-scoped functions, that is, \key{lambda}
+abstractions, which is the topic of Chapter~\ref{ch:Rlam}.
 
 \section{The \LangFun{} Language}
 
@@ -12660,7 +12754,7 @@ definitions does not matter).
   Figure~\ref{fig:Rfun-syntax}.}
 %
 The concrete syntax for function application\index{subject}{function
-  application} is $(\Exp \; \Exp \ldots)$ where the first expression
+  application} is $\CAPPLY{\Exp}{\Exp \ldots}$ where the first expression
 must evaluate to a function and the rest are the arguments.  The
 abstract syntax for function application is
 $\APPLY{\Exp}{\Exp\ldots}$.
@@ -12672,18 +12766,27 @@ $\APPLY{\Exp}{\Exp\ldots}$.
 
 Functions are first-class in the sense that a function pointer
 \index{subject}{function pointer} is data and can be stored in memory or passed
-as a parameter to another function.  Thus, we introduce a function
+as a parameter to another function.  Thus, there is a function
 type, written
+{\if\edition\racketEd
 \begin{lstlisting}
    (|$\Type_1$| |$\cdots$| |$\Type_n$| -> |$\Type_r$|)
 \end{lstlisting}
-for a function whose $n$ parameters have the types $\Type_1$ through
-$\Type_n$ and whose return type is $\Type_r$. The main limitation of
-these functions (with respect to Racket functions) is that they are
-not lexically scoped. That is, the only external entities that can be
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+   Callable[[|$\Type_1$|,|$\cdots$|,|$\Type_n$|], |$\Type_r$|]
+\end{lstlisting}
+\fi}
+%
+\noindent for a function whose $n$ parameters have the types $\Type_1$
+through $\Type_n$ and whose return type is $\Type_r$. The main
+limitation of these functions (with respect to
+\racket{Racket}\python{Python} functions) is that they are not
+lexically scoped. That is, the only external entities that can be
 referenced from inside a function body are other globally-defined
-functions. The syntax of \LangFun{} prevents functions from being nested
-inside each other.
+functions. The syntax of \LangFun{} prevents functions from being
+nested inside each other.
 
 \newcommand{\LfunGrammarRacket}{
   \begin{array}{lcl}
@@ -12702,9 +12805,9 @@ inside each other.
 
 \newcommand{\LfunGrammarPython}{
   \begin{array}{lcl}
-   \Type &::=& \key{Callable}\LS \LS \Type \key{, } \ldots \RS \key{, } \Type \RS \\
-   \Exp &::=& \Exp \LP \Exp \ldots\RP \\
-   \Def &::=& \CDEF{\Var}{\Var \key{:} \Type\key{, } \ldots}{\Type}{\Stmt^{+}} 
+   \Type &::=& \key{Callable}\LS \LS \Type \key{,} \ldots \RS \key{, } \Type \RS \\
+   \Exp &::=& \CAPPLY{\Exp}{\Exp\code{,} \ldots} \\
+   \Def &::=& \CDEF{\Var}{\Var \key{:} \Type\key{,} \ldots}{\Type}{\Stmt^{+}} 
   \end{array}
 }
 \newcommand{\LfunASTPython}{
@@ -12765,9 +12868,9 @@ inside each other.
 \[
 \begin{array}{l}
   \gray{\LintOpAST} \\ \hline
-  \gray{\LvarAST{}} \\ \hline
-  \gray{\LifAST{}} \\ \hline
-  \gray{\LwhileAST{}} \\ \hline
+  \gray{\LvarASTRacket{}} \\ \hline
+  \gray{\LifASTRacket{}} \\ \hline
+  \gray{\LwhileASTRacket{}} \\ \hline
   \gray{\LtupASTRacket{}} \\ \hline
   \LfunASTRacket \\
   \begin{array}{lcl}
@@ -12799,43 +12902,78 @@ inside each other.
 
 
 The program in Figure~\ref{fig:Rfun-function-example} is a
-representative example of defining and using functions in \LangFun{}.  We
-define a function \code{map-vec} that applies some other function
-\code{f} to both elements of a vector and returns a new
-vector containing the results. We also define a function \code{add1}.
-The program applies
-\code{map-vec} to \code{add1} and \code{(vector 0 41)}.  The result is
-\code{(vector 1 42)}, from which we return the \code{42}.
+representative example of defining and using functions in \LangFun{}.
+We define a function \code{map} that applies some other function
+\code{f} to both elements of a vector and returns a new vector
+containing the results. We also define a function \code{inc}.  The
+program applies \code{map} to \code{inc} and
+%
+\racket{\code{(vector 0 41)}}\python{\code{(0, 41)}}.
+%
+The result is \racket{\code{(vector 1 42)}}\python{\code{(1, 42)}},
+%
+from which we return the \code{42}.
 
 \begin{figure}[tbp]
+{\if\edition\racketEd  
 \begin{lstlisting}
-(define (map-vec [f : (Integer -> Integer)]
-                   [v : (Vector Integer Integer)])
+(define (map [f : (Integer -> Integer)] [v : (Vector Integer Integer)])
         : (Vector Integer Integer)
   (vector (f (vector-ref v 0)) (f (vector-ref v 1))))
 
-(define (add1 [x : Integer]) : Integer
+(define (inc [x : Integer]) : Integer
   (+ x 1))
 
-(vector-ref (map-vec add1 (vector 0 41)) 1)
+(vector-ref (map inc (vector 0 41)) 1)
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+def map(f : Callable[[int], int], v : tuple[int,int]) -> tuple[int,int]:
+    return f(v[0]), f(v[1])
+
+def inc(x : int) -> int:
+    return x + 1
+
+print( map(inc, (0, 41))[1] )
+\end{lstlisting}
+\fi}
 \caption{Example of using functions in \LangFun{}.}
 \label{fig:Rfun-function-example}
 \end{figure}
 
 The definitional interpreter for \LangFun{} is in
-Figure~\ref{fig:interp-Rfun}. The case for the \code{ProgramDefsExp} form is
-responsible for setting up the mutual recursion between the top-level
-function definitions. We use the classic back-patching \index{subject}{back-patching}
-approach that uses mutable variables and makes two passes over the function
-definitions~\citep{Kelsey:1998di}.  In the first pass we set up the
-top-level environment using a mutable cons cell for each function
-definition. Note that the \code{lambda} value for each function is
-incomplete; it does not yet include the environment.  Once the
-top-level environment is constructed, we then iterate over it and
-update the \code{lambda} values to use the top-level environment.
+Figure~\ref{fig:interp-Rfun}. The case for the
+%
+\racket{\code{ProgramDefsExp}}\python{\code{Module}}
+%
+AST is responsible for setting up the mutual recursion between the
+top-level function definitions.
+%
+\racket{We use the classic back-patching
+  \index{subject}{back-patching} approach that uses mutable variables
+  and makes two passes over the function
+  definitions~\citep{Kelsey:1998di}.  In the first pass we set up the
+  top-level environment using a mutable cons cell for each function
+  definition. Note that the \code{lambda} value for each function is
+  incomplete; it does not yet include the environment.  Once the
+  top-level environment is constructed, we then iterate over it and
+  update the \code{lambda} values to use the top-level environment.}
+%
+\python{We create a dictionary named \code{env} and fill it in
+  by mapping each function name to a new \code{Function} value,
+  each of which stores a reference to the \code{env}.
+  (We define the class \code{Function} for this purpose.)}
+%
+To interpret a function \racket{application}\python{call}, we match
+the result of the function expression to obtain a function value.  We
+then extend the function's environment with mapping of parameters to
+argument values. Finally, we interpret the body of the function in
+this extended environment.
+
 
 \begin{figure}[tp]
+{\if\edition\racketEd  
 \begin{lstlisting}
 (define interp-Rfun_class
   (class interp-Lvec_class
@@ -12880,8 +13018,53 @@ update the \code{lambda} values to use the top-level environment.
 (define (interp-Rfun p)
   (send (new interp-Rfun_class) interp-program p))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+class InterpLfun(InterpLtup):
+  def apply_fun(self, fun, args, e):
+      match fun:
+        case Function(name, xs, body, env):
+          new_env = {x: v for (x,v) in env.items()}
+          for (x,arg) in zip(xs, args):
+              new_env[x] = arg
+          return self.interp_stmts(body, new_env)
+        case _:
+          raise Exception('apply_fun: unexpected: ' + repr(fun))
+    
+  def interp_exp(self, e, env):
+    match e:
+      case Call(Name('input_int'), []):
+        return super().interp_exp(e, env)      
+      case Call(func, args):
+        f = self.interp_exp(func, env)
+        vs = [self.interp_exp(arg, env) for arg in args]
+        return self.apply_fun(f, vs, e)
+      case _:
+        return super().interp_exp(e, env)
 
-
+  def interp_stmts(self, ss, env):
+    if len(ss) == 0:
+      return
+    match ss[0]:
+      case Return(value):
+        return self.interp_exp(value, env)
+      case _:
+        return super().interp_stmts(ss, env)
+    
+  def interp(self, p):
+    match p:
+      case Module(defs):
+        env = {}
+        for d in defs:
+            match d:
+              case FunctionDef(name, params, bod, dl, returns, comment):
+                env[name] = Function(name, [x for (x,t) in params], bod, env)
+        self.apply_fun(env['main'], [], None)
+      case _:
+        raise Exception('interp: unexpected ' + repr(p))
+\end{lstlisting}
+\fi}
 \caption{Interpreter for the \LangFun{} language.}
 \label{fig:interp-Rfun}
 \end{figure}
@@ -12889,9 +13072,26 @@ update the \code{lambda} values to use the top-level environment.
 
 %\margincomment{TODO: explain type checker}
 
-The type checker for \LangFun{} is in Figure~\ref{fig:type-check-Rfun}.
+The type checker for \LangFun{} is in
+Figure~\ref{fig:type-check-Rfun}.  (We omit the code that parses
+function parameters into the simpler abstract syntax.)  Similar to the
+interpreter, the case for the
+\racket{\code{ProgramDefsExp}}\python{\code{Module}}
+%
+AST is responsible for setting up the mutual recursion between the
+top-level function definitions. We begin by create a mapping
+\code{env} from every function name to its type. We then type check
+the program using this \code{env}.
+%
+In the case for function \racket{application}\python{call}, we match
+the type of the function expression to a function type and check that
+the types of the argument expressions are equal to the function's
+parameter types. The type of the \racket{application}\python{call} as
+a whole is the return type from the function type.
+
 
 \begin{figure}[tp]
+{\if\edition\racketEd  
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define type-check-Rfun_class
   (class type-check-Lvec_class
@@ -12937,16 +13137,68 @@ The type checker for \LangFun{} is in Figure~\ref{fig:type-check-Rfun}.
     (define/override (type-check-program e)
       (match e
         [(ProgramDefsExp info ds body)
-         (define new-env (for/list ([d ds])
+         (define env (for/list ([d ds])
                            (cons (Def-name d) (fun-def-type d))))
-         (define ds^ (for/list ([d ds]) ((type-check-def new-env) d)))
-         (define-values (body^ ty) ((type-check-exp new-env) body))
+         (define ds^ (for/list ([d ds]) ((type-check-def env) d)))
+         (define-values (body^ ty) ((type-check-exp env) body))
          (check-type-equal? ty 'Integer body)
          (ProgramDefsExp info ds^ body^)]))))
 
 (define (type-check-Rfun p)
   (send (new type-check-Rfun_class) type-check-program p))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}  
+class TypeCheckLfun(TypeCheckLtup):
+  def type_check_exp(self, e, env):
+    match e:
+      case Call(Name('input_int'), []):
+        return super().type_check_exp(e, env)      
+      case Call(func, args):
+        func_t = self.type_check_exp(func, env)
+        args_t = [self.type_check_exp(arg, env) for arg in args]
+        match func_t:
+          case FunctionType(params_t, return_t):
+            for (arg_t, param_t) in zip(args_t, params_t):
+                check_type_equal(param_t, arg_t, e)
+            return return_t
+          case _:
+            raise Exception('type_check_exp: in call, unexpected ' + \
+                              repr(func_t))
+      case _:
+        return super().type_check_exp(e, env)
+
+  def type_check_stmts(self, ss, env):
+    if len(ss) == 0:
+      return
+    match ss[0]:
+      case FunctionDef(name, params, body, dl, returns, comment):
+        new_env = {x: t for (x,t) in env.items()}
+        for (x,t) in params:
+            new_env[x] = t
+        rt = self.type_check_stmts(body, new_env)
+        check_type_equal(returns, rt, ss[0])
+        return self.type_check_stmts(ss[1:], env)
+      case Return(value):
+        return self.type_check_exp(value, env)
+      case _:
+        return super().type_check_stmts(ss, env)
+
+  def type_check(self, p):
+    match p:
+      case Module(body):
+        env = {}
+        for s in body:
+            match s:
+              case FunctionDef(name, params, bod, dl, returns, comment):
+                params_t = [t for (x,t) in params]
+                env[name] = FunctionType(params_t, returns)
+        self.type_check_stmts(body, env)
+      case _:
+        raise Exception('type_check: unexpected ' + repr(p))
+\end{lstlisting}
+\fi}
 \caption{Type checker for the \LangFun{} language.}
 \label{fig:type-check-Rfun}
 \end{figure}
@@ -12968,17 +13220,17 @@ needed for jump instructions. Labels can also be used to mark the
 beginning of the instructions for a function.  Going further, we can
 obtain the address of a label by using the \key{leaq} instruction and
 PC-relative addressing. For example, the following puts the
-address of the \code{add1} label into the \code{rbx} register.
+address of the \code{inc} label into the \code{rbx} register.
 \begin{lstlisting}
-   leaq add1(%rip), %rbx
+   leaq inc(%rip), %rbx
 \end{lstlisting}
 The instruction pointer register \key{rip} (aka. the program counter
-\index{subject}{program counter}) always points to the next instruction to be
-executed. When combined with an label, as in \code{add1(\%rip)}, the
-linker computes the distance $d$ between the address of \code{add1}
-and where the \code{rip} would be at that moment and then changes
-\code{add1(\%rip)} to \code{$d$(\%rip)}, which at runtime will compute
-the address of \code{add1}.
+\index{subject}{program counter}) always points to the next
+instruction to be executed. When combined with an label, as in
+\code{inc(\%rip)}, the assembler computes the distance $d$ between the
+address of \code{inc} and where the \code{rip} would be at that moment
+and then changes the \code{inc(\%rip)} argument to \code{$d$(\%rip)},
+which at runtime will compute the address of \code{inc}.
 
 In Section~\ref{sec:x86} we used the \code{callq} instruction to jump
 to functions whose locations were given by a label, such as
@@ -13133,25 +13385,38 @@ $-8(j+k)$(\key{\%rbp}) &  & local variable $k$ \\
 
 In general, the amount of stack space used by a program is determined
 by the longest chain of nested function calls. That is, if function
-$f_1$ calls $f_2$, $f_2$ calls $f_3$, $\ldots$, and $f_{n-1}$ calls
-$f_n$, then the amount of stack space is linear in $n$.  The depth $n$
-can grow quite large in the case of recursive or mutually recursive
-functions. However, in some cases we can arrange to use only a
-constant amount of space for a long chain of nested function calls.
+$f_1$ calls $f_2$, $f_2$ calls $f_3$, $\ldots$, $f_n$, then the amount
+of stack space is linear in $n$.  The depth $n$ can grow quite large
+in the case of recursive or mutually recursive functions. However, in
+some cases we can arrange to use only a constant amount of space for a
+long chain of nested function calls.
 
 If a function call is the last action in a function body, then that
 call is said to be a \emph{tail call}\index{subject}{tail call}.
 For example, in the following
 program, the recursive call to \code{tail\_sum} is a tail call.
 \begin{center}
+{\if\edition\racketEd  
 \begin{lstlisting}
 (define (tail_sum [n : Integer] [r : Integer]) : Integer
   (if (eq? n 0) 
       r
       (tail_sum (- n 1) (+ n r))))
 
-(+ (tail_sum 5 0) 27)
+(+ (tail_sum 3 0) 36)
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+def tail_sum(n : int, r : int) -> int:
+    if n == 0:
+        return r
+    else:
+        return tail_sum(n - 1, n + r)
+
+print( tail_sum(3, 0) + 36)
+\end{lstlisting}
+\fi}
 \end{center}
 At a tail call, the frame of the caller is no longer needed, so we can
 pop the caller's frame before making the tail call. With this
@@ -13197,13 +13462,17 @@ just about everything else.
    jmp *%rax
 \end{lstlisting}
 
+
 \section{Shrink \LangFun{}}
 \label{sec:shrink-r4}
 
 The \code{shrink} pass performs a minor modification to ease the
-later passes. This pass introduces an explicit \code{main} function
-and changes the top \code{ProgramDefsExp} form to
-\code{ProgramDefs} as follows.
+later passes. This pass introduces an explicit \code{main} function.
+%
+\racket{It also changes the top \code{ProgramDefsExp} form to
+\code{ProgramDefs}.}
+
+{\if\edition\racketEd  
 \begin{lstlisting}
    (ProgramDefsExp |$\itm{info}$| (|$\Def\ldots$|) |$\Exp$|)
 |$\Rightarrow$| (ProgramDefs |$\itm{info}$| (|$\Def\ldots$| |$\itm{mainDef}$|))
@@ -13212,26 +13481,38 @@ where $\itm{mainDef}$ is
 \begin{lstlisting}
 (Def 'main '() 'Integer '() |$\Exp'$|)
 \end{lstlisting}
-
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+Module(|$\Def\ldots\Stmt\ldots$|)
+|$\Rightarrow$| Module(|$\Def\ldots\itm{mainDef}$|)
+\end{lstlisting}
+where $\itm{mainDef}$ is
+\begin{lstlisting}
+FunctionDef('main', [], int, |$\Stmt'\ldots$|Return(Constant(0)))
+\end{lstlisting}
+\fi}
 
 \section{Reveal Functions and the \LangFunRef{} language}
 \label{sec:reveal-functions-r4}
 
-The syntax of \LangFun{} is inconvenient for purposes of compilation in one
-respect: it conflates the use of function names and local
+The syntax of \LangFun{} is inconvenient for purposes of compilation
+in that it conflates the use of function names and local
 variables. This is a problem because we need to compile the use of a
 function name differently than the use of a local variable; we need to
 use \code{leaq} to convert the function name (a label in x86) to an
-address in a register.  Thus, it is a good idea to create a new pass
-that changes function references from just a symbol $f$ to
-$\FUNREF{f}$. This pass is named \code{reveal\_functions} and the
-output language, \LangFunRef{}, is defined in Figure~\ref{fig:f1-syntax}.
-The concrete syntax for a function reference is $\CFUNREF{f}$.
+address in a register.  Thus, we create a new pass that changes
+function references from $\VAR{f}$ to $\FUNREF{f}$. This pass is named
+\code{reveal\_functions} and the output language, \LangFunRef{}, is
+defined in Figure~\ref{fig:f1-syntax}.
+%% The concrete syntax for a
+%% function reference is $\CFUNREF{f}$.
 
 \begin{figure}[tp]
 \centering
 \fbox{
 \begin{minipage}{0.96\textwidth}
+{\if\edition\racketEd   
 \[
 \begin{array}{lcl}
 \Exp &::=& \ldots \MID \FUNREF{\Var}\\
@@ -13239,6 +13520,15 @@ The concrete syntax for a function reference is $\CFUNREF{f}$.
   \LangFunRefM{} &::=& \PROGRAMDEFS{\code{'()}}{\LP \Def\ldots \RP}
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd  
+\[
+\begin{array}{lcl}
+\Exp &::=& \ldots \MID \FUNREF{\Var}\\
+  \LangFunM{} &::=& \PROGRAM{}{\LS \Def \ldots \RS}
+\end{array}
+\]
+\fi}
 \end{minipage}
 }
 \caption{The abstract syntax \LangFunRef{}, an extension of \LangFun{}
@@ -13251,9 +13541,11 @@ The concrete syntax for a function reference is $\CFUNREF{f}$.
 %% two mutually recursive functions, one for processing expressions in
 %% tail position and another for the rest. 
 
-Placing this pass after \code{uniquify} will make sure that there are
-no local variables and functions that share the same name. On the
-other hand, \code{reveal\_functions} needs to come before the
+\racket{Placing this pass after \code{uniquify} will make sure that
+  there are no local variables and functions that share the same
+  name.}
+%
+The \code{reveal\_functions} pass should come before the
 \code{remove\_complex\_operands} pass because function references
 should be categorized as complex expressions.
 
@@ -13273,33 +13565,66 @@ sixth argument.
 
 Each function definition with too many parameters is transformed as
 follows.
+{\if\edition\racketEd   
 \begin{lstlisting}
   (Def |$f$| ([|$x_1$|:|$T_1$|] |$\ldots$| [|$x_n$|:|$T_n$|]) |$T_r$| |$\itm{info}$| |$\itm{body}$|) 
 |$\Rightarrow$|
-  (Def |$f$| ([|$x_1$|:|$T_1$|] |$\ldots$| [|$x_5$|:|$T_5$|] [vec : (Vector |$T_6 \ldots T_n$|)]) |$T_r$| |$\itm{info}$| |$\itm{body}'$|) 
+  (Def |$f$| ([|$x_1$|:|$T_1$|] |$\ldots$| [|$x_5$|:|$T_5$|] [tup : (Vector |$T_6 \ldots T_n$|)]) |$T_r$| |$\itm{info}$| |$\itm{body}'$|) 
 \end{lstlisting}
-where the $\itm{body}$ is transformed into $\itm{body}'$ by replacing
-the occurrences of the later parameters with vector references.
+\fi}
+{\if\edition\pythonEd   
 \begin{lstlisting}
-  (Var |$x_i$|) |$\Rightarrow$| (Prim 'vector-ref (list vec (Int |$(i - 6)$|)))
+  FunctionDef(|$f$|, [(|$x_1$|,|$T_1$|),|$\ldots$|,(|$x_n$|,|$T_n$|)], |$T_r$|, |$\itm{body}$|)
+|$\Rightarrow$|
+  FunctionDef(|$f$|, [(|$x_1$|,|$T_1$|),|$\ldots$|,(|$x_5$|,|$T_5$|),(tup,TupleType([|$T_6, \ldots, T_n$|]))], |$T_r$|, |$\itm{body}'$|) 
 \end{lstlisting}
+\fi}
+%
+\noindent where the $\itm{body}$ is transformed into $\itm{body}'$ by
+replacing the occurrences of each parameter $x_i$ where $i > 5$ with
+the $k$th element of the tuple, where $k = i - 6$.
+%
+{\if\edition\racketEd
+\begin{lstlisting}
+  (Var |$x_i$|) |$\Rightarrow$| (Prim 'vector-ref (list tup (Int |$k$|)))
+\end{lstlisting}
+\fi}
+{\if\edition\pythonEd   
+\begin{lstlisting}
+  Name(|$x_i$|) |$\Rightarrow$| Subscript(tup, Constant(|$k$|))
+\end{lstlisting}
+\fi}
 
-For function calls with too many arguments, the \code{limit-functions}
+For function calls with too many arguments, the \code{limit\_functions}
 pass transforms them in the following way.
 
 \begin{tabular}{lll}
-\begin{minipage}{0.2\textwidth}
+\begin{minipage}{0.3\textwidth}
+{\if\edition\racketEd
 \begin{lstlisting}
   (|$e_0$| |$e_1$| |$\ldots$| |$e_n$|) 
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+Call(|$e_0$|, [|$e_1,\ldots,e_n$|])
+\end{lstlisting}
+\fi}
 \end{minipage}
 &
 $\Rightarrow$
 &
-\begin{minipage}{0.4\textwidth}
+\begin{minipage}{0.5\textwidth}
+{\if\edition\racketEd
 \begin{lstlisting}
 (|$e_0$| |$e_1 \ldots e_5$| (vector |$e_6 \ldots e_n$|))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+Call(|$e_0$|, [|$e_1,\ldots,e_5$|,Tuple([|$e_6,\ldots,e_n$|])])
+\end{lstlisting}
+\fi}
 \end{minipage}
 \end{tabular}
 
@@ -13308,67 +13633,78 @@ $\Rightarrow$
 \label{sec:rco-r4}
 
 The primary decisions to make for this pass is whether to classify
-\code{FunRef} and \code{Apply} as either atomic or complex
-expressions. Recall that a simple expression will eventually end up as
-just an immediate argument of an x86 instruction. Function
-application will be translated to a sequence of instructions, so
-\code{Apply} must be classified as complex expression.
-On the other hand, the arguments of \code{Apply} should be
-atomic expressions.
+\code{FunRef} and \racket{\code{Apply}}\python{\code{Call}} as either
+atomic or complex expressions. Recall that a simple expression will
+eventually end up as just an immediate argument of an x86
+instruction. Function application will be translated to a sequence of
+instructions, so \racket{\code{Apply}}\python{\code{Call}} must be
+classified as complex expression.  On the other hand, the arguments of
+\racket{\code{Apply}}\python{\code{Call}} should be atomic expressions.
 %
 Regarding \code{FunRef}, as discussed above, the function label needs
 to be converted to an address using the \code{leaq} instruction. Thus,
 even though \code{FunRef} seems rather simple, it needs to be
 classified as a complex expression so that we generate an assignment
 statement with a left-hand side that can serve as the target of the
-\code{leaq}. Figure~\ref{fig:Rfun-anf-syntax} defines the
-output language \LangFunANF{} of this pass.
+\code{leaq}.
 
-\begin{figure}[tp]
-\centering
-\fbox{
-\begin{minipage}{0.96\textwidth}
-\small
-\[
-\begin{array}{rcl}
-  \Atm &::=& \gray{ \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} 
-       \MID \VOID{} } \\
-\Exp &::=& \gray{ \Atm \MID \READ{} } \\
-   &\MID& \gray{ \NEG{\Atm} \MID \ADD{\Atm}{\Atm} } \\
-   &\MID& \gray{ \LET{\Var}{\Exp}{\Exp} } \\
-   &\MID& \gray{ \UNIOP{\key{'not}}{\Atm} } \\
-   &\MID& \gray{ \BINOP{\itm{cmp}}{\Atm}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} }\\
-   &\MID& \gray{ \LP\key{Collect}~\Int\RP \MID \LP\key{Allocate}~\Int~\Type\RP
-  \MID \LP\key{GlobalValue}~\Var\RP }\\
-   &\MID& \FUNREF{\Var} \MID \APPLY{\Atm}{\Atm\ldots}\\
- \Def &::=& \gray{ \FUNDEF{\Var}{([\Var \code{:} \Type]\ldots)}{\Type}{\code{'()}}{\Exp} }\\
-R^{\dagger}_4  &::=& \gray{ \PROGRAMDEFS{\code{'()}}{\Def} }
-\end{array}
-\]
-\end{minipage}
-}
-\caption{\LangFunANF{} is \LangFunRefAlloc{} in monadic normal form.}
-\label{fig:Rfun-anf-syntax}
-\end{figure}
+The output of this pass, \LangFunANF{}, extends \LangAllocANF{} with
+\code{FunRef} and \racket{\code{Apply}}\python{\code{Call}} in the
+grammar for expressions.
+
+
+%% Figure~\ref{fig:Rfun-anf-syntax} defines the output language
+%% \LangFunANF{} of this pass.
+
+%% \begin{figure}[tp]
+%% \centering
+%% \fbox{
+%% \begin{minipage}{0.96\textwidth}
+%% \small
+%% \[
+%% \begin{array}{rcl}
+%%   \Atm &::=& \gray{ \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} 
+%%        \MID \VOID{} } \\
+%% \Exp &::=& \gray{ \Atm \MID \READ{} } \\
+%%    &\MID& \gray{ \NEG{\Atm} \MID \ADD{\Atm}{\Atm} } \\
+%%    &\MID& \gray{ \LET{\Var}{\Exp}{\Exp} } \\
+%%    &\MID& \gray{ \UNIOP{\key{'not}}{\Atm} } \\
+%%    &\MID& \gray{ \BINOP{\itm{cmp}}{\Atm}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} }\\
+%%    &\MID& \gray{ \LP\key{Collect}~\Int\RP \MID \LP\key{Allocate}~\Int~\Type\RP
+%%   \MID \LP\key{GlobalValue}~\Var\RP }\\
+%%    &\MID& \FUNREF{\Var} \MID \APPLY{\Atm}{\Atm\ldots}\\
+%%  \Def &::=& \gray{ \FUNDEF{\Var}{([\Var \code{:} \Type]\ldots)}{\Type}{\code{'()}}{\Exp} }\\
+%% R^{\dagger}_4  &::=& \gray{ \PROGRAMDEFS{\code{'()}}{\Def} }
+%% \end{array}
+%% \]
+%% \end{minipage}
+%% }
+%% \caption{\LangFunANF{} is \LangFunRefAlloc{} in monadic normal form.}
+%% \label{fig:Rfun-anf-syntax}
+%% \end{figure}
 
 
 \section{Explicate Control and the \LangCFun{} language}
 \label{sec:explicate-control-r4}
 
 Figure~\ref{fig:c3-syntax} defines the abstract syntax for \LangCFun{}, the
-output of \code{explicate\_control}. (The concrete syntax is given in
-Figure~\ref{fig:c3-concrete-syntax} of the Appendix.) The auxiliary
-functions for assignment and tail contexts should be updated with
-cases for \code{Apply} and \code{FunRef} and the function for
-predicate context should be updated for \code{Apply} but not
-\code{FunRef}.  (A \code{FunRef} can't be a Boolean.)  In assignment
-and predicate contexts, \code{Apply} becomes \code{Call}, whereas in
-tail position \code{Apply} becomes \code{TailCall}.  We recommend
-defining a new auxiliary function for processing function definitions.
-This code is similar to the case for \code{Program} in \LangVec{}.  The
-top-level \code{explicate\_control} function that handles the
-\code{ProgramDefs} form of \LangFun{} can then apply this new function to
-all the function definitions.
+output of \code{explicate\_control}.
+%
+\racket{(The concrete syntax is given in
+  Figure~\ref{fig:c3-concrete-syntax} of the Appendix.)}
+%
+The auxiliary functions for assignment and tail contexts should be
+updated with cases for \racket{\code{Apply}}\python{\code{Call}} and
+\code{FunRef} and the function for predicate context should be updated
+for \racket{\code{Apply}}\python{\code{Call}} but not \code{FunRef}.
+(A \code{FunRef} can't be a Boolean.)  In assignment and predicate
+contexts, \code{Apply} becomes \code{Call}, whereas in tail position
+\code{Apply} becomes \code{TailCall}.  We recommend defining a new
+auxiliary function for processing function definitions.  This code is
+similar to the case for \code{Program} in \LangVec{}.  The top-level
+\code{explicate\_control} function that handles the \code{ProgramDefs}
+form of \LangFun{} can then apply this new function to all the
+function definitions.
 
 
 \begin{figure}[tp]
@@ -13802,7 +14138,7 @@ $\Rightarrow$
       movq %rsi, y88
       movq x87, %rax
       addq y88, %rax
-      jmp add11389conclusion
+      jmp inc1389conclusion
    )
 (define (main) : Integer
    mainstart:
@@ -14072,9 +14408,9 @@ syntax for function application.
 \[
 \begin{array}{l}
   \gray{\LintOpAST} \\ \hline
-  \gray{\LvarAST{}} \\ \hline
-  \gray{\LifAST{}} \\ \hline
-  \gray{\LwhileAST{}} \\ \hline
+  \gray{\LvarASTRacket{}} \\ \hline
+  \gray{\LifASTRacket{}} \\ \hline
+  \gray{\LwhileASTRacket{}} \\ \hline
   \gray{\LtupASTRacket{}} \\ \hline
   \gray{\LfunASTRacket} \\ \hline
   \LlambdaASTRacket \\
@@ -14769,15 +15105,15 @@ However, this problem is not so trivial because a global function may
 ``escape'' and become involved in applications that also involve
 closures. Consider the following example in which the application
 \code{(f 41)} needs to be compiled into a closure application, because
-the \code{lambda} may get bound to \code{f}, but the \code{add1}
+the \code{lambda} may get bound to \code{f}, but the \code{inc}
 function might also get bound to \code{f}.
 \begin{lstlisting}
-(define (add1 [x : Integer]) : Integer
+(define (inc [x : Integer]) : Integer
   (+ x 1))
 
 (let ([y (read)])
   (let ([f (if (eq? (read) 0)
-               add1
+               inc
                (lambda: ([x : Integer]) : Integer (- x y)))])
     (f 41)))
 \end{lstlisting}
@@ -15180,9 +15516,9 @@ in greater detail.
 \[
 \begin{array}{l}
   \gray{\LintOpAST} \\ \hline
-  \gray{\LvarAST{}} \\ \hline
-  \gray{\LifAST{}} \\ \hline
-  \gray{\LwhileAST{}} \\ \hline
+  \gray{\LvarASTRacket{}} \\ \hline
+  \gray{\LifASTRacket{}} \\ \hline
+  \gray{\LwhileASTRacket{}} \\ \hline
   \gray{\LtupASTRacket{}} \\ \hline
   \gray{\LfunASTRacket} \\ \hline
   \gray{\LlambdaASTRacket} \\ \hline
@@ -16072,25 +16408,25 @@ syntax.
 
 Both the type checker and the interpreter for \LangGrad{} require some
 interesting changes to enable gradual typing, which we discuss in the
-next two sections in the context of the \code{map-vec} example from
-Chapter~\ref{ch:Rfun}.  In Figure~\ref{fig:gradual-map-vec} we
-revised the \code{map-vec} example, omitting the type annotations from
-the \code{add1} function.
+next two sections in the context of the \code{map} example from
+Chapter~\ref{ch:Rfun}.  In Figure~\ref{fig:gradual-map} we
+revised the \code{map} example, omitting the type annotations from
+the \code{inc} function.
 
 \begin{figure}[btp]
 % gradual_test_9.rkt
 \begin{lstlisting}
-(define (map-vec [f : (Integer -> Integer)]
+(define (map [f : (Integer -> Integer)]
                    [v : (Vector Integer Integer)])
                    : (Vector Integer Integer)
   (vector (f (vector-ref v 0)) (f (vector-ref v 1))))
 
-(define (add1 x) (+ x 1))
+(define (inc x) (+ x 1))
 
-(vector-ref (map-vec add1 (vector 0 41)) 1)
+(vector-ref (map inc (vector 0 41)) 1)
 \end{lstlisting}
-\caption{A partially-typed version of the \code{map-vec} example.}
-\label{fig:gradual-map-vec}
+\caption{A partially-typed version of the \code{map} example.}
+\label{fig:gradual-map}
 \end{figure}
 
 \section{Type Checking \LangGrad{} and \LangCast{}}
@@ -16098,9 +16434,9 @@ the \code{add1} function.
 
 The type checker for \LangGrad{} uses the \code{Any} type for missing
 parameter and return types. For example, the \code{x} parameter of
-\code{add1} in Figure~\ref{fig:gradual-map-vec} is given the type
-\code{Any} and the return type of \code{add1} is \code{Any}. Next
-consider the \code{+} operator inside \code{add1}. It expects both
+\code{inc} in Figure~\ref{fig:gradual-map} is given the type
+\code{Any} and the return type of \code{inc} is \code{Any}. Next
+consider the \code{+} operator inside \code{inc}. It expects both
 arguments to have type \code{Integer}, but its first argument \code{x}
 has type \code{Any}.  In a gradually typed language, such differences
 are allowed so long as the types are \emph{consistent}, that is, they
@@ -16128,29 +16464,29 @@ Figure~\ref{fig:consistent} defines the \code{consistent?} predicate.
 \label{fig:consistent}
 \end{figure}
 
-Returning to the \code{map-vec} example of
-Figure~\ref{fig:gradual-map-vec}, the \code{add1} function has type
-\code{(Any -> Any)} but parameter \code{f} of \code{map-vec} has type
+Returning to the \code{map} example of
+Figure~\ref{fig:gradual-map}, the \code{inc} function has type
+\code{(Any -> Any)} but parameter \code{f} of \code{map} has type
 \code{(Integer -> Integer)}.  The type checker for \LangGrad{} allows this
 because the two types are consistent.  In particular, \code{->} is
 equal to \code{->} and because \code{Any} is consistent with
 \code{Integer}.
 
 Next consider a program with an error, such as applying the
-\code{map-vec} to a function that sometimes returns a Boolean, as
-shown in Figure~\ref{fig:map-vec-maybe-add1}.  The type checker for
-\LangGrad{} accepts this program because the type of \code{maybe-add1} is
-consistent with the type of parameter \code{f} of \code{map-vec}, that
+\code{map} to a function that sometimes returns a Boolean, as
+shown in Figure~\ref{fig:map-maybe-inc}.  The type checker for
+\LangGrad{} accepts this program because the type of \code{maybe-inc} is
+consistent with the type of parameter \code{f} of \code{map}, that
 is, \code{(Any -> Any)} is consistent with \code{(Integer ->
   Integer)}. One might say that a gradual type checker is optimistic
 in that it accepts programs that might execute without a runtime type
 error.
 %
 Unfortunately, running this program with input \code{1} triggers an
-error when the \code{maybe-add1} function returns \code{\#t}. \LangGrad{}
+error when the \code{maybe-inc} function returns \code{\#t}. \LangGrad{}
 performs checking at runtime to ensure the integrity of the static
 types, such as the \code{(Integer -> Integer)} annotation on parameter
-\code{f} of \code{map-vec}.  This runtime checking is carried out by a
+\code{f} of \code{map}.  This runtime checking is carried out by a
 new \code{Cast} form that is inserted by the type checker.  Thus, the
 output of the type checker is a program in the \LangCast{} language, which
 adds \code{Cast} to \LangLoop{}, as shown in
@@ -16176,45 +16512,45 @@ Figure~\ref{fig:Rgrad-prime-syntax}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(define (map-vec [f : (Integer -> Integer)]
+(define (map [f : (Integer -> Integer)]
                    [v : (Vector Integer Integer)])
                    : (Vector Integer Integer)
   (vector (f (vector-ref v 0)) (f (vector-ref v 1))))
-(define (add1 x) (+ x 1))
+(define (inc x) (+ x 1))
 (define (true) #t)
-(define (maybe-add1 x) (if (eq? 0 (read)) (add1 x) (true)))
+(define (maybe-inc x) (if (eq? 0 (read)) (inc x) (true)))
 
-(vector-ref (map-vec maybe-add1 (vector 0 41)) 0)
+(vector-ref (map maybe-inc (vector 0 41)) 0)
 \end{lstlisting}
-\caption{A variant of the \code{map-vec} example with an error.}
-\label{fig:map-vec-maybe-add1}
+\caption{A variant of the \code{map} example with an error.}
+\label{fig:map-maybe-inc}
 \end{figure}
 
-Figure~\ref{fig:map-vec-cast} shows the output of the type checker for
-\code{map-vec} and \code{maybe-add1}.  The idea is that \code{Cast} is
+Figure~\ref{fig:map-cast} shows the output of the type checker for
+\code{map} and \code{maybe-inc}.  The idea is that \code{Cast} is
 inserted every time the type checker sees two types that are
-consistent but not equal. In the \code{add1} function, \code{x} is
+consistent but not equal. In the \code{inc} function, \code{x} is
 cast to \code{Integer} and the result of the \code{+} is cast to
-\code{Any}.  In the call to \code{map-vec}, the \code{add1} argument
+\code{Any}.  In the call to \code{map}, the \code{inc} argument
 is cast from \code{(Any -> Any)} to \code{(Integer -> Integer)}.
 
 \begin{figure}[btp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define (map-vec [f : (Integer -> Integer)] [v : (Vector Integer Integer)])
+(define (map [f : (Integer -> Integer)] [v : (Vector Integer Integer)])
                    : (Vector Integer Integer)
   (vector (f (vector-ref v 0)) (f (vector-ref v 1))))
-(define (add1 [x : Any]) : Any
+(define (inc [x : Any]) : Any
   (cast (+ (cast x Any Integer) 1) Integer Any))
 (define (true) : Any (cast #t Boolean Any))
-(define (maybe-add1 [x : Any]) : Any
-  (if (eq? 0 (read)) (add1 x) (true)))
+(define (maybe-inc [x : Any]) : Any
+  (if (eq? 0 (read)) (inc x) (true)))
 
-(vector-ref (map-vec (cast maybe-add1 (Any -> Any) (Integer -> Integer))
+(vector-ref (map (cast maybe-inc (Any -> Any) (Integer -> Integer))
                        (vector 0 41)) 0)
 \end{lstlisting}
-\caption{Output of type checking \code{map-vec}
-  and \code{maybe-add1}.}
-\label{fig:map-vec-cast}
+\caption{Output of type checking \code{map}
+  and \code{maybe-inc}.}
+\label{fig:map-cast}
 \end{figure}
 
 
@@ -16478,49 +16814,49 @@ integers (Figure~\ref{fig:apply-project}).
 Things get more interesting for higher-order casts, that is, casts
 involving function or vector types.
 
-Consider the cast of the function \code{maybe-add1} from \code{(Any ->
+Consider the cast of the function \code{maybe-inc} from \code{(Any ->
   Any)} to \code{(Integer -> Integer)}. When a function flows through
 this cast at runtime, we can't know in general whether the function
 will always return an integer.\footnote{Predicting the return value of
   a function is equivalent to the halting problem, which is
   undecidable.}  The \LangCast{} interpreter therefore delays the checking
 of the cast until the function is applied. This is accomplished by
-wrapping \code{maybe-add1} in a new function that casts its parameter
-from \code{Integer} to \code{Any}, applies \code{maybe-add1}, and then
+wrapping \code{maybe-inc} in a new function that casts its parameter
+from \code{Integer} to \code{Any}, applies \code{maybe-inc}, and then
 casts the return value from \code{Any} to \code{Integer}.
 
 Turning our attention to casts involving vector types, we consider the
-example in Figure~\ref{fig:map-vec-bang} that defines a
-partially-typed version of \code{map-vec} whose parameter \code{v} has
+example in Figure~\ref{fig:map-bang} that defines a
+partially-typed version of \code{map} whose parameter \code{v} has
 type \code{(Vector Any Any)} and that updates \code{v} in place
 instead of returning a new vector. So we name this function
-\code{map-vec!}. We apply \code{map-vec!} to a vector of integers, so
+\code{map!}. We apply \code{map!} to a vector of integers, so
 the type checker inserts a cast from \code{(Vector Integer Integer)}
 to \code{(Vector Any Any)}. A naive way for the \LangCast{} interpreter to
 cast between vector types would be a build a new vector whose elements
 are the result of casting each of the original elements to the
 appropriate target type. However, this approach is only valid for
 immutable vectors; and our vectors are mutable. In the example of
-Figure~\ref{fig:map-vec-bang}, if the cast created a new vector, then
-the updates inside of \code{map-vec!} would happen to the new vector
+Figure~\ref{fig:map-bang}, if the cast created a new vector, then
+the updates inside of \code{map!} would happen to the new vector
 and not the original one.
 
 \begin{figure}[tbp]
   % gradual_test_11.rkt
 \begin{lstlisting}
-(define (map-vec! [f : (Any -> Any)]
+(define (map! [f : (Any -> Any)]
                   [v : (Vector Any Any)]) : Void
   (begin
     (vector-set! v 0 (f (vector-ref v 0)))
     (vector-set! v 1 (f (vector-ref v 1)))))
 
-(define (add1 x) (+ x 1))
+(define (inc x) (+ x 1))
 
 (let ([v (vector 0 41)])
-  (begin (map-vec! add1 v) (vector-ref v 1)))
+  (begin (map! inc v) (vector-ref v 1)))
 \end{lstlisting}
 \caption{An example involving casts on vectors.}
-\label{fig:map-vec-bang}
+\label{fig:map-bang}
 \end{figure}
 
 Instead the interpreter needs to create a new kind of value, a
@@ -16528,16 +16864,16 @@ Instead the interpreter needs to create a new kind of value, a
 read, the proxy reads from the underlying vector and then applies a
 cast to the resulting value.  On a write, the proxy casts the argument
 value and then performs the write to the underlying vector. For the
-first \code{(vector-ref v 0)} in \code{map-vec!}, the proxy casts
+first \code{(vector-ref v 0)} in \code{map!}, the proxy casts
 \code{0} from \code{Integer} to \code{Any}.  For the first
 \code{vector-set!}, the proxy casts a tagged \code{1} from \code{Any}
 to \code{Integer}.
 
 The final category of cast that we need to consider are casts between
 the \code{Any} type and either a function or a vector
-type. Figure~\ref{fig:map-vec-any} shows a variant of \code{map-vec!}
+type. Figure~\ref{fig:map-any} shows a variant of \code{map!}
 in which parameter \code{v} does not have a type annotation, so it is
-given type \code{Any}. In the call to \code{map-vec!}, the vector has
+given type \code{Any}. In the call to \code{map!}, the vector has
 type \code{(Vector Integer Integer)} so the type checker inserts a
 cast from \code{(Vector Integer Integer)} to \code{Any}. A first
 thought is to use \code{Inject}, but that doesn't work because
@@ -16547,18 +16883,18 @@ to \code{Any}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(define (map-vec! [f : (Any -> Any)] v) : Void
+(define (map! [f : (Any -> Any)] v) : Void
   (begin
     (vector-set! v 0 (f (vector-ref v 0)))
     (vector-set! v 1 (f (vector-ref v 1)))))
 
-(define (add1 x) (+ x 1))
+(define (inc x) (+ x 1))
 
 (let ([v (vector 0 41)])
-  (begin (map-vec! add1 v) (vector-ref v 1)))
+  (begin (map! inc v) (vector-ref v 1)))
 \end{lstlisting}
 \caption{Casting a vector to \code{Any}.}
-\label{fig:map-vec-any}
+\label{fig:map-any}
 \end{figure}
 
 The \LangCast{} interpreter uses an auxiliary function named
@@ -16722,24 +17058,24 @@ You can create the functions using \code{Lambda}. Also, as we shall
 see in the next section, we need to differentiate these vectors from
 the user-created ones, so we recommend using a new primitive operator
 named \code{raw-vector} instead of \code{vector} to create these
-vectors of functions. Figure~\ref{fig:map-vec-bang-lower-cast} shows
+vectors of functions. Figure~\ref{fig:map-bang-lower-cast} shows
 the output of \code{lower-casts} on the example in
-Figure~\ref{fig:map-vec-bang} that involved casting a vector of
+Figure~\ref{fig:map-bang} that involved casting a vector of
 integers to a vector of \code{Any}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(define (map-vec! [f : (Any -> Any)] [v : (Vector Any Any)]) : Void
+(define (map! [f : (Any -> Any)] [v : (Vector Any Any)]) : Void
    (begin 
       (vector-set! v 0 (f (vector-ref v 0)))
       (vector-set! v 1 (f (vector-ref v 1)))))
   
-(define (add1 [x : Any]) : Any
+(define (inc [x : Any]) : Any
    (inject (+ (project x Integer) 1) Integer))
 
 (let ([v (vector 0 41)])
    (begin 
-      (map-vec! add1 (vector-proxy v
+      (map! inc (vector-proxy v
                         (raw-vector (lambda: ([x9 : Integer]) : Any
                                        (inject x9 Integer))
                                      (lambda: ([x9 : Integer]) : Any
@@ -16751,8 +17087,8 @@ integers to a vector of \code{Any}.
       (vector-ref v 1)))
 \end{lstlisting}
 \caption{Output of \code{lower-casts} on the example in
-  Figure~\ref{fig:map-vec-bang}.}
-\label{fig:map-vec-bang-lower-cast}
+  Figure~\ref{fig:map-bang}.}
+\label{fig:map-bang-lower-cast}
 \end{figure}
 
 A cast from one function type to another function type is accomplished
@@ -16762,28 +17098,28 @@ the parameters from the target type to the source type (yes,
 backwards! functions are contravariant\index{subject}{contravariant} in the
 parameters), then call the underlying function, and finally cast the
 result from the source return type to the target return type.
-Figure~\ref{fig:map-vec-lower-cast} shows the output of the
-\code{lower-casts} pass on the \code{map-vec} example in
-Figure~\ref{fig:gradual-map-vec}. Note that the \code{add1} argument
-in the call to \code{map-vec} is wrapped in a \code{lambda}.
+Figure~\ref{fig:map-lower-cast} shows the output of the
+\code{lower-casts} pass on the \code{map} example in
+Figure~\ref{fig:gradual-map}. Note that the \code{inc} argument
+in the call to \code{map} is wrapped in a \code{lambda}.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(define (map-vec [f : (Integer -> Integer)]
+(define (map [f : (Integer -> Integer)]
                    [v : (Vector Integer Integer)])
                    : (Vector Integer Integer)
   (vector (f (vector-ref v 0)) (f (vector-ref v 1))))
 
-(define (add1 [x : Any]) : Any
+(define (inc [x : Any]) : Any
   (inject (+ (project x Integer) 1) Integer))
 
-(vector-ref (map-vec (lambda: ([x9 : Integer]) : Integer
-                        (project (add1 (inject x9 Integer)) Integer))
+(vector-ref (map (lambda: ([x9 : Integer]) : Integer
+                        (project (inc (inject x9 Integer)) Integer))
                       (vector 0 41)) 1)
 \end{lstlisting}
 \caption{Output of \code{lower-casts} on the example in
-  Figure~\ref{fig:gradual-map-vec}.}
-\label{fig:map-vec-lower-cast}
+  Figure~\ref{fig:gradual-map}.}
+\label{fig:map-lower-cast}
 \end{figure}
 
 
@@ -17161,34 +17497,34 @@ polymorphism\index{subject}{parametric polymorphism}
 (aka. generics\index{subject}{generics}) in the subset \LangPoly{} of Typed
 Racket. Parametric polymorphism enables improved code reuse by
 parameterizing functions and data structures with respect to the types
-that they operate on. For example, Figure~\ref{fig:map-vec-poly}
-revisits the \code{map-vec} example but this time gives it a more
-fitting type.  This \code{map-vec} function is parameterized with
-respect to the element type of the vector. The type of \code{map-vec}
+that they operate on. For example, Figure~\ref{fig:map-poly}
+revisits the \code{map} example but this time gives it a more
+fitting type.  This \code{map} function is parameterized with
+respect to the element type of the vector. The type of \code{map}
 is the following polymorphic type as specified by the \code{All} and
 the type parameter \code{a}.
 \begin{lstlisting}
   (All (a) ((a -> a) (Vector a a) -> (Vector a a)))
 \end{lstlisting}
-The idea is that \code{map-vec} can be used at \emph{all} choices of a
-type for parameter \code{a}. In Figure~\ref{fig:map-vec-poly} we apply
-\code{map-vec} to a vector of integers, a choice of \code{Integer} for
-\code{a}, but we could have just as well applied \code{map-vec} to a
+The idea is that \code{map} can be used at \emph{all} choices of a
+type for parameter \code{a}. In Figure~\ref{fig:map-poly} we apply
+\code{map} to a vector of integers, a choice of \code{Integer} for
+\code{a}, but we could have just as well applied \code{map} to a
 vector of Booleans (and a function on Booleans).
 
 \begin{figure}[tbp]
   % poly_test_2.rkt
 \begin{lstlisting}
-(: map-vec (All (a) ((a -> a) (Vector a a) -> (Vector a a))))
-(define (map-vec f v)
+(: map (All (a) ((a -> a) (Vector a a) -> (Vector a a))))
+(define (map f v)
   (vector (f (vector-ref v 0)) (f (vector-ref v 1))))
 
-(define (add1 [x : Integer]) : Integer (+ x 1))
+(define (inc [x : Integer]) : Integer (+ x 1))
 
-(vector-ref (map-vec add1 (vector 0 41)) 1)
+(vector-ref (map inc (vector 0 41)) 1)
 \end{lstlisting}
-\caption{The \code{map-vec} example using parametric polymorphism.}
-\label{fig:map-vec-poly}
+\caption{The \code{map} example using parametric polymorphism.}
+\label{fig:map-poly}
 \end{figure}
 
 Figure~\ref{fig:Rpoly-concrete-syntax} defines the concrete syntax of
@@ -17343,23 +17679,23 @@ process in next pass of the compiler.
 \label{fig:Rpoly-prime-syntax}
 \end{figure}
 
-The output of the type checker on the polymorphic \code{map-vec}
-example is listed in Figure~\ref{fig:map-vec-type-check}.
+The output of the type checker on the polymorphic \code{map}
+example is listed in Figure~\ref{fig:map-type-check}.
 
 \begin{figure}[tbp]
   % poly_test_2.rkt
 \begin{lstlisting}
-(poly (a) (define (map-vec [f : (a -> a)] [v : (Vector a a)]) : (Vector a a)
+(poly (a) (define (map [f : (a -> a)] [v : (Vector a a)]) : (Vector a a)
   (vector (f (vector-ref v 0)) (f (vector-ref v 1)))))
 
-(define (add1 [x : Integer]) : Integer (+ x 1))
+(define (inc [x : Integer]) : Integer (+ x 1))
 
-(vector-ref ((inst map-vec (All (a) ((a -> a) (Vector a a) -> (Vector a a)))
+(vector-ref ((inst map (All (a) ((a -> a) (Vector a a) -> (Vector a a)))
                            (Integer))
-              add1 (vector 0 41)) 1)
+              inc (vector 0 41)) 1)
 \end{lstlisting}
-\caption{Output of the type checker on the \code{map-vec} example.}
-\label{fig:map-vec-type-check}
+\caption{Output of the type checker on the \code{map} example.}
+\label{fig:map-type-check}
 \end{figure}
 
 \begin{figure}[tbp]
@@ -17601,34 +17937,34 @@ add just one new pass, \code{erase-types}, to compile \LangInst{} to
 \label{sec:erase-types}
 
 We use the \code{Any} type from Chapter~\ref{ch:Rdyn} to
-represent type variables. For example, Figure~\ref{fig:map-vec-erase}
+represent type variables. For example, Figure~\ref{fig:map-erase}
 shows the output of the \code{erase-types} pass on the polymorphic
-\code{map-vec} (Figure~\ref{fig:map-vec-poly}). The occurrences of
+\code{map} (Figure~\ref{fig:map-poly}). The occurrences of
 type parameter \code{a} are replaced by \code{Any} and the polymorphic
-\code{All} types are removed from the type of \code{map-vec}. 
+\code{All} types are removed from the type of \code{map}. 
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(define (map-vec [f : (Any -> Any)] [v : (Vector Any Any)])
+(define (map [f : (Any -> Any)] [v : (Vector Any Any)])
                    : (Vector Any Any)
   (vector (f (vector-ref v 0)) (f (vector-ref v 1))))
 
-(define (add1 [x : Integer]) : Integer (+ x 1))
+(define (inc [x : Integer]) : Integer (+ x 1))
 
-(vector-ref ((cast map-vec
+(vector-ref ((cast map
                      ((Any -> Any) (Vector Any Any) -> (Vector Any Any))  
                      ((Integer -> Integer) (Vector Integer Integer)
                                -> (Vector Integer Integer)))
-             add1 (vector 0 41)) 1)
+             inc (vector 0 41)) 1)
 \end{lstlisting}
-\caption{The polymorphic \code{map-vec} example after type erasure.}
-\label{fig:map-vec-erase}
+\caption{The polymorphic \code{map} example after type erasure.}
+\label{fig:map-erase}
 \end{figure}
 
 This process of type erasure creates a challenge at points of
 instantiation. For example, consider the instantiation of
-\code{map-vec} in Figure~\ref{fig:map-vec-type-check}.
-The type of \code{map-vec} is
+\code{map} in Figure~\ref{fig:map-type-check}.
+The type of \code{map} is
 \begin{lstlisting}
 (All (a) ((a -> a) (Vector a a) -> (Vector a a)))
 \end{lstlisting}
@@ -17637,18 +17973,18 @@ and it is instantiated to
 ((Integer -> Integer) (Vector Integer Integer)
    -> (Vector Integer Integer))
 \end{lstlisting}
-After erasure, the type of \code{map-vec} is
+After erasure, the type of \code{map} is
 \begin{lstlisting}
 ((Any -> Any) (Vector Any Any) -> (Vector Any Any))
 \end{lstlisting}
 but we need to convert it to the instantiated type.  This is easy to
 do in the target language \LangCast{} with a single \code{cast}.  In
-Figure~\ref{fig:map-vec-erase}, the instantiation of \code{map-vec}
-has been compiled to a \code{cast} from the type of \code{map-vec} to
+Figure~\ref{fig:map-erase}, the instantiation of \code{map}
+has been compiled to a \code{cast} from the type of \code{map} to
 the instantiated type. The source and target type of a cast must be
 consistent (Figure~\ref{fig:consistent}), which indeed is the case
 because both the source and target are obtained from the same
-polymorphic type of \code{map-vec}, replacing the type parameters with
+polymorphic type of \code{map}, replacing the type parameters with
 \code{Any} in the former and with the deduced type arguments in the
 later. (Recall that the \code{Any} type is consistent with any type.)
 
