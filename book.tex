@@ -11468,6 +11468,8 @@ tuple, which is 8 for the tag plus \itm{len} times 8.
   of the tuple AST node, which is stored there by running the type
   checker for \LangVec{} immediately before this pass.}
 %
+\begin{center}
+\begin{minipage}{\textwidth}
 {\if\edition\racketEd
 \begin{lstlisting}
   (has-type (vector |$e_0 \ldots e_{n-1}$|) |\itm{type}|)
@@ -11502,6 +11504,8 @@ tuple, which is 8 for the tag plus \itm{len} times 8.
       |$v$|
 \end{lstlisting}
 \fi}
+\end{minipage}
+\end{center}
 %
 \noindent The sequencing of the initializing expressions
 $e_0,\ldots,e_{n-1}$ prior to the \code{allocate} is important, as
@@ -11747,6 +11751,7 @@ the other forms that we've already encoutered.
 %% collect (callq collect)
 %% vector-ref
 %% vector-set!
+%% vector-length
 %% global (postpone)
 
 In this pass we generate x86 code for most of the new operations that
@@ -11818,6 +11823,13 @@ movq $0, |$\itm{lhs}'$|
 But the above sequence of instructions does not work because we're
 trying to use \code{rax} for two different values ($\itm{tup}'$ and
 $\itm{rhs}'$) at the same time!
+
+The \racket{\code{vector-length}}\python{\code{len}} operation should
+be translated into a sequence of instructions that read the tag of the
+tuple and extract the six bits that represent the tuple length, which
+are the bits starting at index 1 and going up to and including bit 6.
+The x86 instructions \code{andq} (for bitwise-and) and \code{sarq}
+(shift right) can be used to accomplish this.
 
 We compile the \code{allocate} form to operations on the
 \code{free\_ptr}, as shown below. The address in the \code{free\_ptr}
@@ -12171,7 +12183,7 @@ conclusion:
 \node (Lvec-2) at (3,2)  {\large \LangVec{}};
 \node (Lvec-3) at (6,2)  {\large \LangVec{}};
 \node (Lvec-4) at (9,2)  {\large \LangVec{}};
-\node (Lvec-5) at (12,2)  {\large \LangAllocANF{}};
+\node (Lvec-5) at (9,0)  {\large \LangAllocANF{}};
 \node (C2-4) at (3,0)  {\large \LangCVec{}};
 
 \node (x86-2) at (3,-2)  {\large \LangXGlobalVar{}};
@@ -12187,7 +12199,7 @@ conclusion:
 \path[->,bend left=15] (Lvec-2) edge [above] node {\ttfamily\footnotesize uniquify} (Lvec-3);
 \path[->,bend left=15] (Lvec-3) edge [above] node {\ttfamily\footnotesize expose\_alloc.} (Lvec-4);
 \path[->,bend left=15] (Lvec-4) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Lvec-5);
-\path[->,bend left=20] (Lvec-5) edge [left] node {\ttfamily\footnotesize explicate\_control} (C2-4);
+\path[->,bend left=10] (Lvec-5) edge [above] node {\ttfamily\footnotesize explicate\_control} (C2-4);
 \path[->,bend left=15] (C2-4) edge [right] node {\ttfamily\footnotesize select\_instr.} (x86-2);
 \path[->,bend right=15] (x86-2) edge [left] node {\ttfamily\footnotesize uncover\_live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build\_inter.} (x86-2-2);
@@ -12742,7 +12754,7 @@ This chapter studies the compilation of functions similar to those
 found in the C language. This corresponds to a subset of \racket{Typed
   Racket} \python{Python} in which only top-level function definitions
 are allowed. This kind of function is an important stepping stone to
-implementing lexically-scoped functions, that is, \key{lambda}
+implementing lexically-scoped functions in the form of \key{lambda}
 abstractions, which is the topic of Chapter~\ref{ch:Rlam}.
 
 \section{The \LangFun{} Language}
@@ -14184,7 +14196,7 @@ function in \LangFun{} to x86. The figure also includes the results of the
 
 \begin{figure}[htbp]
 \begin{tabular}{ll}
-\begin{minipage}{0.5\textwidth}
+\begin{minipage}{0.4\textwidth}
 % s3_2.rkt
 {\if\edition\racketEd
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
@@ -14396,8 +14408,6 @@ mainconclusion:
 \index{subject}{lambda}
 \index{subject}{lexical scoping}
 
-\if\edition\racketEd
-
 This chapter studies lexically scoped functions as they appear in
 functional languages such as Racket. By lexical scoping we mean that a
 function's body may refer to variables whose binding site is outside
@@ -14408,7 +14418,7 @@ Consider the example in Figure~\ref{fig:lexical-scoping} written in
 \key{lambda} form.  The body of the \key{lambda}, refers to three
 variables: \code{x}, \code{y}, and \code{z}. The binding sites for
 \code{x} and \code{y} are outside of the \key{lambda}. Variable
-\code{y} is bound by the enclosing \key{let} and \code{x} is a
+\code{y} is \racket{bound by the enclosing \key{let}}\python{a local variable of function\code{f}} and \code{x} is a
 parameter of function \code{f}. The \key{lambda} is returned from the
 function \code{f}. The main expression of the program includes two
 calls to \code{f} with different arguments for \code{x}, first
@@ -14420,7 +14430,8 @@ functions because they use different values for \code{x}. Applying
 \code{15} produces \code{22}. The result of this program is \code{42}.
 
 \begin{figure}[btp]
-% s4_6.rkt
+{\if\edition\racketEd
+% lambda_test_21.rkt
 \begin{lstlisting}
    (define (f [x : Integer]) : (Integer -> Integer)
       (let ([y 4])
@@ -14431,53 +14442,71 @@ functions because they use different values for \code{x}. Applying
      (let ([h (f 3)])
        (+ (g 11) (h 15))))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+    def f(x : int) -> Callable[[int], int]:
+        y = 4
+        return lambda z: x + y + z
+
+    g = f(5)
+    h = f(3)
+    print( g(11) + h(15) )
+\end{lstlisting}
+\fi}
 \caption{Example of a lexically scoped function.}
 \label{fig:lexical-scoping}
 \end{figure}
 
 
-The approach that we take for implementing lexically scoped
-functions is to compile them into top-level function definitions,
-translating from \LangLam{} into \LangFun{}.  However, the compiler will need to
-provide special treatment for variable occurrences such as \code{x}
-and \code{y} in the body of the \code{lambda} of
-Figure~\ref{fig:lexical-scoping}. After all, an \LangFun{} function may not
-refer to variables defined outside of it. To identify such variable
-occurrences, we review the standard notion of free variable.
+The approach that we take for implementing lexically scoped functions
+is to compile them into top-level function definitions, translating
+from \LangLam{} into \LangFun{}.  However, the compiler must give
+special treatment to variable occurrences such as \code{x} and
+\code{y} in the body of the \code{lambda} of
+Figure~\ref{fig:lexical-scoping}. After all, an \LangFun{} function
+may not refer to variables defined outside of it. To identify such
+variable occurrences, we review the standard notion of free variable.
 
 \begin{definition}
-A variable is \emph{free in expression} $e$ if the variable occurs
-inside $e$ but does not have an enclosing binding in $e$.\index{subject}{free
-  variable}
+A variable is \textbf{free in expression} $e$ if the variable occurs
+inside $e$ but does not have an enclosing binding that is also in
+$e$.\index{subject}{free variable}
 \end{definition}
 
 For example, in the expression \code{(+ x (+ y z))} the variables
 \code{x}, \code{y}, and \code{z} are all free.  On the other hand,
 only \code{x} and \code{y} are free in the following expression
 because \code{z} is bound by the \code{lambda}.
+{\if\edition\racketEd
 \begin{lstlisting}
    (lambda: ([z : Integer]) : Integer
       (+ x (+ y z)))
 \end{lstlisting}
-
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+   lambda z: x + y + z
+\end{lstlisting}
+\fi}
 So the free variables of a \code{lambda} are the ones that will need
 special treatment. We need to arrange for some way to transport, at
 runtime, the values of those variables from the point where the
 \code{lambda} was created to the point where the \code{lambda} is
 applied. An efficient solution to the problem, due to
-\citet{Cardelli:1983aa}, is to bundle into a vector the values of the
+\citet{Cardelli:1983aa}, is to bundle into a tuple the values of the
 free variables together with the function pointer for the lambda's
 code, an arrangement called a \emph{flat closure} (which we shorten to
 just ``closure'').  \index{subject}{closure}\index{subject}{flat closure} Fortunately,
 we have all the ingredients to make closures, Chapter~\ref{ch:Lvec}
-gave us vectors and Chapter~\ref{ch:Rfun} gave us function
+gave us tuples and Chapter~\ref{ch:Rfun} gave us function
 pointers. The function pointer resides at index $0$ and the
-values for the free variables will fill in the rest of the vector.
+values for the free variables will fill in the rest of the tuple.
 
 Let us revisit the example in Figure~\ref{fig:lexical-scoping} to see
 how closures work. It's a three-step dance. The program first calls
 function \code{f}, which creates a closure for the \code{lambda}. The
-closure is a vector whose first element is a pointer to the top-level
+closure is a tuple whose first element is a pointer to the top-level
 function that we will generate for the \code{lambda}, the second
 element is the value of \code{x}, which is \code{5}, and the third
 element is \code{4}, the value of \code{y}. The closure does not
@@ -14508,7 +14537,7 @@ in this case \code{11}. This technique for applying a closure is step
 But doesn't this \code{lambda} only take 1 argument, for parameter
 \code{z}? The third and final step of the dance is generating a
 top-level function for a \code{lambda}.  We add an additional
-parameter for the closure and we insert a \code{let} at the beginning
+parameter for the closure and we insert an initialization at the beginning
 of the function for each free variable, to bind those variables to the
 appropriate elements from the closure parameter.
 %
@@ -14520,6 +14549,8 @@ syntax and semantics of \LangLam{} in Section~\ref{sec:r5}.
 
 \section{The \LangLam{} Language}
 \label{sec:r5}
+
+\python{UNDER CONSTRUCTION}
 
 The concrete and abstract syntax for \LangLam{}, a language with anonymous
 functions and lexical scoping, is defined in
@@ -14693,9 +14724,6 @@ require the body's type to match the declared return type.
 
 \section{Assignment and Lexically Scoped Functions}
 \label{sec:assignment-scoping}
-
-[UNDER CONSTRUCTION: This section was just moved into this location
-and may need to be updated. -Jeremy]
 
 The combination of lexically-scoped functions and assignment
 (i.e. \code{set!}) raises a challenge with our approach to
@@ -15134,6 +15162,7 @@ operators.
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \small
+{\if\edition\racketEd
 \[
 \begin{array}{lcl}
 \Exp &::= & \ldots
@@ -15148,6 +15177,7 @@ operators.
 \LangCLamM{} & ::= & \gray{ \PROGRAMDEFS{\itm{info}}{\LP\Def\ldots\RP} }
 \end{array}
 \]
+\fi}
 \end{minipage}
 }
 \caption{The abstract syntax of \LangCLam{}, extending \LangCFun{} (Figure~\ref{fig:c3-syntax}).}
@@ -15389,7 +15419,6 @@ closure is proportional to the number of its free variables.  Flat
 closures were reinvented by \citet{Dybvig:1987ab} in his Ph.D. thesis
 and used in Chez Scheme version 1~\citep{Dybvig:2006aa}.
 
-\fi
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Dynamic Typing}
