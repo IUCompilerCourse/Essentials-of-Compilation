@@ -6478,12 +6478,12 @@ how to handle conditional \code{goto}'s during liveness analysis.
 \section{The \LangIf{} Language}
 \label{sec:lang-if}
 
-The concrete syntax of the \LangIf{} language is defined in
-Figure~\ref{fig:Lif-concrete-syntax} and the abstract syntax is defined
-in Figure~\ref{fig:Lif-syntax}. The \LangIf{} language includes all of
-\LangVar{}\racket{(shown in gray)}, the Boolean literals \TRUE{} and
-\FALSE{}, and the \code{if} expression \python{and statement}. We expand the
-operators to include
+The concrete and abstract syntax of the \LangIf{} language are defined in
+Figures~\ref{fig:Lif-concrete-syntax} and~\ref{fig:Lif-syntax},
+respectively. The \LangIf{} language includes all of 
+\LangVar{} {(shown in gray)}, the Boolean literals \TRUE{} and
+\FALSE{},\racket{ and} the \code{if} expression\python{, and the
+  \code{if}  statement}. We expand the set of operators to include
 \begin{enumerate}
 \item subtraction on integers,
 \item the logical operators \key{and}, \key{or}, and \key{not},
@@ -6628,9 +6628,9 @@ evaluate to the corresponding Boolean values. The conditional
 expression $\CIF{e_1}{e_2}{\itm{e_3}}$ evaluates expression $e_1$
 and then either evaluates $e_2$ or $e_3$ depending on whether
 $e_1$ produced \TRUE{} or \FALSE{}. The logical operations
-\code{and}, \code{or}, and \code{not} behave according to propositional logic,
-but note that the \code{and} and \code{or} operations are
-short-circuiting.
+\code{and}, \code{or}, and \code{not} behave according to
+propositional logic. In addition, the \code{and} and \code{or}
+operations perform \emph{short-circuit evaluation}.
 %
 That is, given the expression $\CAND{e_1}{e_2}$, the expression $e_2$
 is not evaluated if $e_1$ evaluates to \FALSE{}.
@@ -6889,8 +6889,8 @@ Figure~\ref{fig:type-check-Lvar}.  The type of an integer constant is
   arguments and then invoke \code{type\_check\_op} to check whether
   the argument types are allowed.}
 %
-\python{Regarding addition and negation, we recursively analyze the
-  arguments, check that they have type \INT{}, and return \INT{}.}
+\python{Regarding addition, subtraction, and negation, we recursively analyze the
+  arguments, check that they have type \INTTY{}, and return \INTTY{}.}
 
 \racket{Several auxiliary methods are used in the type checker. The
   method \code{operator-types} defines a dictionary that maps the
@@ -6903,7 +6903,7 @@ Figure~\ref{fig:type-check-Lvar}.  The type of an integer constant is
   checks whether the argument types are equal to the parameter types.
   The result is the return type of the operator.}
 %
-\python{The auxiliary method \code{check\_type\_equal} method triggers
+\python{The auxiliary method \code{check\_type\_equal} triggers
   an error if the two types are not equal.}
 
 \begin{figure}[tbp]
@@ -6961,7 +6961,7 @@ Figure~\ref{fig:type-check-Lvar}.  The type of an integer constant is
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
-\begin{lstlisting}
+\begin{lstlisting}[escapechar=`]
 class TypeCheckLvar:
   def check_type_equal(self, t1, t2, e):
     if t1 != t2:
@@ -6970,7 +6970,7 @@ class TypeCheckLvar:
           
   def type_check_exp(self, e, env):
     match e:
-      case BinOp(left, Add(), right):
+      case BinOp(left, (Add() | Sub()), right):
         l = self.type_check_exp(left, env)
         check_type_equal(l, int, left)
         r = self.type_check_exp(right, env)
@@ -7123,8 +7123,7 @@ The type of a Boolean constant is \BOOLTY{}.
 \racket{The \code{operator-types} function adds dictionary entries for
   the other new operators.}
 %
-\python{Subtraction requires its arguments to be of type \INTTY{} and produces
-  an \INTTY{}. Negation requires its argument to be a \BOOLTY{} and
+\python{Logical not requires its argument to be a \BOOLTY{} and
   produces a \BOOLTY{}. Similarly for logical and and logical or. }
 %
 The equality operators require the two arguments to have the same
@@ -7203,17 +7202,24 @@ the arguments of operators are restricted to atomic expressions. The
 include a restricted form of \code{if} statment. The condition must be
 a comparison and the two branches may only contain \code{goto}
 statements. These restrictions make it easier to translate \code{if}
-statements to x86.
+statements to x86. 
 %
 \fi}
+%
+Besides the \code{goto} statement, \LangCIf{}, also adds a
+\code{return} statement to finish a function call with a specified value.
 %
 The \key{CProgram} construct contains
 %
 \racket{an alist}\python{a dictionary}
 %
-mapping labels to $\Tail$ expressions, which can be return statements,
+mapping labels to
+\racket{$\Tail$ expressions, which can be \code{return} statements,
 an assignment statement followed by a $\Tail$ expression, a
-\code{goto}, or a conditional \code{goto}.
+\code{goto}, or a conditional \code{goto}.}
+\python{lists of statements, which comprise of assignment statements
+  and end in a \code{return} statement, a \code{goto}, or a
+  conditional \code{goto}.}
 
 \newcommand{\CifGrammarRacket}{
 \begin{array}{lcl}
@@ -7329,7 +7335,7 @@ an assignment statement followed by a $\Tail$ expression, a
 \label{sec:x86-if}
 
 \index{subject}{x86} To implement the new logical operations, the comparison
-operations, and the \key{if} expression, we need to delve further into
+operations, and the \key{if} expression\python{ and statement}, we need to delve further into
 the x86 language. Figures~\ref{fig:x86-1-concrete} and \ref{fig:x86-1}
 define the concrete and abstract syntax for the \LangXIf{} subset
 of x86, which includes instructions for logical operations,
