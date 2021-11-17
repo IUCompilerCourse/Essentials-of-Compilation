@@ -25,7 +25,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{0}
+\def\edition{1}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd{#1}\fi}}
@@ -10381,6 +10381,14 @@ fine to place \code{begin} there.
 \section{Explicate Control \racket{and \LangCLoop{}}}
 \label{sec:explicate-loop}
 
+\newcommand{\CloopASTRacket}{
+\begin{array}{lcl}
+\Atm  &::=&  \VOID \\
+\Stmt &::=& \READ{}\\
+\Def &::=& \DEF{\itm{label}}{\LP\LS\Var\key{:}\Type\RS\ldots\RP}{\Type}{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP}
+\end{array}
+}
+
 {\if\edition\racketEd
 
 Recall that in the \code{explicate\_control} pass we define one helper
@@ -10400,19 +10408,25 @@ The output language of \code{explicate\_control} is \LangCLoop{}
 difference between \LangCLam{} and \LangCLoop{} is that the
 control-flow graphs of the later may contain cycles.
 
-
 \begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \small
+{\if\edition\racketEd
 \[
+\begin{array}{l}
+  \gray{\CvarASTRacket} \\ \hline
+  \gray{\CifASTRacket} \\ \hline
+  \CloopASTRacket \\
 \begin{array}{lcl}
-\Stmt &::=& \gray{ \ASSIGN{\VAR{\Var}}{\Exp} } 
-     \MID \READ{}\\
-\Def &::=& \DEF{\itm{label}}{\LP\LS\Var\key{:}\Type\RS\ldots\RP}{\Type}{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP}\\
 \LangCLoopM{} & ::= & \CPROGRAM{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP}
 \end{array}
+\end{array}
 \]
+\fi}
+{\if\edition\pythonEd
+UNDER CONSTRUCTION
+\fi}
 \end{minipage}
 }
 \caption{The abstract syntax of \LangCLoop{}, extending \LangCIf{} (Figure~\ref{fig:c1-syntax}).}
@@ -11662,10 +11676,23 @@ pass, which is \LangAlloc{} in monadic normal form.
 \section{Explicate Control and the \LangCVec{} language}
 \label{sec:explicate-control-r3}
 
+
+\newcommand{\CtupASTRacket}{
+\begin{array}{lcl}
+\Exp &::= & \LP\key{Allocate} \,\itm{int}\,\itm{type}\RP \\
+   &\MID& \VECREF{\Atm}{\INT{\Int}}  \\
+   &\MID& \VECSET{\Atm}{\INT{\Int}}{\Atm} \\
+   &\MID& \VECLEN{\Atm} \\
+   &\MID& \GLOBALVALUE{\Var} \\
+\Stmt &::=& \VECSET{\Atm}{\INT{\Int}}{\Atm} \\
+    &\MID& \LP\key{Collect} \,\itm{int}\RP 
+\end{array}
+}
+  
 \newcommand{\CtupASTPython}{
 \begin{array}{lcl}
-\Exp &::= & \GET{\Atm}{\Atm}\MID \ALLOCATE{\Int}{\Type} \\
-      &\MID& \GLOBALVALUE{\Var}\RP \MID \LEN{\Atm} \\
+\Exp &::= & \GET{\Atm}{\Atm} \MID \ALLOCATE{\Int}{\Type} \\
+      &\MID& \GLOBALVALUE{\Var} \MID \LEN{\Atm} \\
 \Stmt &::=& \COLLECT{\Int} \\
      &\MID& \ASSIGN{\PUT{\Atm}{\Atm}}{\Atm} 
 \end{array}
@@ -11677,22 +11704,14 @@ pass, which is \LangAlloc{} in monadic normal form.
     \small
 {\if\edition\racketEd    
 \[
-\begin{array}{lcl}
-\Atm &::=& \gray{ \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} }\\
-\itm{cmp} &::= & \gray{  \key{eq?} \MID \key{<} } \\
-\Exp &::= & \gray{ \Atm \MID \READ{} } \\
-   &\MID& \gray{ \NEG{\Atm} \MID \ADD{\Atm}{\Atm} }\\
-   &\MID& \gray{ \UNIOP{\key{not}}{\Atm} \MID \BINOP{\itm{cmp}}{\Atm}{\Atm}  } \\
-   &\MID& \LP\key{Allocate} \,\itm{int}\,\itm{type}\RP \\
-   &\MID& \BINOP{\key{'vector-ref}}{\Atm}{\INT{\Int}}  \\
-   &\MID& \LP\key{Prim}~\key{'vector-set!}\,\LP\Atm\,\INT{\Int}\,\Atm\RP\RP\\
-   &\MID& \LP\key{GlobalValue} \,\Var\RP \MID \LP\key{Void}\RP\\
-\Stmt &::=& \gray{ \ASSIGN{\VAR{\Var}}{\Exp} } 
-       \MID \LP\key{Collect} \,\itm{int}\RP \\
-\Tail &::= & \gray{ \RETURN{\Exp} \MID \SEQ{\Stmt}{\Tail} 
-       \MID \GOTO{\itm{label}} } \\
-      &\MID& \gray{ \IFSTMT{\BINOP{\itm{cmp}}{\Atm}{\Atm}}{\GOTO{\itm{label}}}{\GOTO{\itm{label}}}  }\\
-\LangCVecM{} & ::= & \gray{ \CPROGRAM{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP} }
+\begin{array}{l}
+  \gray{\CvarASTRacket} \\ \hline
+  \gray{\CifASTRacket} \\ \hline
+  \gray{\CloopASTRacket} \\ \hline
+  \CtupASTRacket \\
+  \begin{array}{lcl}
+    \LangCVecM{} & ::= & \CPROGRAM{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP}
+  \end{array}
 \end{array}
 \]
 \fi}
@@ -11709,8 +11728,8 @@ pass, which is \LangAlloc{} in monadic normal form.
 \fi}
 \end{minipage}
 }
-\caption{The abstract syntax of \LangCVec{}, extending \LangCIf{}
-   (Figure~\ref{fig:c1-syntax}).}
+\caption{The abstract syntax of \LangCVec{}, extending \LangCLoop{}
+   (Figure~\ref{fig:c7-syntax}).}
 \label{fig:c2-syntax}
 \end{figure}
 
@@ -12078,7 +12097,7 @@ needs to be followed. Thus, we zero-out all locations on the root
 stack in the prelude of \code{main}. In
 Figure~\ref{fig:print-x86-output-gc}, the instruction
 %
-\lstinline{movq $0, (%r15)}
+\lstinline{movq $0, 0(%r15)}
 %
 accomplishes this task. The garbage collector tests each root to see
 if it is null prior to dereferencing it.
@@ -12154,7 +12173,7 @@ main:
 	movq $16384, %rsi
 	callq initialize
 	movq rootstack_begin(%rip), %r15
-	movq $0, (%r15)
+	movq $0, 0(%r15)
 	addq $8, %r15
 	jmp start
 conclusion:
@@ -13748,6 +13767,13 @@ appropriate explicate functions for the various contexts.
   
 \fi}
 
+\newcommand{\CfunASTRacket}{
+\begin{array}{lcl}
+\Exp &::= & \FUNREF{\itm{label}} \MID \CALL{\Atm}{\LP\Atm\ldots\RP} \\
+\Tail &::= & \TAILCALL{\Atm}{\Atm\ldots} \\
+\Def &::=& \DEF{\itm{label}}{\LP[\Var\key{:}\Type]\ldots\RP}{\Type}{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP}
+\end{array}
+}
 
 \newcommand{\CfunASTPython}{
 \begin{array}{lcl}
@@ -13763,25 +13789,15 @@ appropriate explicate functions for the various contexts.
 \small
 {\if\edition\racketEd
 \[
-\begin{array}{lcl}
-\Atm &::=& \gray{ \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} }\\
-\itm{cmp} &::= & \gray{  \key{eq?} \MID \key{<} } \\
-\Exp &::= & \gray{ \Atm \MID \READ{} } \\
-   &\MID& \gray{ \NEG{\Atm} \MID \ADD{\Atm}{\Atm} }\\
-   &\MID& \gray{ \UNIOP{\key{not}}{\Atm} \MID \BINOP{\itm{cmp}}{\Atm}{\Atm}  } \\
-   &\MID& \gray{ \LP\key{Allocate} \,\itm{int}\,\itm{type}\RP } \\
-   &\MID& \gray{ \BINOP{\key{'vector-ref}}{\Atm}{\INT{\Int}}  }\\
-   &\MID& \gray{ \LP\key{Prim}~\key{'vector-set!}\,\LP\key{list}\,\Atm\,\INT{\Int}\,\Atm\RP\RP }\\
-   &\MID& \gray{ \LP\key{GlobalValue} \,\Var\RP \MID \LP\key{Void}\RP }\\
-   &\MID& \FUNREF{\itm{label}} \MID \CALL{\Atm}{\LP\Atm\ldots\RP} \\
-\Stmt &::=& \gray{ \ASSIGN{\VAR{\Var}}{\Exp} 
-       \MID \LP\key{Collect} \,\itm{int}\RP } \\
-\Tail &::= & \gray{ \RETURN{\Exp} \MID \SEQ{\Stmt}{\Tail} 
-       \MID \GOTO{\itm{label}} } \\
-    &\MID& \gray{ \IFSTMT{\BINOP{\itm{cmp}}{\Atm}{\Atm}}{\GOTO{\itm{label}}}{\GOTO{\itm{label}}}  }\\
-    &\MID& \TAILCALL{\Atm}{\Atm\ldots} \\
-\Def &::=& \DEF{\itm{label}}{\LP[\Var\key{:}\Type]\ldots\RP}{\Type}{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP}\\
-\LangCFunM{} & ::= & \PROGRAMDEFS{\itm{info}}{\LP\Def\ldots\RP} 
+\begin{array}{l}
+  \gray{\CvarASTRacket} \\ \hline
+  \gray{\CifASTRacket} \\ \hline
+  \gray{\CloopASTRacket} \\ \hline
+  \gray{\CtupASTRacket} \\ \hline
+  \CfunASTRacket \\
+  \begin{array}{lcl}
+  \LangCFunM{} & ::= & \PROGRAMDEFS{\itm{info}}{\LP\Def\ldots\RP} 
+  \end{array}
 \end{array}
 \]
 \fi}
