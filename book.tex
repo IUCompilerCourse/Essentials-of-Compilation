@@ -13063,6 +13063,7 @@ this extended environment.
 {\if\edition\pythonEd
 \begin{lstlisting}
 class InterpLfun(InterpLtup):
+  
   def apply_fun(self, fun, args, e):
       match fun:
         case Function(name, xs, body, env):
@@ -14421,26 +14422,26 @@ mainconclusion:
 \index{subject}{lambda}
 \index{subject}{lexical scoping}
 
-This chapter studies lexically scoped functions as they appear in
-functional languages such as Racket. By lexical scoping we mean that a
-function's body may refer to variables whose binding site is outside
-of the function, in an enclosing scope.
+This chapter studies lexically scoped functions, that is, functions
+whose body may refer to variables that are bound outside of the
+function, in an enclosing scope.
 %
 Consider the example in Figure~\ref{fig:lexical-scoping} written in
-\LangLam{}, which extends \LangFun{} with anonymous functions using the
-\key{lambda} form.  The body of the \key{lambda}, refers to three
-variables: \code{x}, \code{y}, and \code{z}. The binding sites for
-\code{x} and \code{y} are outside of the \key{lambda}. Variable
-\code{y} is \racket{bound by the enclosing \key{let}}\python{a local variable of function\code{f}} and \code{x} is a
-parameter of function \code{f}. The \key{lambda} is returned from the
-function \code{f}. The main expression of the program includes two
-calls to \code{f} with different arguments for \code{x}, first
-\code{5} then \code{3}. The functions returned from \code{f} are bound
-to variables \code{g} and \code{h}. Even though these two functions
-were created by the same \code{lambda}, they are really different
-functions because they use different values for \code{x}. Applying
-\code{g} to \code{11} produces \code{20} whereas applying \code{h} to
-\code{15} produces \code{22}. The result of this program is \code{42}.
+\LangLam{}, which extends \LangFun{} with lexically scoped functions
+using the \key{lambda} form.  The body of the \key{lambda} refers to
+three variables: \code{x}, \code{y}, and \code{z}. The binding sites
+for \code{x} and \code{y} are outside of the \key{lambda}. Variable
+\code{y} is \racket{bound by the enclosing \key{let}}\python{a local
+  variable of function \code{f}} and \code{x} is a parameter of
+function \code{f}. The \key{lambda} is returned from the function
+\code{f}. The main expression of the program includes two calls to
+\code{f} with different arguments for \code{x}, first \code{5} then
+\code{3}. The functions returned from \code{f} are bound to variables
+\code{g} and \code{h}. Even though these two functions were created by
+the same \code{lambda}, they are really different functions because
+they use different values for \code{x}. Applying \code{g} to \code{11}
+produces \code{20} whereas applying \code{h} to \code{15} produces
+\code{22}. The result of this program is \code{42}.
 
 \begin{figure}[btp]
 {\if\edition\racketEd
@@ -14502,31 +14503,32 @@ because \code{z} is bound by the \code{lambda}.
    lambda z: x + y + z
 \end{lstlisting}
 \fi}
-So the free variables of a \code{lambda} are the ones that will need
-special treatment. We need to arrange for some way to transport, at
-runtime, the values of those variables from the point where the
-\code{lambda} was created to the point where the \code{lambda} is
-applied. An efficient solution to the problem, due to
-\citet{Cardelli:1983aa}, is to bundle into a tuple the values of the
-free variables together with the function pointer for the lambda's
-code, an arrangement called a \emph{flat closure} (which we shorten to
-just ``closure'').  \index{subject}{closure}\index{subject}{flat closure} Fortunately,
-we have all the ingredients to make closures, Chapter~\ref{ch:Lvec}
-gave us tuples and Chapter~\ref{ch:Rfun} gave us function
-pointers. The function pointer resides at index $0$ and the
-values for the free variables will fill in the rest of the tuple.
+%
+So the free variables of a \code{lambda} are the ones that need
+special treatment. We need to transport, at runtime, the values of
+those variables from the point where the \code{lambda} was created to
+the point where the \code{lambda} is applied. An efficient solution to
+the problem, due to \citet{Cardelli:1983aa}, is to bundle the values
+of the free variables together with the function pointer for the
+lambda's code into a tuple, an arrangement called a \emph{flat
+  closure} (which we shorten to just ``closure'').
+\index{subject}{closure}\index{subject}{flat closure} Fortunately, we
+have all the ingredients to make closures: Chapter~\ref{ch:Lvec} gave
+us tuples and Chapter~\ref{ch:Rfun} gave us function pointers. The
+function pointer resides at index $0$ and the values for the free
+variables fill in the rest of the tuple.
 
 Let us revisit the example in Figure~\ref{fig:lexical-scoping} to see
-how closures work. It's a three-step dance. The program first calls
-function \code{f}, which creates a closure for the \code{lambda}. The
-closure is a tuple whose first element is a pointer to the top-level
-function that we will generate for the \code{lambda}, the second
-element is the value of \code{x}, which is \code{5}, and the third
-element is \code{4}, the value of \code{y}. The closure does not
-contain an element for \code{z} because \code{z} is not a free
-variable of the \code{lambda}. Creating the closure is step 1 of the
-dance. The closure is returned from \code{f} and bound to \code{g}, as
-shown in Figure~\ref{fig:closures}.
+how closures work. It's a three-step dance. The program calls function
+\code{f}, which creates a closure for the \code{lambda}. The closure
+is a tuple whose first element is a pointer to the top-level function
+that we will generate for the \code{lambda}, the second element is the
+value of \code{x}, which is \code{5}, and the third element is
+\code{4}, the value of \code{y}. The closure does not contain an
+element for \code{z} because \code{z} is not a free variable of the
+\code{lambda}. Creating the closure is step 1 of the dance. The
+closure is returned from \code{f} and bound to \code{g}, as shown in
+Figure~\ref{fig:closures}.
 %
 The second call to \code{f} creates another closure, this time with
 \code{3} in the second slot (for \code{x}). This closure is also
@@ -14535,8 +14537,8 @@ Figure~\ref{fig:closures}.
 
 \begin{figure}[tbp]
 \centering \includegraphics[width=0.6\textwidth]{figs/closures}
-\caption{Example closure representation for the \key{lambda}'s
-  in Figure~\ref{fig:lexical-scoping}.}
+\caption{Flat closure representations for the two functions
+  produced by the \key{lambda} in Figure~\ref{fig:lexical-scoping}.}
 \label{fig:closures}
 \end{figure}
 
@@ -14563,13 +14565,13 @@ syntax and semantics of \LangLam{} in Section~\ref{sec:r5}.
 \section{The \LangLam{} Language}
 \label{sec:r5}
 
-\python{UNDER CONSTRUCTION}
-
 The concrete and abstract syntax for \LangLam{}, a language with anonymous
 functions and lexical scoping, is defined in
-Figures~\ref{fig:Rlam-concrete-syntax} and ~\ref{fig:Rlam-syntax}. It adds
+Figures~\ref{fig:Rlam-concrete-syntax} and \ref{fig:Rlam-syntax}. It adds
 the \key{lambda} form to the grammar for \LangFun{}, which already has
 syntax for function application.
+\python{The syntax also includes an assignment statement that includes
+a type annotation for the variable on the left-hand side.}
 
 \newcommand{\LlambdaGrammarRacket}{
   \begin{array}{lcl}
@@ -14584,6 +14586,21 @@ syntax for function application.
   \end{array}
 }
 
+\newcommand{\LlambdaGrammarPython}{
+  \begin{array}{lcl}
+  \Exp &::=& \CLAMBDA{\Var\code{, }\ldots}{\Exp}\\
+  \Stmt &::=& \CANNASSIGN{\Var}{\Type}{\Exp}
+  \end{array}
+}
+
+\newcommand{\LlambdaASTPython}{
+  \begin{array}{lcl}
+  \Exp &::=& \LAMBDA{\Var^{*}}{\Exp} \\
+  \Stmt &::=& \ANNASSIGN{\Var}{\Type}{\Exp}
+  \end{array}
+}
+
+
 % include AnnAssign in ASTPython
 
 \begin{figure}[tp]
@@ -14591,6 +14608,7 @@ syntax for function application.
 \fbox{
   \begin{minipage}{0.96\textwidth}
     \small
+{\if\edition\racketEd
 \[
 \begin{array}{l}
   \gray{\LintGrammarRacket{}} \\ \hline
@@ -14605,6 +14623,23 @@ syntax for function application.
   \end{array}
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd
+\[
+\begin{array}{l}
+  \gray{\LintGrammarPython{}} \\ \hline
+  \gray{\LvarGrammarPython{}} \\ \hline
+  \gray{\LifGrammarPython{}} \\ \hline
+  \gray{\LwhileGrammarPython} \\ \hline
+  \gray{\LtupGrammarPython} \\ \hline
+  \gray{\LfunGrammarPython} \\ \hline
+  \LlambdaGrammarPython \\
+  \begin{array}{rcl}
+    \LangFunM{} &::=& \Def^{*} \Stmt^{*}
+  \end{array}
+\end{array}
+\]
+\fi}
 \end{minipage}
 }
 \caption{The concrete syntax of \LangLam{}, extending \LangFun{} (Figure~\ref{fig:Rfun-concrete-syntax}) 
@@ -14617,6 +14652,7 @@ syntax for function application.
 \fbox{
   \begin{minipage}{0.96\textwidth}
     \small
+{\if\edition\racketEd
 \[
 \begin{array}{l}
   \gray{\LintOpAST} \\ \hline
@@ -14631,6 +14667,23 @@ syntax for function application.
   \end{array}
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd
+\[
+\begin{array}{l}
+  \gray{\LintASTPython{}} \\ \hline
+  \gray{\LvarASTPython{}} \\ \hline
+  \gray{\LifASTPython{}} \\ \hline
+  \gray{\LwhileASTPython} \\ \hline
+  \gray{\LtupASTPython} \\ \hline
+  \gray{\LfunASTPython} \\ \hline
+  \LlambdaASTPython \\
+\begin{array}{rcl}
+  \LangFunM{} &::=& \PROGRAM{}{\LS \Def \ldots \Stmt \ldots \RS}
+\end{array}
+\end{array}
+\]
+\fi}
 \end{minipage}
 }
 \caption{The abstract syntax of \LangLam{}, extending \LangFun{} (Figure~\ref{fig:Rfun-syntax}).}
@@ -14641,14 +14694,14 @@ syntax for function application.
 \label{sec:interp-Rlambda}
 
 Figure~\ref{fig:interp-Rlambda} shows the definitional interpreter for
-\LangLam{}. The case for \key{lambda} saves the current environment
-inside the returned \key{lambda}. Then the case for \key{Apply} uses
-the environment from the \key{lambda}, the \code{lam-env}, when
-interpreting the body of the \key{lambda}.  The \code{lam-env}
-environment is extended with the mapping of parameters to argument
-values.
+\LangLam{}. The case for \key{Lambda} saves the current environment
+inside the returned function value. Recall that during function
+application, the environment stored in the function value, extended
+with the mapping of parameters to argument values, is used to
+interpret the body of the function.
 
 \begin{figure}[tbp]
+{\if\edition\racketEd 
 \begin{lstlisting}
 (define interp-Rlambda_class
   (class interp-Rfun_class
@@ -14674,6 +14727,36 @@ values.
 (define (interp-Rlambda p)
   (send (new interp-Rlambda_class) interp-program p))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+class InterpLlambda(InterpLfun):
+
+  def interp_exp(self, e, env):
+    match e:
+      case FunRefArity(id, arity):
+        return env[id]
+      case Lambda(params, body):
+        return Function('lambda', params, [Return(body)], env)
+      case Closure(arity, args):
+        return tuple([self.interp_exp(arg, env) for arg in args])
+      case AllocateClosure(length, typ, arity):
+        array = [None] * length
+        return array
+      case _:
+        return super().interp_exp(e, env)
+    
+  def interp_stmts(self, ss, env):
+    if len(ss) == 0:
+      return
+    match ss[0]:
+      case AnnAssign(lhs, typ, value, simple):
+        env[lhs.id] = self.interp_exp(value, env)
+        return self.interp_stmts(ss[1:], env)
+      case _:
+        return super().interp_stmts(ss, env)
+\end{lstlisting}
+\fi}
 \caption{Interpreter for \LangLam{}.}
 \label{fig:interp-Rlambda}
 \end{figure}
@@ -14682,13 +14765,61 @@ values.
 \label{sec:type-check-r5}
 \index{subject}{type checking}
 
-Figure~\ref{fig:type-check-Rlambda} shows how to type check the new
+{\if\edition\racketEd
+%
+Figure~\ref{fig:type-check-Llambda} shows how to type check the new
 \key{lambda} form. The body of the \key{lambda} is checked in an
 environment that includes the current environment (because it is
 lexically scoped) and also includes the \key{lambda}'s parameters.  We
 require the body's type to match the declared return type.
+%
+\fi}
+
+{\if\edition\pythonEd
+%
+Figures~\ref{fig:type-check-Llambda} and
+\ref{fig:type-check-Llambda-part2} define the type checker for
+\LangLam{}, which is more complex than one might expect. The reason
+for the added complexity is that the syntax of \key{lambda} does not
+include type annotations for the parameters or return type.  Instead
+they must be inferred. There are many approaches of type inference to
+choose from of varying degrees of complexity. We choose one of the
+simpler approaches, bidirectional type inference~\citep{Dunfield:2021}
+(aka. local type inference~\citep{Pierce:2000}), because the focus of
+this book is compilation, not type inference.
+
+The main idea of bidirectional type inference is to add an auxilliary
+function, here named \code{check\_exp}, that takes an expected type
+and checks whether the given expression can be of that type.  Thus, in
+\code{check\_exp}, type information flows in a top-down manner with
+respect to the AST, in contrast to the regular \code{type\_check\_exp}
+function, where type information flows in a primarily bottom-up
+manner.
+%
+The idea then is to use \code{check\_exp} in all the places where we
+already know what the type of an expression should be, such as in the
+\code{return} statement of a top-level function definition, or on the
+right-hand side of an annotated assignment statement.
+
+Getting back to \code{lambda}, it is straightforward to check a
+\code{lambda} inside \code{check\_exp} because the expected type
+provides the parameter types and the return type.  On the other hand,
+inside \code{type\_check\_exp} we disallow \code{lambda}, which means
+that we do not allow \code{lambda} in contexts where we don't already
+know its type. This restriction does not incur a loss of
+expressiveness for \LangLam{} because it is straightforward to modify
+a program to sidestep the restriction, for example, by using an
+annotated assignment statement to assign the \code{lambda} to a
+temporary variable.
+
+Note that for the \code{Name} and \code{Lambda} AST nodes, we record
+their type in a \code{has\_type} field. This type information is used
+later in this chapter.
+%
+\fi}
 
 \begin{figure}[tbp]
+{\if\edition\racketEd 
 \begin{lstlisting}
 (define (type-check-Rlambda env)
   (lambda (e)
@@ -14705,10 +14836,108 @@ require the body's type to match the declared return type.
       ...
       )))
 \end{lstlisting}
-\caption{Type checking the \key{lambda}'s in \LangLam{}.}
-\label{fig:type-check-Rlambda}
+\fi}
+{\if\edition\pythonEd 
+\begin{lstlisting}
+class TypeCheckLlambda(TypeCheckLfun):
+
+  def type_check_exp(self, e, env):
+    match e:
+      case Name(id):
+        e.has_type = env[id]
+        return env[id]
+      case Lambda(params, body):
+        raise Exception('cannot synthesize a type for a lambda')
+      case _:
+        return super().type_check_exp(e, env)
+    
+  def check_exp(self, e, ty, env):
+    match e:
+      case Lambda(params, body):
+        e.has_type = ty
+        match ty:
+          case FunctionType(params_t, return_t):
+            new_env = {x:t for (x,t) in env.items()}
+            for (p,t) in zip(params, params_t):
+                new_env[p] = t
+            self.check_exp(body, return_t, new_env)
+          case _:
+            raise Exception('lambda does not have type ' + str(ty))
+      case Call(func, args):
+        func_t = self.type_check_exp(func, env)
+        match func_t:
+          case FunctionType(params_t, return_t):
+            for (arg, param_t) in zip(args, params_t):
+                self.check_exp(arg, param_t, env)
+            self.check_type_equal(return_t, ty, e)
+          case _:
+            raise Exception('type_check_exp: in call, unexpected ' + \
+                            repr(func_t))
+      case _:
+        t = self.type_check_exp(e, env)
+        self.check_type_equal(t, ty, e)
+\end{lstlisting}
+\fi}
+\caption{Type checking \LangLam{}\python{, part 1}.}
+\label{fig:type-check-Llambda}
 \end{figure}
 
+
+{\if\edition\pythonEd 
+\begin{figure}[tbp]
+\begin{lstlisting}
+  def check_stmts(self, ss, return_ty, env):
+    if len(ss) == 0:
+      return
+    match ss[0]:
+      case FunctionDef(name, params, body, dl, returns, comment):
+        new_env = {x: t for (x,t) in env.items()}
+        for (x,t) in params:
+            new_env[x] = t
+        rt = self.check_stmts(body, returns, new_env)
+        self.check_stmts(ss[1:], return_ty, env)
+      case Return(value):
+        self.check_exp(value, return_ty, env)
+      case Assign([Name(id)], value):
+        if id in env:
+          self.check_exp(value, env[id], env)
+        else:
+          env[id] = self.type_check_exp(value, env)
+        self.check_stmts(ss[1:], return_ty, env)
+      case Assign([Subscript(tup, Constant(index), Store())], value):
+        tup_t = self.type_check_exp(tup, env)
+        match tup_t:
+          case TupleType(ts):
+            self.check_exp(value, ts[index], env)
+          case _:
+            raise Exception('expected a tuple, not '  + repr(tup_t))
+        self.check_stmts(ss[1:], return_ty, env)
+      case AnnAssign(Name(id), ty, value, simple):
+        ss[0].annotation = ty_annot
+        if id in env:
+            self.check_type_equal(env[id], ty)
+        else:
+            env[id] = ty_annot
+        self.check_exp(value, ty_annot, env)
+      case _:
+        self.type_check_stmts(ss, env)
+
+  def type_check(self, p):
+    match p:
+      case Module(body):
+        env = {}
+        for s in body:
+            match s:
+              case FunctionDef(name, params, bod, dl, returns, comment):
+                params_t = [t for (x,t) in params]
+                env[name] = FunctionType(params_t, returns)
+        self.check_stmts(body, int, env)
+\end{lstlisting}
+\caption{Type checking the \key{lambda}'s in \LangLam{}, part 2.}
+\label{fig:type-check-Llambda-part2}
+\end{figure}
+
+\clearpage
 
 \section{Assignment and Lexically Scoped Functions}
 \label{sec:assignment-scoping}
