@@ -12818,12 +12818,12 @@ type, written
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
-   Callable[[|$\Type_1$|,|$\cdots$|,|$\Type_n$|], |$\Type_r$|]
+   Callable[[|$\Type_1$|,|$\cdots$|,|$\Type_n$|], |$\Type_R$|]
 \end{lstlisting}
 \fi}
 %
 \noindent for a function whose $n$ parameters have the types $\Type_1$
-through $\Type_n$ and whose return type is $\Type_r$. The main
+through $\Type_n$ and whose return type is $\Type_R$. The main
 limitation of these functions (with respect to
 \racket{Racket}\python{Python} functions) is that they are not
 lexically scoped. That is, the only external entities that can be
@@ -12859,7 +12859,8 @@ nested inside each other.
     \Type &::=& \key{FunctionType}\LP \Type^{*} \key{, } \Type \RP \\
     \Exp &::=& \CALL{\Exp}{\Exp^{*}}\\
     \Stmt &::=& \RETURN{\Exp} \\
-   \Def &::=& \FUNDEF{\Var}{\LS \LP \Var \key{, } \Type \RP \key{, } \ldots \RS}{\Type}{}{\Stmt^{+}} 
+   \Params &::=& \LS\LP\Var\key{,}\Type\RP\code{,}\ldots\RS \\
+   \Def &::=& \FUNDEF{\Var}{\Params}{\Type}{}{\Stmt^{+}} 
   \end{array}
 }
 
@@ -12893,7 +12894,7 @@ nested inside each other.
   \gray{\LtupGrammarPython} \\  \hline
   \LfunGrammarPython \\
 \begin{array}{rcl}
-  \LangFunM{} &::=& \Def^{*} \Stmt^{*}
+  \LangFunM{} &::=& \Def\ldots \Stmt\ldots
 \end{array}
 \end{array}
 \]
@@ -12949,7 +12950,7 @@ nested inside each other.
 The program in Figure~\ref{fig:Rfun-function-example} is a
 representative example of defining and using functions in \LangFun{}.
 We define a function \code{map} that applies some other function
-\code{f} to both elements of a vector and returns a new vector
+\code{f} to both elements of a tuple and returns a new tuple
 containing the results. We also define a function \code{inc}.  The
 program applies \code{map} to \code{inc} and
 %
@@ -13250,6 +13251,8 @@ class TypeCheckLfun(TypeCheckLtup):
 \end{figure}
 
 
+\clearpage
+
 \section{Functions in x86}
 \label{sec:fun-x86}
 
@@ -13535,7 +13538,7 @@ Module(|$\Def\ldots\Stmt\ldots$|)
 \end{lstlisting}
 where $\itm{mainDef}$ is
 \begin{lstlisting}
-FunctionDef('main', [], int, |$\Stmt'\ldots$|Return(Constant(0)))
+FunctionDef('main', [], int, None, |$\Stmt'\ldots$|Return(Constant(0)), None)
 \end{lstlisting}
 \fi}
 
@@ -13571,7 +13574,7 @@ defined in Figure~\ref{fig:f1-syntax}.
 \[
 \begin{array}{lcl}
 \Exp &::=& \FUNREF{\Var}\\
-  \LangFunM{} &::=& \PROGRAM{}{\LS \Def \code{,} \ldots \RS}
+  \LangFunRefM{} &::=& \PROGRAM{}{\LS \Def \code{,} \ldots \RS}
 \end{array}
 \]
 \fi}
@@ -13620,9 +13623,10 @@ follows.
 \fi}
 {\if\edition\pythonEd   
 \begin{lstlisting}
-  FunctionDef(|$f$|, [(|$x_1$|,|$T_1$|),|$\ldots$|,(|$x_n$|,|$T_n$|)], |$T_r$|, |$\itm{body}$|)
+  FunctionDef(|$f$|, [(|$x_1$|,|$T_1$|),|$\ldots$|,(|$x_n$|,|$T_n$|)], |$T_r$|, None, |$\itm{body}$|, None)
 |$\Rightarrow$|
-  FunctionDef(|$f$|, [(|$x_1$|,|$T_1$|),|$\ldots$|,(|$x_5$|,|$T_5$|),(tup,TupleType([|$T_6, \ldots, T_n$|]))], |$T_r$|, |$\itm{body}'$|) 
+  FunctionDef(|$f$|, [(|$x_1$|,|$T_1$|),|$\ldots$|,(|$x_5$|,|$T_5$|),(tup,TupleType([|$T_6, \ldots, T_n$|]))],
+         |$T_r$|, None, |$\itm{body}'$|, None)
 \end{lstlisting}
 \fi}
 %
@@ -13783,9 +13787,12 @@ appropriate explicate functions for the various contexts.
 
 \newcommand{\CfunASTPython}{
 \begin{array}{lcl}
-\Exp &::= & \FUNREF{\itm{label}} \MID \CALL{\Atm}{\LS\Atm\code{,}\ldots\RS} \\
-\Stmt &::= & \TAILCALL{\Atm}{\LS\Atm\code{,}\ldots\RS} \\
-\Def &::=& \DEF{\itm{label}}{\LS\LP\Var\key{,}\Type\RP\code{,}\ldots\RS}{\LC\itm{label}\key{:}\Stmt^{*}\code{,}\ldots\RC}{\_}{\Type}{\_} 
+\Exp &::= & \FUNREF{\itm{label}} \MID \CALL{\Atm}{\Atm^{*}} \\
+\Stmt &::= & \TAILCALL{\Atm}{\Atm^{*}} \\
+\Params &::=& \LS\LP\Var\key{,}\Type\RP\code{,}\ldots\RS \\
+\Block &::=& \Stmt^{*} \\
+\Blocks &::=& \LC\itm{label}\key{:}\Block\code{,}\ldots\RC \\
+\Def &::=& \DEF{\itm{label}}{\Params}{\Blocks}{\key{None}}{\Type}{\key{None}} 
 \end{array}
 }
 
@@ -13845,8 +13852,9 @@ language, whose syntax is defined in Figure~\ref{fig:x86-3}.
 \Instr &::=& \ldots
      \MID \key{callq}\;\key{*}\Arg \MID \key{tailjmp}\;\Arg 
      \MID \key{leaq}\;\Arg\key{,}\;\key{\%}\Reg \\
-\Block &::= & \Instr\ldots \\
-\Def &::= & \LP\key{define} \; \LP\itm{label}\RP \;\LP\LP\itm{label} \,\key{.}\, \Block\RP\ldots\RP\RP\\
+\Block &::= & \Instr^{*} \\
+\Blocks &::=& \LP\LP\itm{label} \,\key{.}\, \Block\RP\ldots\RP\\
+\Def &::= & \LP\key{define} \; \LP\itm{label} \RP \; \Blocks \RP\\
 \LangXIndCallM{} &::= & \Def\ldots
 \end{array}
 \]
@@ -14639,7 +14647,7 @@ a type annotation for the variable on the left-hand side.}
   \gray{\LfunGrammarPython} \\ \hline
   \LlambdaGrammarPython \\
   \begin{array}{rcl}
-    \LangFunM{} &::=& \Def^{*} \Stmt^{*}
+    \LangFunM{} &::=& \Def\ldots \Stmt\ldots
   \end{array}
 \end{array}
 \]
@@ -14794,7 +14802,7 @@ this book is compilation, not type inference.
 
 The main idea of bidirectional type inference is to add an auxilliary
 function, here named \code{check\_exp}, that takes an expected type
-and checks whether the given expression can be of that type.  Thus, in
+and checks whether the given expression is of that type.  Thus, in
 \code{check\_exp}, type information flows in a top-down manner with
 respect to the AST, in contrast to the regular \code{type\_check\_exp}
 function, where type information flows in a primarily bottom-up
@@ -14816,9 +14824,9 @@ a program to sidestep the restriction, for example, by using an
 annotated assignment statement to assign the \code{lambda} to a
 temporary variable.
 
-Note that for the \code{Name} and \code{Lambda} AST nodes, we record
-their type in a \code{has\_type} field. This type information is used
-later in this chapter.
+Note that for the \code{Name} and \code{Lambda} AST nodes, the type
+checker records their type in a \code{has\_type} field. This type
+information is used later in this chapter.
 %
 \fi}
 
@@ -14965,15 +14973,17 @@ function \code{f} has a free variable \code{x} that is changed after
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
-%  assign_free.py
+%  box_free_assign.py
 \begin{lstlisting}
+def g(z : int) -> int:
     x = 0
     y = 0  
-    z = 20
     f : Callable[[int],int] = lambda a: a + x + z
     x = 10
     y = 12
-    print( f(y) )
+    return f(y)
+
+print( g(20) )
 \end{lstlisting}
 \fi}
 The correct output for this example is \code{42} because the call to
@@ -15046,22 +15056,34 @@ the variable needs to live on the heap.  The verb
 value on the heap, producing a pointer, and
 \emph{unbox}\index{subject}{unbox} for dereferencing the pointer.
 
-{\if\edition\racketEd
-We recommend solving these problems by boxing the local variables that
-are in the intersection of 1) variables that appear on the
-left-hand-side of a \code{set!}  and 2) variables that occur free
-inside a \code{lambda}.
-\fi}
-{\if\edition\pythonEd
-We recommend solving these problems by boxing the local variables that
-are in the intersection of 1) variables whose values may change and 2)
-variables that occur free inside a \code{lambda}.
-\fi}
+%% {\if\edition\racketEd
+%% We recommend solving these problems by boxing the local variables that
+%% are in the intersection of 1) variables that appear on the
+%% left-hand-side of a \code{set!}  and 2) variables that occur free
+%% inside a \code{lambda}.
+%% \fi}
+%% {\if\edition\pythonEd
+%% We recommend solving these problems by boxing the local variables that
+%% are in the intersection of 1) variables whose values may change and 2)
+%% variables that occur free inside a \code{lambda}.
+%% \fi}
 We shall introduce a new pass named
 \code{convert\_assignments} in Section~\ref{sec:convert-assignments}
-to perform this translation. But before diving into the compiler
-passes, we one more problem to discuss.
+to address this challenge.
+%
+\racket{But before diving into the compiler passes, we have one more
+  problem to discuss.}
 
+\if\edition\pythonEd
+\section{Uniquify Variables}
+\label{sec:uniquify-lambda}
+
+UNDER CONSTRUCTION
+
+\fi
+
+
+\if\edition\racketEd
 \section{Reveal Functions and the $F_2$ language}
 \label{sec:reveal-functions-r5}
 
@@ -15090,23 +15112,29 @@ Figure~\ref{fig:f2-syntax}.
 \label{fig:f2-syntax}
 \end{figure}
 
+\fi
 
-\section{Convert Assignments}
+\section{Assignment Conversion}
 \label{sec:convert-assignments}
 
-[UNDER CONSTRUCTION: This section was just moved into this location
-and may need to be updated. -Jeremy]
-
-Recall that in Section~\ref{sec:assignment-scoping} we learned that
-the combination of assignments and lexically-scoped functions requires
-that we box those variables that are both assigned-to and that appear
-free inside a \code{lambda}. The purpose of the
-\code{convert-assignments} pass is to carry out that transformation.
-We recommend placing this pass after \code{uniquify} but before
-\code{reveal\_functions}.
+The purpose of the \code{convert\_assignments} pass is address the
+challenge posed in Section~\ref{sec:assignment-scoping} regarding the
+interaction between variable assignments and closure conversion.
+First we identify which variables need to be boxed, then we transform
+the program to box those variables. In general, boxing introduces
+runtime overhead that we would like to avoid, so we should box as few
+variables as possible. We recommend boxing the variables in the
+intersection of the following two sets of variables:
+\begin{enumerate}
+\item The variables that are free in a \code{lambda}.
+\item The variables that appear on the left-hand side of an
+  assignment.
+\end{enumerate}
 
 Consider again the first example from
 Section~\ref{sec:assignment-scoping}:
+%
+{\if\edition\racketEd
 \begin{lstlisting}
 (let ([x 0])
   (let ([y 0])
@@ -15117,14 +15145,31 @@ Section~\ref{sec:assignment-scoping}:
           (set! y 12)
           (f y))))))
 \end{lstlisting}
-The variables \code{x} and \code{y} are assigned-to.  The variables
-\code{x} and \code{z} occur free inside the \code{lambda}. Thus,
-variable \code{x} needs to be boxed but not \code{y} and \code{z}.
-The boxing of \code{x} consists of three transformations: initialize
-\code{x} with a vector, replace reads from \code{x} with
-\code{vector-ref}'s, and replace each \code{set!} on \code{x} with a
-\code{vector-set!}. The output of \code{convert-assignments} for this
-example is as follows.
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+def g(z : int) -> int:
+    x = 0
+    y = 0  
+    f : Callable[[int],int] = lambda a: a + x + z
+    x = 10
+    y = 12
+    return f(y)
+
+print( g(20) )
+\end{lstlisting}
+\fi}
+%
+\noindent The variables \code{x} and \code{y} are assigned-to.  The
+variables \code{x} and \code{z} occur free inside the
+\code{lambda}. Thus, variable \code{x} needs to be boxed but not
+\code{y} or \code{z}.  The boxing of \code{x} consists of three
+transformations: initialize \code{x} with a tuple, replace reads from
+\code{x} with tuple reads, and replace each assignment to \code{x}
+with a tuple writes. The output of \code{convert\_assignments} for
+this example is as follows.
+%
+{\if\edition\racketEd
 \begin{lstlisting}
 (define (main) : Integer
   (let ([x0 (vector 0)])
@@ -15137,126 +15182,175 @@ example is as follows.
             (set! y1 12)
             (f4 y1)))))))
 \end{lstlisting}
-
-\paragraph{Assigned \& Free}
-
-We recommend defining an auxiliary function named
-\code{assigned\&free} that takes an expression and simultaneously
-computes 1) a set of assigned variables $A$, 2) a set $F$ of variables
-that occur free within lambda's, and 3) a new version of the
-expression that records which bound variables occurred in the
-intersection of $A$ and $F$. You can use the struct
-\code{AssignedFree} to do this. Consider the case for
-$\LET{x}{\itm{rhs}}{\itm{body}}$.  Suppose the the recursive call on
-$\itm{rhs}$ produces $\itm{rhs}'$, $A_r$, and $F_r$ and the recursive
-call on the $\itm{body}$ produces $\itm{body}'$, $A_b$, and $F_b$. If
-$x$ is in $A_b\cap F_b$, then transforms the \code{Let} as follows.
+\fi}
+%
+{\if\edition\pythonEd
 \begin{lstlisting}
-  (Let |$x$| |$rhs$| |$body$|)
-  |$\Rightarrow$|
-  (Let (AssignedFree |$x$|) |$rhs'$| |$body'$|)
+def g(z : int)-> int:
+  x = (0,)
+  x[0] = 0
+  y = 0
+  f : Callable[[int], int] = (lambda a: a + x[0] + z)
+  x[0] = 10
+  y = 12
+  return f(y)
+
+def main() -> int:
+  print(g(20))
+  return 0
 \end{lstlisting}
-If $x$ is not in $A_b\cap F_b$ then omit the use of \code{AssignedFree}.
-The set of assigned variables for this \code{Let} is
-$A_r \cup (A_b - \{x\})$
-and the set of variables free in lambda's is
-$F_r \cup (F_b - \{x\})$.
+\fi}
 
-The case for $\SETBANG{x}{\itm{rhs}}$ is straightforward but
-important. Recursively process \itm{rhs} to obtain \itm{rhs'}, $A_r$,
-and $F_r$. The result is $\SETBANG{x}{\itm{rhs'}}$, $\{x\} \cup A_r$,
-and $F_r$.
+To compute the free variables of all the \code{lambda} expressions, we
+recommend defining two auxiliary functions:
+\begin{enumerate}
+\item \code{free\_variables} computes the free variables of an expression, and
+\item \code{free\_in\_lambda} collects all of the variables that are
+  free in any of the \code{lambda} expressions, using
+  \code{free\_variables} in the case for each \code{lambda}.
+\end{enumerate}
 
-The case for $\LAMBDA{\itm{params}}{T}{\itm{body}}$ is a bit more
-involved.  Let \itm{body'}, $A_b$, and $F_b$ be the result of
-recursively processing \itm{body}. Wrap each of parameter that occurs
-in $A_b \cap F_b$ with \code{AssignedFree} to produce \itm{params'}.
-Let $P$ be the set of parameter names in \itm{params}.  The result is
-$\LAMBDA{\itm{params'}}{T}{\itm{body'}}$, $A_b - P$, and $(F_b \cup
-\mathrm{FV}(\itm{body})) - P$, where $\mathrm{FV}$ computes the free
-variables of an expression (see Chapter~\ref{ch:Rlam}).
 
-\paragraph{Convert Assignments}
+{\if\edition\racketEd
+%
+To compute the variables that are assigned-to, we recommend using the
+\code{collect-set!} function that we introduced in
+Section~\ref{sec:uncover-get-bang}, but updated to include the new AST
+forms such as \code{Lambda}.
+%
+\fi}
+  
+{\if\edition\pythonEd
+%
+To compute the variables that are assigned-to, we recommend defining
+an auxiliary function named \code{assigned\_vars\_stmt} that returns
+the set of variables that occur in the left-hand side of an assignment
+statement, and otherwise returns the empty set.
+%
+\fi}
 
-Next we discuss the \code{convert-assignment} pass with its auxiliary
-functions for expressions and definitions. The function for
-expressions, \code{cnvt-assign-exp}, should take an expression and a
-set of assigned-and-free variables (obtained from the result of
-\code{assigned\&free}. In the case for $\VAR{x}$, if $x$ is
-assigned-and-free, then unbox it by translating $\VAR{x}$ to a
-\code{vector-ref}.
+Let $\mathit{AF}$ be the intersection of the set of variables that are
+free in a \code{lambda} and that are assigned-to in the enclosing
+function definition.
+
+Next we discuss the \code{convert\_assignments} pass.  In the case for
+$\VAR{x}$, if $x$ is in $\mathit{AF}$, then unbox it by translating
+$\VAR{x}$ to a tuple read.
+%
+{\if\edition\racketEd
 \begin{lstlisting}
   (Var |$x$|)
   |$\Rightarrow$|
   (Prim 'vector-ref (list (Var |$x$|) (Int 0)))
 \end{lstlisting}
+\fi}
 %
-In the case for $\LET{\LP\code{AssignedFree}\,
-  x\RP}{\itm{rhs}}{\itm{body}}$, recursively process \itm{rhs} to
-obtain \itm{rhs'}.  Next, recursively process \itm{body} to obtain
-\itm{body'} but with $x$ added to the set of assigned-and-free
-variables.  Translate the let-expression as follows to bind $x$ to a
-boxed value.
+{\if\edition\pythonEd
 \begin{lstlisting}
-  (Let (AssignedFree |$x$|) |$rhs$| |$body$|)
+  Name(|$x$|)
   |$\Rightarrow$|
-  (Let |$x$| (Prim 'vector (list |$rhs'$|)) |$body'$|)
+  Subscript(Name(|$x$|), Constant(0), Load())
 \end{lstlisting}
+\fi}
 %
-In the case for $\SETBANG{x}{\itm{rhs}}$, recursively process
-\itm{rhs} to obtain \itm{rhs'}.  If $x$ is in the assigned-and-free
-variables, translate the \code{set!} into a \code{vector-set!}
-as follows.
+%
+In the case for assignment, recursively process the right-hand side
+\itm{rhs} to obtain \itm{rhs'}.  If $x$ is in $\mathit{AF}$, translate
+the assignment into a tuple-write as follows.
+%
+{\if\edition\racketEd
 \begin{lstlisting}
   (SetBang |$x$| |$\itm{rhs}$|)
   |$\Rightarrow$|
   (Prim 'vector-set! (list (Var |$x$|) (Int 0) |$\itm{rhs'}$|))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+  Assign([Name(|$x$|)],|$\itm{rhs}$|)
+  |$\Rightarrow$|
+  Assign([Subscript(Name(|$x$|), Constant(0), Store())], |$\itm{rhs'}$|)
+\end{lstlisting}
+\fi}
 %
+{\if\edition\racketEd
 The case for \code{Lambda} is non-trivial, but it is similar to the
 case for function definitions, which we discuss next.
+\fi}
 
-The auxiliary function for definitions, \code{cnvt-assign-def},
-applies assignment conversion to function definitions.
-We translate a function definition as follows.
+To translate a function definition, we first compute $\mathit{AF}$,
+the intersection of the variables that are free in a \code{lambda} and
+that are assigned-to. We then apply assignment conversion to the body
+of the function definition. Finally, we box the parameters of this
+function definition that are in $\mathit{AF}$. For example,
+the parameter \code{x} of the follow function \code{g}
+needs to be boxed.
+{\if\edition\racketEd
 \begin{lstlisting}
-  (Def |$f$| |$\itm{params}$| |$T$| |$\itm{info}$| |$\itm{body_1}$|)
-  |$\Rightarrow$|
-  (Def |$f$| |$\itm{params'}$| |$T$| |$\itm{info}$| |$\itm{body_4}$|)
+(define (g [x : Integer]) : Integer
+  (let ([f (lambda: ([a : Integer]) : Integer (+ a x))])
+    (begin
+      (set! x 10)
+      (f 32))))
 \end{lstlisting}
-So it remains to explain \itm{params'} and $\itm{body}_4$.
-Let \itm{body_2}, $A_b$, and $F_b$ be the result of
-\code{assigned\&free} on $\itm{body_1}$.
-Let $P$ be the parameter names in \itm{params}.
-We then apply \code{cnvt-assign-exp} to $\itm{body_2}$ to
-obtain \itm{body_3}, passing $A_b \cap F_b \cap P$
-as the set of assigned-and-free variables.
-Finally, we obtain \itm{body_4} by wrapping \itm{body_3}
-in a sequence of let-expressions that box the parameters
-that are in $A_b \cap F_b$.
+\fi}
 %
-Regarding \itm{params'}, change the names of the parameters that are
-in $A_b \cap F_b$ to maintain uniqueness (and so the let-bound
-variables can retain the original names). Recall the second example in
-Section~\ref{sec:assignment-scoping} involving a counter
-abstraction. The following is the output of assignment version for
-function \code{f}.
+{\if\edition\pythonEd
 \begin{lstlisting}
-(define (f0 [x1 : Integer]) : (Vector ( -> Integer) ( -> Void))
-  (vector
-   (lambda: () : Integer x1)
-   (lambda: () : Void (set! x1 (+ 1 x1)))))
-|$\Rightarrow$|
-(define (f0 [param_x1 : Integer]) : (Vector (-> Integer) (-> Void))
-  (let ([x1 (vector param_x1)])
-    (vector (lambda: () : Integer (vector-ref x1 0))
-             (lambda: () : Void
-                (vector-set! x1 0 (+ 1 (vector-ref x1 0)))))))
+def g(x : int) -> int:
+  f : Callable[[int],int] = lambda a: a + x
+  x = 10
+  return f(32)
 \end{lstlisting}
+\fi}
+%
+\noindent We box parameter \code{x} by creating a local variable named
+\code{x} that is initialized to a tuple whose contents is the value of
+the parameter, which we has been renamed.
+%
+{\if\edition\racketEd
+\begin{lstlisting}
+(define (g [x_0 : Integer]) : Integer
+  (let ([x (vector x_0)])
+    (let ([f (lambda: ([a : Integer]) : Integer
+               (+ a (vector-ref x 0)))])
+      (begin 
+        (vector-set! x 0 10)
+        (f 32)))))
+\end{lstlisting}
+\fi}
+%
+{\if\edition\pythonEd
+\begin{lstlisting}
+def g(x_0 : int)-> int:
+  x = (x_0,)
+  f : Callable[[int], int] = (lambda a: a + x[0])
+  x[0] = 10
+  return f(32)
+\end{lstlisting}
+\fi}
+
+%% Recall the second example in Section~\ref{sec:assignment-scoping}
+%% involving a counter abstraction. The following is the output of
+%% assignment version for function \code{f}.
+%% \begin{lstlisting}
+%% (define (f0 [x1 : Integer]) : (Vector ( -> Integer) ( -> Void))
+%%   (vector
+%%    (lambda: () : Integer x1)
+%%    (lambda: () : Void (set! x1 (+ 1 x1)))))
+%% |$\Rightarrow$|
+%% (define (f0 [param_x1 : Integer]) : (Vector (-> Integer) (-> Void))
+%%   (let ([x1 (vector param_x1)])
+%%     (vector (lambda: () : Integer (vector-ref x1 0))
+%%              (lambda: () : Void
+%%                 (vector-set! x1 0 (+ 1 (vector-ref x1 0)))))))
+%% \end{lstlisting}
 
 \section{Closure Conversion}
 \label{sec:closure-conversion}
 \index{subject}{closure conversion}
+
+\python{UNDER CONSTRUCTION}
 
 The compiling of lexically-scoped functions into top-level function
 definitions is accomplished in the pass \code{convert-to-closures}
