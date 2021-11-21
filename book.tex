@@ -58,7 +58,7 @@ showstringspaces=false
 \lstset{%
 language=Python,
 basicstyle=\ttfamily\small,
-morekeywords={match,case,bool,int},
+morekeywords={match,case,bool,int,let},
 deletekeywords={},
 escapechar=|,
 columns=flexible,
@@ -15350,33 +15350,45 @@ def g(x_0 : int)-> int:
 \label{sec:closure-conversion}
 \index{subject}{closure conversion}
 
-\python{UNDER CONSTRUCTION}
-
 The compiling of lexically-scoped functions into top-level function
-definitions is accomplished in the pass \code{convert-to-closures}
+definitions is accomplished in the pass \code{convert\_to\_closures}
 that comes after \code{reveal\_functions} and before
-\code{limit-functions}. 
+\code{limit\_functions}. 
 
 As usual, we implement the pass as a recursive function over the
-AST. All of the action is in the cases for \key{Lambda} and
-\key{Apply}. We transform a \key{Lambda} expression into an expression
-that creates a closure, that is, a vector whose first element is a
-function pointer and the rest of the elements are the free variables
-of the \key{Lambda}. We use the struct \code{Closure} here instead of
-using \code{vector} so that we can distinguish closures from vectors
-in Section~\ref{sec:optimize-closures} and to record the arity.  In
-the generated code below, the \itm{name} is a unique symbol generated
-to identify the function and the \itm{arity} is the number of
-parameters (the length of \itm{ps}).
+AST. The interesting cases are the ones for \key{lambda} and function
+application. We transform a \key{lambda} expression into an expression
+that creates a closure, that is, a tuple whose first element is a
+function pointer and the rest of the elements are the values of the
+free variables of the \key{lambda}. However, we use the \code{Closure}
+AST node instead of using a tuple so that we can record the arity and
+to distinguish closures from tuples in
+Section~\ref{sec:optimize-closures}.  In the generated code below,
+\itm{fvs} is the free variables of the lambda, \itm{name} is a unique
+symbol generated to identify the lambda and the \itm{arity} is the
+number of parameters (the length of \itm{ps}).
+%
+{\if\edition\racketEd
 \begin{lstlisting}
 (Lambda |\itm{ps}| |\itm{rt}| |\itm{body}|)
 |$\Rightarrow$|
 (Closure |\itm{arity}| (cons (FunRef |\itm{name}|) |\itm{fvs}|))
 \end{lstlisting}
-In addition to transforming each \key{Lambda} into a \key{Closure}, we
-create a top-level function definition for each \key{Lambda}, as
-shown below.\\
+\fi}
+%
+{\if\edition\pythonEd
+\begin{lstlisting}
+Lambda(|\itm{ps}|, |\itm{body}|)
+|$\Rightarrow$|
+Closure(|\itm{arity}|, [FunRef(|\itm{name}|), |\itm{fvs}, \ldots|])
+\end{lstlisting}
+\fi}
+%
+In addition to transforming each \key{Lambda} AST node into a
+\key{Closure}, we create a top-level function definition for each
+\key{Lambda}, as shown below.\\
 \begin{minipage}{0.8\textwidth}
+{\if\edition\racketEd
 \begin{lstlisting}
 (Def |\itm{name}| ([clos : (Vector _ |\itm{fvts}| ...)] |\itm{ps'}| ...) |\itm{rt'}|
    (Let |$\itm{fvs}_1$| (Prim 'vector-ref (list (Var clos) (Int 1)))
@@ -15384,64 +15396,117 @@ shown below.\\
      (Let |$\itm{fvs}_n$| (Prim 'vector-ref (list (Var clos) (Int |$n$|)))
        |\itm{body'}|)...))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+def |\itm{name}|(clos : |\itm{closTy}|, |\itm{ps'}, \ldots|) -> |\itm{rt'}|:
+   |$\itm{fvs}_1$| = clos[1]
+   |$\ldots$|
+   |$\itm{fvs}_n$| = clos[|$n$|]
+   |\itm{body'}|
+\end{lstlisting}
+\fi}
 \end{minipage}\\
 The \code{clos} parameter refers to the closure.  Translate the type
 annotations in \itm{ps} and the return type \itm{rt}, as discussed in
-the next paragraph, to obtain \itm{ps'} and \itm{rt'}.  The types
-$\itm{fvts}$ are the types of the free variables in the lambda and the
-underscore \code{\_} is a dummy type that we use because it is rather
-difficult to give a type to the function in the closure's
-type.\footnote{To give an accurate type to a closure, we would need to
-  add existential types to the type checker~\citep{Minamide:1996ys}.}
-The dummy type is considered to be equal to any other type during type
-checking.  The sequence of \key{Let} forms bind the free variables to
-their values obtained from the closure.
+the next paragraph, to obtain \itm{ps'} and \itm{rt'}.  The type
+\itm{closTy} is a tuple type whose first element type is
+\python{\code{Bottom()}}\racket{\code{\_} (the dummy type)} and the rest of
+the element types are the types of the free variables in the
+lambda. We use \python{\code{Bottom()}}\racket{\code{\_}} because it
+is difficult to give a type to the function in the closure's type.%
+%
+\footnote{To give an accurate type to a closure, we would need to add
+  existential types to the type checker~\citep{Minamide:1996ys}.}
+%
+%% The dummy type is considered to be equal to any other type during type
+%% checking.
+The free variables become local variables that are initialized with
+their values in the closure.
 
-Closure conversion turns functions into vectors, so the type
+Closure conversion turns every function into a tuple, so the type
 annotations in the program must also be translated.  We recommend
-defining a auxiliary recursive function for this purpose.  Function
+defining an auxiliary recursive function for this purpose.  Function
 types should be translated as follows.
+%
+{\if\edition\racketEd
 \begin{lstlisting}
 (|$T_1, \ldots, T_n$| -> |$T_r$|)
 |$\Rightarrow$|  
-(Vector ((Vector _) |$T'_1, \ldots, T'_n$| -> |$T'_r$|))
+(Vector ((Vector) |$T'_1, \ldots, T'_n$| -> |$T'_r$|))
 \end{lstlisting}
-The above type says that the first thing in the vector is a function
-pointer. The first parameter of the function pointer is a vector (a
-closure) and the rest of the parameters are the ones from the original
-function, with types $T'_1, \ldots, T'_n$.  The \code{Vector} type for
-the closure omits the types of the free variables because 1) those
-types are not available in this context and 2) we do not need them in
-the code that is generated for function application.
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+FunctionType([|$T_1, \ldots, T_n$|], |$T_r$|)
+|$\Rightarrow$|  
+TupleType([FunctionType([TupleType([]), |$T'_1, \ldots, T'_n$|], |$T'_r$|)])
+\end{lstlisting}
+\fi}
+%
+The above type says that the first thing in the tuple is a
+function. The first parameter of the function is a tuple (a closure)
+and the rest of the parameters are the ones from the original
+function, with types $T'_1, \ldots, T'_n$.  The type for the closure
+omits the types of the free variables because 1) those types are not
+available in this context and 2) we do not need them in the code that
+is generated for function application.
 
 We transform function application into code that retrieves the
-function pointer from the closure and then calls the function, passing
-in the closure as the first argument. We bind $e'$ to a temporary
-variable to avoid code duplication.
+function from the closure and then calls the function, passing in the
+closure as the first argument. We place $e'$ in a temporary variable
+to avoid code duplication.
+%
+{\if\edition\racketEd
 \begin{lstlisting}
-(Apply |$e$| |\itm{es}|)
+(Apply |$e$| |$\itm{es}$|)
 |$\Rightarrow$|
-(Let |\itm{tmp}| |$e'$|
-  (Apply (Prim 'vector-ref (list (Var |\itm{tmp}|) (Int 0))) (cons |\itm{tmp}| |\itm{es'}|)))
+(Let |$\itm{tmp}$| |$e'$|
+  (Apply (Prim 'vector-ref (list (Var |$\itm{tmp}$|) (Int 0))) (cons |$\itm{tmp}$| |$\itm{es'}$|)))
 \end{lstlisting}
+\fi}
+%
+{\if\edition\pythonEd
+\begin{lstlisting}
+Call(|$e$|, [|$e_1, \ldots, e_n$|])
+|$\Rightarrow$|
+Let(|$\itm{tmp}$|, |$e'$|,
+  Call(Subscript(Name(|$\itm{tmp}$|), Constant(0)),
+       [|$\itm{tmp}$|, |$e'_1, \ldots, e'_n$|]))
+\end{lstlisting}
+\fi}
 
-There is also the question of what to do with references top-level
+There is also the question of what to do with references to top-level
 function definitions. To maintain a uniform translation of function
 application, we turn function references into closures.
 
 \begin{tabular}{lll}
 \begin{minipage}{0.3\textwidth}
+{\if\edition\racketEd
 \begin{lstlisting}
 (FunRefArity |$f$| |$n$|)
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+FunRefArity(|$f$|, |$n$|)
+\end{lstlisting}
+\fi}
 \end{minipage}
 &
 $\Rightarrow$
 &
 \begin{minipage}{0.5\textwidth}
+{\if\edition\racketEd
 \begin{lstlisting}
 (Closure |$n$| (FunRef |$f$|) '())
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+Closure(|$n$|, [FunRef(|$f$|)])
+\end{lstlisting}
+\fi}
 \end{minipage}
 \end{tabular}  \\
 %
@@ -15452,13 +15517,14 @@ an extra closure parameter.
 \label{sec:example-lambda}
 
 Figure~\ref{fig:lexical-functions-example} shows the result of
-\code{reveal\_functions} and \code{convert-to-closures} for the example
+\code{reveal\_functions} and \code{convert\_to\_closures} for the example
 program demonstrating lexical scoping that we discussed at the
 beginning of this chapter.
 
 
 \begin{figure}[tbp]
   \begin{minipage}{0.8\textwidth}
+{\if\edition\racketEd
 % tests/lambda_test_6.rkt
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define (f6 [x7 : Integer]) : (Integer -> Integer)
@@ -15489,8 +15555,40 @@ $\Rightarrow$
                        ((vector-ref clos6 0) clos6 3))])
          (+ ((vector-ref g0 0) g0 11) ((vector-ref h1 0) h1 15)))))
 \end{lstlisting}
-\end{minipage}
+\fi}
+%
+{\if\edition\pythonEd
+% free_var.py
+\begin{lstlisting}
+def f(x : int) -> Callable[[int], int]:
+    y = 4
+    return lambda z: x + y + z
 
+g = f(5)
+h = f(3)
+print( g(11) + h(15) )
+\end{lstlisting}
+$\Rightarrow$
+\begin{lstlisting}
+def lambda_0(fvs_1:tuple[bot,int,tuple[int]],z:int) -> int:
+  x = fvs_1[1]
+  y = fvs_1[2]
+  return x + y[0] + z
+
+def f(fvs_2:bot, x:int) -> tuple[Callable[[tuple[],int], int]]
+  y = (777,)
+  y[0] = 4
+  return closure(lambda_0,y,x)
+
+def main() -> int:
+  g = (let clos_3 = closure(f) in clos_3[0](clos_3, 5))
+  h = (let clos_4 = closure(f) in clos_4[0](clos_4, 3))
+  print((let clos_5 = g in clos_5[0](clos_5, 11))
+        + (let clos_6 = h in clos_6[0](clos_6, 15)))
+  return 0
+\end{lstlisting}
+\fi}
+\end{minipage}
 \caption{Example of closure conversion.}
 \label{fig:lexical-functions-example}
 \end{figure}
@@ -15544,6 +15642,9 @@ operators.
 \LangCLamM{} & ::= & \gray{ \PROGRAMDEFS{\itm{info}}{\LP\Def\ldots\RP} }
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd
+UNDER CONSTRUCTION
 \fi}
 \end{minipage}
 }
