@@ -172,7 +172,7 @@ There is a magical moment when a programmer presses the ``run'' button
 and the software begins to execute. Somehow a program written in a
 high-level language is running on a computer that is only capable of
 shuffling bits. Here we reveal the wizardry that makes that moment
-possible. Beginning with the ground breaking work of Backus and
+possible. Beginning with the groundbreaking work of Backus and
 colleagues in the 1950s, computer scientists discovered techniques for
 constructing programs, called \emph{compilers}, that automatically
 translate high-level programs into machine code.
@@ -184,7 +184,7 @@ develop your understanding of how programs are mapped onto computer
 hardware, which is helpful when reasoning about properties at the
 junction between hardware and software such as execution time,
 software errors, and security vulnerabilities.  For those interested
-in pursuing compiler construction, our goal is to provide a
+in pursuing compiler construction as a career, our goal is to provide a
 stepping-stone to advanced topics such as just-in-time compilation,
 program analysis, and program optimization.  For those interested in
 designing and implementing programming languages, we connect
@@ -192,23 +192,24 @@ language design choices to their impact on the compiler and the generated
 code.
 
 A compiler is typically organized as a sequence of stages that
-progressively translate a program to code that runs on hardware. We
-take this approach to the extreme by partitioning our compiler into a
-large number of \emph{nanopasses}, each of which performs a single
-task. This allows us to test the output of each pass in isolation, and
-furthermore, allows us to focus our attention which makes the compiler
-far easier to understand.
+progressively translate a program to the code that runs on
+hardware. We take this approach to the extreme by partitioning our
+compiler into a large number of \emph{nanopasses}, each of which
+performs a single task. This allows us to test the output of each pass
+in isolation, and furthermore, allows us to focus our attention which
+makes the compiler far easier to understand.
 
 The most familiar approach to describing compilers is with one pass
 per chapter.  The problem with that approach is it obfuscates how
-language features motivate design choices in a compiler. We take an
-\emph{incremental} approach in which we build a complete compiler in
-each chapter, starting with a small input language that includes only
-arithmetic and variables and we add new language features in
-subsequent chapters.
+language features motivate design choices in a compiler. We instead
+take an \emph{incremental} approach in which we build a complete
+compiler in each chapter, starting with a small input language that
+includes only arithmetic and variables and we add new language
+features in subsequent chapters.
 
-Our choice of language features is designed to elicit the fundamental
-concepts and algorithms used in compilers.
+Our choice of language features is designed to elicit fundamental
+concepts and algorithms used in compilers while minimizing incidental
+complexity.
 \begin{itemize}
 \item We begin with integer arithmetic and local variables in
   Chapters~\ref{ch:trees-recur} and \ref{ch:Lvar}, where we introduce
@@ -15779,53 +15780,87 @@ applications where we know that only \code{tail\_sum} is being applied
 (and not any other functions).
 \begin{center}
 \begin{minipage}{0.95\textwidth}
+{\if\edition\racketEd  
 \begin{lstlisting}
-(define (tail_sum [n : Integer] [r : Integer]) : Integer
+(define (tail_sum [n : Integer] [s : Integer]) : Integer
   (if (eq? n 0)
-      r
-      (tail_sum (- n 1) (+ n r))))
+      s
+      (tail_sum (- n 1) (+ n s))))
 
-(+ (tail_sum 5 0) 27)
+(+ (tail_sum 3 0) 36)
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+def tail_sum(n : int, s : int) -> int:
+    if n == 0:
+        return s
+    else:
+        return tail_sum(n - 1, n + s)
+
+print( tail_sum(3, 0) + 36)
+\end{lstlisting}
+\fi}
 \end{minipage}
 \end{center}
 As described in this chapter, we uniformly apply closure conversion to
 all functions, obtaining the following output for this program.
 \begin{center}
 \begin{minipage}{0.95\textwidth}
+{\if\edition\racketEd  
 \begin{lstlisting}
-(define (tail_sum1 [fvs5 : _] [n2 : Integer] [r3 : Integer]) : Integer
+(define (tail_sum1 [fvs5 : _] [n2 : Integer] [s3 : Integer]) : Integer
    (if (eq? n2 0)
-      r3
+      s3
       (let ([clos4 (closure (list (fun-ref tail_sum1)))])
-         ((vector-ref clos4 0) clos4 (+ n2 -1) (+ n2 r3)))))
+         ((vector-ref clos4 0) clos4 (+ n2 -1) (+ n2 s3)))))
 
 (define (main) : Integer
    (+ (let ([clos6 (closure (list (fun-ref tail_sum1)))])
-         ((vector-ref clos6 0) clos6 5 0)) 27))
+         ((vector-ref clos6 0) clos6 3 0)) 27))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+def tail_sum(fvs_3:bot,n_0:int,s_1:int) -> int :
+  if n_0 == 0:
+    return s_1
+  else:
+    return (let clos_2 = (tail_sum,)
+            in clos_2[0](clos_2, n_0 - 1, n_0 + s_1))
+
+def main() -> int :
+  print((let clos_4 = (tail_sum,)
+         in clos_4[0](clos_4, 3, 0)) + 36)
+  return 0
+\end{lstlisting}
+\fi}
 \end{minipage}
 \end{center}
 
-In the previous Chapter, there would be no allocation in the program
+In the previous chapter, there would be no allocation in the program
 and the calls to \code{tail\_sum} would be direct calls. In contrast,
-the above program allocates memory for each \code{closure} and the
-calls to \code{tail\_sum} are indirect. These two differences incur
+the above program allocates memory for each closure and the calls to
+\code{tail\_sum} are indirect. These two differences incur
 considerable overhead in a program such as this one, where the
 allocations and indirect calls occur inside a tight loop.
 
 One might think that this problem is trivial to solve: can't we just
-recognize calls of the form \code{((fun-ref $f$) $e_1 \ldots e_n$)}
-and compile them to direct calls \code{((fun-ref $f$) $e'_1 \ldots
-  e'_n$)} instead of treating it like a call to a closure? We would
-also drop the \code{fvs5} parameter of \code{tail\_sum1}.
+recognize calls of the form \APPLY{\FUNREF{$f$}}{$\mathit{args}$}
+and compile them to direct calls instead of treating it like a call to
+a closure? We would also drop the new \code{fvs} parameter of
+\code{tail\_sum}.
 %
 However, this problem is not so trivial because a global function may
 ``escape'' and become involved in applications that also involve
 closures. Consider the following example in which the application
-\code{(f 41)} needs to be compiled into a closure application, because
-the \code{lambda} may get bound to \code{f}, but the \code{inc}
-function might also get bound to \code{f}.
+\CAPPLY{\code{f}}{\code{41}} needs to be compiled into a closure
+application, because the \code{lambda} may flow into \code{f}, but the
+\code{inc} function might also flow into \code{f}.
+\begin{center}
+\begin{minipage}{\textwidth}
+% lambda_test_30.rkt
+{\if\edition\racketEd  
 \begin{lstlisting}
 (define (inc [x : Integer]) : Integer
   (+ x 1))
@@ -15836,6 +15871,20 @@ function might also get bound to \code{f}.
                (lambda: ([x : Integer]) : Integer (- x y)))])
     (f 41)))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd  
+\begin{lstlisting}
+def add1(x : int) -> int:
+  return x + 1
+
+y = input_int()
+g : Callable[[int], int] = lambda x: x - y
+f = add1 if input_int() == 0 else g
+print( f(41) )
+\end{lstlisting}
+\fi}
+\end{minipage}
+\end{center}
 If a global function name is used in any way other than as the
 operator in a direct call, then we say that the function
 \emph{escapes}. If a global function does not escape, then we do not
@@ -15856,13 +15905,27 @@ it would also be nice to reduce the overhead of calling a
 \code{lambda} will be called. We refer to such calls as \emph{known
   calls}.  Consider the following example in which a \code{lambda} is
 bound to \code{f} and then applied.
+{\if\edition\racketEd
+% lambda_test_9.rkt  
 \begin{lstlisting}
 (let ([y (read)])
   (let ([f (lambda: ([x : Integer]) : Integer
              (+ x y))])
     (f 21)))
 \end{lstlisting}
-Closure conversion compiles \code{(f 21)} into an indirect call:
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+y = input_int()
+f : Callable[[int],int] = lambda x: x + y
+print( f(21) )
+\end{lstlisting}
+\fi}
+%
+\noindent Closure conversion compiles the application
+\CAPPLY{\code{f}}{\code{21}} into an indirect call:
+%
+{\if\edition\racketEd
 \begin{lstlisting}
 (define (lambda5 [fvs6 : (Vector _ Integer)] [x3 : Integer]) : Integer
    (let ([y2 (vector-ref fvs6 1)])
@@ -15873,29 +15936,59 @@ Closure conversion compiles \code{(f 21)} into an indirect call:
       (let ([f4 (Closure 1 (list (fun-ref lambda5) y2))])
          ((vector-ref f4 0) f4 21))))
 \end{lstlisting}
-but we can instead compile the application \code{(f 21)} into a direct call
-to \code{lambda5}:
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+def lambda_3(fvs_4:tuple[bot,tuple[int]], x_2:int) -> int:
+  y_1 = fvs_4[1]
+  return x_2 + y_1[0]
+
+def main() -> int:
+  y_1 = (777,)
+  y_1[0] = input_int()
+  f_0 = (lambda_3, y_1)
+  print((let clos_5 = f_0 in clos_5[0](clos_5, 21)))
+  return 0
+\end{lstlisting}
+\fi}
+%
+\noindent but we can instead compile the application
+\CAPPLY{\code{f}}{\code{21}} into a direct call:
+%
+{\if\edition\racketEd
 \begin{lstlisting}
 (define (main) : Integer
    (let ([y2 (read)])
       (let ([f4 (Closure 1 (list (fun-ref lambda5) y2))])
          ((fun-ref lambda5) f4 21))))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+def main() -> int:
+  y_1 = (777,)
+  y_1[0] = input_int()
+  f_0 = (lambda_3, y_1)
+  print(lambda_3(f_0, 21))
+  return 0
+\end{lstlisting}
+\fi}
 
-The problem of determining which lambda will be called from a
+The problem of determining which \code{lambda} will be called from a
 particular application is quite challenging in general and the topic
 of considerable research~\citep{Shivers:1988aa,Gilray:2016aa}. For the
 following exercise we recommend that you compile an application to a
-direct call when the operator is a variable and the variable is
-\code{let}-bound to a closure. This can be accomplished by maintaining
-an environment mapping \code{let}-bound variables to function names.
-Extend the environment whenever you encounter a closure on the
-right-hand side of a \code{let}, mapping the \code{let}-bound variable
-to the name of the global function for the closure.  This pass should
-come after closure conversion.
+direct call when the operator is a variable and \racket{the variable
+  is \code{let}-bound to a closure} \python{the previous assignment to
+  the variable is a closure}.  This can be accomplished by maintaining
+an environment mapping variables to function names.  Extend the
+environment whenever you encounter a closure on the right-hand side of
+a \racket{\code{let}}\python{assignment}, mapping the variable to the
+name of the global function for the closure. This pass should come
+after closure conversion.
 
 \begin{exercise}\normalfont
-Implement a compiler pass, named \code{optimize-known-calls}, that
+Implement a compiler pass, named \code{optimize\_known\_calls}, that
 compiles known calls into direct calls. Verify that your compiler is
 successful in this regard on several example programs.
 \end{exercise}
@@ -15906,15 +15999,15 @@ work of \citet{Keep:2012ab}.
 
 \section{Further Reading}
 
-The notion of lexically scoped anonymous functions predates modern
-computers by about a decade. They were invented by
-\citet{Church:1932aa}, who proposed the $\lambda$ calculus as a
-foundation for logic. Anonymous functions were included in the
-LISP~\citep{McCarthy:1960dz} programming language but were initially
-dynamically scoped. The Scheme dialect of LISP adopted lexical scoping
-and \citet{Guy-L.-Steele:1978yq} demonstrated how to efficiently
-compile Scheme programs. However, environments were represented as
-linked lists, so variable lookup was linear in the size of the
+The notion of lexically scoped functions predates modern computers by
+about a decade. They were invented by \citet{Church:1932aa}, who
+proposed the lambda calculus as a foundation for logic. Anonymous
+functions were included in the LISP~\citep{McCarthy:1960dz}
+programming language but were initially dynamically scoped. The Scheme
+dialect of LISP adopted lexical scoping and
+\citet{Guy-L.-Steele:1978yq} demonstrated how to efficiently compile
+Scheme programs. However, environments were represented as linked
+lists, so variable lookup was linear in the size of the
 environment. In this chapter we represent environments using flat
 closures, which were invented by
 \citet{Cardelli:1983aa,Cardelli:1984aa} for the purposes of compiling
