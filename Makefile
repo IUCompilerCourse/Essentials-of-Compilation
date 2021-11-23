@@ -12,7 +12,7 @@ continuous:
 
 clean:
 	$(LATEXMK) -C book
-	rm -f book.log book.aux book.bbl book.lof book.out book.toc book.blg book.pdf book.ilg book.ind book.lot book.run.xml book.bcf book.fls book.fdb_latexmk authors.idx athors.ilg authors.ind subject.idx subject.ilg subject.ind
+	rm -f book.log book.aux book.bbl book.lof book.out book.toc book.blg book.pdf book.ilg book.ind book.lot book.run.xml book.bcf book.fls book.fdb_latexmk authors.idx authors.ilg authors.ind subject.idx subject.ilg subject.ind
 
 # Build with a fixed snapshot of NixPkgs 17.03.  Known-to-work.
 # For a very clean version, run git clean -fxd followed by this:
