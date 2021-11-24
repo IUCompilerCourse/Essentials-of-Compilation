@@ -25,7 +25,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{0}
+\def\edition{1}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd{#1}\fi}}
@@ -1175,7 +1175,7 @@ that correspond to a grammar, and the body of each
 \racket{clause}\python{case} makes a recursive call on each child
 node.\footnote{This principle of structuring code according to the
   data definition is advocated in the book \emph{How to Design
-    Programs} \url{https://htdp.org/2020-8-1/Book/index.html}.}.
+    Programs} \url{https://htdp.org/2020-8-1/Book/index.html}.}
 \python{We define a second function, named \code{stmt}, that
   recognizes whether a value is a \LangInt{} statement.}
 \python{Finally, } Figure~\ref{fig:exp-predicate} \racket{also}
@@ -2541,6 +2541,11 @@ programs, so we define an abstract syntax for x86 in
 Figure~\ref{fig:x86-int-ast}. We refer to this language as
 \LangXInt{}.
 %
+{\if\edition\pythonEd%
+  The main difference compared to the concrete syntax of \LangXInt{}
+  (Figure~\ref{fig:x86-int-concrete}) is that labels, instruction
+  names, and register names are explicitly represented by strings. 
+\fi} %
 {\if\edition\racketEd  
 The main difference compared to the concrete syntax of \LangXInt{}
 (Figure~\ref{fig:x86-int-concrete}) is that labels are not allowed in
@@ -2559,6 +2564,12 @@ Regarding the abstract syntax for \code{callq}, the \code{Callq} AST
 node includes an integer for representing the arity of the function,
 i.e., the number of arguments, which is helpful to know during
 register allocation (Chapter~\ref{ch:register-allocation-Lvar}).
+
+\newcommand{\allastregisters}{\skey{rsp} \MID \skey{rbp} \MID \skey{rax} \MID \skey{rbx} \MID \skey{rcx}
+              \MID \skey{rdx} \MID \skey{rsi} \MID \skey{rdi} \MID \\
+              && \skey{r8} \MID \skey{r9} \MID \skey{r10}
+              \MID \skey{r11} \MID \skey{r12} \MID \skey{r13}
+              \MID \skey{r14} \MID \skey{r15}}
 
 \begin{figure}[tp]
 \fbox{
@@ -2586,15 +2597,15 @@ register allocation (Chapter~\ref{ch:register-allocation-Lvar}).
 {\if\edition\pythonEd
 \[
 \begin{array}{lcl}
-\Reg &::=& \allregisters{} \\
+\Reg &::=& \allastregisters{} \\
 \Arg &::=&  \IMM{\Int} \MID \REG{\Reg}
    \MID \DEREF{\Reg}{\Int} \\
-\Instr &::=& \BININSTR{\code{addq}}{\Arg}{\Arg} 
-       \MID \BININSTR{\code{subq}}{\Arg}{\Arg} \\
-       &\MID& \BININSTR{\code{movq}}{\Arg}{\Arg}
-       \MID \UNIINSTR{\code{negq}}{\Arg}\\
-       &\MID& \PUSHQ{\Arg} \MID \POPQ{\Arg}\\
-       &\MID& \CALLQ{\itm{label}}{\itm{int}} \MID \RETQ{} \MID \JMP{\itm{label}} \\
+\Instr &::=& \BININSTR{\scode{addq}}{\Arg}{\Arg} 
+       \MID \BININSTR{\scode{subq}}{\Arg}{\Arg} \\
+       &\MID& \BININSTR{\scode{movq}}{\Arg}{\Arg}
+       \MID \UNIINSTR{\scode{negq}}{\Arg}\\
+       &\MID&  \PUSHQ{\Arg} \MID \POPQ{\Arg} \\
+       &\MID& \CALLQ{\itm{label}}{\itm{int}} \MID \RETQ{}  \MID \JMP{\itm{label}} \\
 \LangXIntM{} &::= & \XPROGRAM{}{\Instr^{*}}{}
 \end{array}
 \]
@@ -3582,6 +3593,13 @@ For $\SEQ{s}{t}$, you can translate the statement $s$ and tail $t$
 recursively and then append the resulting instructions.
 \fi}
 
+{\if\edition\pythonEd
+We recommend that you use the function \code{utils.label\_name()} to
+transform a string into an label argument suitably suitable for, e.g.,
+the target of the \code{callq} instruction. This practice makes your
+compiler portable across Linus and Mac OS X, which requires an underscore prefixed to
+all labels.
+\fi}
 \begin{exercise}
   \normalfont
 {\if\edition\racketEd
@@ -4476,9 +4494,9 @@ L_{\mathsf{after}}(5)=  \emptyset
   addq tmp_0, tmp_1
                       |$\{\ttm{tmp\_1}\}$|
   movq tmp_1, %rdi
-                       |$\{\ttm{rdi}\}$|
+                      |$\{\ttm{rdi}\}$|
   callq print_int
-                       |$\{\}$|
+                      |$\{\}$|
 \end{lstlisting}
 \fi}
 \end{minipage}
@@ -4666,8 +4684,8 @@ shown in Figure~\ref{fig:interfere}.
 \lstinline!movq x, y!& \ttm{y} interferes with \ttm{w} but not \ttm{x}\\
 \lstinline!movq x, z!& \ttm{z} interferes with \ttm{w} and \ttm{y}\\
 \lstinline!addq w, z!& \ttm{z} interferes with \ttm{y} \\
-\lstinline!movq y, tmp_0!& \ttm{t} interferes with \ttm{z} \\
-\lstinline!negq tmp_0!& \ttm{t} interferes with \ttm{z} \\
+\lstinline!movq y, tmp_0!& \ttm{tmp\_0} interferes with \ttm{z} \\
+\lstinline!negq tmp_0!& \ttm{tmp\_0} interferes with \ttm{z} \\
 \lstinline!movq z, tmp_1! & \ttm{tmp\_0} interferes with \ttm{tmp\_1} \\
 \lstinline!addq tmp_0, tmp_1! & no interference\\
 \lstinline!movq tmp_1, %rdi! & no interference \\
@@ -6477,12 +6495,12 @@ how to handle conditional \code{goto}'s during liveness analysis.
 \section{The \LangIf{} Language}
 \label{sec:lang-if}
 
-The concrete syntax of the \LangIf{} language is defined in
-Figure~\ref{fig:Lif-concrete-syntax} and the abstract syntax is defined
-in Figure~\ref{fig:Lif-syntax}. The \LangIf{} language includes all of
-\LangVar{}\racket{(shown in gray)}, the Boolean literals \TRUE{} and
-\FALSE{}, and the \code{if} expression \python{and statement}. We expand the
-operators to include
+The concrete and abstract syntax of the \LangIf{} language are defined in
+Figures~\ref{fig:Lif-concrete-syntax} and~\ref{fig:Lif-syntax},
+respectively. The \LangIf{} language includes all of 
+\LangVar{} {(shown in gray)}, the Boolean literals \TRUE{} and
+\FALSE{},\racket{ and} the \code{if} expression\python{, and the
+  \code{if}  statement}. We expand the set of operators to include
 \begin{enumerate}
 \item subtraction on integers,
 \item the logical operators \key{and}, \key{or}, and \key{not},
@@ -6627,9 +6645,9 @@ evaluate to the corresponding Boolean values. The conditional
 expression $\CIF{e_1}{e_2}{\itm{e_3}}$ evaluates expression $e_1$
 and then either evaluates $e_2$ or $e_3$ depending on whether
 $e_1$ produced \TRUE{} or \FALSE{}. The logical operations
-\code{and}, \code{or}, and \code{not} behave according to propositional logic,
-but note that the \code{and} and \code{or} operations are
-short-circuiting.
+\code{and}, \code{or}, and \code{not} behave according to
+propositional logic. In addition, the \code{and} and \code{or}
+operations perform \emph{short-circuit evaluation}.
 %
 That is, given the expression $\CAND{e_1}{e_2}$, the expression $e_2$
 is not evaluated if $e_1$ evaluates to \FALSE{}.
@@ -6888,8 +6906,8 @@ Figure~\ref{fig:type-check-Lvar}.  The type of an integer constant is
   arguments and then invoke \code{type\_check\_op} to check whether
   the argument types are allowed.}
 %
-\python{Regarding addition and negation, we recursively analyze the
-  arguments, check that they have type \INT{}, and return \INT{}.}
+\python{Regarding addition, subtraction, and negation, we recursively analyze the
+  arguments, check that they have type \INTTY{}, and return \INTTY{}.}
 
 \racket{Several auxiliary methods are used in the type checker. The
   method \code{operator-types} defines a dictionary that maps the
@@ -6902,7 +6920,7 @@ Figure~\ref{fig:type-check-Lvar}.  The type of an integer constant is
   checks whether the argument types are equal to the parameter types.
   The result is the return type of the operator.}
 %
-\python{The auxiliary method \code{check\_type\_equal} method triggers
+\python{The auxiliary method \code{check\_type\_equal} triggers
   an error if the two types are not equal.}
 
 \begin{figure}[tbp]
@@ -6960,7 +6978,7 @@ Figure~\ref{fig:type-check-Lvar}.  The type of an integer constant is
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
-\begin{lstlisting}
+\begin{lstlisting}[escapechar=`]
 class TypeCheckLvar:
   def check_type_equal(self, t1, t2, e):
     if t1 != t2:
@@ -6969,7 +6987,7 @@ class TypeCheckLvar:
           
   def type_check_exp(self, e, env):
     match e:
-      case BinOp(left, Add(), right):
+      case BinOp(left, (Add() | Sub()), right):
         l = self.type_check_exp(left, env)
         check_type_equal(l, int, left)
         r = self.type_check_exp(right, env)
@@ -7122,11 +7140,10 @@ The type of a Boolean constant is \BOOLTY{}.
 \racket{The \code{operator-types} function adds dictionary entries for
   the other new operators.}
 %
-\python{Subtraction requires its arguments to be of type \INTTY{} and produces
-  an \INTTY{}. Negation requires its argument to be a \BOOLTY{} and
+\python{Logical not requires its argument to be a \BOOLTY{} and
   produces a \BOOLTY{}. Similarly for logical and and logical or. }
 %
-The equality operators requires the two arguments to have the same
+The equality operators require the two arguments to have the same
 type.
 %
 \python{The other comparisons (less-than, etc.) require their
@@ -7199,17 +7216,29 @@ the arguments of operators are restricted to atomic expressions. The
 include a restricted form of \code{if} statment. The condition must be
 a comparison and the two branches may only contain \code{goto}
 statements. These restrictions make it easier to translate \code{if}
-statements to x86.
+statements to x86. 
 %
 \fi}
+%
+Besides the \code{goto} statement, \LangCIf{}, also adds a
+\code{return} statement to finish a function call with a specified value.
 %
 The \key{CProgram} construct contains
 %
 \racket{an alist}\python{a dictionary}
 %
-mapping labels to $\Tail$ expressions, which can be return statements,
+mapping labels to
+\racket{$\Tail$ expressions, which can be \code{return} statements,
 an assignment statement followed by a $\Tail$ expression, a
-\code{goto}, or a conditional \code{goto}.
+\code{goto}, or a conditional \code{goto}.}
+\python{lists of statements, which comprise of assignment statements
+  and end in a \code{return} statement, a \code{goto}, or a
+  conditional \code{goto}.
+  \index{subject}{basic block}
+  Statement lists of this form are called
+  \emph{basic blocks}: there is a control transfer at the end and
+  control only enters at the beginning of the list, which is marked by
+  the label. }
 
 \newcommand{\CifGrammarRacket}{
 \begin{array}{lcl}
@@ -7325,7 +7354,7 @@ an assignment statement followed by a $\Tail$ expression, a
 \label{sec:x86-if}
 
 \index{subject}{x86} To implement the new logical operations, the comparison
-operations, and the \key{if} expression, we need to delve further into
+operations, and the \key{if} expression\python{ and statement}, we need to delve further into
 the x86 language. Figures~\ref{fig:x86-1-concrete} and \ref{fig:x86-1}
 define the concrete and abstract syntax for the \LangXIf{} subset
 of x86, which includes instructions for logical operations,
@@ -7369,7 +7398,7 @@ $\Atm$.
   \itm{bytereg} &::=& \key{ah} \MID \key{al} \MID \key{bh} \MID \key{bl}
     \MID \key{ch} \MID \key{cl} \MID \key{dh} \MID \key{dl} \\
 \Arg &::=& \gray{ \key{\$}\Int \MID \key{\%}\Reg \MID \Int\key{(}\key{\%}\Reg\key{)} } \MID \key{\%}\itm{bytereg}\\
-\itm{cc} & ::= & \key{e} \MID \key{l} \MID \key{le} \MID \key{g} \MID \key{ge} \\
+\itm{cc} & ::= & \key{e} \MID \key{ne} \MID \key{l} \MID \key{le} \MID \key{g} \MID \key{ge} \\
 \Instr &::=& \gray{ \key{addq} \; \Arg\key{,} \Arg \MID
       \key{subq} \; \Arg\key{,} \Arg \MID
       \key{negq} \; \Arg \MID \key{movq} \; \Arg\key{,} \Arg \MID } \\
@@ -7424,22 +7453,22 @@ $\Atm$.
 {\if\edition\pythonEd
 \[
 \begin{array}{lcl}
-\itm{bytereg} &::=& \key{ah} \MID \key{al} \MID \key{bh} \MID \key{bl}
-    \MID \key{ch} \MID \key{cl} \MID \key{dh} \MID \key{dl} \\
+\itm{bytereg} &::=& \skey{ah} \MID \skey{al} \MID \skey{bh} \MID \skey{bl}
+    \MID \skey{ch} \MID \skey{cl} \MID \skey{dh} \MID \skey{dl} \\
 \Arg &::=&  \gray{\IMM{\Int} \MID \REG{\Reg} \MID \DEREF{\Reg}{\Int}} 
      \MID \BYTEREG{\itm{bytereg}} \\
-\itm{cc} & ::= & \key{e} \MID \key{l} \MID \key{le} \MID \key{g} \MID \key{ge} \\
-\Instr &::=& \gray{ \BININSTR{\code{addq}}{\Arg}{\Arg} 
-       \MID \BININSTR{\code{subq}}{\Arg}{\Arg} } \\
-       &\MID& \gray{ \BININSTR{\code{movq}}{\Arg}{\Arg} 
-       \MID \UNIINSTR{\code{negq}}{\Arg} } \\
+\itm{cc} & ::= & \key{e} \MID \key{ne} \MID \key{l} \MID \key{le} \MID \key{g} \MID \key{ge} \\
+\Instr &::=& \gray{ \BININSTR{\scode{addq}}{\Arg}{\Arg} 
+       \MID \BININSTR{\scode{subq}}{\Arg}{\Arg} } \\
+       &\MID& \gray{ \BININSTR{\scode{movq}}{\Arg}{\Arg} 
+       \MID \UNIINSTR{\scode{negq}}{\Arg} } \\
        &\MID& \gray{ \CALLQ{\itm{label}}{\itm{int}} \MID \RETQ{} 
        \MID \PUSHQ{\Arg}} \\
        &\MID& \gray{ \POPQ{\Arg} \MID \racket{\JMP{\itm{label}}} } \python{\JMP{\itm{label}}}\\
-       &\MID& \BININSTR{\code{xorq}}{\Arg}{\Arg}
-       \MID \BININSTR{\code{cmpq}}{\Arg}{\Arg}\\
-       &\MID& \BININSTR{\code{set}}{\itm{cc}}{\Arg} 
-       \MID \BININSTR{\code{movzbq}}{\Arg}{\Arg}\\
+       &\MID& \BININSTR{\scode{xorq}}{\Arg}{\Arg}
+       \MID \BININSTR{\scode{cmpq}}{\Arg}{\Arg}\\
+       &\MID& \BININSTR{\scode{set}}{\itm{cc}}{\Arg} 
+       \MID \BININSTR{\scode{movzbq}}{\Arg}{\Arg}\\
        &\MID&  \JMPIF{\key{'}\itm{cc}\key{'}}{\itm{label}} \\
 \LangXIfM{} &::= & \XPROGRAM{\itm{info}}{\LC\itm{label} \,\key{:}\, \Instr^{*} \key{,} \ldots \RC }
 \end{array}
@@ -7506,8 +7535,8 @@ are expressible using \code{if} as follows.
   \CAND{e_1}{e_2} & \quad \Rightarrow \quad \CIF{e_1}{e_2}{\FALSE{}}\\
   \COR{e_1}{e_2} & \quad \Rightarrow \quad \CIF{e_1}{\TRUE{}}{e_2}
 \end{align*}
-By performing these translations in the front-end of the compiler, the
-later passes of the compiler do not need to deal with these features,
+By performing these translations in the front-end of the compiler,
+subsequent passes of the compiler do not need to deal with these features,
 making the passes shorter.
 
 %% For example, subtraction is
@@ -7600,7 +7629,7 @@ but the \code{if} expression is not.  All three sub-expressions of an
   branch) or false (for the ``else'' branch). The \code{Let} provides
   a way to initialize the temporary variables within the two branches
   of the \code{if} expression.  In general, the $\LET{x}{e_1}{e_2}$
-  form assigns the result of $e_1$ to the variable $x$, an then
+  form assigns the result of $e_1$ to the variable $x$, and then
   evaluates $e_2$, which may reference $x$.}
 
 Add cases for Boolean constants, \python{comparisons,} and \code{if}
@@ -7620,7 +7649,7 @@ high-quality output in the \code{explicate\_control} pass.
 %% \itm{bool} &::=& \code{True} \MID \code{False} \\
 \Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}}\\
 \Exp &::=& \Atm \MID \READ{} \\
-  &\MID& \BINOP{\itm{binaryop}}{\Atm}{\Atm} \MID \UNIOP{\key{unaryop}}{\Atm} \\
+  &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm} \MID \UNIOP{\itm{unaryop}}{\Atm} \\
   &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} \\
   &\MID& \LET{\Var}{\Exp}{\Exp}\\
 \Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
@@ -7650,9 +7679,9 @@ Atm &::=& \gray{ \INT{\Int} \MID \VAR{\Var} } \MID \BOOL{\itm{bool}}\\
 \[
 \begin{array}{l}
   \LifASTMonadPython \\
-  \begin{array}{rcl}
-    \LangIfANF  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
-  \end{array}
+  % \begin{array}{rcl}
+  %   \LangIfANF  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
+  % \end{array}
 \end{array}
 \]
 \fi}
@@ -7727,7 +7756,7 @@ print(y + 2 if (x == 0 if x < 1 else x == 2) else y + 10)
 The naive way to compile \key{if} and the comparison operations would
 be to handle each of them in isolation, regardless of their context.
 Each comparison would be translated into a \key{cmpq} instruction
-followed by a couple instructions to move the result from the EFLAGS
+followed by several instructions to move the result from the EFLAGS
 register into a general purpose register or stack location. Each
 \key{if} would be translated into a \key{cmpq} instruction followed by
 a conditional jump. The generated code for the inner \key{if} in the
@@ -7760,7 +7789,7 @@ For example, we want to generate the following code for the inner
 \end{lstlisting}
 \end{minipage}
 \end{center}
-One way to achieve this is to reorganize the code at the level of
+One way to achieve this goal is to reorganize the code at the level of
 \LangIf{}, pushing the outer \key{if} inside the inner one, yielding
 the following code.
 \begin{center}
@@ -7884,7 +7913,7 @@ basic blocks.
 Let's consider a few of the cases for the expression to be compiled.
 If the expression to be compiled is a constant, then it can be
 discarded because it has no side effects. If it's a \CREAD{}, then it
-has a side-effect and should be preserved. So the exprssion should be
+has a side-effect and should be preserved. So the expression should be
 translated into a statement using the \code{Expr} AST class. If the
 expression to be compiled is an \code{if} expression, we translate the
 two branches using \code{explicate\_effect} and then translate the
@@ -8054,7 +8083,7 @@ We then delegate to \code{explicate\_pred}, passing the condition \code{(eq? y
   every kind of expression that can have type \code{Boolean}.}
 %
 \python{The \code{explicate\_pred} function has four parameters: 1)
-  the condition expession, 2) the generated statements for the
+  the condition expression, 2) the generated statements for the
   ``then'' branch, 3) the generated statements for the ``else''
   branch, and 4) the dictionary of basic blocks. The
   \code{explicate\_pred} function returns a list of \LangCIf{}
@@ -8066,12 +8095,22 @@ statements created by applying \code{create\_block} to the code
 generated for the \code{thn} and \code{els} branches. Let us
 illustrate this translation with an example.  Returning
 to the program with an \code{if} expression in tail position,
-we invoke \code{explicate\_pred} on its condition \code{(eq? x 0)}
+we invoke \code{explicate\_pred} on its condition
+\racket{\code{(eq? x 0)}}
+\python{\code{x == 0}}
 which happens to be a comparison operator.
+{\if\edition\racketEd
 \begin{lstlisting}
 (let ([x (read)])
   (if (eq? x 0) 42 777))
 \end{lstlisting}
+  \fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+x = input_int()
+42 if x == 0 else 777
+\end{lstlisting}
+  \fi}
 The two branches \code{42} and \code{777} were already compiled to \code{return}
 statements, from which we now create the following blocks.
 \begin{center}
@@ -8085,9 +8124,12 @@ block_2:
   \end{minipage}
 \end{center}
 %
-So \code{explicate\_pred} compiles the comparison \code{(eq? x 0)}
+So \code{explicate\_pred} compiles the comparison
+\racket{\code{(eq? x 0)}}
+\python{\code{x == 0}}
 to the following \code{if} statement.
 %
+{\if\edition\racketEd
 \begin{center}
 \begin{minipage}{\textwidth}
 \begin{lstlisting}
@@ -8098,12 +8140,25 @@ else
 \end{lstlisting}
 \end{minipage}
 \end{center}
-
+\fi}
+{\if\edition\pythonEd
+\begin{center}
+\begin{minipage}{\textwidth}
+\begin{lstlisting}
+if x == 0:
+   goto block_1;
+else
+   goto block_2;
+\end{lstlisting}
+\end{minipage}
+\end{center}
+\fi}
 Next consider the case for Boolean constants. We perform a kind of
 partial evaluation\index{subject}{partial evaluation} and output
 either the \code{thn} or \code{els} branch depending on whether the
 constant is \TRUE{} or \FALSE{}. Let us illustrate this with the
 following program.
+{\if\edition\racketEd
 \begin{center}
 \begin{minipage}{\textwidth}
 \begin{lstlisting}
@@ -8111,10 +8166,23 @@ following program.
 \end{lstlisting}
 \end{minipage}
 \end{center}
+\fi}
+{\if\edition\pythonEd
+\begin{center}
+\begin{minipage}{\textwidth}
+\begin{lstlisting}
+42 if True else 777
+\end{lstlisting}
+\end{minipage}
+\end{center}
+\fi}
 %
 Again, the two branches \code{42} and \code{777} were compiled to
 \code{return} statements, so \code{explicate\_pred} compiles the
-constant \code{\#t} to the code for the ``then'' branch.
+constant
+\racket{\code{\#t}}
+\python{\code{True}}
+to the code for the ``then'' branch.
 \begin{center}
 \begin{minipage}{\textwidth}
 \begin{lstlisting}
@@ -8131,7 +8199,7 @@ particularly illuminating because it deals with the challenges we
 discussed above regarding nested \key{if} expressions
 (Figure~\ref{fig:explicate-control-s1-38}).  The
 \racket{\lstinline{thn^}}\python{\code{body}} and
-\racket{\lstinline{els^}}\python{\code{orlese}} branches of the
+\racket{\lstinline{els^}}\python{\code{orelse}} branches of the
 \key{if} inherit their context from the current one, that is,
 predicate context. So you should recursively apply
 \code{explicate\_pred} to the
@@ -8457,7 +8525,7 @@ We take the usual approach of encoding them as integers.
 \FALSE{} \quad\Rightarrow\quad \key{0}
 \]
 
-For translating statements, we discuss a couple cases.  The \code{not}
+For translating statements, we discuss a selection of cases.  The \code{not}
 operation can be implemented in terms of \code{xorq} as we discussed
 at the beginning of this section. Given an assignment, if the
 left-hand side variable is the same as the argument of \code{not},
@@ -8580,7 +8648,7 @@ the addition of \key{if} expressions to \LangIf{},
 %% \code{uncover\_live\_CFG} that applies liveness analysis to a
 %% control-flow graph.
 
-The first question is: what order should we process the basic blocks?
+The first question is: in what order should we process the basic blocks?
 Recall that to perform liveness analysis on a basic block we need to
 know the live-after set for the last instruction in the block. If a
 basic block has no successors (i.e. contains no jumps to other
@@ -8689,14 +8757,15 @@ program.
 \label{sec:build-interference-Lif}
 
 Many of the new instructions in \LangXIfVar{} can be handled in the
-same way as the instructions in \LangXVar{}. Thus, if your code was
-already quite general, it will not need to be changed to handle the
-new instructions. If you code is not general enough, we recommend that
-you change your code to be more general. For example, you can factor
-out the computing of the the read and write sets for each kind of
-instruction into auxiliary functions.
-
-Note that the \key{movzbq} instruction requires some special care,
+same way as the instructions in \LangXVar{}.
+% Thus, if your code was
+% already quite general, it will not need to be changed to handle the
+% new instructions. If your code is not general enough, we recommend that
+% you change your code to be more general. For example, you can factor
+% out the computing of the the read and write sets for each kind of
+% instruction into auxiliary functions.
+%
+Some instructions, e.g., the \key{movzbq} instruction, require special care,
 similar to the \key{movq} instruction. See rule number 1 in
 Section~\ref{sec:build-interference}.
 
@@ -9006,11 +9075,9 @@ this problem by modifying the \code{create\_block} function to
 recognize this situation.
 
 Second, \code{explicate\_control} creates a basic block whenever a
-continuation \emph{might} get used more than once (wheneven a
+continuation \emph{might} get used more than once (whenever a
 continuation is passed into two or more recursive calls). However,
-just because a continuation might get used more than once, doesn't
-mean it will.  In fact, some continuation parameters may not be used
-at all because we sometimes ignore them. For example, consider the
+some continuation parameters may not be used at all. For example, consider the
 case for the constant \TRUE{} in \code{explicate\_pred}, where we
 discard the \code{els} branch.  So the question is how can we decide
 whether to create a basic block?
@@ -9047,9 +9114,9 @@ by wrapping it inside a function with no parameters. We can
 cases of \code{explicate\_pred}, etc., we will return a list of
 statements and in other cases we will return a function that computes
 a list of statements. We use the term \emph{promise} to refer to a
-value that may or may not be delayed.  To uniformly deal with
+value that may be delayed.  To uniformly deal with
 promises, we define the following \code{force} function that checks
-whether its input is delayed (i.e. whether it is a function) and then
+whether its input is delayed (i.e., whether it is a function) and then
 either 1) calls the function, or 2) returns the input.
 \begin{lstlisting}
 def force(promise):
@@ -9095,7 +9162,7 @@ which we use to create a \code{goto}.
 \fi}
 {\if\edition\pythonEd
 %
-Here's the new version of the \code{create\_block} auxiliary function
+Here is the new version of the \code{create\_block} auxiliary function
 that works on promises and that checks whether the block consists of a
 solitary \code{goto} statement.\\
 \begin{minipage}{\textwidth}
@@ -9455,7 +9522,7 @@ blocks on several test programs.
 \label{sec:cond-further-reading}
 
 The algorithm for the \code{explicate\_control} pass is based on the
-the \code{explose-basic-blocks} pass in the course notes of
+\code{explose-basic-blocks} pass in the course notes of
 \citet{Dybvig:2010aa}.
 %
 It has similarities to the algorithms of \citet{Danvy:2003fk} and
@@ -18222,7 +18289,7 @@ be translated in a similar way.
   and tests for \LangDyn{}. Sometimes you may get a type checking error
   on the \LangDyn{} programs but you can adapt them by inserting
   a cast to the \code{Any} type around each subexpression
-  causing a type error. While \LangDyn{} doesn't have explicit casts,
+  causing a type error. While \LangDyn{} does not have explicit casts,
   you can induce one by wrapping the subexpression \code{e}
   with a call to an un-annotated identity function, like this:
   \code{((lambda (x) x) e)}.
