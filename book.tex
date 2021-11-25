@@ -3314,7 +3314,8 @@ intermediate programs, place \lstinline{(debug-level 1)} before the call to
   Implement the \code{remove\_complex\_operands} pass in
   \code{compiler.py}, creating auxiliary functions for each
   non-terminal in the grammar, i.e., \code{rco\_exp}
-  and \code{rco\_stmt}.
+  and \code{rco\_stmt}. We recommend you use the function
+  \code{utils.generate\_name()} to generate fresh names from a stub string.
 \fi}  
 \end{exercise}
 
@@ -7457,7 +7458,7 @@ $\Atm$.
     \MID \skey{ch} \MID \skey{cl} \MID \skey{dh} \MID \skey{dl} \\
 \Arg &::=&  \gray{\IMM{\Int} \MID \REG{\Reg} \MID \DEREF{\Reg}{\Int}} 
      \MID \BYTEREG{\itm{bytereg}} \\
-\itm{cc} & ::= & \key{e} \MID \key{ne} \MID \key{l} \MID \key{le} \MID \key{g} \MID \key{ge} \\
+\itm{cc} & ::= & \skey{e} \MID \skey{ne} \MID \skey{l} \MID \skey{le} \MID \skey{g} \MID \skey{ge} \\
 \Instr &::=& \gray{ \BININSTR{\scode{addq}}{\Arg}{\Arg} 
        \MID \BININSTR{\scode{subq}}{\Arg}{\Arg} } \\
        &\MID& \gray{ \BININSTR{\scode{movq}}{\Arg}{\Arg} 
@@ -7469,7 +7470,7 @@ $\Atm$.
        \MID \BININSTR{\scode{cmpq}}{\Arg}{\Arg}\\
        &\MID& \BININSTR{\scode{set}}{\itm{cc}}{\Arg} 
        \MID \BININSTR{\scode{movzbq}}{\Arg}{\Arg}\\
-       &\MID&  \JMPIF{\key{'}\itm{cc}\key{'}}{\itm{label}} \\
+       &\MID&  \JMPIF{\itm{cc}}{\itm{label}} \\
 \LangXIfM{} &::= & \XPROGRAM{\itm{info}}{\LC\itm{label} \,\key{:}\, \Instr^{*} \key{,} \ldots \RC }
 \end{array}
 \]
@@ -10190,21 +10191,16 @@ function with the transpose of the control-flow graph.
 {\if\edition\pythonEd
 \begin{lstlisting}
 def analyze_dataflow(G, transfer, bottom, join):
-    trans_G = transpose(G)
-    mapping = {}
-    for v in G.vertices():
-        mapping[v] = bottom
-    worklist = deque()
-    for v in G.vertices():
-        worklist.append(v)
+    trans_G  = transpose(G)
+    mapping  = dict((v, bottom) for v in G.vertices())
+    worklist = deque(G.vertices)
     while worklist:
         node = worklist.pop()
         input = reduce(join, [mapping[v] for v in trans_G.adjacent(node)], bottom)
         output = transfer(node, input)
         if output != mapping[node]:
             mapping[node] = output
-            for v in G.adjacent(node):
-                worklist.append(v)
+            worklist.extend(G.adjacent(node))
 \end{lstlisting}
 \fi}
 \caption{Generic work list algorithm for dataflow analysis}
