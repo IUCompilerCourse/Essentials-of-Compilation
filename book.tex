@@ -10706,14 +10706,13 @@ interpreter and type checker. The \LangVec{} language extends the \LangLoop{}
 language of Chapter~\ref{ch:Lwhile} with tuples.
 
 Section~\ref{sec:GC} describes a garbage collection algorithm based on
-copying live objects back and forth between two halves of the
-heap. The garbage collector requires coordination with the compiler so
-that it can see all of the \emph{root} pointers, that is, pointers in
-registers or on the procedure call stack.
+copying live tuples back and forth between two halves of the heap. The
+garbage collector requires coordination with the compiler so that it
+can find all of the live tuples.
 
 Sections~\ref{sec:expose-allocation} through \ref{sec:print-x86-gc}
-discuss all the necessary changes and additions to the compiler
-passes, including a new compiler pass named \code{expose\_allocation}.
+discuss the necessary changes and additions to the compiler passes,
+including a new compiler pass named \code{expose\_allocation}.
 
 \section{The \LangVec{} Language}
 \label{sec:r3}
@@ -10730,18 +10729,19 @@ Figure~\ref{fig:Lvec-concrete-syntax} defines the concrete syntax for
 \python{The \LangVec{} language adds 1) tuple creation via a
   comma-separated list of expressions, 2) accessing an element of a
   tuple with the square bracket notation, i.e., \code{t[n]} returns
-  the nth element of the tuple \code{t}, 3) the \code{is} comparison
+  the element at index \code{n} of tuple \code{t}, 3) the \code{is} comparison
   operator, and 4) obtaining the number of elements (the length) of a
   tuple. In this chapter, we restrict access indices to constant
   integers.}
 %
-The program below shows an example use of tuples. It creates a 3-tuple
-\code{t} and a 1-tuple that is stored at index $2$ of the 3-tuple,
-demonstrating that tuples are first-class values.  The element at
-index $1$ of \code{t} is \racket{\code{\#t}}\python{\code{True}}, so the
-``then'' branch of the \key{if} is taken.  The element at index $0$ of
-\code{t} is \code{40}, to which we add \code{2}, the element at index
-$0$ of the 1-tuple. So the result of the program is \code{42}.
+The program below shows an example use of tuples. It creates a tuple
+\code{t} containing the elements \code{40},
+\racket{\code{\#t}}\python{\code{True}}, and another tuple that
+contains just \code{2}. The element at index $1$ of \code{t} is
+\racket{\code{\#t}}\python{\code{True}}, so the ``then'' branch of the
+\key{if} is taken.  The element at index $0$ of \code{t} is \code{40},
+to which we add \code{2}, the element at index $0$ of the tuple. So
+the result of the program is \code{42}.
 %
 {\if\edition\racketEd      
 \begin{lstlisting}
@@ -10869,7 +10869,7 @@ print( t[0] + t[2][0] if t[1] else 44 )
 \label{fig:Lvec-syntax}
 \end{figure}
 
-Tuples raises several interesting new issues.  First, variable binding
+Tuples raise several interesting new issues.  First, variable binding
 performs a shallow-copy when dealing with tuples, which means that
 different variables can refer to the same tuple, that is, two
 variables can be \emph{aliases}\index{subject}{alias} for the same
@@ -10896,7 +10896,7 @@ program is \code{42}.
 t1 = 3, 7
 t2 = t1
 t3 = 3, 7
-print( 42 if (t1 is t2) and not (t1 is t3) else 0)
+print( 42 if (t1 is t2) and not (t1 is t3) else 0 )
 \end{lstlisting}
 \fi}
 \end{minipage}
@@ -10965,9 +10965,9 @@ print( t[0] )
 \fi}
 %
 From the perspective of programmer-observable behavior, tuples live
-forever. Of course, if they really lived forever then many programs
-would run out of memory. The language's runtime system must therefore
-perform automatic garbage collection.
+forever. However, if they really lived forever then many long-running
+programs would run out of memory. To solve this problem, the
+language's runtime system performs automatic garbage collection.
 
 Figure~\ref{fig:interp-Lvec} shows the definitional interpreter for the
 \LangVec{} language.
@@ -10978,9 +10978,12 @@ Figure~\ref{fig:interp-Lvec} shows the definitional interpreter for the
   subtle point is that the \code{vector-set!}  operation returns the
   \code{\#<void>} value.}
 %
-\python{We define tuple creation, element access, and the \code{len}
-  operator for \LangVec{} in terms of the corresponding operations in
-  Python.}
+\python{We represent tuples with Python lists in the interpreter
+  because we need to write to them
+  (Section~\ref{sec:expose-allocation}).  (Python tuples are
+  immutable.)  We define element access, the \code{is} operator, and
+  the \code{len} operator for \LangVec{} in terms of the corresponding
+  operations in Python.}
 
 
 \begin{figure}[tbp]
@@ -11046,9 +11049,9 @@ class InterpLtup(InterpLwhile):
 
 Figure~\ref{fig:type-check-Lvec} shows the type checker for
 \LangVec{}, which deserves some explanation. When allocating a tuple,
-we need to know which elements of the tuple are pointers (i.e. are
-also tuple) for garbage collection purposes. We can obtain this
-information during type checking. The type checker in
+we need to know which elements of the tuple are themselves tuples for
+the purposes of garbage collection. We can obtain this information
+during type checking. The type checker in
 Figure~\ref{fig:type-check-Lvec} not only computes the type of an
 expression, it also
 %
@@ -11061,7 +11064,7 @@ Figure~\ref{fig:type-check-Lvec}, we use the
 start and end parentheses. \index{subject}{unquote-slicing}}
 %
 \python{records the type of each tuple expression in a new field
-  named \code{has\_type}. As the type checker has to compute the type
+  named \code{has\_type}. Because the type checker has to compute the type
   of each tuple access, the index must be a constant.}
 
 
@@ -11212,17 +11215,17 @@ So the goal of the garbage collector is twofold:
   \emph{garbage}.
 \end{enumerate}
 A copying collector accomplishes this by copying all of the live
-objects from the FromSpace into the ToSpace and then performs a sleight
-of hand, treating the ToSpace as the new FromSpace and the old
+objects from the FromSpace into the ToSpace and then performs a
+sleight of hand, treating the ToSpace as the new FromSpace and the old
 FromSpace as the new ToSpace.  In the example of
 Figure~\ref{fig:copying-collector}, there are three pointers in the
 root set, one in a register and two on the stack.  All of the live
 objects have been copied to the ToSpace (the right-hand side of
 Figure~\ref{fig:copying-collector}) in a way that preserves the
 pointer relationships. For example, the pointer in the register still
-points to a 2-tuple whose first element is a 3-tuple and whose second
-element is a 2-tuple.  There are four tuples that are not reachable
-from the root set and therefore do not get copied into the ToSpace.
+points to a tuple that in turn points to two other tuples.  There are
+four tuples that are not reachable from the root set and therefore do
+not get copied into the ToSpace.
 
 The exact situation in Figure~\ref{fig:copying-collector} cannot be
 created by a well-typed program in \LangVec{} because it contains a
