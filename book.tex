@@ -11165,15 +11165,33 @@ class TypeCheckLtup(TypeCheckLwhile):
 \section{Garbage Collection}
 \label{sec:GC}
 
+Garbage collection is a runtime technique for reclaiming space on the
+heap that will not be used in the future by the executing
+program. Unfortunately, it is impossible to know precisely which heap
+allocated values, such as tuples, will be accessed in the
+future. Instead, garbage collectors overapproximate this set of values
+by identifying which of them are possible to access in the future. In
+particular, the \textbf{live}\index{subject}{live} values are those
+that are reachable from values in the registers or procedure call
+stack. Garbage collectors reclaim the space for those values that are
+no longer live.
 
-%% Def. The *live data* are all of the tuples that might be accessed by
-%% the program in the future. We can overapproximate this as all of the
-%% tuples that are reachable, transitively, from the registers or
-%% procedure call stack. We refer to the registers and stack collectively
-%% as the *root set*.
+UNDER CONSTRUCTION
 
-%% The goal of a garbage collector is to reclaim the data that is not
-%% live.
+These addresses are called the \emph{root
+  set}\index{subject}{root set}. In addition, a program could access any tuple that is
+transitively reachable from the root set. Thus, it is safe for the
+garbage collector to reclaim the tuples that are not reachable in this
+way.
+
+So the goal of the garbage collector is twofold:
+\begin{enumerate}
+\item preserve all tuples that are reachable from the root set via a
+  path of pointers, that is, the \emph{live} tuples, and
+\item reclaim the memory of everything else, that is, the
+  \emph{garbage}.
+\end{enumerate}
+
 
 Here we study a relatively simple algorithm for garbage collection
 that is the basis of state-of-the-art garbage
@@ -11195,25 +11213,6 @@ garbage collector goes to work to make more room.
 \index{subject}{ToSpace}
 \index{subject}{FromSpace}
 
-The garbage collector must be careful not to reclaim tuples that will
-be used by the program in the future. Of course, it is impossible in
-general to predict what a program will do, but we can over approximate
-the will-be-used tuples by preserving all tuples that could be
-accessed by \emph{any} program given the current computer state.  A
-program could access any tuple whose address is in a register or on
-the procedure call stack. These addresses are called the \emph{root
-  set}\index{subject}{root set}. In addition, a program could access any tuple that is
-transitively reachable from the root set. Thus, it is safe for the
-garbage collector to reclaim the tuples that are not reachable in this
-way.
-
-So the goal of the garbage collector is twofold:
-\begin{enumerate}
-\item preserve all tuples that are reachable from the root set via a
-  path of pointers, that is, the \emph{live} tuples, and
-\item reclaim the memory of everything else, that is, the
-  \emph{garbage}.
-\end{enumerate}
 A copying collector accomplishes this by copying all of the live
 objects from the FromSpace into the ToSpace and then performs a
 sleight of hand, treating the ToSpace as the new FromSpace and the old
