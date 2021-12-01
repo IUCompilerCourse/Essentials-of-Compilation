@@ -12177,12 +12177,12 @@ changes to also record the number of spills to the root stack.
 
 Figure~\ref{fig:print-x86-output-gc} shows the output of the
 \code{prelude\_and\_conclusion} pass on the running example. In the
-prelude and conclusion of the \code{main} function, we treat the root
-stack very much like the regular stack in that we move the root stack
-pointer (\code{r15}) to make room for the spills to the root stack,
-except that the root stack grows up instead of down.  For the running
+prelude and conclusion of the \code{main} function, we allocate space
+on the root stack to make room for the spills of tuple-typed
+variables. We do so by bumping the root stack
+pointer (\code{r15}) taking care that the root stack grows up instead of down.  For the running
 example, there was just one spill so we increment \code{r15} by 8
-bytes. In the conclusion we decrement \code{r15} by 8 bytes.
+bytes. In the conclusion we decrement \code{r15} by 8 bytes. 
 
 One issue that deserves special care is that there may be a call to
 \code{collect} prior to the initializing assignments for all the
@@ -12194,8 +12194,10 @@ Figure~\ref{fig:print-x86-output-gc}, the instruction
 %
 \lstinline{movq $0, 0(%r15)}
 %
-accomplishes this task. The garbage collector tests each root to see
-if it is null prior to dereferencing it.
+is sufficient to accomplish this task because there is only one spill.
+In general, we have to clear as many words as there are spills of
+tuple-typed variables. The garbage collector tests each root to see
+if it is null prior to dereferencing it. 
 
 \begin{figure}[htbp]
   % TODO: Python Version -Jeremy
