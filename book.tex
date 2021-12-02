@@ -10409,9 +10409,9 @@ Figure~\ref{fig:Rwhile-anf-syntax} defines the output language
 \begin{array}{rcl}
 \Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}}\\
 \Exp &::=& \Atm \MID \READ{} \\
-  &\MID& \BINOP{\itm{binaryop}}{\Atm}{\Atm} \MID \UNIOP{\key{unaryop}}{\Atm} \\
+  &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm} \MID \UNIOP{\itm{unaryop}}{\Atm} \\
   &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} \\
-%  &\MID& \LET{\Var}{\Exp}{\Exp}\\
+%  &\MID& \LET{\Var}{\Exp}{\Exp}\\ % Why?
 \Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
   &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
   &\MID& \WHILESTMT{\Exp}{\Stmt^{+}} \\
@@ -11732,17 +11732,18 @@ pass, which is \LangAlloc{} in monadic normal form.
 \itm{bool} &::=& \code{True} \MID \code{False} \\
 \Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} \\
 \Exp &::=& \Atm \MID \READ{} \MID \\
-     &\MID& \BINOP{\Exp}{\itm{binaryop}}{\Exp}
-     \MID \UNIOP{\itm{unaryop}}{\Exp}\\
-     &\MID& \CMP{\Exp}{\itm{cmp}}{\Exp} 
-     \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp}\\
+     &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm}
+     \MID \UNIOP{\itm{unaryop}}{\Atm}\\
+     &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \\
+%     \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp} \\ % removed by RCO
      &\MID& \IF{\Exp}{\Exp}{\Exp} \\
      &\MID& \GET{\Atm}{\Atm} \\
      &\MID& \LEN{\Exp}\\
    &\MID& \ALLOCATE{\Int}{\Type}
      \MID \GLOBALVALUE{\Var}\RP\\
-   &\MID& \BEGIN{\Stmt^{*}}{\Exp} \\
-\Stmt{} &::=& \PRINT{\Exp} \MID \EXPR{\Exp} \\
+   &\MID& \BEGIN{\Stmt^{*}}{\Atm} \\ % can use this in place of \LET;
+                                % why have \LET?
+\Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
   &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \\
   &\MID& \ASSIGN{\PUT{\Atm}{\Atm}}{\Exp} \\
   &\MID& \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
@@ -11814,8 +11815,9 @@ pass, which is \LangAlloc{} in monadic normal form.
 \fi}
 \end{minipage}
 }
-\caption{The abstract syntax of \LangCVec{}, extending \LangCLoop{}
-   (Figure~\ref{fig:c7-syntax}).}
+\caption{The abstract syntax of \LangCVec{}, extending
+  \racket{\LangCLoop{} (Figure~\ref{fig:c7-syntax})}\python{\LangCIf{}
+  (Figure~\ref{fig:c1-syntax})}.}
 \label{fig:c2-syntax}
 \end{figure}
 
@@ -11894,7 +11896,6 @@ movq |$8(n+1)$|(%r11), |$\itm{lhs'}$|
 |$\Longrightarrow$|
 movq |$\itm{tup}'$|, %r11
 movq |$\itm{rhs}'$|, |$8(n+1)$|(%r11)
-movq $0, |$\itm{lhs'}$|
 \end{lstlisting}
 \fi}
 \end{minipage}
@@ -11933,7 +11934,10 @@ The x86 instructions \code{andq} (for bitwise-and) and \code{sarq}
 (shift right) can be used to accomplish this.
 
 We compile the \code{allocate} form to operations on the
-\code{free\_ptr}, as shown below. The address in the \code{free\_ptr}
+\code{free\_ptr}, as shown below. This approach is called \emph{inline
+allocation} as it implements allocation by bumping the allocation
+pointer. It is much more efficient than calling a function for each
+allocation. The address in the \code{free\_ptr}
 is the next free address in the FromSpace, so we copy it into
 \code{r11} and then move it forward by enough space for the tuple
 being allocated, which is $8(\itm{len}+1)$ bytes because each element
@@ -12173,12 +12177,12 @@ changes to also record the number of spills to the root stack.
 
 Figure~\ref{fig:print-x86-output-gc} shows the output of the
 \code{prelude\_and\_conclusion} pass on the running example. In the
-prelude and conclusion of the \code{main} function, we treat the root
-stack very much like the regular stack in that we move the root stack
-pointer (\code{r15}) to make room for the spills to the root stack,
-except that the root stack grows up instead of down.  For the running
+prelude and conclusion of the \code{main} function, we allocate space
+on the root stack to make room for the spills of tuple-typed
+variables. We do so by bumping the root stack
+pointer (\code{r15}) taking care that the root stack grows up instead of down.  For the running
 example, there was just one spill so we increment \code{r15} by 8
-bytes. In the conclusion we decrement \code{r15} by 8 bytes.
+bytes. In the conclusion we decrement \code{r15} by 8 bytes. 
 
 One issue that deserves special care is that there may be a call to
 \code{collect} prior to the initializing assignments for all the
@@ -12190,8 +12194,10 @@ Figure~\ref{fig:print-x86-output-gc}, the instruction
 %
 \lstinline{movq $0, 0(%r15)}
 %
-accomplishes this task. The garbage collector tests each root to see
-if it is null prior to dereferencing it.
+is sufficient to accomplish this task because there is only one spill.
+In general, we have to clear as many words as there are spills of
+tuple-typed variables. The garbage collector tests each root to see
+if it is null prior to dereferencing it. 
 
 \begin{figure}[htbp]
   % TODO: Python Version -Jeremy
