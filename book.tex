@@ -3096,10 +3096,13 @@ print(tmp_1)
 \end{transformation}
 \fi}
 
-
-\newcommand{LVarMonGrammarPython}{
+\newcommand{\LvarMonadASTPython}{
 \begin{array}{rcl}
-    ...
+\Atm &::=& \INT{\Int} \MID \VAR{\Var} \\  
+\Exp{} &::=& \Atm \MID \READ{} \\
+       &\MID& \UNIOP{\itm{unaryop}}{\Atm} \MID \BINOP{\Atm}{\itm{binaryop}}{\Atm}  \\ 
+\Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
+        &\MID& \ASSIGN{\VAR{\Var}}{\Exp}
 \end{array}
 }
 
@@ -3120,16 +3123,13 @@ print(tmp_1)
 \fi}
 {\if\edition\pythonEd
 \[
+\begin{array}{l}
+  \LvarMonadASTPython \\
 \begin{array}{rcl}
-\Atm &::=& \INT{\Int} \MID \VAR{\Var} \\  
-\Exp{} &::=& \Atm \MID \READ{} \\
-       &\MID& \NEG{\Atm} \MID  \ADD{\Atm}{\Atm} \\
-\Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
-        &\MID& \ASSIGN{\VAR{\Var}}{\Exp}\\
 \LangVarANFM{}  &::=& \PROGRAM{}{\Stmt^{*}}
 \end{array}
+\end{array}
 \]
-
 \fi}  
 \end{minipage}
 }
@@ -7630,17 +7630,17 @@ but the \code{if} expression is not.  All three sub-expressions of an
 \code{if} are allowed to be complex expressions but the operands of
 \code{not} and the comparisons must be atomic.
 %
-\python{We add a new language form, the \code{Let} expression, to aid
+\python{We add a new language form, the \code{Begin} expression, to aid
   in the translation of \code{if} expressions. When we recursively
   process the two branches of the \code{if}, we generate temporary
   variables and their initializing expressions. However, these
   expressions may contain side effects and should only be executed
   when the condition of the \code{if} is true (for the ``then''
-  branch) or false (for the ``else'' branch). The \code{Let} provides
+  branch) or false (for the ``else'' branch). The \code{Begin} provides
   a way to initialize the temporary variables within the two branches
-  of the \code{if} expression.  In general, the $\LET{x}{e_1}{e_2}$
-  form assigns the result of $e_1$ to the variable $x$, and then
-  evaluates $e_2$, which may reference $x$.}
+  of the \code{if} expression.  In general, the $\BEGIN{ss}{e}$
+  form execute the statements $ss$ and then returns the result of
+  expression $e$.}
 
 Add cases for Boolean constants, \python{comparisons,} and \code{if}
 expressions to the \code{rco\_exp} and \code{rco\_atom} functions
@@ -7651,20 +7651,16 @@ temporary variable because that would interfere with the generation of
 high-quality output in the \code{explicate\_control} pass.
 
 
-\newcommand{\LifASTMonadPython}{
+\newcommand{\LifMonadASTPython}{
 \begin{array}{rcl}
 %% \itm{binaryop} &::=& \code{Add()} \MID \code{Sub()} \\
 %% \itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \\
 %% \itm{unaryop} &::=& \code{USub()} \MID \code{Not()} \\
 %% \itm{bool} &::=& \code{True} \MID \code{False} \\
-\Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}}\\
-\Exp &::=& \Atm \MID \READ{} \\
-  &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm} \MID \UNIOP{\itm{unaryop}}{\Atm} \\
-  &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} \\
-  &\MID& \LET{\Var}{\Exp}{\Exp}\\
-\Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
-        &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{*}}{\Stmt^{*}}\\
-\LangIfANF  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
+\Atm &::=& \BOOL{\itm{bool}}\\
+\Exp &::=& \CMP{\Atm}{\itm{cmp}}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} \\
+  &\MID& \BEGIN{\Stmt^{*}}{\Exp}\\
+\Stmt{} &::=& \IFSTMT{\Exp}{\Stmt^{*}}{\Stmt^{*}}
 \end{array}
 }
 
@@ -7688,10 +7684,11 @@ Atm &::=& \gray{ \INT{\Int} \MID \VAR{\Var} } \MID \BOOL{\itm{bool}}\\
 {\if\edition\pythonEd
 \[
 \begin{array}{l}
-  \LifASTMonadPython \\
-  % \begin{array}{rcl}
-  %   \LangIfANF  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
-  % \end{array}
+  \gray{\LvarMonadASTPython} \\ \hline
+  \LifMonadASTPython \\
+   \begin{array}{rcl}
+     \LangIfANF  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
+   \end{array}
 \end{array}
 \]
 \fi}
@@ -7952,7 +7949,7 @@ def explicate_effect(e, cont, basic_blocks):
             ...
         case Call(func, args):
             ...
-        case Let(var, rhs, body):
+        case Begin(body, result):
             ...
         case _:
             ...
@@ -7961,7 +7958,7 @@ def explicate_assign(rhs, lhs, cont, basic_blocks):
     match rhs:
         case IfExp(test, body, orelse):
             ...
-        case Let(var, rhs, body):
+        case Begin(body, result):
             ...
         case _:
             return [Assign([lhs], rhs)] + cont
@@ -7980,7 +7977,7 @@ def explicate_pred(cnd, thn, els, basic_blocks):
             ...
         case IfExp(test, body, orelse):
             ...
-        case Let(var, rhs, body):
+        case Begin(body, result):
             ...
         case _:
             return [If(Compare(cnd, [Eq()], [Constant(False)]),
@@ -10392,6 +10389,13 @@ statement.
 Figure~\ref{fig:Rwhile-anf-syntax} defines the output language
 \LangLoopANF{} of this pass.
 
+
+\newcommand{\LwhileMonadASTPython}{
+\begin{array}{rcl}
+\Stmt{} &::=& \WHILESTMT{\Exp}{\Stmt^{+}} 
+\end{array}
+}
+
 \begin{figure}[tp]
 \centering
 \fbox{
@@ -10413,17 +10417,25 @@ Figure~\ref{fig:Rwhile-anf-syntax} defines the output language
 \fi}
 {\if\edition\pythonEd
 \[
-\begin{array}{rcl}
-\Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}}\\
-\Exp &::=& \Atm \MID \READ{} \\
-  &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm} \MID \UNIOP{\itm{unaryop}}{\Atm} \\
-  &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} \\
-%  &\MID& \LET{\Var}{\Exp}{\Exp}\\ % Why?
-\Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
-  &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
-  &\MID& \WHILESTMT{\Exp}{\Stmt^{+}} \\
-\LangLoopANF  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
+\begin{array}{l}
+  \gray{\LvarMonadASTPython} \\ \hline
+  \gray{\LifMonadASTPython} \\ \hline
+  \LwhileMonadASTPython \\
+   \begin{array}{rcl}
+     \LangLoopANF  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
+   \end{array}
 \end{array}
+%% \begin{array}{rcl}
+%% \Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}}\\
+%% \Exp &::=& \Atm \MID \READ{} \\
+%%   &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm} \MID \UNIOP{\itm{unaryop}}{\Atm} \\
+%%   &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} \\
+%% %  &\MID& \LET{\Var}{\Exp}{\Exp}\\ % Why?
+%% \Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
+%%   &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
+%%   &\MID& \WHILESTMT{\Exp}{\Stmt^{+}} \\
+%% \LangLoopANF  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
+%% \end{array}
 \]
 \fi}
 \end{minipage}
@@ -11249,8 +11261,11 @@ begin with so we will not need to revisit this issue.
 
 \begin{figure}[tbp]
 \centering
-\includegraphics[width=\textwidth]{figs/copy-collect-1} \\[5ex]
-\includegraphics[width=\textwidth]{figs/copy-collect-2}
+\racket{\includegraphics[width=\textwidth]{figs/copy-collect-1}}
+\python{\includegraphics[width=\textwidth]{figs/copy-collect-1-python}}
+\\[5ex]
+\racket{\includegraphics[width=\textwidth]{figs/copy-collect-2}}
+\python{\includegraphics[width=\textwidth]{figs/copy-collect-2-python}}
 \caption{A copying collector in action.}
 \label{fig:copying-collector}
 \end{figure}
@@ -11291,7 +11306,9 @@ then updates the pointers in the popped tuple so they point to the
 newly copied tuples.
 
 \begin{figure}[tbp]
-\centering \includegraphics[width=0.9\textwidth]{figs/cheney}
+\centering
+\racket{\includegraphics[width=0.9\textwidth]{figs/cheney}}
+\python{\includegraphics[width=0.9\textwidth]{figs/cheney-python}}
 \caption{Depiction of the Cheney algorithm copying the live tuples.}
 \label{fig:cheney}
 \end{figure}
@@ -11351,7 +11368,9 @@ contains the two pointers from the regular stack and also the pointer
 in the second register.
 
 \begin{figure}[tbp]
-\centering \includegraphics[width=0.60\textwidth]{figs/root-stack}
+  \centering
+  \racket{\includegraphics[width=0.60\textwidth]{figs/root-stack}}
+  \python{\includegraphics[width=0.60\textwidth]{figs/root-stack-python}}
 \caption{Maintaining a root stack to facilitate garbage collection.}
 \label{fig:shadow-stack}
 \end{figure}
@@ -11707,6 +11726,17 @@ Figure~\ref{fig:Lvec-anf-syntax}
 shows the grammar for the output language \LangAllocANF{} of this
 pass, which is \LangAlloc{} in monadic normal form.
 
+\newcommand{\LtupMonadASTPython}{
+\begin{array}{rcl}
+\Exp &::=& \GET{\Atm}{\Atm} \\
+     &\MID& \LEN{\Atm}\\
+   &\MID& \ALLOCATE{\Int}{\Type}
+    \MID \GLOBALVALUE{\Var} \\
+\Stmt{} &::=& \ASSIGN{\PUT{\Atm}{\Atm}}{\Atm} \\
+   &\MID& \COLLECT{\Int}
+\end{array}
+}
+
 \begin{figure}[tp]
 \centering
 \fbox{
@@ -11731,33 +11761,42 @@ pass, which is \LangAlloc{} in monadic normal form.
 \fi}
 {\if\edition\pythonEd
 \[
-\begin{array}{lcl}
-\itm{binaryop} &::=& \code{Add()} \MID \code{Sub()} \\
-\itm{boolop} &::=& \code{And()} \MID \code{Or()} \\
-\itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \MID \code{Is()} \\
-\itm{unaryop} &::=& \code{USub()} \MID \code{Not()} \\
-\itm{bool} &::=& \code{True} \MID \code{False} \\
-\Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} \\
-\Exp &::=& \Atm \MID \READ{} \MID \\
-     &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm}
-     \MID \UNIOP{\itm{unaryop}}{\Atm}\\
-     &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \\
-%     \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp} \\ % removed by RCO
-     &\MID& \IF{\Exp}{\Exp}{\Exp} \\
-     &\MID& \GET{\Atm}{\Atm} \\
-     &\MID& \LEN{\Exp}\\
-   &\MID& \ALLOCATE{\Int}{\Type}
-     \MID \GLOBALVALUE{\Var}\RP\\
-   &\MID& \BEGIN{\Stmt^{*}}{\Atm} \\ % can use this in place of \LET;
-                                % why have \LET?
-\Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
-  &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \\
-  &\MID& \ASSIGN{\PUT{\Atm}{\Atm}}{\Exp} \\
-  &\MID& \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
-  &\MID& \WHILESTMT{\Exp}{\Stmt^{+}}
-   \MID \COLLECT{\Int}  \\
-\LangAllocANFM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
+\begin{array}{l}
+  \gray{\LvarMonadASTPython} \\ \hline
+  \gray{\LifMonadASTPython} \\ \hline
+  \gray{\LwhileMonadASTPython} \\ \hline
+  \LtupMonadASTPython   \\
+  \begin{array}{rcl}
+     \LangAllocANFM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
+  \end{array}
 \end{array}
+%% \begin{array}{lcl}
+%% \itm{binaryop} &::=& \code{Add()} \MID \code{Sub()} \\
+%% \itm{boolop} &::=& \code{And()} \MID \code{Or()} \\
+%% \itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \MID \code{Is()} \\
+%% \itm{unaryop} &::=& \code{USub()} \MID \code{Not()} \\
+%% \itm{bool} &::=& \code{True} \MID \code{False} \\
+%% \Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} \\
+%% \Exp &::=& \Atm \MID \READ{} \MID \\
+%%      &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm}
+%%      \MID \UNIOP{\itm{unaryop}}{\Atm}\\
+%%      &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \\
+%% %     \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp} \\ % removed by RCO
+%%      &\MID& \IF{\Exp}{\Exp}{\Exp} \\
+%%      &\MID& \GET{\Atm}{\Atm} \\
+%%      &\MID& \LEN{\Exp}\\
+%%    &\MID& \ALLOCATE{\Int}{\Type}
+%%      \MID \GLOBALVALUE{\Var}\RP\\
+%%    &\MID& \BEGIN{\Stmt^{*}}{\Atm} \\ % can use this in place of \LET;
+%%                                 % why have \LET?
+%% \Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
+%%   &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \\
+%%   &\MID& \ASSIGN{\PUT{\Atm}{\Atm}}{\Exp} \\
+%%   &\MID& \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
+%%   &\MID& \WHILESTMT{\Exp}{\Stmt^{+}}
+%%    \MID \COLLECT{\Int}  \\
+%% \LangAllocANFM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
+%% \end{array}
 \]
 \fi}
 \end{minipage}
@@ -12492,6 +12531,7 @@ inner-product of two arrays (Figure~\ref{fig:inner-product}).
 \fbox{
   \begin{minipage}{0.96\textwidth}
     \small
+{\if\edition\racketEd    
 \[
 \begin{array}{lcl}
   \Type &::=& \ldots \MID \LP \key{Vectorof}~\Type \RP \\
@@ -12517,6 +12557,10 @@ inner-product of two arrays (Figure~\ref{fig:inner-product}).
   \LangArray{} &::=& \gray{\Def\ldots \; \Exp}
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd    
+UNDER CONSTRUCTION
+\fi}
 \end{minipage}
 }
 \caption{The concrete syntax of \LangArray{}, extending \LangLoop{} (Figure~\ref{fig:Lwhile-concrete-syntax}).}
@@ -15641,9 +15685,9 @@ to avoid code duplication.
 \begin{lstlisting}
 Call(|$e$|, [|$e_1, \ldots, e_n$|])
 |$\Rightarrow$|
-Let(|$\itm{tmp}$|, |$e'$|,
-  Call(Subscript(Name(|$\itm{tmp}$|), Constant(0)),
-       [|$\itm{tmp}$|, |$e'_1, \ldots, e'_n$|]))
+Begin([Assign([|$\itm{tmp}$|], |$e'$|)],
+      Call(Subscript(Name(|$\itm{tmp}$|), Constant(0)),
+           [|$\itm{tmp}$|, |$e'_1, \ldots, e'_n$|]))
 \end{lstlisting}
 \fi}
 \end{minipage}
@@ -16215,7 +16259,8 @@ True[0]
 \begin{figure}[tp]
 \centering
 \fbox{
-\begin{minipage}{0.97\textwidth}
+  \begin{minipage}{0.97\textwidth}
+{\if\edition\racketEd    
 \[
 \begin{array}{rcl}
   \itm{cmp} &::= & \key{eq?} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=} \\
@@ -16238,6 +16283,10 @@ True[0]
 \LangDynM{}  &::=& \Def\ldots\; \Exp
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd
+  UNDER CONSTRUCTION
+\fi}
 \end{minipage}
 }
 \caption{Syntax of \LangDyn{}, an untyped language (a subset of \racket{Racket}\python{Python}).}
