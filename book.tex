@@ -15341,7 +15341,7 @@ Figure~\ref{fig:f2-syntax}.
 \section{Assignment Conversion}
 \label{sec:convert-assignments}
 
-The purpose of the \code{convert\_assignments} pass is address the
+The purpose of the \code{convert\_assignments} pass is to address the
 challenge posed in Section~\ref{sec:assignment-scoping} regarding the
 interaction between variable assignments and closure conversion.
 First we identify which variables need to be boxed, then we transform
@@ -15354,6 +15354,8 @@ intersection of the following two sets of variables:
 \item The variables that appear on the left-hand side of an
   assignment.
 \end{enumerate}
+The first condition is a must, but the second condition is quite conservative and it is possible to
+develop a more liberal condition. 
 
 Consider again the first example from
 Section~\ref{sec:assignment-scoping}:
@@ -15390,7 +15392,7 @@ variables \code{x} and \code{z} occur free inside the
 \code{y} or \code{z}.  The boxing of \code{x} consists of three
 transformations: initialize \code{x} with a tuple, replace reads from
 \code{x} with tuple reads, and replace each assignment to \code{x}
-with a tuple writes. The output of \code{convert\_assignments} for
+with a tuple write. The output of \code{convert\_assignments} for
 this example is as follows.
 %
 {\if\edition\racketEd
@@ -15507,7 +15509,7 @@ the intersection of the variables that are free in a \code{lambda} and
 that are assigned-to. We then apply assignment conversion to the body
 of the function definition. Finally, we box the parameters of this
 function definition that are in $\mathit{AF}$. For example,
-the parameter \code{x} of the follow function \code{g}
+the parameter \code{x} of the following function \code{g}
 needs to be boxed.
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -15682,10 +15684,12 @@ and the rest of the parameters are the ones from the original
 function, with types $T'_1, \ldots, T'_n$.  The type for the closure
 omits the types of the free variables because 1) those types are not
 available in this context and 2) we do not need them in the code that
-is generated for function application.
+is generated for function application. So this type only describes the
+first component of the closure tuple. At runtime the tuple may have
+more components, but we ignore them at this point.
 
 We transform function application into code that retrieves the
-function from the closure and then calls the function, passing in the
+function from the closure and then calls the function, passing the
 closure as the first argument. We place $e'$ in a temporary variable
 to avoid code duplication.
 \begin{center}
