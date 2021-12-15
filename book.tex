@@ -13014,7 +13014,10 @@ nested inside each other.
 
 \newcommand{\LfunGrammarPython}{
   \begin{array}{lcl}
-   \Type &::=& \key{Callable}\LS \LS \Type \key{,} \ldots \RS \key{, } \Type \RS \\
+    \Type &::=& \key{int}
+                \MID \key{bool}
+                \MID \key{tuple}\LS \Type^+ \RS
+                \MID \key{Callable}\LS \LS \Type \key{,} \ldots \RS \key{, } \Type \RS \\
    \Exp &::=& \CAPPLY{\Exp}{\Exp\code{,} \ldots} \\
    \Stmt &::=& \CRETURN{\Exp} \\
    \Def &::=& \CDEF{\Var}{\Var \key{:} \Type\key{,} \ldots}{\Type}{\Stmt^{+}} 
@@ -13022,11 +13025,10 @@ nested inside each other.
 }
 \newcommand{\LfunASTPython}{
   \begin{array}{lcl}
-    \Type &::=& \key{FunctionType}\LP \Type^{*} \key{, } \Type \RP \\
+    \Type &::=& \key{int} \MID \key{bool} \MID \key{tuple}\LS\Type^+\RS \MID \key{FunctionType}\LP \Type^{*} \key{, } \Type \RP \\
     \Exp &::=& \CALL{\Exp}{\Exp^{*}}\\
     \Stmt &::=& \RETURN{\Exp} \\
    \Params &::=&                  \LP\Var\key{,}\Type\RP^*
-   % was: \LS\LP\Var\key{,}\Type\RP\code{,}\ldots\RS 
     \\
    \Def &::=& \FUNDEF{\Var}{\Params}{\Type}{}{\Stmt^{+}} 
   \end{array}
@@ -13240,9 +13242,7 @@ class InterpLfun(InterpLtup):
   def apply_fun(self, fun, args, e):
       match fun:
         case Function(name, xs, body, env):
-          new_env = {x: v for (x,v) in env.items()}
-          for (x,arg) in zip(xs, args):
-              new_env[x] = arg
+          new_env = env.copy().update(zip(xs, args))
           return self.interp_stmts(body, new_env)
         case _:
           raise Exception('apply_fun: unexpected: ' + repr(fun))
@@ -13379,7 +13379,7 @@ class TypeCheckLfun(TypeCheckLtup):
                 check_type_equal(param_t, arg_t, e)
             return return_t
           case _:
-            raise Exception('type_check_exp: in call, unexpected ' + \
+            raise Exception('type_check_exp: in call, unexpected ' +
                               repr(func_t))
       case _:
         return super().type_check_exp(e, env)
@@ -13389,9 +13389,7 @@ class TypeCheckLfun(TypeCheckLtup):
       return
     match ss[0]:
       case FunctionDef(name, params, body, dl, returns, comment):
-        new_env = {x: t for (x,t) in env.items()}
-        for (x,t) in params:
-            new_env[x] = t
+        new_env = env.copy().update(params)
         rt = self.type_check_stmts(body, new_env)
         check_type_equal(returns, rt, ss[0])
         return self.type_check_stmts(ss[1:], env)
@@ -13405,10 +13403,13 @@ class TypeCheckLfun(TypeCheckLtup):
       case Module(body):
         env = {}
         for s in body:
-            match s:
-              case FunctionDef(name, params, bod, dl, returns, comment):
-                params_t = [t for (x,t) in params]
-                env[name] = FunctionType(params_t, returns)
+          match s:
+            case FunctionDef(name, params, bod, dl, returns, comment):
+              if name in env:
+                raise Exception('type_check: function ' +
+                                  repr(name) + ' defined twice')
+              params_t = [t for (x,t) in params]
+              env[name] = FunctionType(params_t, returns)
         self.type_check_stmts(body, env)
       case _:
         raise Exception('type_check: unexpected ' + repr(p))
@@ -13476,13 +13477,14 @@ the target. However, \code{callq} does not handle
 \item determining how registers are shared by different functions.
 \end{enumerate}
 
-Regarding (1) parameter passing, recall that the following six
-registers are used to pass arguments to a function, in this order.
+Regarding (1) parameter passing, recall that the x86-64 calling convention
+for Unix-based system uses the following six
+registers to pass arguments to a function, in this order.
 \begin{lstlisting}
 rdi rsi rdx rcx r8 r9
 \end{lstlisting}
 If there are
-more than six arguments, then the convention is to use space on the
+more than six arguments, then the calling convention mandates to use space on the
 frame of the caller for the rest of the arguments. However, to ease
 the implementation of efficient tail calls
 (Section~\ref{sec:tail-call}), we arrange never to need more than six
@@ -14104,7 +14106,7 @@ leaq (fun-ref |$f$|), |$\itm{lhs}'$|
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
-leaq (FunRef(|$f$|)), |$\itm{lhs}'$|
+leaq |$f$|(%rip), |$\itm{lhs}'$|
 \end{lstlisting}
 \fi}
 \end{minipage}
@@ -15056,9 +15058,7 @@ class TypeCheckLlambda(TypeCheckLfun):
         e.has_type = ty
         match ty:
           case FunctionType(params_t, return_t):
-            new_env = {x:t for (x,t) in env.items()}
-            for (p,t) in zip(params, params_t):
-                new_env[p] = t
+            new_env = env.copy().update(zip(params, params_t))
             self.check_exp(body, return_t, new_env)
           case _:
             raise Exception('lambda does not have type ' + str(ty))
@@ -15090,9 +15090,7 @@ class TypeCheckLlambda(TypeCheckLfun):
       return
     match ss[0]:
       case FunctionDef(name, params, body, dl, returns, comment):
-        new_env = {x: t for (x,t) in env.items()}
-        for (x,t) in params:
-            new_env[x] = t
+        new_env = env.copy().update(params)
         rt = self.check_stmts(body, returns, new_env)
         self.check_stmts(ss[1:], return_ty, env)
       case Return(value):
@@ -15343,7 +15341,7 @@ Figure~\ref{fig:f2-syntax}.
 \section{Assignment Conversion}
 \label{sec:convert-assignments}
 
-The purpose of the \code{convert\_assignments} pass is address the
+The purpose of the \code{convert\_assignments} pass is to address the
 challenge posed in Section~\ref{sec:assignment-scoping} regarding the
 interaction between variable assignments and closure conversion.
 First we identify which variables need to be boxed, then we transform
@@ -15356,6 +15354,8 @@ intersection of the following two sets of variables:
 \item The variables that appear on the left-hand side of an
   assignment.
 \end{enumerate}
+The first condition is a must, but the second condition is quite conservative and it is possible to
+develop a more liberal condition. 
 
 Consider again the first example from
 Section~\ref{sec:assignment-scoping}:
@@ -15392,7 +15392,7 @@ variables \code{x} and \code{z} occur free inside the
 \code{y} or \code{z}.  The boxing of \code{x} consists of three
 transformations: initialize \code{x} with a tuple, replace reads from
 \code{x} with tuple reads, and replace each assignment to \code{x}
-with a tuple writes. The output of \code{convert\_assignments} for
+with a tuple write. The output of \code{convert\_assignments} for
 this example is as follows.
 %
 {\if\edition\racketEd
@@ -15509,7 +15509,7 @@ the intersection of the variables that are free in a \code{lambda} and
 that are assigned-to. We then apply assignment conversion to the body
 of the function definition. Finally, we box the parameters of this
 function definition that are in $\mathit{AF}$. For example,
-the parameter \code{x} of the follow function \code{g}
+the parameter \code{x} of the following function \code{g}
 needs to be boxed.
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -15684,10 +15684,12 @@ and the rest of the parameters are the ones from the original
 function, with types $T'_1, \ldots, T'_n$.  The type for the closure
 omits the types of the free variables because 1) those types are not
 available in this context and 2) we do not need them in the code that
-is generated for function application.
+is generated for function application. So this type only describes the
+first component of the closure tuple. At runtime the tuple may have
+more components, but we ignore them at this point.
 
 We transform function application into code that retrieves the
-function from the closure and then calls the function, passing in the
+function from the closure and then calls the function, passing the
 closure as the first argument. We place $e'$ in a temporary variable
 to avoid code duplication.
 \begin{center}
@@ -15798,8 +15800,8 @@ $\Rightarrow$
 % free_var.py
 \begin{lstlisting}
 def f(x : int) -> Callable[[int], int]:
-    y = 4
-    return lambda z: x + y + z
+  y = 4
+  return lambda z: x + y + z
 
 g = f(5)
 h = f(3)
