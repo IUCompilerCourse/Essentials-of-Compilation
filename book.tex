@@ -16307,7 +16307,27 @@ True[0]
 \]
 \fi}
 {\if\edition\pythonEd
-  UNDER CONSTRUCTION
+\[
+\begin{array}{rcl}
+  \itm{cmp} &::= & \key{==} \MID \key{!=} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=} \MID \key{is} \\
+  \Exp &::=& \Int \MID \key{input\_int}\LP\RP \MID \key{-}\;\Exp \MID \Exp \; \key{+} \; \Exp \MID \Exp \; \key{-} \; \Exp \MID \LP\Exp\RP \\
+  &\MID& \Var{} \MID \TRUE \MID \FALSE \MID \CAND{\Exp}{\Exp}
+  \MID \COR{\Exp}{\Exp} \MID \key{not}~\Exp \\
+  &\MID& \CCMP{\itm{cmp}}{\Exp}{\Exp}
+      \MID \CIF{\Exp}{\Exp}{\Exp} \\
+  &\MID& \Exp \key{,} \ldots \key{,} \Exp \MID \CGET{\Exp}{\Exp}
+      \MID \CLEN{\Exp}  \\
+   &\MID& \CAPPLY{\Exp}{\Exp\code{,} \ldots} 
+    \MID \CLAMBDA{\Var\code{, }\ldots}{\Exp}\\
+  \Stmt &::=& \key{print}\LP \Exp \RP \MID \Exp 
+    \MID \Var\mathop{\key{=}}\Exp \\
+   &\MID& \key{if}~ \Exp \key{:}~ \Stmt^{+} ~\key{else:}~ \Stmt^{+} 
+   \MID \key{while}~ \Exp \key{:}~ \Stmt^{+} \\
+    &\MID& \CRETURN{\Exp} \\
+   \Def &::=& \CDEFU{\Var}{\Var{,} \ldots}{\Stmt^{+}} \\
+  \LangDynM{} &::=& \Def\ldots \Stmt\ldots
+\end{array}
+\]
 \fi}
 \end{minipage}
 }
@@ -16336,7 +16356,35 @@ True[0]
 \]
 \fi}
 {\if\edition\pythonEd
-UNDER CONSTRUCTION
+\[
+\begin{array}{rcl}
+\itm{binaryop} &::= & \code{Add()} \MID \code{Sub()} \\
+\itm{unaryop} &::= & \code{USub()} \MID \code{Not()} \\
+\itm{boolop} &::=& \code{And()} \MID \code{Or()} \\
+\itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()}
+   \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \\
+   &\MID & \code{Is()} \\
+\itm{bool} &::=& \code{True} \MID \code{False} \\
+\Exp{} &::=& \INT{\Int} \MID \READ{} \\
+  &\MID& \UNIOP{\itm{unaryop}}{\Exp}
+    \MID  \BINOP{\itm{binaryop}}{\Exp}{\Exp}  
+    \MID \VAR{\Var{}} \\
+  &\MID& \BOOL{\itm{bool}} 
+     \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp}\\
+  &\MID& \CMP{\Exp}{\itm{cmp}}{\Exp}  \MID \IF{\Exp}{\Exp}{\Exp} \\
+  &\MID& \TUPLE{\Exp^{+}} \MID \GET{\Exp}{\Exp} \\
+  &\MID& \LEN{\Exp} \\
+  &\MID& \CALL{\Exp}{\Exp^{*}} \MID \LAMBDA{\Var^{*}}{\Exp} \\
+\Stmt{} &::=& \PRINT{\Exp} \MID \EXPR{\Exp} \\
+  &\MID& \ASSIGN{\VAR{\Var}}{\Exp}\\
+  &\MID& \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}} 
+  \MID \WHILESTMT{\Exp}{\Stmt^{+}}\\
+  &\MID& \RETURN{\Exp} \\
+\Params &::=& \LP\Var\key{,}\code{AnyType()}\RP^*   \\
+\Def &::=& \FUNDEF{\Var}{\Params}{\_}{}{\Stmt^{+}}  \\
+\LangDynM{} &::=& \PROGRAM{}{\LS \Def \ldots \Stmt \ldots \RS}
+\end{array}
+\]
 \fi}
 \end{minipage}
 }
@@ -16355,36 +16403,74 @@ typed language (it's dynamically typed!).
 UNDER CONSTRUCTION
 
 The definitional interpreter for \LangDyn{} is presented in
-Figure~\ref{fig:interp-Rdyn} and its auxiliary functions are defined in
-Figure~\ref{fig:interp-Rdyn-aux}. Consider the match case for
+\racket{Figure~\ref{fig:interp-Ldyn}}
+\python{Figures~\ref{fig:interp-Ldyn} and \ref{fig:interp-Ldyn-2}}
+and its auxiliary functions are defined in
+Figure~\ref{fig:interp-Ldyn-aux}. Consider the match case for
 \INT{n}.  Instead of simply returning the integer \code{n} (as
 in the interpreter for \LangVar{} in Figure~\ref{fig:interp-Lvar}), the
 interpreter for \LangDyn{} creates a \emph{tagged value}\index{subject}{tagged
   value} that combines an underlying value with a tag that identifies
-what kind of value it is. We define the following struct
+what kind of value it is. We define the following \racket{struct}\python{class}
 to represented tagged values.
+%
+{\if\edition\racketEd
 \begin{lstlisting}
 (struct Tagged (value tag) #:transparent)
 \end{lstlisting}
-The tags are \code{Integer}, \code{Boolean}, \code{Void},
-\code{Vector}, and \code{Procedure}. Tags are closely related to types
-but don't always capture all the information that a type does. For
-example, a vector of type \code{(Vector Any Any)} is tagged with
-\code{Vector} and a procedure of type \code{(Any Any -> Any)}
-is tagged with \code{Procedure}.
+\fi}
+{\if\edition\pythonEd
+\begin{minipage}{\textwidth}
+\begin{lstlisting}
+@dataclass
+class Tagged:
+  value : Value
+  tag : int
+  __match_args__ = ("value", "tag")
+  def __str__(self):
+    return str(self.value)
+\end{lstlisting}
+\end{minipage}
+\fi}
+%
+\racket{The tags are \code{Integer}, \code{Boolean}, \code{Void},
+  \code{Vector}, and \code{Procedure}.}
+%
+\python{The tags are \code{'int'}, \code{'bool'}, \code{'none'},
+  \code{'tuple'}, and \code{'function'}}
+%
+Tags are closely related to types
+but don't always capture all the information that a type does.
+%
+\racket{For example, a vector of type \code{(Vector Any Any)} is
+  tagged with \code{Vector} and a procedure of type \code{(Any Any ->
+    Any)} is tagged with \code{Procedure}.}
+%
+\python{For example, a tuple of type \code{TupleType([AnyType(),AnyType()])}
+  is tagged with \code{'tuple'} and a function of type
+  \code{FunctionType([AnyType(), AnyType()], AnyType())}
+  is tagged with \code{'function'}.}
 
-Next consider the match case for \code{vector-ref}.  The
-\code{check-tag} auxiliary function (Figure~\ref{fig:interp-Rdyn-aux})
-is used to ensure that the first argument is a vector and the second
-is an integer. If they are not, a \code{trapped-error} is raised.
-Recall from Section~\ref{sec:interp_Lint} that when a definition
-interpreter raises a \code{trapped-error} error, the compiled code
-must also signal an error by exiting with return code \code{255}.  A
+Next consider the match case for accessing the element of a tuple.
+The \racket{\code{check-tag}}\python{\code{untag}} auxiliary function
+(Figure~\ref{fig:interp-Ldyn-aux}) is used to ensure that the first
+argument is a tuple and the second is an integer.
+\racket{
+If they are not, a \code{trapped-error} is raised.  Recall from
+Section~\ref{sec:interp_Lint} that when a definition interpreter
+raises a \code{trapped-error} error, the compiled code must also
+signal an error by exiting with return code \code{255}.  A
 \code{trapped-error} is also raised if the index is not less than
 length of the vector.
-
+}
+%
+\python{If they are not, an exception is raised.  The compiled code
+  must also signal an error by exiting with return code \code{255}.  A
+  exception is also raised if the index is not less than length of the
+  tuple.}
 
 \begin{figure}[tbp]
+{\if\edition\racketEd
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define ((interp-Rdyn-exp env) ast)
   (define recur (interp-Rdyn-exp env))
@@ -16439,11 +16525,123 @@ length of the vector.
         ((interp-Rdyn-exp new-env) body)]
        [else (error "interp-Rdyn-exp, expected function, not" f-val)])]))
 \end{lstlisting}
-\caption{Interpreter for the \LangDyn{} language.}
-\label{fig:interp-Rdyn}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+class InterpLdyn(InterpLlambda):
+  
+  def interp_exp(self, e, env):
+    match e:
+      case Constant(n):
+        return self.tag(super().interp_exp(e, env))
+      case Tuple(es, Load()):
+        return self.tag(super().interp_exp(e, env))
+      case Lambda(params, body):
+        return self.tag(super().interp_exp(e, env))
+      case Call(Name('input_int'), []):
+        return self.tag(super().interp_exp(e, env))
+      case BinOp(left, Add(), right):
+          l = self.interp_exp(left, env); r = self.interp_exp(right, env)
+          return self.tag(self.untag(l, 'int', e) + self.untag(r, 'int', e))
+      case BinOp(left, Sub(), right):
+          l = self.interp_exp(left, env); r = self.interp_exp(right, env)
+          return self.tag(self.untag(l, 'int', e) - self.untag(r, 'int', e))
+      case UnaryOp(USub(), e1):
+          v = self.interp_exp(e1, env)
+          return self.tag(- self.untag(v, 'int', e))
+      case IfExp(test, body, orelse):
+        v = self.interp_exp(test, env)
+        match self.untag(v, 'bool', e):
+          case True:
+            return self.interp_exp(body, env)
+          case False:
+            return self.interp_exp(orelse, env)
+      case UnaryOp(Not(), e1):
+        v = self.interp_exp(e1, env)
+        return self.tag(not self.untag(v, 'bool', e))
+      case BoolOp(And(), values):
+        left = values[0]; right = values[1]
+        l = self.interp_exp(left, env)
+        match self.untag(l, 'bool', e):
+          case True:
+            return self.interp_exp(right, env)
+          case False:
+            return self.tag(False)
+      case BoolOp(Or(), values):
+        left = values[0]; right = values[1]
+        l = self.interp_exp(left, env)
+        match self.untag(l, 'bool', e):
+          case True:
+            return True
+          case False:
+            return self.interp_exp(right, env)
+      case Compare(left, [cmp], [right]):
+        l = self.interp_exp(left, env)
+        r = self.interp_exp(right, env)
+        if l.tag == r.tag:
+          return self.tag(self.interp_cmp(cmp)(l.value, r.value))
+        else:
+          raise Exception('interp Compare unexpected ' \
+                          + repr(l) + ' ' + repr(r))
+      case Subscript(tup, index, Load()):
+        t = self.interp_exp(tup, env)
+        n = self.interp_exp(index, env)
+        return self.untag(t, 'tuple', e)[self.untag(n, 'int', e)]
+      case Call(Name('len'), [tup]):
+        t = self.interp_exp(tup, env)
+        return self.tag(len(self.untag(t, 'tuple', e)))
+      case _:
+        return super().interp_exp(e, env)
+
+\end{lstlisting}
+\fi}
+\caption{Interpreter for the \LangDyn{} language \python{, part 1}.}
+\label{fig:interp-Ldyn}
 \end{figure}
 
 \begin{figure}[tbp]
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+class InterpLdyn(InterpLlambda):
+  
+  def interp_stmts(self, ss, env):
+    if len(ss) == 0:
+      return
+    match ss[0]:
+      case If(test, body, orelse):
+        v = self.interp_exp(test, env)
+        match self.untag(v, 'bool', ss[0]):
+          case True:
+            return self.interp_stmts(body + ss[1:], env)
+          case False:
+            return self.interp_stmts(orelse + ss[1:], env)
+      case While(test, body, []):
+        while self.untag(self.interp_exp(test, env), 'bool', ss[0]):
+            self.interp_stmts(body, env)
+        return self.interp_stmts(ss[1:], env)
+      case Assign([Subscript(tup, index)], value):
+        tup = self.interp_exp(tup, env)
+        index = self.interp_exp(index, env)
+        tup_v = self.untag(tup, 'tuple', ss[0])
+        index_v = self.untag(index, 'int', ss[0])
+        tup_v[index_v] = self.interp_exp(value, env)
+        return self.interp_stmts(ss[1:], env)
+      case _:
+        return super().interp_stmts(ss, env)
+    
+  def interp_def(self, d, env):
+    match d:
+      case FunctionDef(name, params, bod, dl, returns, comment):
+        ps = [x for (x,t) in params]
+        env[name] = self.tag(Function(name, ps, bod, env))
+      case _:
+        raise Exception('interp_def unexpected ' + repr(d))
+\end{lstlisting}
+\caption{Interpreter for the \LangDyn{} language \python{, part 2}.}
+\label{fig:interp-Ldyn-2}
+\end{figure}
+
+\begin{figure}[tbp]
+{\if\edition\racketEd
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define (interp-op op)
   (match op
@@ -16496,13 +16694,48 @@ length of the vector.
   (unless (eq? tag expected)
     (error 'trapped-error "expected ~a, not ~a\nin ~v" expected tag ast)))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+class InterpLdyn(InterpLlambda):
+  
+  def tag(self, v):
+      if v is True or v is False:
+          return Tagged(v, 'bool')
+      elif isinstance(v, int):
+          return Tagged(v, 'int')
+      elif isinstance(v, Function):
+          return Tagged(v, 'function')
+      elif isinstance(v, list):
+          return Tagged(v, 'tuple')
+      elif isinstance(v, type(None)):
+          return Tagged(v, 'none')
+      else:
+          raise Exception('tag: unexpected ' + repr(v))
+
+  def untag(self, v, expected_tag, ast):
+      match v:
+        case Tagged(val, tag):
+          if tag != expected_tag:
+            raise Exception('expected tag ' + expected_tag + ', not ' + ' ' + repr(v))
+          return val
+        case _:
+          raise Exception('expected Tagged value with ' + expected_tag + ', not ' + ' ' + repr(v))
+
+  def apply_fun(self, fun, args, e):
+      f = self.untag(fun, 'function', e)
+      return super().apply_fun(f, args, e)
+\end{lstlisting}
+\fi}
 \caption{Auxiliary functions for the \LangDyn{} interpreter.}
-\label{fig:interp-Rdyn-aux}
+\label{fig:interp-Ldyn-aux}
 \end{figure}
 
 \clearpage
 
 \section{Representation of Tagged Values}
+
+\python{UNDER CONSTRUCTION}
 
 The interpreter for \LangDyn{} introduced a new kind of value, a tagged
 value. To compile \LangDyn{} to x86 we must decide how to represent tagged
