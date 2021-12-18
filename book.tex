@@ -13025,7 +13025,9 @@ nested inside each other.
 }
 \newcommand{\LfunASTPython}{
   \begin{array}{lcl}
-    \Type &::=& \key{int} \MID \key{bool} \MID \key{tuple}\LS\Type^+\RS \MID \key{FunctionType}\LP \Type^{*} \key{, } \Type \RP \\
+    \Type &::=& \key{IntType()} \MID \key{BoolType()} \key{VoidType()}
+        \MID \key{TupleType}\LS\Type^+\RS\\
+        &\MID& \key{FunctionType}\LP \Type^{*} \key{, } \Type \RP \\
     \Exp &::=& \CALL{\Exp}{\Exp^{*}}\\
     \Stmt &::=& \RETURN{\Exp} \\
    \Params &::=&                  \LP\Var\key{,}\Type\RP^*
@@ -16400,8 +16402,6 @@ Figures~\ref{fig:r7-concrete-syntax} and \ref{fig:r7-syntax}.
 There is no type checker for \LangDyn{} because it is not a statically
 typed language (it's dynamically typed!).
 
-UNDER CONSTRUCTION
-
 The definitional interpreter for \LangDyn{} is presented in
 \racket{Figure~\ref{fig:interp-Ldyn}}
 \python{Figures~\ref{fig:interp-Ldyn} and \ref{fig:interp-Ldyn-2}}
@@ -16780,17 +16780,31 @@ but first we describe the \LangAny{} language in greater detail.
 \section{The \LangAny{} Language}
 \label{sec:Rany-lang}
 
-\python{UNDER CONSTRUCTION}
-
-
-\newcommand{\LAnyAST}{
+\newcommand{\LanyASTRacket}{
 \begin{array}{lcl}
 \Type &::= & \key{Any} \\
+\FType &::=& \key{Integer} \MID \key{Boolean} \MID \key{Void} 
+      \MID \LP\key{Vector}\; \key{Any}\ldots\RP \\
+     &\MID& \LP\key{Any}\ldots \; \key{->}\; \key{Any}\RP\\
 \itm{op} &::= & \code{any-vector-length}
      \MID \code{any-vector-ref} \MID \code{any-vector-set!}\\
     &\MID& \code{boolean?} \MID \code{integer?} \MID \code{vector?}
      \MID \code{procedure?} \MID \code{void?} \\
   \Exp &::=& \INJECT{\Exp}{\FType} \MID \PROJECT{\Exp}{\FType} 
+\end{array}
+}
+
+\newcommand{\LanyASTPython}{
+\begin{array}{lcl}
+\Type &::= & \key{AnyType} \\
+\FType &::=& \key{IntType()} \MID \key{BoolType()} \MID \key{VoidType()}
+  \MID \key{TupleType}\LS\key{AnyType()}^+\RS \\
+  &\MID& \key{FunctionType}\LP \key{AnyType()}^{*}\key{, }\key{AnyType()}\RP \\
+\itm{unaryop} &::= & \code{IsBool()} \MID \code{IsInt()}
+     \MID \code{IsTuple()}  \MID \code{IsFunction()} \MID \code{IsNone()}\\
+\Exp & ::= & \INJECT{\Exp}{\Type} \MID \PROJECT{\Exp}{\Type} \\
+     &\MID& \CALL{\VAR{\key{'any\_tuple\_load'}}}{\Exp\key{, }\INT{n}}\\
+     &\MID& \CALL{\VAR{\key{'any\_len}}}{\Exp}
 \end{array}
 }
 
@@ -16809,7 +16823,7 @@ but first we describe the \LangAny{} language in greater detail.
   \gray{\LtupASTRacket{}} \\ \hline
   \gray{\LfunASTRacket} \\ \hline
   \gray{\LlambdaASTRacket} \\ \hline
-  \LAnyAST \\
+  \LanyASTRacket \\
 \begin{array}{lcl}
 %% \Type &::= & \ldots \MID \key{Any} \\
 %% \itm{op} &::= & \ldots \MID \code{any-vector-length}
@@ -16826,7 +16840,21 @@ but first we describe the \LangAny{} language in greater detail.
 \]
 \fi}
 {\if\edition\pythonEd
-UNDER CONSTRUCTION
+\[
+\begin{array}{l}
+  \gray{\LintASTPython} \\ \hline
+  \gray{\LvarASTPython{}} \\ \hline
+  \gray{\LifASTPython{}} \\ \hline
+  \gray{\LwhileASTPython{}} \\ \hline
+  \gray{\LtupASTPython{}} \\ \hline
+  \gray{\LfunASTPython} \\ \hline
+  \gray{\LlambdaASTPython} \\ \hline
+  \LanyASTPython \\
+  \begin{array}{lcl}
+  \LangLamM{} &::=& \PROGRAM{}{\LS \Def \ldots \Stmt \ldots \RS}
+  \end{array}
+\end{array}
+\]
 \fi}
 \end{minipage}
 }
@@ -16836,8 +16864,8 @@ UNDER CONSTRUCTION
 
 
 The abstract syntax of \LangAny{} is defined in Figure~\ref{fig:Rany-syntax}.
-(The concrete syntax of \LangAny{} is in the Appendix,
-Figure~\ref{fig:Rany-concrete-syntax}.)  The $\INJECT{e}{T}$ form
+\racket{(The concrete syntax of \LangAny{} is in the Appendix,
+Figure~\ref{fig:Rany-concrete-syntax}.)}  The $\INJECT{e}{T}$ form
 converts the value produced by expression $e$ of type $T$ into a
 tagged value.  The $\PROJECT{e}{T}$ form converts the tagged value
 produced by expression $e$ into a value of type $T$ or else halts the
