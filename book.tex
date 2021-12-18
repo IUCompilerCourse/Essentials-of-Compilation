@@ -3096,6 +3096,16 @@ print(tmp_1)
 \end{transformation}
 \fi}
 
+\newcommand{\LvarMonadASTPython}{
+\begin{array}{rcl}
+\Atm &::=& \INT{\Int} \MID \VAR{\Var} \\  
+\Exp{} &::=& \Atm \MID \READ{} \\
+       &\MID& \UNIOP{\itm{unaryop}}{\Atm} \MID \BINOP{\Atm}{\itm{binaryop}}{\Atm}  \\ 
+\Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
+        &\MID& \ASSIGN{\VAR{\Var}}{\Exp}
+\end{array}
+}
+
 \begin{figure}[tp]
 \centering
 \fbox{
@@ -3113,16 +3123,13 @@ print(tmp_1)
 \fi}
 {\if\edition\pythonEd
 \[
+\begin{array}{l}
+  \LvarMonadASTPython \\
 \begin{array}{rcl}
-\Atm &::=& \INT{\Int} \MID \VAR{\Var} \\  
-\Exp{} &::=& \Atm \MID \READ{} \\
-       &\MID& \NEG{\Atm} \MID  \ADD{\Atm}{\Atm} \\
-\Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
-        &\MID& \ASSIGN{\VAR{\Var}}{\Exp}\\
 \LangVarANFM{}  &::=& \PROGRAM{}{\Stmt^{*}}
 \end{array}
+\end{array}
 \]
-
 \fi}  
 \end{minipage}
 }
@@ -7623,17 +7630,17 @@ but the \code{if} expression is not.  All three sub-expressions of an
 \code{if} are allowed to be complex expressions but the operands of
 \code{not} and the comparisons must be atomic.
 %
-\python{We add a new language form, the \code{Let} expression, to aid
+\python{We add a new language form, the \code{Begin} expression, to aid
   in the translation of \code{if} expressions. When we recursively
   process the two branches of the \code{if}, we generate temporary
   variables and their initializing expressions. However, these
   expressions may contain side effects and should only be executed
   when the condition of the \code{if} is true (for the ``then''
-  branch) or false (for the ``else'' branch). The \code{Let} provides
+  branch) or false (for the ``else'' branch). The \code{Begin} provides
   a way to initialize the temporary variables within the two branches
-  of the \code{if} expression.  In general, the $\LET{x}{e_1}{e_2}$
-  form assigns the result of $e_1$ to the variable $x$, and then
-  evaluates $e_2$, which may reference $x$.}
+  of the \code{if} expression.  In general, the $\BEGIN{ss}{e}$
+  form execute the statements $ss$ and then returns the result of
+  expression $e$.}
 
 Add cases for Boolean constants, \python{comparisons,} and \code{if}
 expressions to the \code{rco\_exp} and \code{rco\_atom} functions
@@ -7644,20 +7651,16 @@ temporary variable because that would interfere with the generation of
 high-quality output in the \code{explicate\_control} pass.
 
 
-\newcommand{\LifASTMonadPython}{
+\newcommand{\LifMonadASTPython}{
 \begin{array}{rcl}
 %% \itm{binaryop} &::=& \code{Add()} \MID \code{Sub()} \\
 %% \itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \\
 %% \itm{unaryop} &::=& \code{USub()} \MID \code{Not()} \\
 %% \itm{bool} &::=& \code{True} \MID \code{False} \\
-\Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}}\\
-\Exp &::=& \Atm \MID \READ{} \\
-  &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm} \MID \UNIOP{\itm{unaryop}}{\Atm} \\
-  &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} \\
-  &\MID& \LET{\Var}{\Exp}{\Exp}\\
-\Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
-        &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{*}}{\Stmt^{*}}\\
-\LangIfANF  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
+\Atm &::=& \BOOL{\itm{bool}}\\
+\Exp &::=& \CMP{\Atm}{\itm{cmp}}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} \\
+  &\MID& \BEGIN{\Stmt^{*}}{\Exp}\\
+\Stmt{} &::=& \IFSTMT{\Exp}{\Stmt^{*}}{\Stmt^{*}}
 \end{array}
 }
 
@@ -7681,10 +7684,11 @@ Atm &::=& \gray{ \INT{\Int} \MID \VAR{\Var} } \MID \BOOL{\itm{bool}}\\
 {\if\edition\pythonEd
 \[
 \begin{array}{l}
-  \LifASTMonadPython \\
-  % \begin{array}{rcl}
-  %   \LangIfANF  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
-  % \end{array}
+  \gray{\LvarMonadASTPython} \\ \hline
+  \LifMonadASTPython \\
+   \begin{array}{rcl}
+     \LangIfANF  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
+   \end{array}
 \end{array}
 \]
 \fi}
@@ -7945,7 +7949,7 @@ def explicate_effect(e, cont, basic_blocks):
             ...
         case Call(func, args):
             ...
-        case Let(var, rhs, body):
+        case Begin(body, result):
             ...
         case _:
             ...
@@ -7954,7 +7958,7 @@ def explicate_assign(rhs, lhs, cont, basic_blocks):
     match rhs:
         case IfExp(test, body, orelse):
             ...
-        case Let(var, rhs, body):
+        case Begin(body, result):
             ...
         case _:
             return [Assign([lhs], rhs)] + cont
@@ -7973,7 +7977,7 @@ def explicate_pred(cnd, thn, els, basic_blocks):
             ...
         case IfExp(test, body, orelse):
             ...
-        case Let(var, rhs, body):
+        case Begin(body, result):
             ...
         case _:
             return [If(Compare(cnd, [Eq()], [Constant(False)]),
@@ -9403,9 +9407,9 @@ block_1:
 
 There is an opportunity for removing jumps that is apparent in the
 example of Figure~\ref{fig:if-example-x86}. The \code{start} block
-ends with a jump to \code{block\_4} and there are no other jumps to
-\code{block\_4} in the rest of the program. In this situation we can
-avoid the runtime overhead of this jump by merging \code{block\_4}
+ends with a jump to \code{block7953} and there are no other jumps to
+\code{block7953} in the rest of the program. In this situation we can
+avoid the runtime overhead of this jump by merging \code{block7953}
 into the preceding block, in this case the \code{start} block.
 Figure~\ref{fig:remove-jumps} shows the output of
 \code{select\_instructions} on the left and the result of this
@@ -10142,29 +10146,29 @@ guaranteed that iteratively applying liveness analysis to all blocks
 in the program will eventually produce the least fixed point solution.
 
 Next let us consider dataflow analysis in general and discuss the
-generic work list algorithm (Figure~\ref{fig:generic-dataflow}).
+generic work list algorithm (Figure~\ref{fig:generic-dataflow}). 
 %
 The algorithm has four parameters: the control-flow graph \code{G}, a
 function \code{transfer} that applies the analysis to one block, the
 \code{bottom} and \code{join} operator for the lattice of abstract
-states.  The algorithm begins by creating the bottom mapping,
-represented by a hash table.  It then pushes all of the nodes in the
-control-flow graph onto the work list (a queue). The algorithm repeats
-the \code{while} loop as long as there are items in the work list. In
-each iteration, a node is popped from the work list and processed. The
-\code{input} for the node is computed by taking the join of the
-abstract states of all the predecessor nodes. The \code{transfer}
-function is then applied to obtain the \code{output} abstract
-state. If the output differs from the previous state for this block,
-the mapping for this block is updated and its successor nodes are
-pushed onto the work list.
-
-Note that the \code{analyze\_dataflow} function is formulated as a
+states. The \code{analyze\_dataflow} function is formulated as a
 \emph{forward} dataflow analysis, that is, the inputs to the transfer
 function come from the predecessor nodes in the control-flow
 graph. However, liveness analysis is a \emph{backward} dataflow
 analysis, so in that case one must supply the \code{analyze\_dataflow}
 function with the transpose of the control-flow graph.
+
+The algorithm begins by creating the bottom mapping, represented by a
+hash table.  It then pushes all of the nodes in the control-flow graph
+onto the work list (a queue). The algorithm repeats the \code{while}
+loop as long as there are items in the work list. In each iteration, a
+node is popped from the work list and processed. The \code{input} for
+the node is computed by taking the join of the abstract states of all
+the predecessor nodes. The \code{transfer} function is then applied to
+obtain the \code{output} abstract state. If the output differs from
+the previous state for this block, the mapping for this block is
+updated and its successor nodes are pushed onto the work list.
+
 
 \begin{figure}[tb]
 {\if\edition\racketEd    
@@ -10385,6 +10389,13 @@ statement.
 Figure~\ref{fig:Rwhile-anf-syntax} defines the output language
 \LangLoopANF{} of this pass.
 
+
+\newcommand{\LwhileMonadASTPython}{
+\begin{array}{rcl}
+\Stmt{} &::=& \WHILESTMT{\Exp}{\Stmt^{+}} 
+\end{array}
+}
+
 \begin{figure}[tp]
 \centering
 \fbox{
@@ -10406,17 +10417,25 @@ Figure~\ref{fig:Rwhile-anf-syntax} defines the output language
 \fi}
 {\if\edition\pythonEd
 \[
-\begin{array}{rcl}
-\Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}}\\
-\Exp &::=& \Atm \MID \READ{} \\
-  &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm} \MID \UNIOP{\itm{unaryop}}{\Atm} \\
-  &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} \\
-%  &\MID& \LET{\Var}{\Exp}{\Exp}\\ % Why?
-\Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
-  &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
-  &\MID& \WHILESTMT{\Exp}{\Stmt^{+}} \\
-\LangLoopANF  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
+\begin{array}{l}
+  \gray{\LvarMonadASTPython} \\ \hline
+  \gray{\LifMonadASTPython} \\ \hline
+  \LwhileMonadASTPython \\
+   \begin{array}{rcl}
+     \LangLoopANF  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
+   \end{array}
 \end{array}
+%% \begin{array}{rcl}
+%% \Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}}\\
+%% \Exp &::=& \Atm \MID \READ{} \\
+%%   &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm} \MID \UNIOP{\itm{unaryop}}{\Atm} \\
+%%   &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} \\
+%% %  &\MID& \LET{\Var}{\Exp}{\Exp}\\ % Why?
+%% \Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
+%%   &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
+%%   &\MID& \WHILESTMT{\Exp}{\Stmt^{+}} \\
+%% \LangLoopANF  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
+%% \end{array}
 \]
 \fi}
 \end{minipage}
@@ -10483,16 +10502,16 @@ generate better code by taking this fact into account.
 
 The output language of \code{explicate\_control} is \LangCLoop{}
 (Figure~\ref{fig:c7-syntax}), which is nearly identical to
-\LangCLam{}. The only syntactic difference is that \code{Call} and
-\code{read} may also appear as statements.  The most significant
-difference between \LangCLam{} and \LangCLoop{} is that the
-control-flow graphs of the later may contain cycles.
+\LangCIf{}. The only syntactic difference is that \code{read} may also
+appear as a statement.  The most significant difference between the
+programs generated by \code{explicate\_control} in
+Chapter~\ref{ch:Lif} versus \code{explicate\_control} in this chapter
+is that the control-flow graphs of the later may contain cycles.
 
 \begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \small
-{\if\edition\racketEd
 \[
 \begin{array}{l}
   \gray{\CvarASTRacket} \\ \hline
@@ -10503,10 +10522,6 @@ control-flow graphs of the later may contain cycles.
 \end{array}
 \end{array}
 \]
-\fi}
-{\if\edition\pythonEd
-UNDER CONSTRUCTION
-\fi}
 \end{minipage}
 }
 \caption{The abstract syntax of \LangCLoop{}, extending \LangCIf{} (Figure~\ref{fig:c1-syntax}).}
@@ -11242,8 +11257,11 @@ begin with so we will not need to revisit this issue.
 
 \begin{figure}[tbp]
 \centering
-\includegraphics[width=\textwidth]{figs/copy-collect-1} \\[5ex]
-\includegraphics[width=\textwidth]{figs/copy-collect-2}
+\racket{\includegraphics[width=\textwidth]{figs/copy-collect-1}}
+\python{\includegraphics[width=\textwidth]{figs/copy-collect-1-python}}
+\\[5ex]
+\racket{\includegraphics[width=\textwidth]{figs/copy-collect-2}}
+\python{\includegraphics[width=\textwidth]{figs/copy-collect-2-python}}
 \caption{A copying collector in action.}
 \label{fig:copying-collector}
 \end{figure}
@@ -11284,7 +11302,9 @@ then updates the pointers in the popped tuple so they point to the
 newly copied tuples.
 
 \begin{figure}[tbp]
-\centering \includegraphics[width=0.9\textwidth]{figs/cheney}
+\centering
+\racket{\includegraphics[width=0.9\textwidth]{figs/cheney}}
+\python{\includegraphics[width=0.9\textwidth]{figs/cheney-python}}
 \caption{Depiction of the Cheney algorithm copying the live tuples.}
 \label{fig:cheney}
 \end{figure}
@@ -11344,7 +11364,9 @@ contains the two pointers from the regular stack and also the pointer
 in the second register.
 
 \begin{figure}[tbp]
-\centering \includegraphics[width=0.60\textwidth]{figs/root-stack}
+  \centering
+  \racket{\includegraphics[width=0.60\textwidth]{figs/root-stack}}
+  \python{\includegraphics[width=0.60\textwidth]{figs/root-stack-python}}
 \caption{Maintaining a root stack to facilitate garbage collection.}
 \label{fig:shadow-stack}
 \end{figure}
@@ -11453,10 +11475,6 @@ succeed.
 %%   ToSpace, and finally to swap the global pointers for the FromSpace
 %%   and ToSpace.
 %% \end{exercise}
-
-
-%% \section{Compiler Passes}
-%% \label{sec:code-generation-gc}
 
 The introduction of garbage collection has a non-trivial impact on our
 compiler passes. We introduce a new compiler pass named
@@ -11700,6 +11718,17 @@ Figure~\ref{fig:Lvec-anf-syntax}
 shows the grammar for the output language \LangAllocANF{} of this
 pass, which is \LangAlloc{} in monadic normal form.
 
+\newcommand{\LtupMonadASTPython}{
+\begin{array}{rcl}
+\Exp &::=& \GET{\Atm}{\Atm} \\
+     &\MID& \LEN{\Atm}\\
+   &\MID& \ALLOCATE{\Int}{\Type}
+    \MID \GLOBALVALUE{\Var} \\
+\Stmt{} &::=& \ASSIGN{\PUT{\Atm}{\Atm}}{\Atm} \\
+   &\MID& \COLLECT{\Int}
+\end{array}
+}
+
 \begin{figure}[tp]
 \centering
 \fbox{
@@ -11724,33 +11753,42 @@ pass, which is \LangAlloc{} in monadic normal form.
 \fi}
 {\if\edition\pythonEd
 \[
-\begin{array}{lcl}
-\itm{binaryop} &::=& \code{Add()} \MID \code{Sub()} \\
-\itm{boolop} &::=& \code{And()} \MID \code{Or()} \\
-\itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \MID \code{Is()} \\
-\itm{unaryop} &::=& \code{USub()} \MID \code{Not()} \\
-\itm{bool} &::=& \code{True} \MID \code{False} \\
-\Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} \\
-\Exp &::=& \Atm \MID \READ{} \MID \\
-     &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm}
-     \MID \UNIOP{\itm{unaryop}}{\Atm}\\
-     &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \\
-%     \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp} \\ % removed by RCO
-     &\MID& \IF{\Exp}{\Exp}{\Exp} \\
-     &\MID& \GET{\Atm}{\Atm} \\
-     &\MID& \LEN{\Exp}\\
-   &\MID& \ALLOCATE{\Int}{\Type}
-     \MID \GLOBALVALUE{\Var}\RP\\
-   &\MID& \BEGIN{\Stmt^{*}}{\Atm} \\ % can use this in place of \LET;
-                                % why have \LET?
-\Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
-  &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \\
-  &\MID& \ASSIGN{\PUT{\Atm}{\Atm}}{\Exp} \\
-  &\MID& \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
-  &\MID& \WHILESTMT{\Exp}{\Stmt^{+}}
-   \MID \COLLECT{\Int}  \\
-\LangAllocANFM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
+\begin{array}{l}
+  \gray{\LvarMonadASTPython} \\ \hline
+  \gray{\LifMonadASTPython} \\ \hline
+  \gray{\LwhileMonadASTPython} \\ \hline
+  \LtupMonadASTPython   \\
+  \begin{array}{rcl}
+     \LangAllocANFM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
+  \end{array}
 \end{array}
+%% \begin{array}{lcl}
+%% \itm{binaryop} &::=& \code{Add()} \MID \code{Sub()} \\
+%% \itm{boolop} &::=& \code{And()} \MID \code{Or()} \\
+%% \itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \MID \code{Is()} \\
+%% \itm{unaryop} &::=& \code{USub()} \MID \code{Not()} \\
+%% \itm{bool} &::=& \code{True} \MID \code{False} \\
+%% \Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} \\
+%% \Exp &::=& \Atm \MID \READ{} \MID \\
+%%      &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm}
+%%      \MID \UNIOP{\itm{unaryop}}{\Atm}\\
+%%      &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \\
+%% %     \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp} \\ % removed by RCO
+%%      &\MID& \IF{\Exp}{\Exp}{\Exp} \\
+%%      &\MID& \GET{\Atm}{\Atm} \\
+%%      &\MID& \LEN{\Exp}\\
+%%    &\MID& \ALLOCATE{\Int}{\Type}
+%%      \MID \GLOBALVALUE{\Var}\RP\\
+%%    &\MID& \BEGIN{\Stmt^{*}}{\Atm} \\ % can use this in place of \LET;
+%%                                 % why have \LET?
+%% \Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
+%%   &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \\
+%%   &\MID& \ASSIGN{\PUT{\Atm}{\Atm}}{\Exp} \\
+%%   &\MID& \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
+%%   &\MID& \WHILESTMT{\Exp}{\Stmt^{+}}
+%%    \MID \COLLECT{\Int}  \\
+%% \LangAllocANFM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
+%% \end{array}
 \]
 \fi}
 \end{minipage}
@@ -11900,8 +11938,11 @@ movq |$\itm{rhs}'$|, |$8(n+1)$|(%r11)
 \fi}
 \end{minipage}
 \end{center}
-The $\itm{lhs}'$, $\itm{tup}'$, and $\itm{rhs}'$ are obtained by
-translating $\itm{tup}$ and $\itm{rhs}$ to x86.  The move of $\itm{tup}'$ to
+\racket{The $\itm{lhs}'$, $\itm{tup}'$, and $\itm{rhs}'$}
+\python{The $\itm{tup}'$ and $\itm{rhs}'$}
+are obtained by translating from \LangCVec{} to x86.
+%
+The move of $\itm{tup}'$ to
 register \code{r11} ensures that offset expression
 \code{$-8(n+1)$(\%r11)} contains a register operand.  This requires
 removing \code{r11} from consideration by the register allocating.
@@ -11911,7 +11952,6 @@ Why not use \code{rax} instead of \code{r11}? Suppose we instead used
 \begin{lstlisting}
 movq |$\itm{tup}'$|, %rax
 movq |$\itm{rhs}'$|, |$8(n+1)$|(%rax)
-movq $0, |$\itm{lhs}'$|
 \end{lstlisting}
 Next, suppose that $\itm{rhs}'$ ends up as a stack location, so
 \code{patch\_instructions} would insert a move through \code{rax}
@@ -11920,7 +11960,6 @@ as follows.
 movq |$\itm{tup}'$|, %rax
 movq |$\itm{rhs}'$|, %rax
 movq %rax, |$8(n+1)$|(%rax)
-movq $0, |$\itm{lhs}'$|
 \end{lstlisting}
 But the above sequence of instructions does not work because we're
 trying to use \code{rax} for two different values ($\itm{tup}'$ and
@@ -12015,7 +12054,7 @@ available for use by the register allocator.
 \begin{array}{lcl}
   \Arg &::=& \gray{ \key{\$}\Int \MID \key{\%}\Reg \MID \Int\key{(}\key{\%}\Reg\key{)} \MID \key{\%}\itm{bytereg} } \MID \Var \key{(\%rip)} \\
 \LangXGlobalM{} &::= & \gray{ \key{.globl main} }\\
-      &    & \gray{ \key{main:} \; \Instr\ldots }
+      &    & \gray{ \key{main:} \; \Instr^{*} }
 \end{array}
 \]
 \end{minipage}
@@ -12485,6 +12524,7 @@ inner-product of two arrays (Figure~\ref{fig:inner-product}).
 \fbox{
   \begin{minipage}{0.96\textwidth}
     \small
+{\if\edition\racketEd    
 \[
 \begin{array}{lcl}
   \Type &::=& \ldots \MID \LP \key{Vectorof}~\Type \RP \\
@@ -12510,6 +12550,10 @@ inner-product of two arrays (Figure~\ref{fig:inner-product}).
   \LangArray{} &::=& \gray{\Def\ldots \; \Exp}
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd    
+UNDER CONSTRUCTION
+\fi}
 \end{minipage}
 }
 \caption{The concrete syntax of \LangArray{}, extending \LangLoop{} (Figure~\ref{fig:Lwhile-concrete-syntax}).}
@@ -12884,10 +12928,11 @@ present these findings.
 \label{ch:Lfun}
 \index{subject}{function}
 
-This chapter studies the compilation of functions similar to those
-found in the C language. This corresponds to a subset of \racket{Typed
-  Racket} \python{Python} in which only top-level function definitions
-are allowed. This kind of function is an important stepping stone to
+This chapter studies the compilation of  a subset of \racket{Typed
+  Racket}\python{Python} in which only top-level function definitions
+are allowed..
+This kind of function is a realistic example as the C language imposes
+similar restrictions. It is also  an important stepping stone to
 implementing lexically-scoped functions in the form of \key{lambda}
 abstractions, which is the topic of Chapter~\ref{ch:Llambda}.
 
@@ -12903,11 +12948,11 @@ definitions does not matter).
 %
 \python{The abstract syntax for function parameters in
   Figure~\ref{fig:Rfun-syntax} is a list of pairs, where each pair
-  consists of a parameter name and its type.  This differs from
-  Python's \code{ast} module, which has a more complex syntax for
-  function parameters, for example, to handle keyword parameters and
-  defaults. The type checker in \code{type\_check\_Lfun} converts the
-  more commplex syntax into the simpler syntax of
+  consists of a parameter name and its type.  This design differs from
+  Python's \code{ast} module, which has a more complex structure for
+  function parameters to handle keyword parameters,
+  defaults, and so on. The type checker in \code{type\_check\_Lfun} converts the
+  complex Python abstract syntax into the simpler syntax of
   Figure~\ref{fig:Rfun-syntax}. The fourth and sixth parameters of the
   \code{FunctionDef} constructor are for decorators and a type
   comment, neither of which are used by our compiler. We recommend
@@ -12915,10 +12960,13 @@ definitions does not matter).
 }
 %
 The concrete syntax for function application\index{subject}{function
-  application} is $\CAPPLY{\Exp}{\Exp \ldots}$ where the first expression
-must evaluate to a function and the rest are the arguments.  The
+  application} is 
+\python{$\CAPPLY{\Exp}{\Exp\code{,} \ldots}$}
+\racket{$\CAPPLY{\Exp}{\Exp \ldots}$}
+ where the first expression
+must evaluate to a function and the remaining expressions are the arguments.  The
 abstract syntax for function application is
-$\APPLY{\Exp}{\Exp\ldots}$.
+$\APPLY{\Exp}{\Exp^*}$.
 
 %% The syntax for function application does not include an explicit
 %% keyword, which is error prone when using \code{match}. To alleviate
@@ -12946,7 +12994,7 @@ limitation of these functions (with respect to
 \racket{Racket}\python{Python} functions) is that they are not
 lexically scoped. That is, the only external entities that can be
 referenced from inside a function body are other globally-defined
-functions. The syntax of \LangFun{} prevents functions from being
+functions. The syntax of \LangFun{} prevents function definitions from being
 nested inside each other.
 
 \newcommand{\LfunGrammarRacket}{
@@ -12966,7 +13014,10 @@ nested inside each other.
 
 \newcommand{\LfunGrammarPython}{
   \begin{array}{lcl}
-   \Type &::=& \key{Callable}\LS \LS \Type \key{,} \ldots \RS \key{, } \Type \RS \\
+    \Type &::=& \key{int}
+                \MID \key{bool}
+                \MID \key{tuple}\LS \Type^+ \RS
+                \MID \key{Callable}\LS \LS \Type \key{,} \ldots \RS \key{, } \Type \RS \\
    \Exp &::=& \CAPPLY{\Exp}{\Exp\code{,} \ldots} \\
    \Stmt &::=& \CRETURN{\Exp} \\
    \Def &::=& \CDEF{\Var}{\Var \key{:} \Type\key{,} \ldots}{\Type}{\Stmt^{+}} 
@@ -12974,10 +13025,11 @@ nested inside each other.
 }
 \newcommand{\LfunASTPython}{
   \begin{array}{lcl}
-    \Type &::=& \key{FunctionType}\LP \Type^{*} \key{, } \Type \RP \\
+    \Type &::=& \key{int} \MID \key{bool} \MID \key{tuple}\LS\Type^+\RS \MID \key{FunctionType}\LP \Type^{*} \key{, } \Type \RP \\
     \Exp &::=& \CALL{\Exp}{\Exp^{*}}\\
     \Stmt &::=& \RETURN{\Exp} \\
-   \Params &::=& \LS\LP\Var\key{,}\Type\RP\code{,}\ldots\RS \\
+   \Params &::=&                  \LP\Var\key{,}\Type\RP^*
+    \\
    \Def &::=& \FUNDEF{\Var}{\Params}{\Type}{}{\Stmt^{+}} 
   \end{array}
 }
@@ -13190,9 +13242,7 @@ class InterpLfun(InterpLtup):
   def apply_fun(self, fun, args, e):
       match fun:
         case Function(name, xs, body, env):
-          new_env = {x: v for (x,v) in env.items()}
-          for (x,arg) in zip(xs, args):
-              new_env[x] = arg
+          new_env = env.copy().update(zip(xs, args))
           return self.interp_stmts(body, new_env)
         case _:
           raise Exception('apply_fun: unexpected: ' + repr(fun))
@@ -13246,7 +13296,7 @@ interpreter, the case for the
 AST is responsible for setting up the mutual recursion between the
 top-level function definitions. We begin by create a mapping
 \code{env} from every function name to its type. We then type check
-the program using this \code{env}.
+the program using this mapping.
 %
 In the case for function \racket{application}\python{call}, we match
 the type of the function expression to a function type and check that
@@ -13329,7 +13379,7 @@ class TypeCheckLfun(TypeCheckLtup):
                 check_type_equal(param_t, arg_t, e)
             return return_t
           case _:
-            raise Exception('type_check_exp: in call, unexpected ' + \
+            raise Exception('type_check_exp: in call, unexpected ' +
                               repr(func_t))
       case _:
         return super().type_check_exp(e, env)
@@ -13339,9 +13389,7 @@ class TypeCheckLfun(TypeCheckLtup):
       return
     match ss[0]:
       case FunctionDef(name, params, body, dl, returns, comment):
-        new_env = {x: t for (x,t) in env.items()}
-        for (x,t) in params:
-            new_env[x] = t
+        new_env = env.copy().update(params)
         rt = self.type_check_stmts(body, new_env)
         check_type_equal(returns, rt, ss[0])
         return self.type_check_stmts(ss[1:], env)
@@ -13355,10 +13403,13 @@ class TypeCheckLfun(TypeCheckLtup):
       case Module(body):
         env = {}
         for s in body:
-            match s:
-              case FunctionDef(name, params, bod, dl, returns, comment):
-                params_t = [t for (x,t) in params]
-                env[name] = FunctionType(params_t, returns)
+          match s:
+            case FunctionDef(name, params, bod, dl, returns, comment):
+              if name in env:
+                raise Exception('type_check: function ' +
+                                  repr(name) + ' defined twice')
+              params_t = [t for (x,t) in params]
+              env[name] = FunctionType(params_t, returns)
         self.type_check_stmts(body, env)
       case _:
         raise Exception('type_check: unexpected ' + repr(p))
@@ -13381,8 +13432,8 @@ class TypeCheckLfun(TypeCheckLtup):
 %%    stack and what callq  and retq does.\\ --Jeremy }
 
 The x86 architecture provides a few features to support the
-implementation of functions. We have already seen that x86 provides
-labels so that one can refer to the location of an instruction, as is
+implementation of functions. We have already seen that there are
+labels in x86 so that one can refer to the location of an instruction, as is
 needed for jump instructions. Labels can also be used to mark the
 beginning of the instructions for a function.  Going further, we can
 obtain the address of a label by using the \key{leaq} instruction and
@@ -13393,7 +13444,7 @@ address of the \code{inc} label into the \code{rbx} register.
 \end{lstlisting}
 The instruction pointer register \key{rip} (aka. the program counter
 \index{subject}{program counter}) always points to the next
-instruction to be executed. When combined with an label, as in
+instruction to be executed. When combined with a label, as in
 \code{inc(\%rip)}, the assembler computes the distance $d$ between the
 address of \code{inc} and where the \code{rip} would be at that moment
 and then changes the \code{inc(\%rip)} argument to \code{$d$(\%rip)},
@@ -13426,13 +13477,14 @@ the target. However, \code{callq} does not handle
 \item determining how registers are shared by different functions.
 \end{enumerate}
 
-Regarding (1) parameter passing, recall that the following six
-registers are used to pass arguments to a function, in this order.
+Regarding (1) parameter passing, recall that the x86-64 calling convention
+for Unix-based system uses the following six
+registers to pass arguments to a function, in this order.
 \begin{lstlisting}
 rdi rsi rdx rcx r8 r9
 \end{lstlisting}
 If there are
-more than six arguments, then the convention is to use space on the
+more than six arguments, then the calling convention mandates to use space on the
 frame of the caller for the rest of the arguments. However, to ease
 the implementation of efficient tail calls
 (Section~\ref{sec:tail-call}), we arrange never to need more than six
@@ -13453,7 +13505,8 @@ is, anything that is at or above the stack pointer. The callee is free
 to use locations that are below the stack pointer.
 
 Recall that we are storing variables of tuple type on the root stack.
-So the prelude needs to move the root stack pointer \code{r15} up and
+So the prelude needs to move the root stack pointer \code{r15} up
+according to the number of variables of tuple type and
 the conclusion needs to move the root stack pointer back down.  Also,
 the prelude must initialize to \code{0} this frame's slots in the root
 stack to signal to the garbage collector that those slots do not yet
@@ -13466,15 +13519,15 @@ recall from Section~\ref{sec:calling-conventions} that the registers
 are divided into two groups, the caller-saved registers and the
 callee-saved registers. The caller should assume that all the
 caller-saved registers get overwritten with arbitrary values by the
-callee. That is why we recommend in
+callee. For that reason we recommend in
 Section~\ref{sec:calling-conventions} that variables that are live
 during a function call should not be assigned to caller-saved
 registers.
 
 On the flip side, if the callee wants to use a callee-saved register,
 the callee must save the contents of those registers on their stack
-frame and then put them back prior to returning to the caller.  That
-is why we recommended in Section~\ref{sec:calling-conventions} that if
+frame and then put them back prior to returning to the caller.  For
+that reason we recommend in Section~\ref{sec:calling-conventions} that if
 the register allocator assigns a variable to a callee-saved register,
 then the prelude of the \code{main} function must save that register
 to the stack and the conclusion of \code{main} must restore it.  This
@@ -13554,12 +13607,12 @@ In general, the amount of stack space used by a program is determined
 by the longest chain of nested function calls. That is, if function
 $f_1$ calls $f_2$, $f_2$ calls $f_3$, $\ldots$, $f_n$, then the amount
 of stack space is linear in $n$.  The depth $n$ can grow quite large
-in the case of recursive or mutually recursive functions. However, in
+if functions are (mutually) recursive. However, in
 some cases we can arrange to use only a constant amount of space for a
 long chain of nested function calls.
 
-If a function call is the last action in a function body, then that
-call is said to be a \emph{tail call}\index{subject}{tail call}.
+A \emph{tail call}\index{subject}{tail call} is a function call that
+happens as the last action in a function body. 
 For example, in the following
 program, the recursive call to \code{tail\_sum} is a tail call.
 \begin{center}
@@ -13587,10 +13640,10 @@ print( tail_sum(3, 0) + 36)
 \end{center}
 At a tail call, the frame of the caller is no longer needed, so we can
 pop the caller's frame before making the tail call. With this
-approach, a recursive function that only makes tail calls will only
-use a constant amount of stack space.  Functional languages like
-Racket typically rely heavily on recursive functions, so they
-typically guarantee that all tail calls will be optimized in this way.
+approach, a recursive function that only makes tail calls ends up 
+using a constant amount of stack space.  Functional languages like
+Racket rely heavily on recursive functions, so the definition of
+Racket \emph{requires} that all tail calls be optimized in this way.
 \index{subject}{frame}
 
 Some care is needed with regards to argument passing in tail calls.
@@ -13634,7 +13687,8 @@ just about everything else.
 \label{sec:shrink-r4}
 
 The \code{shrink} pass performs a minor modification to ease the
-later passes. This pass introduces an explicit \code{main} function.
+later passes. This pass introduces an explicit \code{main} function
+that gobbles up all the top-level statements of the module.
 %
 \racket{It also changes the top \code{ProgramDefsExp} form to
 \code{ProgramDefs}.}
@@ -13656,7 +13710,7 @@ Module(|$\Def\ldots\Stmt\ldots$|)
 \end{lstlisting}
 where $\itm{mainDef}$ is
 \begin{lstlisting}
-FunctionDef('main', [], int, None, |$\Stmt'\ldots$|Return(Constant(0)), None)
+FunctionDef('main', [], int, None, |$\Stmt\ldots$|Return(Constant(0)), None)
 \end{lstlisting}
 \fi}
 
@@ -13730,7 +13784,7 @@ than six arguments to pass the first five arguments as usual, but it
 packs the rest of the arguments into a vector and passes it as the
 sixth argument.
 
-Each function definition with too many parameters is transformed as
+Each function definition with seven or more parameters is transformed as
 follows.
 {\if\edition\racketEd   
 \begin{lstlisting}
@@ -13759,7 +13813,7 @@ the $k$th element of the tuple, where $k = i - 6$.
 \fi}
 {\if\edition\pythonEd   
 \begin{lstlisting}
-  Name(|$x_i$|) |$\Rightarrow$| Subscript(tup, Constant(|$k$|))
+  Name(|$x_i$|) |$\Rightarrow$| Subscript(tup, Constant(|$k$|), Load())
 \end{lstlisting}
 \fi}
 
@@ -13870,7 +13924,7 @@ be updated with cases for
 \racket{\code{Apply}}\python{\code{Call}} and \code{FunRef} and the
 function for predicate context should be updated for
 \racket{\code{Apply}}\python{\code{Call}} but not \code{FunRef}.  (A
-\code{FunRef} can't be a Boolean.) In assignment and predicate
+\code{FunRef} cannot be a Boolean.) In assignment and predicate
 contexts, \code{Apply} becomes \code{Call}\racket{, whereas in tail position
 \code{Apply} becomes \code{TailCall}}.  We recommend defining a new
 auxiliary function for processing function definitions.  This code is
@@ -13908,8 +13962,8 @@ appropriate explicate functions for the various contexts.
 \Exp &::= & \FUNREF{\itm{label}} \MID \CALL{\Atm}{\Atm^{*}} \\
 \Stmt &::= & \TAILCALL{\Atm}{\Atm^{*}} \\
 \Params &::=& \LS\LP\Var\key{,}\Type\RP\code{,}\ldots\RS \\
-\Block &::=& \Stmt^{*} \\
-\Blocks &::=& \LC\itm{label}\key{:}\Block\code{,}\ldots\RC \\
+\Block &::=& \itm{label}\key{:} \Stmt^{*} \\
+\Blocks &::=& \LC\Block\code{,}\ldots\RC \\
 \Def &::=& \DEF{\itm{label}}{\Params}{\Blocks}{\key{None}}{\Type}{\key{None}} 
 \end{array}
 }
@@ -13966,13 +14020,12 @@ language, whose syntax is defined in Figure~\ref{fig:x86-3}.
 \[
 \begin{array}{lcl}
   \Arg &::=& \gray{ \key{\$}\Int \MID \key{\%}\Reg \MID \Int\key{(}\key{\%}\Reg\key{)} \MID \key{\%}\itm{bytereg} } \MID \Var \key{(\%rip)} \\
-\itm{cc} & ::= & \gray{  \key{e} \MID \key{l} \MID \key{le} \MID \key{g} \MID \key{ge}  } \\
+\itm{cc} & ::= & \gray{  \key{e} \MID \key{ne} \MID \key{l} \MID \key{le} \MID \key{g} \MID \key{ge}  } \\
 \Instr &::=& \ldots
      \MID \key{callq}\;\key{*}\Arg \MID \key{tailjmp}\;\Arg 
      \MID \key{leaq}\;\Arg\key{,}\;\key{\%}\Reg \\
-\Block &::= & \Instr^{*} \\
-\Blocks &::=& \LP\LP\itm{label} \,\key{.}\, \Block\RP\ldots\RP\\
-\Def &::= & \LP\key{define} \; \LP\itm{label} \RP \; \Blocks \RP\\
+\Block &::= & \itm{label}\key{:}\, \Instr^{*} \\
+\Def &::= & \key{.globl}\,\itm{label}\; \Block^{*} \\
 \LangXIndCallM{} &::= & \Def\ldots
 \end{array}
 \]
@@ -14009,8 +14062,10 @@ language, whose syntax is defined in Figure~\ref{fig:x86-3}.
      &\MID& \gray{ \GLOBAL{\Var} } \MID \FUNREF{\itm{label}} \\
   \Instr &::=& \ldots \MID \INDCALLQ{\Arg}{\itm{int}}
     \MID \TAILJMP{\Arg}{\itm{int}}\\
-    &\MID& \BININSTR{\code{leaq}}{\Arg}{\REG{\Reg}}\\
-  \Def &::= & \DEF{\itm{label}}{\LS\RS}{\LC\itm{label}\key{:}\,\Instr^{*}\code{,}\ldots\RC}{\_}{\Type}{\_} \\
+    &\MID& \BININSTR{\scode{leaq}}{\Arg}{\REG{\Reg}}\\
+  \Block &::=&\itm{label}\key{:}\,\Instr^{*} \\
+  \Blocks &::= & \LC\Block\code{,}\ldots\RC\\
+  \Def &::= & \DEF{\itm{label}}{\LS\RS}{\Blocks}{\_}{\Type}{\_} \\
 \LangXIndCallM{} &::= & \XPROGRAMDEFS{\LS\Def\code{,}\ldots\RS}
 \end{array}
 \]
@@ -14029,17 +14084,31 @@ is the translation of $\itm{lhs}$ from \Atm{} in \LangCFun{}
 to \Arg{} in \LangXIndCallVar{}. \\
 \begin{tabular}{lcl}
 \begin{minipage}{0.35\textwidth}
+{\if\edition\racketEd
 \begin{lstlisting}
   |$\itm{lhs}$| = (fun-ref |$f$|);
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+  |$\itm{lhs}$| = FunRef(|$f$|);
+\end{lstlisting}
+\fi}
 \end{minipage}
 &
 $\Rightarrow$\qquad\qquad
 &
 \begin{minipage}{0.3\textwidth}
+{\if\edition\racketEd
 \begin{lstlisting}
 leaq (fun-ref |$f$|), |$\itm{lhs}'$|
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+leaq |$f$|(%rip), |$\itm{lhs}'$|
+\end{lstlisting}
+\fi}
 \end{minipage}
 \end{tabular} \\
 
@@ -14134,7 +14203,7 @@ useful in the \code{uncover\_live} pass for determining which
 argument-passing registers are potentially read during the call.
 
 For tail calls, the parameter passing is the same as non-tail calls:
-generate instructions to move the arguments into to the argument
+generate instructions to move the arguments into the argument
 passing registers.  After that we need to pop the frame from the
 procedure call stack.  However, we do not yet know how big the frame
 is; that gets determined during register allocation. So instead of
@@ -14145,7 +14214,7 @@ argument that specifies where to jump and an integer that represents
 the arity of the function being called.
 
 Recall that we use the label \code{start} for the initial block of a
-program, and in Section~\ref{sec:select-Lvar} we recommended labeling
+program, and in Section~\ref{sec:select-Lvar} we recommend labeling
 the conclusion of the program with \code{conclusion}, so that
 $\RETURN{Arg}$ can be compiled to an assignment to \code{rax} followed
 by a jump to \code{conclusion}. With the addition of function
@@ -14170,28 +14239,30 @@ to obtain unique labels.
 The \code{IndirectCallq} instruction should be treated like
 \code{Callq} regarding its written locations $W$, in that they should
 include all the caller-saved registers. Recall that the reason for
-that is to force call-live variables to be assigned to callee-saved
+that is to force variables that are live across a function call to be assigned to callee-saved
 registers or to be spilled to the stack.
 
-Regarding the set of read locations $R$ the arity field of
+Regarding the set of read locations $R$, the arity field of
 \code{TailJmp} and \code{IndirectCallq} determines how many of the
 argument-passing registers should be considered as read by those
-instructions.
+instructions. Also, the target field of \code{TailJmp} and
+\code{IndirectCallq} should be included in the set of read locations
+$R$.
 
 \subsection{Build Interference Graph}
 \label{sec:build-interference-r4}
 
-With the addition of function definitions, we compute an interference
+With the addition of function definitions, we compute a separate interference
 graph for each function (not just one for the whole program).
 
 Recall that in Section~\ref{sec:reg-alloc-gc} we discussed the need to
-spill vector-typed variables that are live during a call to the
-\code{collect}.  With the addition of functions to our language, we
-need to revisit this issue. Many functions perform allocation and
-therefore have calls to the collector inside of them. Thus, we should
+spill vector-typed variables that are live during a call to 
+\code{collect}, the garbage collector.  With the addition of functions to our language, we
+need to revisit this issue. Functions that perform allocation contain
+calls to the collector. Thus, we should 
 not only spill a vector-typed variable when it is live during a call
 to \code{collect}, but we should spill the variable if it is live
-during any function call. Thus, in the \code{build\_interference} pass,
+during call to a user-defined function. Thus, in the \code{build\_interference} pass,
 we recommend adding interference edges between call-live vector-typed
 variables and the callee-saved registers (in addition to the usual
 addition of edges between call-live variables and the caller-saved
@@ -14214,7 +14285,7 @@ instead of just once for the whole program.
 In \code{patch\_instructions}, you should deal with the x86
 idiosyncrasy that the destination argument of \code{leaq} must be a
 register. Additionally, you should ensure that the argument of
-\code{TailJmp} is \itm{rax}, our reserved register---this is to make
+\code{TailJmp} is \itm{rax}, our reserved register---mostly to make
 code generation more convenient, because we trample many registers
 before the tail call (as explained in the next section).
 
@@ -14237,7 +14308,7 @@ a function, except the \code{retq} is replaced with \code{jmp *$\itm{arg}$}.
 
 Regarding function definitions, you need to generate a prelude
 and conclusion for each one. This code is similar to the prelude and
-conclusion that you generated for the \code{main} function in
+conclusion generated for the \code{main} function in
 Chapter~\ref{ch:Lvec}. To review, the prelude of every function
 should carry out the following steps.
 % TODO: .align the functions!
@@ -14255,13 +14326,13 @@ should carry out the following steps.
 \item Move the root stack pointer \code{r15} up by the size of the
   root-stack frame for this function, which depends on the number of
   spilled vectors. \label{root-stack-init}
-\item Initialize to zero all of the entries in the root-stack frame.
+\item Initialize to zero all new entries in the root-stack frame.
 \item Jump to the start block.
 \end{enumerate}
 The prelude of the \code{main} function has one additional task: call
 the \code{initialize} function to set up the garbage collector and
 move the value of the global \code{rootstack\_begin} in
-\code{r15}. This should happen before step \ref{root-stack-init}
+\code{r15}. This initialization should happen before step \ref{root-stack-init}
 above, which depends on \code{r15}.
 
 The conclusion of every function should do the following.
@@ -14987,9 +15058,7 @@ class TypeCheckLlambda(TypeCheckLfun):
         e.has_type = ty
         match ty:
           case FunctionType(params_t, return_t):
-            new_env = {x:t for (x,t) in env.items()}
-            for (p,t) in zip(params, params_t):
-                new_env[p] = t
+            new_env = env.copy().update(zip(params, params_t))
             self.check_exp(body, return_t, new_env)
           case _:
             raise Exception('lambda does not have type ' + str(ty))
@@ -15021,9 +15090,7 @@ class TypeCheckLlambda(TypeCheckLfun):
       return
     match ss[0]:
       case FunctionDef(name, params, body, dl, returns, comment):
-        new_env = {x: t for (x,t) in env.items()}
-        for (x,t) in params:
-            new_env[x] = t
+        new_env = env.copy().update(params)
         rt = self.check_stmts(body, returns, new_env)
         self.check_stmts(ss[1:], return_ty, env)
       case Return(value):
@@ -15274,7 +15341,7 @@ Figure~\ref{fig:f2-syntax}.
 \section{Assignment Conversion}
 \label{sec:convert-assignments}
 
-The purpose of the \code{convert\_assignments} pass is address the
+The purpose of the \code{convert\_assignments} pass is to address the
 challenge posed in Section~\ref{sec:assignment-scoping} regarding the
 interaction between variable assignments and closure conversion.
 First we identify which variables need to be boxed, then we transform
@@ -15287,6 +15354,8 @@ intersection of the following two sets of variables:
 \item The variables that appear on the left-hand side of an
   assignment.
 \end{enumerate}
+The first condition is a must, but the second condition is quite conservative and it is possible to
+develop a more liberal condition. 
 
 Consider again the first example from
 Section~\ref{sec:assignment-scoping}:
@@ -15323,7 +15392,7 @@ variables \code{x} and \code{z} occur free inside the
 \code{y} or \code{z}.  The boxing of \code{x} consists of three
 transformations: initialize \code{x} with a tuple, replace reads from
 \code{x} with tuple reads, and replace each assignment to \code{x}
-with a tuple writes. The output of \code{convert\_assignments} for
+with a tuple write. The output of \code{convert\_assignments} for
 this example is as follows.
 %
 {\if\edition\racketEd
@@ -15440,7 +15509,7 @@ the intersection of the variables that are free in a \code{lambda} and
 that are assigned-to. We then apply assignment conversion to the body
 of the function definition. Finally, we box the parameters of this
 function definition that are in $\mathit{AF}$. For example,
-the parameter \code{x} of the follow function \code{g}
+the parameter \code{x} of the following function \code{g}
 needs to be boxed.
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -15506,6 +15575,8 @@ def g(x_0 : int)-> int:
 \section{Closure Conversion}
 \label{sec:closure-conversion}
 \index{subject}{closure conversion}
+
+[TODO: discuss conversion of \code{AnnAssign} to \code{Assign} -Jeremy]
 
 The compiling of lexically-scoped functions into top-level function
 definitions is accomplished in the pass \code{convert\_to\_closures}
@@ -15613,10 +15684,12 @@ and the rest of the parameters are the ones from the original
 function, with types $T'_1, \ldots, T'_n$.  The type for the closure
 omits the types of the free variables because 1) those types are not
 available in this context and 2) we do not need them in the code that
-is generated for function application.
+is generated for function application. So this type only describes the
+first component of the closure tuple. At runtime the tuple may have
+more components, but we ignore them at this point.
 
 We transform function application into code that retrieves the
-function from the closure and then calls the function, passing in the
+function from the closure and then calls the function, passing the
 closure as the first argument. We place $e'$ in a temporary variable
 to avoid code duplication.
 \begin{center}
@@ -15634,9 +15707,9 @@ to avoid code duplication.
 \begin{lstlisting}
 Call(|$e$|, [|$e_1, \ldots, e_n$|])
 |$\Rightarrow$|
-Let(|$\itm{tmp}$|, |$e'$|,
-  Call(Subscript(Name(|$\itm{tmp}$|), Constant(0)),
-       [|$\itm{tmp}$|, |$e'_1, \ldots, e'_n$|]))
+Begin([Assign([|$\itm{tmp}$|], |$e'$|)],
+      Call(Subscript(Name(|$\itm{tmp}$|), Constant(0)),
+           [|$\itm{tmp}$|, |$e'_1, \ldots, e'_n$|]))
 \end{lstlisting}
 \fi}
 \end{minipage}
@@ -15655,7 +15728,7 @@ application, we turn function references into closures.
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
-FunRefArity(|$f$|, |$n$|)
+FunRef(|$f$|)
 \end{lstlisting}
 \fi}
 \end{minipage}
@@ -15727,8 +15800,8 @@ $\Rightarrow$
 % free_var.py
 \begin{lstlisting}
 def f(x : int) -> Callable[[int], int]:
-    y = 4
-    return lambda z: x + y + z
+  y = 4
+  return lambda z: x + y + z
 
 g = f(5)
 h = f(3)
@@ -15744,7 +15817,7 @@ def lambda_0(fvs_1:tuple[bot,int,tuple[int]],z:int) -> int:
 def f(fvs_2:bot, x:int) -> tuple[Callable[[tuple[],int], int]]
   y = (777,)
   y[0] = 4
-  return (lambda_0, y, x)
+  return (lambda_0, x, y)
 
 def main() -> int:
   g = (let clos_3 = (f,) in clos_3[0](clos_3, 5))
@@ -16208,7 +16281,8 @@ True[0]
 \begin{figure}[tp]
 \centering
 \fbox{
-\begin{minipage}{0.97\textwidth}
+  \begin{minipage}{0.97\textwidth}
+{\if\edition\racketEd    
 \[
 \begin{array}{rcl}
   \itm{cmp} &::= & \key{eq?} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=} \\
@@ -16231,6 +16305,10 @@ True[0]
 \LangDynM{}  &::=& \Def\ldots\; \Exp
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd
+  UNDER CONSTRUCTION
+\fi}
 \end{minipage}
 }
 \caption{Syntax of \LangDyn{}, an untyped language (a subset of \racket{Racket}\python{Python}).}
