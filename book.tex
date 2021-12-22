@@ -16426,7 +16426,7 @@ to represented tagged values.
 @dataclass
 class Tagged:
   value : Value
-  tag : int
+  tag : str
   def __str__(self):
     return str(self.value)
 \end{lstlisting}
@@ -16551,10 +16551,9 @@ class InterpLdyn(InterpLlambda):
           return self.tag(- self.untag(v, 'int', e))
       case IfExp(test, body, orelse):
         v = self.interp_exp(test, env)
-        match self.untag(v, 'bool', e):
-          case True:
+        if self.untag(v, 'bool', e):
             return self.interp_exp(body, env)
-          case False:
+        else:
             return self.interp_exp(orelse, env)
       case UnaryOp(Not(), e1):
         v = self.interp_exp(e1, env)
@@ -16562,18 +16561,16 @@ class InterpLdyn(InterpLlambda):
       case BoolOp(And(), values):
         left = values[0]; right = values[1]
         l = self.interp_exp(left, env)
-        match self.untag(l, 'bool', e):
-          case True:
+        if self.untag(l, 'bool', e):
             return self.interp_exp(right, env)
-          case False:
+        else:
             return self.tag(False)
       case BoolOp(Or(), values):
         left = values[0]; right = values[1]
         l = self.interp_exp(left, env)
-        match self.untag(l, 'bool', e):
-          case True:
-            return True
-          case False:
+        if self.untag(l, 'bool', e):
+            return self.tag(True)
+        else:
             return self.interp_exp(right, env)
       case Compare(left, [cmp], [right]):
         l = self.interp_exp(left, env)
@@ -16591,11 +16588,10 @@ class InterpLdyn(InterpLlambda):
         t = self.interp_exp(tup, env)
         return self.tag(len(self.untag(t, 'tuple', e)))
       case _:
-        return super().interp_exp(e, env)
-
+        return self.tag(super().interp_exp(e, env))
 \end{lstlisting}
 \fi}
-\caption{Interpreter for the \LangDyn{} language \python{, part 1}.}
+\caption{Interpreter for the \LangDyn{} language\python{, part 1}.}
 \label{fig:interp-Ldyn}
 \end{figure}
 
@@ -16609,10 +16605,9 @@ class InterpLdyn(InterpLlambda):
     match ss[0]:
       case If(test, body, orelse):
         v = self.interp_exp(test, env)
-        match self.untag(v, 'bool', ss[0]):
-          case True:
+        if self.untag(v, 'bool', ss[0]):
             return self.interp_stmts(body + ss[1:], env)
-          case False:
+        else:
             return self.interp_stmts(orelse + ss[1:], env)
       case While(test, body, []):
         while self.untag(self.interp_exp(test, env), 'bool', ss[0]):
@@ -16636,7 +16631,7 @@ class InterpLdyn(InterpLlambda):
       case _:
         raise Exception('interp_def unexpected ' + repr(d))
 \end{lstlisting}
-\caption{Interpreter for the \LangDyn{} language \python{, part 2}.}
+\caption{Interpreter for the \LangDyn{} language\python{, part 2}.}
 \label{fig:interp-Ldyn-2}
 \end{figure}
 
@@ -16706,7 +16701,7 @@ class InterpLdyn(InterpLlambda):
           return Tagged(v, 'int')
       elif isinstance(v, Function):
           return Tagged(v, 'function')
-      elif isinstance(v, list):
+      elif isinstance(v, tuple):
           return Tagged(v, 'tuple')
       elif isinstance(v, type(None)):
           return Tagged(v, 'none')
