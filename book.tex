@@ -17250,33 +17250,32 @@ class InterpLany(InterpLlambda):
 \section{Cast Insertion: Compiling \LangDyn{} to \LangAny{}}
 \label{sec:compile-r7}
 
-\python{UNDER CONSTRUCTION}
-
 The \code{cast\_insert} pass compiles from \LangDyn{} to \LangAny{}.
 Figure~\ref{fig:compile-r7-Rany} shows the compilation of many of the
 \LangDyn{} forms into \LangAny{}. An important invariant of this pass is that
 given a subexpression $e$ in the \LangDyn{} program, the pass will produce
-an expression $e'$ in \LangAny{} that has type \key{Any}. For example, the
+an expression $e'$ in \LangAny{} that has type \ANYTY{}. For example, the
 first row in Figure~\ref{fig:compile-r7-Rany} shows the compilation of
-the Boolean \code{\#t}, which must be injected to produce an
-expression of type \key{Any}.
+the Boolean \TRUE{}, which must be injected to produce an
+expression of type \ANYTY{}.
 %
 The second row of Figure~\ref{fig:compile-r7-Rany}, the compilation of
 addition, is representative of compilation for many primitive
-operations: the arguments have type \key{Any} and must be projected to
-\key{Integer} before the addition can be performed.
+operations: the arguments have type \ANYTY{} and must be projected to
+\INTTYPE{} before the addition can be performed.
 
 The compilation of \key{lambda} (third row of
 Figure~\ref{fig:compile-r7-Rany}) shows what happens when we need to
-produce type annotations: we simply use \key{Any}.
+produce type annotations: we simply use \ANYTY{}.
 %
-The compilation of \code{if} and \code{eq?}  demonstrate how this pass
-has to account for some differences in behavior between \LangDyn{} and
-\LangAny{}. The \LangDyn{} language is more permissive than \LangAny{} regarding what
-kind of values can be used in various places. For example, the
-condition of an \key{if} does not have to be a Boolean. For \key{eq?},
-the arguments need not be of the same type (in that case the
-result is \code{\#f}).
+% TODO:update the following for python, and the tests and interpreter. -Jeremy
+\racket{The compilation of \code{if} and \code{eq?}  demonstrate how
+  this pass has to account for some differences in behavior between
+  \LangDyn{} and \LangAny{}. The \LangDyn{} language is more
+  permissive than \LangAny{} regarding what kind of values can be used
+  in various places. For example, the condition of an \key{if} does
+  not have to be a Boolean. For \key{eq?}, the arguments need not be
+  of the same type (in that case the result is \code{\#f}).}
 
 \begin{figure}[btp]
 \centering
@@ -17538,7 +17537,11 @@ In the \code{reveal-casts} pass we recommend compiling \code{project}
 into an \code{if} expression that checks whether the value's tag
 matches the target type; if it does, the value is converted to a value
 of the target type by removing the tag; if it does not, the program
-exits.  To perform these actions we need a new primitive operation,
+exits.
+%
+{\if\edition\racketEd
+%
+To perform these actions we need a new primitive operation,
 \code{tag-of-any}, and two new forms, \code{ValueOf} and \code{Exit}.
 The \code{tag-of-any} operation retrieves the type tag from a tagged
 value of type \code{Any}.  The \code{ValueOf} form retrieves the
@@ -17546,11 +17549,28 @@ underlying value from a tagged value.  The \code{ValueOf} form
 includes the type for the underlying value which is used by the type
 checker.  Finally, the \code{Exit} form ends the execution of the
 program.
+%
+\fi}
+%
+{\if\edition\pythonEd
+%
+To perform these actions we need the \code{exit} function (from the C
+standard library) and two new AST classes: \code{TagOf} and
+\code{ValueOf}. The \code{exit} function ends the execution of the
+program, with its argument as the exit code of the program.  The
+\code{TagOf} operation retrieves the type tag from a tagged value of
+type \ANYTY{}.  The \code{ValueOf} operation retrieves the underlying
+value from a tagged value.  The \code{ValueOf} operation includes the
+type for the underlying value which is used by the type checker.
+%
+\fi}
 
-If the target type of the projection is \code{Boolean} or
-\code{Integer}, then \code{Project} can be translated as follows.
+
+If the target type of the projection is \BOOLTY{} or \INTTY{}, then
+\code{Project} can be translated as follows.
 \begin{center}
 \begin{minipage}{1.0\textwidth}
+{\if\edition\racketEd    
 \begin{lstlisting}
 (Project |$e$| |$\FType$|)
 |$\Rightarrow$|
@@ -17560,36 +17580,57 @@ If the target type of the projection is \code{Boolean} or
       (ValueOf |$\itm{tmp}$| |$\FType$|)
       (Exit)))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+Project(|$e$|, |$\FType$|)
+|$\Rightarrow$|
+Begin([Assign([|$\itm{tmp}$|], |$e'$|)],
+       IfExp(Compare(TagOf(|$\itm{tmp}$|),[Eq()],
+                     [Constant(|$\itm{tagof}(\FType)$|)]),
+             ValueOf(|$\itm{tmp}$|, |$\FType$|)
+             Call(Name('exit'), [])))
+\end{lstlisting}
+\fi}
 \end{minipage}
 \end{center}
-If the target type of the projection is a vector or function type,
-then there is a bit more work to do. For vectors, check that the
-length of the vector type matches the length of the vector (using the
-\code{vector-length} primitive). For functions, check that the number
-of parameters in the function type matches the function's arity (using
-\code{procedure-arity}).
+If the target type of the projection is a tuple or function type, then
+there is a bit more work to do. For tuples, check that the length of
+the tuple type matches the length of the tuple. For functions, check
+that the number of parameters in the function type matches the
+function's arity.
 
-Regarding \code{inject}, we recommend compiling it to a slightly
+Regarding \code{Inject}, we recommend compiling it to a slightly
 lower-level primitive operation named \code{make-any}. This operation
 takes a tag instead of a type.
 \begin{center}
 \begin{minipage}{1.0\textwidth}
+{\if\edition\racketEd    
 \begin{lstlisting}
 (Inject |$e$| |$\FType$|)
 |$\Rightarrow$|
 (Prim 'make-any (list |$e'$| (Int |$\itm{tagof}(\FType)$|)))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd    
+\begin{lstlisting}
+Inject(|$e$|, |$\FType$|)
+|$\Rightarrow$|
+Call(Name('make-any'), [|$e'$|, Constant(|$\itm{tagof}(\FType)$|)])
+\end{lstlisting}
+\fi}
 \end{minipage}
 \end{center}
 
-The type predicates (\code{boolean?}, etc.) can be translated into
+\racket{The type predicates (\code{boolean?}, etc.) can be translated into
 uses of \code{tag-of-any} and \code{eq?} in a similar way as in the
-translation of \code{Project}.
+translation of \code{Project}.}
 
+{\if\edition\racketEd    
 The \code{any-vector-ref} and \code{any-vector-set!} operations
 combine the projection action with the vector operation.  Also, the
 read and write operations allow arbitrary expressions for the index so
-the type checker for \LangAny{} (Figure~\ref{fig:type-check-Rany-part-1})
+the type checker for \LangAny{} (Figure~\ref{fig:type-check-Rany})
 cannot guarantee that the index is within bounds. Thus, we insert code
 to perform bounds checking at runtime. The translation for
 \code{any-vector-ref} is as follows and the other two operations are
@@ -17604,17 +17645,46 @@ translated in a similar way.
       (If (Prim '< (list (Var |$i$|)
             (Prim 'any-vector-length (list (Var |$v$|)))))
         (Prim 'any-vector-ref (list (Var |$v$|) (Var |$i$|)))
-        (Exit))))
+        (Exit))
+      (Exit))))
 \end{lstlisting}
+\fi}
+%
+{\if\edition\pythonEd
+%
+The \code{any\_tuple\_load} operation combines the projection action
+with the load operation.  Also, the load operation allows arbitrary
+expressions for the index so the type checker for \LangAny{}
+(Figure~\ref{fig:type-check-Rany}) cannot guarantee that the index is
+within bounds. Thus, we insert code to perform bounds checking at
+runtime. The translation for \code{any\_tuple\_load} is as follows.
+
+\begin{lstlisting}
+Call(Name('any_tuple_load'), [|$e_1$|,|$e_2$|])
+|$\Rightarrow$|
+Block([Assign([|$t$|], |$e'_1$|), Assign([|$i$|], |$e'_2$|)],
+      IfExp(Compare(TagOf(|$t$|), [Eq()], [Constant(2)]),
+            IfExp(Compare(|$i$|, [LtE()], [Call(Name('any_len'), [|$t$|])]),
+                  Call(Name('any_tuple_load'), [|$t$|, |$i$|]),
+                  Call(Name('exit'), [])),
+            Call(Name('exit'), [])))
+\end{lstlisting}
+\fi}
+
 
 \section{Remove Complex Operands}
 \label{sec:rco-Rany}
 
-The \code{ValueOf} and \code{Exit} forms are both complex expressions.
-The subexpression of \code{ValueOf} must be atomic.
+\racket{The \code{ValueOf} and \code{Exit} forms are both complex
+  expressions.  The subexpression of \code{ValueOf} must be atomic.}
+%
+\python{The \code{ValueOf} and \code{TagOf} operations are both
+  complex expressions.  Their subexpressions must be atomic.}
 
 \section{Explicate Control and \LangCAny{}}
 \label{sec:explicate-Rany}
+
+\python{UNDER CONSTRUCTION}
 
 The output of \code{explicate\_control} is the \LangCAny{} language whose
 syntax is defined in Figure~\ref{fig:c5-syntax}. The \code{ValueOf}
@@ -19918,10 +19988,10 @@ Figure~\ref{fig:Rany-concrete-syntax}.
 \begin{array}{lcl}
   \Type &::=& \gray{\key{Integer} \MID \key{Boolean}
      \MID \LP\key{Vector}\;\Type\ldots\RP \MID \key{Void}} \\
-    &\MID& \gray{\LP\Type\ldots \; \key{->}\; \Type\RP} \MID \key{Any} \\
+    &\MID& \gray{\LP\Type\ldots \; \key{->}\; \Type\RP} \MID \ANYTY{} \\
 \FType &::=& \key{Integer} \MID \key{Boolean} \MID \key{Void} 
-      \MID \LP\key{Vector}\; \key{Any}\ldots\RP \\
-     &\MID& \LP\key{Any}\ldots \; \key{->}\; \key{Any}\RP\\
+      \MID \LP\key{Vector}\; \ANYTY{}\ldots\RP \\
+     &\MID& \LP\ANYTY{}\ldots \; \key{->}\; \ANYTY{}\RP\\
 \Exp &::=& \ldots \CINJECT{\Exp}{\FType}\RP \MID \CPROJECT{\Exp}{\FType}\\
   &\MID& \LP\key{any-vector-length}\;\Exp\RP
    \MID \LP\key{any-vector-ref}\;\Exp\;\Exp\RP \\
@@ -19940,10 +20010,10 @@ Figure~\ref{fig:Rany-concrete-syntax}.
 \label{fig:Rany-concrete-syntax}
 \end{figure}
 
-The concrete syntax for \LangCVar{}, \LangCIf{}, \LangCVec{} and \LangCFun{} is
-defined in Figures~\ref{fig:c0-concrete-syntax},
-\ref{fig:c1-concrete-syntax}, \ref{fig:c2-concrete-syntax},
-and \ref{fig:c3-concrete-syntax}, respectively.
+The concrete syntax for \LangCVar{}, \LangCIf{}, \LangCVec{} and
+\LangCFun{} is defined in Figures~\ref{fig:c0-concrete-syntax},
+\ref{fig:c1-concrete-syntax}, \ref{fig:c2-concrete-syntax}, and
+\ref{fig:c3-concrete-syntax}, respectively.
 
 
 \begin{figure}[tbp]
