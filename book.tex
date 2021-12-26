@@ -13266,18 +13266,20 @@ class InterpLfun(InterpLtup):
     match ss[0]:
       case Return(value):
         return self.interp_exp(value, env)
+      case FunctionDef(name, params, bod, dl, returns, comment):
+        ps = [x for (x,t) in params]
+        env[name] = Function(name, ps, bod, env)
+        return self.interp_stmts(ss[1:], env)
       case _:
         return super().interp_stmts(ss, env)
     
   def interp(self, p):
     match p:
-      case Module(defs):
+      case Module(ss):
         env = {}
-        for d in defs:
-            match d:
-              case FunctionDef(name, params, bod, dl, returns, comment):
-                env[name] = Function(name, [x for (x,t) in params], bod, env)
-        self.apply_fun(env['main'], [], None)
+        self.interp_stmts(ss, env)
+        if 'main' in env.keys():
+            self.apply_fun(env['main'], [], None)
       case _:
         raise Exception('interp: unexpected ' + repr(p))
 \end{lstlisting}
@@ -16227,13 +16229,14 @@ and used in Chez Scheme version 1~\citep{Dybvig:2006aa}.
 \index{subject}{dynamic typing}
 
 In this chapter we discuss the compilation of \LangDyn{}, a
-dynamically typed language. This is in contrast to the previous
-chapters, which have studied the compilation of statically typed
-languages. In dynamically typed languages such as \LangDyn{}, a
-particular expression may produce a value of a different type each
-time it is executed. Consider the following example with a conditional
-\code{if} expression that may return a Boolean or an integer depending
-on the input to the program.
+dynamically typed language that is a subset of
+\racket{Racket}\python{Python}. The dynamic typing is in contrast to
+the previous chapters, which have studied the compilation of
+statically typed languages. In dynamically typed languages such as
+\LangDyn{}, a particular expression may produce a value of a different
+type each time it is executed. Consider the following example with a
+conditional \code{if} expression that may return a Boolean or an
+integer depending on the input to the program.
 % part of  dynamic_test_25.rkt
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -16264,21 +16267,12 @@ given anything else it returns \FALSE{}.
 
 Furthermore, even when primitive operations restrict their inputs to
 values of a certain type, this restriction is enforced at runtime
-instead of during compilation. For example, the following tuple read
-operation results in a run-time error because it requires a tuple, not
-a Boolean such as \TRUE{}.
-%
-{\if\edition\racketEd
-\begin{lstlisting}
-(vector-ref #t 0)
-\end{lstlisting}
-\fi}
-%
-{\if\edition\pythonEd
-\begin{lstlisting}
-True[0]
-\end{lstlisting}
-\fi}
+instead of during compilation. For example, the tuple read
+operation
+\racket{\code{(vector-ref #t 0)}}
+\python{\code{True[0]}}
+results in a run-time error because the first argument must
+be a tuple, not a Boolean.
 
 \begin{figure}[tp]
 \centering
@@ -16395,12 +16389,11 @@ True[0]
 \end{figure}
 
 
-The concrete and abstract syntax of \LangDyn{}, our subset of
-\racket{Racket}\python{Python}, is defined in
+The concrete and abstract syntax of \LangDyn{} is defined in
 Figures~\ref{fig:r7-concrete-syntax} and \ref{fig:r7-syntax}.
 %
 There is no type checker for \LangDyn{} because it is not a statically
-typed language (it's dynamically typed!).
+typed language.
 
 The definitional interpreter for \LangDyn{} is presented in
 \racket{Figure~\ref{fig:interp-Ldyn}}
@@ -16422,10 +16415,10 @@ to represented tagged values.
 {\if\edition\pythonEd
 \begin{minipage}{\textwidth}
 \begin{lstlisting}
-@dataclass
-class Tagged:
+@dataclass(eq=True)
+class Tagged(Value):
   value : Value
-  tag : int
+  tag : str
   __match_args__ = ("value", "tag")
   def __str__(self):
     return str(self.value)
@@ -16437,10 +16430,10 @@ class Tagged:
   \code{Vector}, and \code{Procedure}.}
 %
 \python{The tags are \code{'int'}, \code{'bool'}, \code{'none'},
-  \code{'tuple'}, and \code{'function'}}
+  \code{'tuple'}, and \code{'function'}.}
 %
-Tags are closely related to types
-but don't always capture all the information that a type does.
+Tags are closely related to types but don't always capture all the
+information that a type does.
 %
 \racket{For example, a vector of type \code{(Vector Any Any)} is
   tagged with \code{Vector} and a procedure of type \code{(Any Any ->
@@ -16625,16 +16618,12 @@ class InterpLdyn(InterpLlambda):
         index_v = self.untag(index, 'int', ss[0])
         tup_v[index_v] = self.interp_exp(value, env)
         return self.interp_stmts(ss[1:], env)
-      case _:
-        return super().interp_stmts(ss, env)
-    
-  def interp_def(self, d, env):
-    match d:
       case FunctionDef(name, params, bod, dl, returns, comment):
         ps = [x for (x,t) in params]
         env[name] = self.tag(Function(name, ps, bod, env))
+        return self.interp_stmts(ss[1:], env)
       case _:
-        raise Exception('interp_def unexpected ' + repr(d))
+        return super().interp_stmts(ss, env)
 \end{lstlisting}
 \caption{Interpreter for the \LangDyn{} language \python{, part 2}.}
 \label{fig:interp-Ldyn-2}
@@ -16800,11 +16789,14 @@ but first we describe the \LangAny{} language in greater detail.
 \FType &::=& \key{IntType()} \MID \key{BoolType()} \MID \key{VoidType()}
   \MID \key{TupleType}\LS\key{AnyType()}^+\RS \\
   &\MID& \key{FunctionType}\LP \key{AnyType()}^{*}\key{, }\key{AnyType()}\RP \\
-\itm{unaryop} &::= & \code{IsBool()} \MID \code{IsInt()}
-     \MID \code{IsTuple()}  \MID \code{IsFunction()} \MID \code{IsNone()}\\
 \Exp & ::= & \INJECT{\Exp}{\Type} \MID \PROJECT{\Exp}{\Type} \\
      &\MID& \CALL{\VAR{\key{'any\_tuple\_load'}}}{\Exp\key{, }\INT{n}}\\
-     &\MID& \CALL{\VAR{\key{'any\_len}}}{\Exp}
+     &\MID& \CALL{\VAR{\key{'any\_len'}}}{\Exp} 
+     %% &\MID& \CALL{\VAR{\key{'is\_int'}}}{\Exp} 
+     %% \MID \CALL{\VAR{\key{'is\_bool'}}}{\Exp} \\
+     %% &\MID& \CALL{\VAR{\key{'is\_none'}}}{\Exp} 
+     %% \MID \CALL{\VAR{\key{'is\_tuple'}}}{\Exp} \\
+     %% &\MID& \CALL{\VAR{\key{'is\_function'}}}{\Exp} 
 \end{array}
 }
 
@@ -16851,7 +16843,7 @@ but first we describe the \LangAny{} language in greater detail.
   \gray{\LlambdaASTPython} \\ \hline
   \LanyASTPython \\
   \begin{array}{lcl}
-  \LangLamM{} &::=& \PROGRAM{}{\LS \Def \ldots \Stmt \ldots \RS}
+  \LangAnyM{} &::=& \PROGRAM{}{\LS \Def \ldots \Stmt \ldots \RS}
   \end{array}
 \end{array}
 \]
@@ -16875,28 +16867,30 @@ Note that in both \code{Inject} and \code{Project}, the type $T$ is
 restricted to a flat type $\FType$, which simplifies the
 implementation and corresponds with what is needed for compiling \LangDyn{}.
 
-The \code{any-vector} operators adapt the vector operations so that
-they can be applied to a value of type \code{Any}.  They also
-generalize the vector operations in that the index is not restricted
-to be a literal integer in the grammar but is allowed to be any
-expression.
+The \racket{\code{any-vector}}\python{\code{any\_tuple}} operators
+adapt the tuple operations so that they can be applied to a value of
+type \racket{\code{Any}}{\code{AnyType}}.  They also generalize the
+tuple operations in that the index is not restricted to be a literal
+integer in the grammar but is allowed to be any expression.
 
-The type predicates such as \key{boolean?} expect their argument to
-produce a tagged value; they return \key{\#t} if the tag corresponds
-to the predicate and they return \key{\#f} otherwise.
+\racket{The type predicates such as
+\racket{\key{boolean?}}\python{\key{is\_bool}} expect their argument
+to produce a tagged value; they return true if the tag corresponds to
+the predicate and they return false otherwise.}
 
 The type checker for \LangAny{} is shown in
-Figures~\ref{fig:type-check-Rany-part-1} and
-\ref{fig:type-check-Rany-part-2} and uses the auxiliary functions in
-Figure~\ref{fig:type-check-Rany-aux}.
+Figure~\ref{fig:type-check-Rany}
 %
-The interpreter for \LangAny{} is in Figure~\ref{fig:interp-Rany} and the
-auxiliary functions \code{apply-inject} and \code{apply-project} are
-in Figure~\ref{fig:apply-project}.
+\racket{ and uses the auxiliary functions in
+Figure~\ref{fig:type-check-Rany-aux}}.
+%
+The interpreter for \LangAny{} is in Figure~\ref{fig:interp-Rany} and
+its auxiliary functions are in Figure~\ref{fig:interp-Rany-aux}.
 
 
 \begin{figure}[btp]
- \begin{lstlisting}[basicstyle=\ttfamily\small]
+{\if\edition\racketEd
+\begin{lstlisting}[basicstyle=\ttfamily\small]
 (define type-check-Rany_class
   (class type-check-Rlambda_class
     (super-new)
@@ -16936,13 +16930,6 @@ in Figure~\ref{fig:apply-project}.
            (check-type-equal? t2 'Integer e)
            (check-type-equal? t3 'Any e)
            (values (Prim 'any-vector-set! (list e1^ e2^ e3^)) 'Void)]
-\end{lstlisting}
-\caption{Type checker for the \LangAny{} language, part 1.}
-\label{fig:type-check-Rany-part-1}
-\end{figure}
-
-\begin{figure}[btp]
- \begin{lstlisting}[basicstyle=\ttfamily\small]
       [(ValueOf e ty)
        (define-values (new-e e-ty) (recur e))
        (values (ValueOf new-e ty) ty)]
@@ -16970,56 +16957,109 @@ in Figure~\ref{fig:apply-project}.
 
 ))
 \end{lstlisting}
-\caption{Type checker for the \LangAny{} language, part 2.}
-\label{fig:type-check-Rany-part-2}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+class TypeCheckLany(TypeCheckLlambda):
+
+  def type_check_exp(self, e, env):
+    match e:
+      case Inject(value, typ):
+        self.check_exp(value, typ, env)
+        return AnyType()
+      case Project(value, typ):
+        self.check_exp(value, AnyType(), env)
+        return typ
+      case Call(Name('any_tuple_load'), [tup, index]):
+        self.check_exp(tup, AnyType(), env)
+        return AnyType()
+      case Call(Name('any_len'), [tup]):
+        self.check_exp(tup, AnyType(), env)
+        return IntType()
+      case Call(Name('arity'), [fun]):
+        ty = self.type_check_exp(fun, env)
+        match ty:
+          case FunctionType(ps, rt):
+            return IntType()
+          case TupleType([FunctionType(ps,rs)]):
+            return IntType()
+          case _:
+            raise Exception('type_check_exp arity unexpected ' + repr(ty))
+      case Call(Name('make_any'), [value, tag]):
+        self.type_check_exp(value, env)
+        self.check_exp(tag, IntType(), env)
+        return AnyType()
+      case ValueOf(value, typ):
+        self.check_exp(value, AnyType(), env)
+        return typ
+      case TagOf(value):
+        self.check_exp(value, AnyType(), env)
+        return IntType()
+      case Call(Name('exit'), []):
+        return Bottom()
+      case AnnLambda(params, returns, body):
+        new_env = {x:t for (x,t) in env.items()}
+        for (x,t) in params:
+            new_env[x] = t
+        return_t = self.type_check_exp(body, new_env)
+        self.check_type_equal(returns, return_t, e)
+        return FunctionType([t for (x,t) in params], return_t)
+      case _:
+        return super().type_check_exp(e, env)
+\end{lstlisting}
+\fi}
+\caption{Type checker for the \LangAny{} language.}
+\label{fig:type-check-Rany}
 \end{figure}
 
-
+{\if\edition\racketEd
 \begin{figure}[tbp]
+{\if\edition\racketEd
 \begin{lstlisting}
-    (define/override (operator-types)
-      (append
-       '((integer? . ((Any) . Boolean))
-         (vector? . ((Any) . Boolean))
-         (procedure? . ((Any) . Boolean))
-         (void? . ((Any) . Boolean))
-         (tag-of-any . ((Any) . Integer))
-         (make-any . ((_ Integer) . Any))
-         )
-       (super operator-types)))
+(define/override (operator-types)
+  (append
+   '((integer? . ((Any) . Boolean))
+     (vector? . ((Any) . Boolean))
+     (procedure? . ((Any) . Boolean))
+     (void? . ((Any) . Boolean))
+     (tag-of-any . ((Any) . Integer))
+     (make-any . ((_ Integer) . Any)))
+   (super operator-types)))
 
-    (define/public (type-predicates)
-      (set 'boolean? 'integer? 'vector? 'procedure? 'void?))
+(define/public (type-predicates)
+  (set 'boolean? 'integer? 'vector? 'procedure? 'void?))
 
-    (define/public (combine-types t1 t2)
-      (match (list t1 t2)
-        [(list '_ t2) t2]
-        [(list t1 '_) t1]
-        [(list `(Vector ,ts1 ...)
-               `(Vector ,ts2 ...))
-         `(Vector ,@(for/list ([t1 ts1] [t2 ts2])
-                      (combine-types t1 t2)))]
-        [(list `(,ts1 ... -> ,rt1)
-               `(,ts2 ... -> ,rt2))
-         `(,@(for/list ([t1 ts1] [t2 ts2])
-               (combine-types t1 t2))
-           -> ,(combine-types rt1 rt2))]
-        [else t1]))
+(define/public (combine-types t1 t2)
+  (match (list t1 t2)
+    [(list '_ t2) t2]
+    [(list t1 '_) t1]
+    [(list `(Vector ,ts1 ...)
+      `(Vector ,ts2 ...))
+      `(Vector ,@(for/list ([t1 ts1] [t2 ts2])
+      (combine-types t1 t2)))]
+    [(list `(,ts1 ... -> ,rt1)
+      `(,ts2 ... -> ,rt2))
+      `(,@(for/list ([t1 ts1] [t2 ts2])
+      (combine-types t1 t2))
+      -> ,(combine-types rt1 rt2))]
+    [else t1]))
 
-    (define/public (flat-ty? ty)
-      (match ty
-        [(or `Integer `Boolean '_ `Void) #t]
-        [`(Vector ,ts ...) (for/and ([t ts]) (eq? t 'Any))]
-        [`(,ts ... -> ,rt)
-         (and (eq? rt 'Any) (for/and ([t ts]) (eq? t 'Any)))]
-        [else #f]))
+(define/public (flat-ty? ty)
+  (match ty
+    [(or `Integer `Boolean '_ `Void) #t]
+    [`(Vector ,ts ...) (for/and ([t ts]) (eq? t 'Any))]
+    [`(,ts ... -> ,rt)
+      (and (eq? rt 'Any) (for/and ([t ts]) (eq? t 'Any)))]
+    [else #f]))
 \end{lstlisting}
+\fi}
 \caption{Auxiliary methods for type checking \LangAny{}.}
 \label{fig:type-check-Rany-aux}
 \end{figure}
-
+\fi}
 
 \begin{figure}[btp]
+{\if\edition\racketEd
 \begin{lstlisting}
 (define interp-Rany_class
   (class interp-Rlambda_class
@@ -17062,11 +17102,85 @@ in Figure~\ref{fig:apply-project}.
 (define (interp-Rany p)
   (send (new interp-Rany_class) interp-program p))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+class InterpLany(InterpLlambda):
+
+  def interp_exp(self, e, env):
+    match e:
+      case Inject(value, typ):
+        v = self.interp_exp(value, env)
+        return Tagged(v, self.type_to_tag(typ))
+      case Project(value, typ):
+        v = self.interp_exp(value, env)
+        match v:
+          case Tagged(val, tag) if self.type_to_tag(typ) == tag:
+            return val
+          case _:
+            raise Exception('interp project to ' + repr(typ) \
+                            + '  unexpected ' + repr(v))
+      case Call(Name('any_tuple_load'), [tup, index]):
+        tv = self.interp_exp(tup, env)
+        n = self.interp_exp(index, env)
+        match tv:
+          case Tagged(v, tag):
+            return v[n]
+          case _:
+            raise Exception('interp any_tuple_load unexpected ' + repr(tv))
+      case Call(Name('any_tuple_store'), [tup, index, value]):
+        tv = self.interp_exp(tup, env)
+        n = self.interp_exp(index, env)
+        val = self.interp_exp(value, env)
+        match tv:
+          case Tagged(v, tag):
+            v[n] = val
+            return None
+          case _:
+            raise Exception('interp any_tuple_load unexpected ' + repr(tv))
+      case Call(Name('any_len'), [value]):
+        v = self.interp_exp(value, env)
+        match v:
+          case Tagged(value, tag):
+            return len(value)
+          case _:
+            raise Exception('interp any_len unexpected ' + repr(v))
+      case Call(Name('make_any'), [value, tag]):
+        v = self.interp_exp(value, env)
+        t = self.interp_exp(tag, env)
+        return Tagged(v, t)
+      case Call(Name('arity'), [fun]):
+        f = self.interp_exp(fun, env)
+        return self.arity(f)
+      case Call(Name('exit'), []):
+        trace('exiting!')
+        exit(0)
+      case TagOf(value):
+        v = self.interp_exp(value, env)
+        match v:
+          case Tagged(val, tag):
+            return tag
+          case _:
+            raise Exception('interp TagOf unexpected ' + repr(v))
+      case ValueOf(value, typ):
+        v = self.interp_exp(value, env)
+        match v:
+          case Tagged(val, tag):
+            return val
+          case _:
+            raise Exception('interp ValueOf unexpected ' + repr(v))
+      case AnnLambda(params, returns, body):
+        return Function('lambda', [x for (x,t) in params], [Return(body)], env)
+      case _:
+        return super().interp_exp(e, env)
+\end{lstlisting}
+\fi}
 \caption{Interpreter for \LangAny{}.}
 \label{fig:interp-Rany}
 \end{figure}
 
 \begin{figure}[tbp]
+{\if\edition\racketEd
 \begin{lstlisting}
 (define/public (apply-inject v tg) (Tagged v tg))
 
@@ -17095,8 +17209,40 @@ in Figure~\ref{fig:apply-project}.
        [else (error 'apply-project "tag mismatch ~a != ~a" tag1 tag2)])]
     [else (error 'apply-project "expected tagged value, not ~a" v)]))
 \end{lstlisting}
-  \caption{Auxiliary functions for injection and projection.}
-  \label{fig:apply-project}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+class InterpLany(InterpLlambda):
+
+  def type_to_tag(self, typ):
+      match typ:
+        case FunctionType(params, rt):
+          return 'function'
+        case TupleType(fields):
+          return 'tuple'
+        case t if t == int:
+          return 'int'
+        case t if t == bool:
+          return 'bool'
+        case IntType():
+          return 'int'
+        case BoolType():
+          return 'int'
+        case _:
+          raise Exception('type_to_tag unexpected ' + repr(typ))
+
+  def arity(self, v):
+    match v:
+      case Function(name, params, body, env):
+        return len(params)
+      case ClosureTuple(args, arity):
+        return arity
+      case _:
+        raise Exception('Lany arity unexpected ' + repr(v))
+\end{lstlisting}
+\fi}
+  \caption{Auxiliary functions for interpreting \LangAny{}.}
+  \label{fig:interp-Rany-aux}
 \end{figure}
 
 \clearpage
@@ -17104,7 +17250,9 @@ in Figure~\ref{fig:apply-project}.
 \section{Cast Insertion: Compiling \LangDyn{} to \LangAny{}}
 \label{sec:compile-r7}
 
-The \code{cast-insert} pass compiles from \LangDyn{} to \LangAny{}.
+\python{UNDER CONSTRUCTION}
+
+The \code{cast\_insert} pass compiles from \LangDyn{} to \LangAny{}.
 Figure~\ref{fig:compile-r7-Rany} shows the compilation of many of the
 \LangDyn{} forms into \LangAny{}. An important invariant of this pass is that
 given a subexpression $e$ in the \LangDyn{} program, the pass will produce
@@ -17132,6 +17280,7 @@ result is \code{\#f}).
 
 \begin{figure}[btp]
 \centering
+{\if\edition\racketEd
 \begin{tabular}{|lll|} \hline
 \begin{minipage}{0.27\textwidth}
 \begin{lstlisting}
@@ -17252,7 +17401,128 @@ $\Rightarrow$
 \end{minipage}
 \\[2ex]\hline
 \end{tabular} 
-
+\fi}
+{\if\edition\pythonEd
+\begin{tabular}{|lll|} \hline
+\begin{minipage}{0.22\textwidth}
+\begin{lstlisting}
+True
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.7\textwidth}
+\begin{lstlisting}
+Inject(True, BoolType())
+\end{lstlisting}
+\end{minipage}
+\\[2ex]\hline
+\begin{minipage}{0.22\textwidth}
+\begin{lstlisting}
+|$e_1$| + |$e_2$|
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.7\textwidth}
+\begin{lstlisting}
+Inject(Project(|$e'_1$|, IntType())
+       + Project(|$e'_2$|, IntType()),
+       IntType())
+\end{lstlisting}
+\end{minipage}
+\\[2ex]\hline
+\begin{minipage}{0.22\textwidth}
+\begin{lstlisting}
+lambda |$x_1 \ldots x_n$|: |$e$|
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.7\textwidth}
+\begin{lstlisting}
+Inject(Lambda([(|$x_1$|,AnyType),|$\ldots$|,(|$x_n$|,AnyType)], |$e'$|)
+       FunctionType([AnyType(),|$\ldots$|], AnyType()))
+\end{lstlisting}
+\end{minipage}
+\\[2ex]\hline
+\begin{minipage}{0.22\textwidth}
+\begin{lstlisting}
+|$e_0$|(|$e_1 \ldots e_n$|)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.7\textwidth}
+\begin{lstlisting}
+Call(Project(|$e'_0$|, FunctionType([AnyType(),|$\ldots$|],
+      AnyType())), |$e'_1, \ldots, e'_n$|)
+\end{lstlisting}
+\end{minipage}
+\\[2ex]\hline
+\begin{minipage}{0.22\textwidth}
+\begin{lstlisting}
+|$e_1$|[|$e_2$|]
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.7\textwidth}
+\begin{lstlisting}
+Call('any_tuple_load',[|$e_1'$|, |$e_2'$|])
+\end{lstlisting}
+\end{minipage}
+\\[2ex]\hline
+%% \begin{minipage}{0.22\textwidth}
+%% \begin{lstlisting}
+%% |$e_2$| if |$e_1$| else |$e_3$|
+%% \end{lstlisting}
+%% \end{minipage}
+%% &
+%% $\Rightarrow$
+%% &
+%% \begin{minipage}{0.7\textwidth}
+%% \begin{lstlisting}
+%% (if (eq? |$e'_1$| (inject #f Boolean)) |$e'_3$| |$e'_2$|)
+%% \end{lstlisting}
+%% \end{minipage}
+%% \\[2ex]\hline
+%% \begin{minipage}{0.22\textwidth}
+%% \begin{lstlisting}
+%% (eq? |$e_1$| |$e_2$|)
+%% \end{lstlisting}
+%% \end{minipage}
+%% &
+%% $\Rightarrow$
+%% &
+%% \begin{minipage}{0.7\textwidth}
+%% \begin{lstlisting}
+%% (inject (eq? |$e'_1$| |$e'_2$|) Boolean)
+%% \end{lstlisting}
+%% \end{minipage}
+%% \\[2ex]\hline
+%% \begin{minipage}{0.22\textwidth}
+%% \begin{lstlisting}
+%% (not |$e_1$|)
+%% \end{lstlisting}
+%% \end{minipage}
+%% &
+%% $\Rightarrow$
+%% &
+%% \begin{minipage}{0.7\textwidth}
+%% \begin{lstlisting}
+%% (if (eq? |$e'_1$| (inject #f Boolean))
+%%     (inject #t Boolean) (inject #f Boolean))
+%% \end{lstlisting}
+%% \end{minipage}
+%% \\[2ex]\hline
+\end{tabular} 
+\fi}
 \caption{Cast Insertion}
 \label{fig:compile-r7-Rany}
 \end{figure}
@@ -17628,13 +17898,13 @@ for the compilation of \LangDyn{}.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-{\if\edition\pythonEd
-\chapter{Objects}
-\label{ch:Lobject}
-\index{subject}{objects}
-\index{subject}{classes}
+%% {\if\edition\pythonEd
+%% \chapter{Objects}
+%% \label{ch:Lobject}
+%% \index{subject}{objects}
+%% \index{subject}{classes}
 
-\fi}
+%% \fi}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -18133,7 +18403,7 @@ puts the integer into a tagged value
 \code{Integer} is accomplished with the \code{Project} operator, that
 is, by checking the value's tag and either retrieving the underlying
 integer or signaling an error if it the tag is not the one for
-integers (Figure~\ref{fig:apply-project}).
+integers (Figure~\ref{fig:interp-Rany-aux}).
 %
 Things get more interesting for higher-order casts, that is, casts
 involving function or vector types.
@@ -18944,10 +19214,10 @@ The \code{match-types} auxiliary function carries out this deduction
 by recursively descending through a parameter type \code{pt} and the
 corresponding argument type \code{at}, making sure that they are equal
 except when there is a type parameter on the left (in the parameter
-type). If it's the first time that the type parameter has been
+type). If it is the first time that the type parameter has been
 encountered, then the algorithm deduces an association of the type
 parameter to the corresponding type on the right (in the argument
-type). If it's not the first time that the type parameter has been
+type). If it is not the first time that the type parameter has been
 encountered, the algorithm looks up its deduced type and makes sure
 that it is equal to the type on the right.
 %
