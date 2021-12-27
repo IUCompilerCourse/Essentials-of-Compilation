@@ -14783,9 +14783,19 @@ The concrete and abstract syntax for \LangLam{}, a language with anonymous
 functions and lexical scoping, is defined in
 Figures~\ref{fig:Rlam-concrete-syntax} and \ref{fig:Rlam-syntax}. It adds
 the \key{lambda} form to the grammar for \LangFun{}, which already has
-syntax for function application.
+syntax for function application. 
+%
 \python{The syntax also includes an assignment statement that includes
-a type annotation for the variable on the left-hand side.}
+  a type annotation for the variable on the left-hand side, which
+  facilitates the type checking of \code{lambda} expressions that we
+  discuss later in this section.}
+%
+\python{The \code{arity} operation returns the number of parameters of
+  a given function, an operation that we need for the translation
+  of dynamic typing in Chapter~\ref{ch:Ldyn}.
+  The \code{arity} operation is not in Python, but the same functionality
+  is available in a more complex form. We include \code{arity} in the
+  \LangLam{} source language to enable testing.}
 
 \newcommand{\LlambdaGrammarRacket}{
   \begin{array}{lcl}
@@ -14802,14 +14812,14 @@ a type annotation for the variable on the left-hand side.}
 
 \newcommand{\LlambdaGrammarPython}{
   \begin{array}{lcl}
-  \Exp &::=& \CLAMBDA{\Var\code{, }\ldots}{\Exp}\\
+  \Exp &::=& \CLAMBDA{\Var\code{, }\ldots}{\Exp} \MID \CARITY{\Exp} \\
   \Stmt &::=& \CANNASSIGN{\Var}{\Type}{\Exp}
   \end{array}
 }
 
 \newcommand{\LlambdaASTPython}{
   \begin{array}{lcl}
-  \Exp &::=& \LAMBDA{\Var^{*}}{\Exp} \\
+  \Exp &::=& \LAMBDA{\Var^{*}}{\Exp} \MID \ARITY{\Exp} \\
   \Stmt &::=& \ANNASSIGN{\Var}{\Type}{\Exp}
   \end{array}
 }
@@ -14946,8 +14956,18 @@ interpret the body of the function.
 \begin{lstlisting}
 class InterpLlambda(InterpLfun):
 
+  def arity(self, v):
+    match v:
+      case Function(name, params, body, env):
+        return len(params)
+      case _:
+        raise Exception('Llambda arity unexpected ' + repr(v))
+      
   def interp_exp(self, e, env):
     match e:
+      case Call(Name('arity'), [fun]):
+        f = self.interp_exp(fun, env)
+        return self.arity(f)
       case Lambda(params, body):
         return Function('lambda', params, [Return(body)], env)
       case _:
@@ -15055,6 +15075,13 @@ class TypeCheckLlambda(TypeCheckLfun):
         return env[id]
       case Lambda(params, body):
         raise Exception('cannot synthesize a type for a lambda')
+      case Call(Name('arity'), [func]):
+        func_t = self.type_check_exp(func, env)
+        match func_t:
+          case FunctionType(params_t, return_t):
+            return IntType()
+          case _:
+            raise Exception('in arity, unexpected ' + repr(func_t))
       case _:
         return super().type_check_exp(e, env)
     
@@ -15856,16 +15883,17 @@ abstract syntax is defined in Figure~\ref{fig:Clam-syntax}.
   \code{explicate\_control} pass is similar to the handling of other
   expressions such as primitive operators.}
 %
-\python{The only differences with respect to \LangCFun{} are the
-  addition of the \code{Uninitialized} and \code{AllocateClosure}
-  forms to the grammar for $\Exp$.  The handling of them in the
+\python{The differences with respect to \LangCFun{} are the
+  additions of \code{Uninitialized}, \code{AllocateClosure},
+  and \code{arity} to the grammar for $\Exp$.  The handling of them in the
   \code{explicate\_control} pass is similar to the handling of other
   expressions such as primitive operators.}
 
 \newcommand{\ClambdaASTPython}{
 \begin{array}{lcl}
 \Exp &::=& \key{Uninitialized}\LP \Type \RP
-      \MID \key{AllocateClosure}\LP\itm{len},\Type, \itm{arity}\RP 
+      \MID \key{AllocateClosure}\LP\itm{len},\Type, \itm{arity}\RP \\
+      &\MID& \ARITY{\Atm}
 \end{array}
 }
 
@@ -15924,6 +15952,12 @@ $58$.
 \racket{Compile the \code{procedure-arity} operator into a sequence of
 instructions that access the tag from position $0$ of the vector and
 extract the $5$-bits starting at position $58$ from the tag.}
+%
+\python{Compile a call to the \code{arity} operator to a sequence of
+instructions that access the tag from position $0$ of the tuple
+(representing a closure) and extract the $5$-bits starting at position
+$58$ from the tag.}
+
 
 
 \begin{figure}[p]
@@ -15953,7 +15987,7 @@ extract the $5$-bits starting at position $58$ from the tag.}
 \path[->,bend left=15] (Rfun-3) edge [above] node
      {\ttfamily\footnotesize reveal\_functions} (F1-0);
 \path[->,bend left=15] (F1-0) edge [right] node
-     {\ttfamily\footnotesize convert\_assignments} (F1-1);
+     {\ttfamily\footnotesize convert\_assign.} (F1-1);
 \path[->,bend left=15] (F1-1) edge [below] node
      {\ttfamily\footnotesize convert\_to\_clos.} (F1-2);
 \path[->,bend right=15] (F1-2) edge [above] node
@@ -17636,6 +17670,18 @@ Call(Name('make_any'), [|$e'$|, Constant(|$\itm{tagof}(\FType)$|)])
 \end{minipage}
 \end{center}
 
+{\if\edition\pythonEd    
+%
+The introduction of \code{make\_any} makes it difficult to use
+bidirectional type checking because we no longer have an expected type
+to use for type checking the expression $e'$. Thus, we run into
+difficulty if $e'$ is a \code{Lambda} expression.  We recommend
+translating \code{Lambda} to a new AST class \code{AnnLambda} (for
+annotated lambda) whose parameters have type annotations and that
+records the return type.
+%
+\fi}
+
 \racket{The type predicates (\code{boolean?}, etc.) can be translated into
 uses of \code{tag-of-any} and \code{eq?} in a similar way as in the
 translation of \code{Project}.}
@@ -17686,6 +17732,22 @@ Block([Assign([|$t$|], |$e'_1$|), Assign([|$i$|], |$e'_2$|)],
 \fi}
 
 
+{\if\edition\pythonEd
+
+\section{Assignment Conversion}
+\label{sec:convert-assignments-Lany}
+
+Update this pass to handle the \code{TagOf}, \code{ValueOf}, and
+\code{AnnLambda} AST classes.
+
+\section{Closure Conversion}
+\label{sec:closure-conversion-Lany}
+
+Update this pass to handle the \code{TagOf}, \code{ValueOf}, and
+\code{AnnLambda} AST classes.
+
+\fi}
+
 \section{Remove Complex Operands}
 \label{sec:rco-Rany}
 
@@ -17716,12 +17778,12 @@ whose syntax is defined in Figure~\ref{fig:c5-syntax}.
 
 \newcommand{\CanyASTPython}{
 \begin{array}{lcl}
-\Exp &::=& \CALL{\VAR{\key{'make\_any'}}}{\LS \Exp,\Exp \RS}
-  \MID \key{TagOf}\LP \Exp \RP
-  \MID \key{ValueOf}\LP \Exp , \Type \RP \\
-  &\MID& \CALL{\VAR{\key{'any\_tuple\_load'}}}{\LS \Exp,\Exp \RS}\\
-  &\MID& \CALL{\VAR{\key{'any\_tuple\_store'}}}{\LS \Exp,\Exp,\Exp \RS}\\
-  &\MID& \CALL{\VAR{\key{'any\_len'}}}{\LS \Exp \RS} \\
+\Exp &::=& \CALL{\VAR{\key{'make\_any'}}}{\LS \Atm,\Atm \RS}\\
+  &\MID& \key{TagOf}\LP \Atm \RP
+  \MID \key{ValueOf}\LP \Atm , \Type \RP \\
+  &\MID& \CALL{\VAR{\key{'any\_tuple\_load'}}}{\LS \Atm,\Atm \RS}\\
+  &\MID& \CALL{\VAR{\key{'any\_tuple\_store'}}}{\LS \Atm,\Atm,\Atm \RS}\\
+  &\MID& \CALL{\VAR{\key{'any\_len'}}}{\LS \Atm \RS} \\
   &\MID& \CALL{\VAR{\key{'exit'}}}{\LS\RS}
 \end{array}
 }
@@ -17991,36 +18053,26 @@ The code generation for
 analogous to the above translation for reading from a tuple.
 
 
-{\if\edition\pythonEd
-
-\paragraph{\code{arity}}
-
-Compile a call to the \code{arity} operator to a sequence of
-instructions that access the tag from position $0$ of the vector and
-extract the $5$-bits starting at position $58$ from the tag.
-
-\fi}
-
 \section{Register Allocation for \LangAny{}}
 \label{sec:register-allocation-Rany}
 \index{subject}{register allocation}
 
 There is an interesting interaction between tagged values and garbage
 collection that has an impact on register allocation.  A variable of
-type \code{Any} might refer to a vector and therefore it might be a
-root that needs to be inspected and copied during garbage
-collection. Thus, we need to treat variables of type \code{Any} in a
-similar way to variables of type \code{Vector} for purposes of
-register allocation.  In particular,
+type \ANYTY{} might refer to a tuple and therefore it might be a root
+that needs to be inspected and copied during garbage collection. Thus,
+we need to treat variables of type \ANYTY{} in a similar way to
+variables of tuple type for purposes of register allocation.  In
+particular,
 \begin{itemize}
-\item If a variable of type \code{Any} is live during a function call,
+\item If a variable of type \ANYTY{} is live during a function call,
   then it must be spilled. This can be accomplished by changing
-  \code{build\_interference} to mark all variables of type \code{Any}
+  \code{build\_interference} to mark all variables of type \ANYTY{}
   that are live after a \code{callq} as interfering with all the
   registers.
 
-\item If a variable of type \code{Any} is spilled, it must be spilled
-  to the root stack instead of the normal procedure call stack.
+\item If a variable of type \ANYTY{} is spilled, it must be spilled to
+  the root stack instead of the normal procedure call stack.
 \end{itemize}
 
 Another concern regarding the root stack is that the garbage collector
@@ -18030,16 +18082,16 @@ not a tuple. We enable this differentiation by choosing not to use the
 tag $000$ in the $\itm{tagof}$ function. Instead, that bit pattern is
 reserved for identifying plain old pointers to tuples. That way, if
 one of the first three bits is set, then we have a tagged value and
-inspecting the tag can differentiation between vectors ($010$) and the
+inspecting the tag can differentiation between tuples ($010$) and the
 other kinds of values.
 
-\begin{exercise}\normalfont
-Expand your compiler to handle \LangAny{} as discussed in the last few
-sections.  Create 5 new programs that use the \code{Any} type and the
-new operations (\code{inject}, \code{project}, \code{boolean?},
-etc.). Test your compiler on these new programs and all of your
-previously created test programs.
-\end{exercise}
+%% \begin{exercise}\normalfont
+%% Expand your compiler to handle \LangAny{} as discussed in the last few
+%% sections.  Create 5 new programs that use the \ANYTY{} type and the
+%% new operations (\code{Inject}, \code{Project}, etc.). Test your
+%% compiler on these new programs and all of your previously created test
+%% programs.
+%% \end{exercise}
 
 \begin{exercise}\normalfont
 Expand your compiler to handle \LangDyn{} as outlined in this chapter.
@@ -18084,9 +18136,9 @@ completion without error.
 \path[->,bend right=15] (Rfun-4) edge [left] node
      {\ttfamily\footnotesize cast\_insert} (Rfun-5);
 \path[->,bend left=15] (Rfun-5) edge [above] node
-     {\ttfamily\footnotesize check\_bounds} (Rfun-6);
+     {\ttfamily\footnotesize reveal\_casts} (Rfun-6);
 \path[->,bend left=15] (Rfun-6) edge [left] node
-     {\ttfamily\footnotesize reveal\_casts} (Rfun-7);
+     {\ttfamily\footnotesize convert\_assign.} (Rfun-7);
      
 \path[->,bend left=15] (Rfun-7) edge [below] node
      {\ttfamily\footnotesize convert\_to\_clos.} (F1-2);
@@ -18136,6 +18188,12 @@ for the compilation of \LangDyn{}.
 \chapter{Gradual Typing}
 \label{ch:Lgrad}
 \index{subject}{gradual typing}
+
+\if\edition\pythonEd
+
+UNDER CONSTRUCTION
+
+\fi
 
 \if\edition\racketEd
 
@@ -19308,6 +19366,12 @@ recommend the reader to the online gradual typing bibliography:
 \label{ch:Lpoly}
 \index{subject}{parametric polymorphism}
 \index{subject}{generics}
+
+\if\edition\pythonEd
+
+UNDER CONSTRUCTION
+
+\fi
 
 \if\edition\racketEd
 
