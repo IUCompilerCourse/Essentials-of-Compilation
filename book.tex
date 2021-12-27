@@ -909,13 +909,14 @@ defined in Figure~\ref{fig:r0-concrete-syntax}.
   \begin{array}{rcl}
     \Type &::=& \key{Integer} \\
     \Exp{} &::=& \Int{} \MID \CREAD \RP \MID \CNEG{\Exp} \MID \CADD{\Exp}{\Exp}
+      \MID \CSUB{\Exp}{\Exp}
   \end{array}
 }
 \newcommand{\LintASTRacket}{
   \begin{array}{rcl}
     \Type &::=& \key{Integer} \\
     \Exp{} &::=& \INT{\Int} \MID \READ{} \\
-           &\MID& \NEG{\Exp} \MID \ADD{\Exp}{\Exp}
+           &\MID& \NEG{\Exp} \MID \ADD{\Exp}{\Exp} \MID \SUB{\Exp}{\Exp}
   \end{array}
 }
 \newcommand{\LintGrammarPython}{
@@ -1079,7 +1080,8 @@ several ASTs is shown on the right.
     [(Int n) #t]
     [(Prim 'read '()) #t]
     [(Prim '- (list e1)) #f]
-    [(Prim '+ (list e1 e2)) #f]))
+    [(Prim '+ (list e1 e2)) #f]
+    [(Prim '- (list e1 e2)) #f]))
 
 (leaf (Prim 'read '()))
 (leaf (Prim '- (list (Int 8))))
@@ -1097,6 +1099,8 @@ def leaf(arith):
         case UnaryOp(USub(), e1):
             return False
         case BinOp(e1, Add(), e2):
+            return False
+        case BinOp(e1, Sub(), e2):
             return False
 
 print(leaf(Call(Name('input_int'), [])))
@@ -1197,6 +1201,8 @@ two examples at the bottom of the figure, the first is in
     [(Prim '- (list e)) (is_exp e)]
     [(Prim '+ (list e1 e2))
       (and (is_exp e1) (is_exp e2))]
+    [(Prim '- (list e1 e2))
+      (and (is_exp e1) (is_exp e2))]
     [else #f]))
 
 (define (is_Lint ast)
@@ -1206,7 +1212,7 @@ two examples at the bottom of the figure, the first is in
 
 (is_Lint (Program '() ast1_1)
 (is_Lint (Program '()
-       (Prim '- (list (Prim 'read '())
+       (Prim '* (list (Prim 'read '())
                       (Prim '+ (list (Int 8)))))))
 \end{lstlisting}
 \fi}
@@ -1333,7 +1339,11 @@ Figure~\ref{fig:interp_Lint}.
     [(Prim '+ (list e1 e2))
      (define v1 (interp_exp e1))
      (define v2 (interp_exp e2))
-     (fx+ v1 v2)]))
+     (fx+ v1 v2)]
+    [(Prim '- (list e1 e2))
+     (define v1 ((interp-exp env) e1))
+     (define v2 ((interp-exp env) e2))
+     (fx- v1 v2)]))
 
 (define (interp_Lint p)
   (match p
@@ -1566,7 +1576,9 @@ operation.
     [(Int n) (Int n)]
     [(Prim 'read '()) (Prim 'read '())]
     [(Prim '- (list e1)) (pe_neg (pe_exp e1))]
-    [(Prim '+ (list e1 e2)) (pe_add (pe_exp e1) (pe_exp e2))]))
+    [(Prim '+ (list e1 e2)) (pe_add (pe_exp e1) (pe_exp e2))]
+    [(Prim '- (list e1 e2)) (pe-add ((pe-exp env) e1)
+                                    (pe-neg ((pe-exp env) e2)))]))
 
 (define (pe_Lint p)
   (match p
@@ -1831,12 +1843,13 @@ print(10 + x)
 When there are multiple \key{let}'s for the same variable, the closest
 enclosing \key{let} is used. That is, variable definitions overshadow
 prior definitions. Consider the following program with two \key{let}'s
-that define variables named \code{x}. Can you figure out the result?
+that define two variables named \code{x}. Can you figure out the
+result?
 \begin{lstlisting}
 (let ([x 32]) (+ (let ([x 10]) x) x))
 \end{lstlisting}
-For the purposes of depicting which variable uses correspond to which
-definitions, the following shows the \code{x}'s annotated with
+For the purposes of depicting which variable occurences correspond to
+which definitions, the following shows the \code{x}'s annotated with
 subscripts to distinguish them. Double check that your answer for the
 above is the same as your answer for this annotated version of the
 program.
@@ -1860,12 +1873,12 @@ why we implement it in an object-oriented style. Throughout this book
 we define many interpreters, one for each of language that we
 study. Because each language builds on the prior one, there is a lot
 of commonality between these interpreters. We want to write down the
-common parts just once instead of many times. A naive approach would
-be for the interpreter of \LangVar{} to handle the
+common parts just once instead of many times. A naive 
+interpreter for \LangVar{} would handle the
 \racket{cases for variables and \code{let}}
 \python{case for variables}
-but dispatch to \LangInt{}
-for the rest of the cases. The following code sketches this idea. (We
+but dispatch to an interpreter for \LangInt{}
+in the rest of the cases. The following code sketches this idea. (We
 explain the \code{env} parameter soon, in
 Section~\ref{sec:interp-Lvar}.)
 
@@ -1917,10 +1930,10 @@ def interp_Lvar(e, env):
 \end{minipage}
 \fi}
 \end{center}
-The problem with this approach is that it does not handle situations
-in which an \LangVar{} feature, such as a variable, is nested inside
-an \LangInt{} feature, like the \code{-} operator, as in the following
-program.
+The problem with this naive approach is that it does not handle
+situations in which an \LangVar{} feature, such as a variable, is
+nested inside an \LangInt{} feature, like the \code{-} operator, as in
+the following program.
 %
 {\if\edition\racketEd
 \begin{lstlisting}
