@@ -13330,8 +13330,8 @@ a whole is the return type from the function type.
     (define/override (type-check-exp env)
       (lambda (e)
         (match e
-          [(FunRef f)
-           (values (FunRef f)  (dict-ref env f))]
+          [(FunRef f n)
+           (values (FunRef f n)  (dict-ref env f))]
           [(Apply e es)
            (define-values (e^ es^ rt) (type-check-apply env e es))
            (values (Apply e^ es^) rt)]
@@ -13727,9 +13727,11 @@ variables. This is a problem because we need to compile the use of a
 function name differently than the use of a local variable; we need to
 use \code{leaq} to convert the function name (a label in x86) to an
 address in a register.  Thus, we create a new pass that changes
-function references from $\VAR{f}$ to $\FUNREF{f}$. This pass is named
-\code{reveal\_functions} and the output language, \LangFunRef{}, is
-defined in Figure~\ref{fig:f1-syntax}.
+function references from $\VAR{f}$ to $\FUNREF{f}{n}$ where $n$ is the
+arity of the function.\python{\footnote{The arity is not needed in this
+    chapter but is used in Chapter~\ref{ch:Ldyn}.}}  This pass is
+named \code{reveal\_functions} and the output language, \LangFunRef{},
+is defined in Figure~\ref{fig:f1-syntax}.
 %% The concrete syntax for a
 %% function reference is $\CFUNREF{f}$.
 
@@ -13740,7 +13742,7 @@ defined in Figure~\ref{fig:f1-syntax}.
 {\if\edition\racketEd   
 \[
 \begin{array}{lcl}
-\Exp &::=& \ldots \MID \FUNREF{\Var}\\
+\Exp &::=& \ldots \MID \FUNREF{\Var}{\Int}\\
  \Def &::=& \gray{ \FUNDEF{\Var}{([\Var \code{:} \Type]\ldots)}{\Type}{\code{'()}}{\Exp} }\\
   \LangFunRefM{} &::=& \PROGRAMDEFS{\code{'()}}{\LP \Def\ldots \RP}
 \end{array}
@@ -13749,7 +13751,7 @@ defined in Figure~\ref{fig:f1-syntax}.
 {\if\edition\pythonEd  
 \[
 \begin{array}{lcl}
-\Exp &::=& \FUNREF{\Var}\\
+\Exp &::=& \FUNREF{\Var}{\Int}\\
   \LangFunRefM{} &::=& \PROGRAM{}{\LS \Def \code{,} \ldots \RS}
 \end{array}
 \]
@@ -13955,7 +13957,7 @@ appropriate explicate functions for the various contexts.
 
 \newcommand{\CfunASTRacket}{
 \begin{array}{lcl}
-\Exp &::= & \FUNREF{\itm{label}} \MID \CALL{\Atm}{\LP\Atm\ldots\RP} \\
+\Exp &::= & \FUNREF{\itm{label}}{\Int} \MID \CALL{\Atm}{\LP\Atm\ldots\RP} \\
 \Tail &::= & \TAILCALL{\Atm}{\Atm\ldots} \\
 \Def &::=& \DEF{\itm{label}}{\LP[\Var\key{:}\Type]\ldots\RP}{\Type}{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP}
 \end{array}
@@ -13963,7 +13965,7 @@ appropriate explicate functions for the various contexts.
 
 \newcommand{\CfunASTPython}{
 \begin{array}{lcl}
-\Exp &::= & \FUNREF{\itm{label}} \MID \CALL{\Atm}{\Atm^{*}} \\
+\Exp &::= & \FUNREF{\itm{label}}{\Int} \MID \CALL{\Atm}{\Atm^{*}} \\
 \Stmt &::= & \TAILCALL{\Atm}{\Atm^{*}} \\
 \Params &::=& \LS\LP\Var\key{,}\Type\RP\code{,}\ldots\RS \\
 \Block &::=& \itm{label}\key{:} \Stmt^{*} \\
@@ -14048,7 +14050,7 @@ language, whose syntax is defined in Figure~\ref{fig:x86-3}.
 \begin{array}{lcl}
   \Arg &::=&  \gray{  \INT{\Int} \MID \REG{\Reg} \MID \DEREF{\Reg}{\Int}
      \MID \BYTEREG{\Reg} } \\
-     &\MID& \gray{ \GLOBAL{\Var} } \MID \FUNREF{\itm{label}} \\
+     &\MID& \gray{ \GLOBAL{\Var} } \MID \FUNREF{\itm{label}}{\Int} \\
   \Instr &::=& \ldots \MID \INDCALLQ{\Arg}{\itm{int}}
     \MID \TAILJMP{\Arg}{\itm{int}}\\
     &\MID& \BININSTR{\code{'leaq}}{\Arg}{\REG{\Reg}}\\
@@ -14063,7 +14065,7 @@ language, whose syntax is defined in Figure~\ref{fig:x86-3}.
 \begin{array}{lcl}
   \Arg &::=&  \gray{  \INT{\Int} \MID \REG{\Reg} \MID \DEREF{\Reg}{\Int}
      \MID \BYTEREG{\Reg} } \\
-     &\MID& \gray{ \GLOBAL{\Var} } \MID \FUNREF{\itm{label}} \\
+     &\MID& \gray{ \GLOBAL{\Var} } \MID \FUNREF{\itm{label}}{\Int} \\
   \Instr &::=& \ldots \MID \INDCALLQ{\Arg}{\itm{int}}
     \MID \TAILJMP{\Arg}{\itm{int}}\\
     &\MID& \BININSTR{\scode{leaq}}{\Arg}{\REG{\Reg}}\\
@@ -14090,12 +14092,12 @@ to \Arg{} in \LangXIndCallVar{}. \\
 \begin{minipage}{0.35\textwidth}
 {\if\edition\racketEd
 \begin{lstlisting}
-  |$\itm{lhs}$| = (fun-ref |$f$|);
+  |$\itm{lhs}$| = (fun-ref |$f$| |$n$|);
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
-  |$\itm{lhs}$| = FunRef(|$f$|);
+  |$\itm{lhs}$| = FunRef(|$f$|, |$n$|);
 \end{lstlisting}
 \fi}
 \end{minipage}
@@ -14105,7 +14107,7 @@ $\Rightarrow$\qquad\qquad
 \begin{minipage}{0.3\textwidth}
 {\if\edition\racketEd
 \begin{lstlisting}
-leaq (fun-ref |$f$|), |$\itm{lhs}'$|
+leaq (fun-ref |$f$| |$n$|), |$\itm{lhs}'$|
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
@@ -14451,7 +14453,7 @@ $\Downarrow$
    )
 (define (main) : Integer ()
    mainstart:
-      tmp89 = (fun-ref add86);
+      tmp89 = (fun-ref add86 2);
       (tail-call tmp89 40 2)
    )
 \end{lstlisting}
@@ -14486,7 +14488,7 @@ $\Rightarrow$
    )
 (define (main) : Integer
    mainstart:
-      leaq (fun-ref add86), tmp89
+      leaq (fun-ref add86 2), tmp89
       movq $40, %rdi
       movq $2, %rsi
       tail-jmp tmp89
@@ -15311,36 +15313,24 @@ def main() -> int :
 
 \fi
 
-\if\edition\racketEd
-\section{Reveal Functions and the $F_2$ language}
-\label{sec:reveal-functions-r5}
+%% \section{Reveal Functions}
+%% \label{sec:reveal-functions-r5}
 
-To support the \code{procedure-arity} operator we need to communicate
-the arity of a function to the point of closure creation.  We can
-accomplish this by replacing the $\FUNREF{\Var}$ struct with one that
-has a second field for the arity: $\FUNREFARITY{\Var}{\Int}$.  The
-output of this pass is the language $F_2$, whose syntax is defined in
-Figure~\ref{fig:f2-syntax}.
-
-\begin{figure}[tp]
-\centering
-\fbox{
-\begin{minipage}{0.96\textwidth}
-\[
-\begin{array}{lcl}
-\Exp &::=& \ldots \MID \FUNREFARITY{\Var}{\Int}\\
- \Def &::=& \gray{ \FUNDEF{\Var}{([\Var \code{:} \Type]\ldots)}{\Type}{\code{'()}}{\Exp} }\\
-  F_2 &::=& \gray{\PROGRAMDEFS{\code{'()}}{\LP \Def\ldots \RP}}
-\end{array}
-\]
-\end{minipage}
-}
-\caption{The abstract syntax $F_2$, an extension of \LangLam{}
-  (Figure~\ref{fig:Rlam-syntax}).}
-\label{fig:f2-syntax}
-\end{figure}
-
-\fi
+%% \racket{To support the \code{procedure-arity} operator we need to
+%%   communicate the arity of a function to the point of closure
+%%   creation.}
+%% %
+%% \python{In Chapter~\ref{ch:Ldyn} we need to access the arity of a
+%%   function at runtime. Thus, we need to communicate the arity of a
+%%   function to the point of closure creation.}
+%% %
+%% We can accomplish this by replacing the $\FUNREF{\Var}{\Int}$ AST node with
+%% one that has a second field for the arity: $\FUNREFARITY{\Var}{\Int}$.
+%% \[
+%% \begin{array}{lcl}
+%% \Exp &::=& \FUNREFARITY{\Var}{\Int}
+%% \end{array}
+%% \]
 
 \section{Assignment Conversion}
 \label{sec:convert-assignments}
@@ -15394,8 +15384,8 @@ print( g(20) )
 variables \code{x} and \code{z} occur free inside the
 \code{lambda}. Thus, variable \code{x} needs to be boxed but not
 \code{y} or \code{z}.  The boxing of \code{x} consists of three
-transformations: initialize \code{x} with a tuple, replace reads from
-\code{x} with tuple reads, and replace each assignment to \code{x}
+transformations: initialize \code{x} with a tuple whose elements are uninitialized,
+replace reads from \code{x} with tuple reads, and replace each assignment to \code{x}
 with a tuple write. The output of \code{convert\_assignments} for
 this example is as follows.
 %
@@ -15417,7 +15407,7 @@ this example is as follows.
 {\if\edition\pythonEd
 \begin{lstlisting}
 def g(z : int)-> int:
-  x = (0,)
+  x = (uninitialized(int),)
   x[0] = 0
   y = 0
   f : Callable[[int], int] = (lambda a: a + x[0] + z)
@@ -15580,8 +15570,6 @@ def g(x_0 : int)-> int:
 \label{sec:closure-conversion}
 \index{subject}{closure conversion}
 
-[TODO: discuss conversion of \code{AnnAssign} to \code{Assign} -Jeremy]
-
 The compiling of lexically-scoped functions into top-level function
 definitions is accomplished in the pass \code{convert\_to\_closures}
 that comes after \code{reveal\_functions} and before
@@ -15594,11 +15582,8 @@ that creates a closure, that is, a tuple whose first element is a
 function pointer and the rest of the elements are the values of the
 free variables of the \key{lambda}.
 %
-\racket{However, we use the \code{Closure}
-  AST node instead of using a tuple so that we can record the arity
-  which is needed for \code{procedure-arity} and
-to distinguish closures from tuples in
-Section~\ref{sec:optimize-closures}.}
+However, we use the \code{Closure} AST node instead of using a tuple
+so that we can record the arity.
 %
 In the generated code below, \itm{fvs} is the free variables of the
 lambda and \itm{name} is a unique symbol generated to identify the lambda.
@@ -15610,15 +15595,15 @@ lambda and \itm{name} is a unique symbol generated to identify the lambda.
 \begin{lstlisting}
 (Lambda |\itm{ps}| |\itm{rt}| |\itm{body}|)
 |$\Rightarrow$|
-(Closure |\itm{arity}| (cons (FunRef |\itm{name}|) |\itm{fvs}|))
+(Closure |\itm{arity}| (cons (FunRef |\itm{name}| |\itm{arity}|) |\itm{fvs}|))
 \end{lstlisting}
 \fi}
 %
 {\if\edition\pythonEd
 \begin{lstlisting}
-Lambda(|\itm{ps}|, |\itm{body}|)
+Lambda([|$x_1,\ldots,x_n$|], |\itm{body}|)
 |$\Rightarrow$|
-Tuple([FunRef(|\itm{name}|), |\itm{fvs}, \ldots|])
+Closure(|$n$|, [FunRef(|\itm{name}|, |$n$|), |\itm{fvs}, \ldots|])
 \end{lstlisting}
 \fi}
 %
@@ -15732,7 +15717,7 @@ application, we turn function references into closures.
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
-FunRef(|$f$|)
+FunRefArity(|$f$|, |$n$|)
 \end{lstlisting}
 \fi}
 \end{minipage}
@@ -15742,19 +15727,24 @@ $\Rightarrow$
 \begin{minipage}{0.5\textwidth}
 {\if\edition\racketEd
 \begin{lstlisting}
-(Closure |$n$| (FunRef |$f$|) '())
+(Closure |$n$| (FunRef |$f$| |$n$|) '())
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
-Tuple([FunRef(|$f$|)])
+Closure(|$n$|, [FunRef(|$f$| |$n$|)])
 \end{lstlisting}
 \fi}
 \end{minipage}
 \end{tabular}  \\
-%
-The top-level function definitions need to be updated as well to take
-an extra closure parameter.
+
+
+We no longer need the annotated assignment statement \code{AnnAssign}
+to support the type checking of \code{lambda} expressions, so we
+translate it to a regular \code{Assign} statement.
+
+The top-level function definitions need to be updated to take an extra
+closure parameter.
 
 \section{An Example Translation}
 \label{sec:example-lambda}
@@ -15776,15 +15766,15 @@ beginning of this chapter.
          (+ x7 (+ y8 z9)))))
 
 (define (main) : Integer
-   (let ([g0 ((fun-ref-arity f6 1) 5)])
-      (let ([h1 ((fun-ref-arity f6 1) 3)])
+   (let ([g0 ((fun-ref f6 1) 5)])
+      (let ([h1 ((fun-ref f6 1) 3)])
          (+ (g0 11) (h1 15)))))
 \end{lstlisting}
 $\Rightarrow$
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define (f6 [fvs4 : _] [x7 : Integer]) : (Vector ((Vector _) Integer -> Integer))
    (let ([y8 4])
-      (closure 1 (list (fun-ref lambda2) x7 y8))))
+      (closure 1 (list (fun-ref lambda2 1) x7 y8))))
 
 (define (lambda2 [fvs3 : (Vector _ Integer Integer)] [z9 : Integer]) : Integer
    (let ([x7 (vector-ref fvs3 1)])
@@ -15792,9 +15782,9 @@ $\Rightarrow$
          (+ x7 (+ y8 z9)))))
 
 (define (main) : Integer
-   (let ([g0 (let ([clos5 (closure 1 (list (fun-ref f6)))])
+   (let ([g0 (let ([clos5 (closure 1 (list (fun-ref f6 1)))])
                     ((vector-ref clos5 0) clos5 5))])
-      (let ([h1 (let ([clos6 (closure 1 (list (fun-ref f6)))])
+      (let ([h1 (let ([clos6 (closure 1 (list (fun-ref f6 1)))])
                        ((vector-ref clos6 0) clos6 3))])
          (+ ((vector-ref g0 0) g0 11) ((vector-ref h1 0) h1 15)))))
 \end{lstlisting}
@@ -15843,14 +15833,12 @@ lexical scoping. Test your compiler on these new programs and all of
 your previously created test programs.
 \end{exercise}
 
-\if\edition\racketEd
-
 \section{Expose Allocation}
 \label{sec:expose-allocation-r5}
 
-Compile the $\CLOSURE{\itm{arity}}{\LP\Exp\ldots\RP}$ form into code
-that allocates and initializes a vector, similar to the translation of
-the \code{vector} operator in Section~\ref{sec:expose-allocation}.
+Compile the $\CLOSURE{\itm{arity}}{\Exp^{*}}$ form into code
+that allocates and initializes a tuple, similar to the translation of
+the tuple creation in Section~\ref{sec:expose-allocation}.
 The only difference is replacing the use of
 \ALLOC{\itm{len}}{\itm{type}} with
 \ALLOCCLOS{\itm{len}}{\itm{type}}{\itm{arity}}.
@@ -15860,12 +15848,26 @@ The only difference is replacing the use of
 \label{sec:explicate-r5}
 
 The output language of \code{explicate\_control} is \LangCLam{} whose
-abstract syntax is defined in Figure~\ref{fig:c4-syntax}.  The only
-difference with respect to \LangCFun{} is the addition of the
-\code{AllocateClosure} form to the grammar for $\Exp$.  The handling
-of \code{AllocateClosure} in the \code{explicate\_control} pass is
-similar to the handling of other expressions such as primitive
-operators.
+abstract syntax is defined in Figure~\ref{fig:Clam-syntax}.
+%
+\racket{The only difference with respect to \LangCFun{} is the
+  addition of the \code{AllocateClosure} form to the grammar for
+  $\Exp$.  The handling of \code{AllocateClosure} in the
+  \code{explicate\_control} pass is similar to the handling of other
+  expressions such as primitive operators.}
+%
+\python{The only differences with respect to \LangCFun{} are the
+  addition of the \code{Uninitialized} and \code{AllocateClosure}
+  forms to the grammar for $\Exp$.  The handling of them in the
+  \code{explicate\_control} pass is similar to the handling of other
+  expressions such as primitive operators.}
+
+\newcommand{\ClambdaASTPython}{
+\begin{array}{lcl}
+\Exp &::=& \key{Uninitialized}\LP \Type \RP
+      \MID \key{AllocateClosure}\LP\itm{len},\Type, \itm{arity}\RP 
+\end{array}
+}
 
 \begin{figure}[tp]
 \fbox{
@@ -15887,10 +15889,23 @@ operators.
 \end{array}
 \]
 \fi}
+{\if\edition\pythonEd
+\[
+  \begin{array}{l}
+  \gray{\CifASTPython} \\ \hline
+  \gray{\CtupASTPython} \\ \hline
+  \gray{\CfunASTPython} \\ \hline
+  \ClambdaASTPython \\
+  \begin{array}{lcl}
+    \LangCLamM{} & ::= & \CPROGRAMDEFS{\LS\Def\code{,}\ldots\RS} 
+  \end{array}
+  \end{array}
+\]
+\fi}
 \end{minipage}
 }
 \caption{The abstract syntax of \LangCLam{}, extending \LangCFun{} (Figure~\ref{fig:c3-syntax}).}
-\label{fig:c4-syntax}
+\label{fig:Clam-syntax}
 \end{figure}
 
 
@@ -15906,11 +15921,10 @@ Section~\ref{sec:select-instructions-gc} a portion of the 64-bit tag
 was not used. We store the arity in the $5$ bits starting at position
 $58$.
 
-Compile the \code{procedure-arity} operator into a sequence of
+\racket{Compile the \code{procedure-arity} operator into a sequence of
 instructions that access the tag from position $0$ of the vector and
-extract the $5$-bits starting at position $58$ from the tag.
+extract the $5$-bits starting at position $58$ from the tag.}
 
-\fi
 
 \begin{figure}[p]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
@@ -16017,11 +16031,11 @@ all functions, obtaining the following output for this program.
 (define (tail_sum1 [fvs5 : _] [n2 : Integer] [s3 : Integer]) : Integer
    (if (eq? n2 0)
       s3
-      (let ([clos4 (closure (list (fun-ref tail_sum1)))])
+      (let ([clos4 (closure (list (fun-ref tail_sum1 2)))])
          ((vector-ref clos4 0) clos4 (+ n2 -1) (+ n2 s3)))))
 
 (define (main) : Integer
-   (+ (let ([clos6 (closure (list (fun-ref tail_sum1)))])
+   (+ (let ([clos6 (closure (list (fun-ref tail_sum1 2)))])
          ((vector-ref clos6 0) clos6 3 0)) 27))
 \end{lstlisting}
 \fi}
@@ -16051,7 +16065,7 @@ considerable overhead in a program such as this one, where the
 allocations and indirect calls occur inside a tight loop.
 
 One might think that this problem is trivial to solve: can't we just
-recognize calls of the form \APPLY{\FUNREF{$f$}}{$\mathit{args}$}
+recognize calls of the form \APPLY{\FUNREF{$f$}{$n$}}{$\mathit{args}$}
 and compile them to direct calls instead of treating it like a call to
 a closure? We would also drop the new \code{fvs} parameter of
 \code{tail\_sum}.
@@ -16138,7 +16152,7 @@ print( f(21) )
 
 (define (main) : Integer
    (let ([y2 (read)])
-      (let ([f4 (Closure 1 (list (fun-ref lambda5) y2))])
+      (let ([f4 (Closure 1 (list (fun-ref lambda5 1) y2))])
          ((vector-ref f4 0) f4 21))))
 \end{lstlisting}
 \fi}
@@ -16164,8 +16178,8 @@ def main() -> int:
 \begin{lstlisting}
 (define (main) : Integer
    (let ([y2 (read)])
-      (let ([f4 (Closure 1 (list (fun-ref lambda5) y2))])
-         ((fun-ref lambda5) f4 21))))
+      (let ([f4 (Closure 1 (list (fun-ref lambda5 1) y2))])
+         ((fun-ref lambda5 1) f4 21))))
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
@@ -17533,8 +17547,8 @@ Call('any_tuple_load',[|$e_1'$|, |$e_2'$|])
 
 % TODO: define R'_6
 
-In the \code{reveal-casts} pass we recommend compiling \code{project}
-into an \code{if} expression that checks whether the value's tag
+In the \code{reveal\_casts} pass we recommend compiling \code{Project}
+into a conditional expression that checks whether the value's tag
 matches the target type; if it does, the value is converted to a value
 of the target type by removing the tag; if it does not, the program
 exits.
@@ -17557,11 +17571,11 @@ program.
 To perform these actions we need the \code{exit} function (from the C
 standard library) and two new AST classes: \code{TagOf} and
 \code{ValueOf}. The \code{exit} function ends the execution of the
-program, with its argument as the exit code of the program.  The
-\code{TagOf} operation retrieves the type tag from a tagged value of
-type \ANYTY{}.  The \code{ValueOf} operation retrieves the underlying
-value from a tagged value.  The \code{ValueOf} operation includes the
-type for the underlying value which is used by the type checker.
+program.  The \code{TagOf} operation retrieves the type tag from a
+tagged value of type \ANYTY{}.  The \code{ValueOf} operation retrieves
+the underlying value from a tagged value.  The \code{ValueOf}
+operation includes the type for the underlying value which is used by
+the type checker.
 %
 \fi}
 
@@ -17601,7 +17615,7 @@ that the number of parameters in the function type matches the
 function's arity.
 
 Regarding \code{Inject}, we recommend compiling it to a slightly
-lower-level primitive operation named \code{make-any}. This operation
+lower-level primitive operation named \code{make\_any}. This operation
 takes a tag instead of a type.
 \begin{center}
 \begin{minipage}{1.0\textwidth}
@@ -17616,7 +17630,7 @@ takes a tag instead of a type.
 \begin{lstlisting}
 Inject(|$e$|, |$\FType$|)
 |$\Rightarrow$|
-Call(Name('make-any'), [|$e'$|, Constant(|$\itm{tagof}(\FType)$|)])
+Call(Name('make_any'), [|$e'$|, Constant(|$\itm{tagof}(\FType)$|)])
 \end{lstlisting}
 \fi}
 \end{minipage}
@@ -17684,15 +17698,33 @@ Block([Assign([|$t$|], |$e'_1$|), Assign([|$i$|], |$e'_2$|)],
 \section{Explicate Control and \LangCAny{}}
 \label{sec:explicate-Rany}
 
-\python{UNDER CONSTRUCTION}
+The output of \code{explicate\_control} is the \LangCAny{} language
+whose syntax is defined in Figure~\ref{fig:c5-syntax}.
+%
+\racket{The \code{ValueOf} form that we added to \LangAny{} remains an
+  expression and the \code{Exit} expression becomes a $\Tail$. Also,
+  note that the index argument of \code{vector-ref} and
+  \code{vector-set!} is an $\Atm$ instead of an integer, as in
+  \LangCVec{} (Figure~\ref{fig:c2-syntax}).}
+%
+\python{
+  Update the auxiliary functions \code{explicate\_tail}, \code{explicate\_effect},
+  and \code{explicate\_pred} as appropriately to handle the new expressions
+  in \LangCAny{}.
+}
 
-The output of \code{explicate\_control} is the \LangCAny{} language whose
-syntax is defined in Figure~\ref{fig:c5-syntax}. The \code{ValueOf}
-form that we added to \LangAny{} remains an expression and the \code{Exit}
-expression becomes a $\Tail$. Also, note that the index argument of
-\code{vector-ref} and \code{vector-set!} is an $\Atm$ instead
-of an integer, as in \LangCVec{} (Figure~\ref{fig:c2-syntax}).
 
+\newcommand{\CanyASTPython}{
+\begin{array}{lcl}
+\Exp &::=& \CALL{\VAR{\key{'make\_any'}}}{\LS \Exp,\Exp \RS}
+  \MID \key{TagOf}\LP \Exp \RP
+  \MID \key{ValueOf}\LP \Exp , \Type \RP \\
+  &\MID& \CALL{\VAR{\key{'any\_tuple\_load'}}}{\LS \Exp,\Exp \RS}\\
+  &\MID& \CALL{\VAR{\key{'any\_tuple\_store'}}}{\LS \Exp,\Exp,\Exp \RS}\\
+  &\MID& \CALL{\VAR{\key{'any\_len'}}}{\LS \Exp \RS} \\
+  &\MID& \CALL{\VAR{\key{'exit'}}}{\LS\RS}
+\end{array}
+}
 
 \begin{figure}[tp]
 \fbox{
@@ -17718,11 +17750,22 @@ of an integer, as in \LangCVec{} (Figure~\ref{fig:c2-syntax}).
 \]
 \fi}
 {\if\edition\pythonEd
-UNDER CONSTRUCTION
+\[
+  \begin{array}{l}
+  \gray{\CifASTPython} \\ \hline
+  \gray{\CtupASTPython} \\ \hline
+  \gray{\CfunASTPython} \\ \hline
+  \gray{\ClambdaASTPython} \\ \hline
+  \CanyASTPython \\
+  \begin{array}{lcl}
+    \LangCAnyM{} & ::= & \CPROGRAMDEFS{\LS\Def\code{,}\ldots\RS} 
+  \end{array}
+  \end{array}
+\]
 \fi}
 \end{minipage}
 }
-\caption{The abstract syntax of \LangCAny{}, extending \LangCLam{} (Figure~\ref{fig:c4-syntax}).}
+\caption{The abstract syntax of \LangCAny{}, extending \LangCLam{} (Figure~\ref{fig:Clam-syntax}).}
 \label{fig:c5-syntax}
 \end{figure}
 
@@ -17731,17 +17774,21 @@ UNDER CONSTRUCTION
 \label{sec:select-Rany}
 
 In the \code{select\_instructions} pass we translate the primitive
-operations on the \code{Any} type to x86 instructions that involve
-manipulating the 3 tag bits of the tagged value.
+operations on the \ANYTY{} type to x86 instructions that manipulate
+the 3 tag bits of the tagged value. In the following descriptions,
+given an atom $e$ we use a primed variable $e'$ to refer to the result
+of translating $e$ into an x86 argument.
 
-\paragraph{Make-any}
+\paragraph{\code{make\_any}}
 
-We recommend compiling the \key{make-any} primitive as follows if the
-tag is for \key{Integer} or \key{Boolean}.  The \key{salq} instruction
+We recommend compiling the \code{make\_any} operation as follows if
+the tag is for \INTTY{} or \BOOLTY{}.  The \key{salq} instruction
 shifts the destination to the left by the number of bits specified its
 source argument (in this case $3$, the length of the tag) and it
 preserves the sign of the integer. We use the \key{orq} instruction to
 combine the tag and the value to form the tagged value.  \\
+%
+{\if\edition\racketEd
 \begin{lstlisting}
 (Assign |\itm{lhs}| (Prim 'make-any (list |$e$| (Int |$\itm{tag}$|))))
 |$\Rightarrow$|
@@ -17749,101 +17796,210 @@ movq |$e'$|, |\itm{lhs'}|
 salq $3, |\itm{lhs'}|
 orq $|$\itm{tag}$|, |\itm{lhs'}|
 \end{lstlisting}
-The instruction selection for vectors and procedures is different
+\fi}
+%
+{\if\edition\pythonEd
+\begin{lstlisting}
+Assign([|\itm{lhs}|], Call(Name('make_any'), [|$e$|, Constant(|$\itm{tag}$|)]))
+|$\Rightarrow$|
+movq |$e'$|, |\itm{lhs'}|
+salq $3, |\itm{lhs'}|
+orq $|$\itm{tag}$|, |\itm{lhs'}|
+\end{lstlisting}
+\fi}
+%
+The instruction selection for tuples and procedures is different
 because their is no need to shift them to the left. The rightmost 3
-bits are already zeros as described at the beginning of this
-chapter. So we just combine the value and the tag using \key{orq}.  \\
+bits are already zeros so we simply combine the value and the tag
+using \key{orq}.  \\
+%
+{\if\edition\racketEd
 \begin{lstlisting}
 (Assign |\itm{lhs}| (Prim 'make-any (list |$e$| (Int |$\itm{tag}$|))))
 |$\Rightarrow$|
 movq |$e'$|, |\itm{lhs'}|
 orq $|$\itm{tag}$|, |\itm{lhs'}|
 \end{lstlisting}
+\fi}
+%
+{\if\edition\pythonEd
+\begin{lstlisting}
+Assign([|\itm{lhs}|], Call(Name('make_any'), [|$e$|, Constant(|$\itm{tag}$|)]))
+|$\Rightarrow$|
+movq |$e'$|, |\itm{lhs'}|
+orq $|$\itm{tag}$|, |\itm{lhs'}|
+\end{lstlisting}
+\fi}
 
-\paragraph{Tag-of-any}
+\paragraph{\code{TagOf}}
 
-Recall that the \code{tag-of-any} operation extracts the type tag from
-a value of type \code{Any}. The type tag is the bottom three bits, so
-we obtain the tag by taking the bitwise-and of the value with $111$
-($7$ in decimal).
+Recall that the \code{TagOf} operation extracts the type tag from a
+value of type \ANYTY{}. The type tag is the bottom three bits, so we
+obtain the tag by taking the bitwise-and of the value with $111$ ($7$
+in decimal).
+%
+{\if\edition\racketEd
 \begin{lstlisting}
 (Assign |\itm{lhs}| (Prim 'tag-of-any (list |$e$|)))
 |$\Rightarrow$|
 movq |$e'$|, |\itm{lhs'}|
 andq $7, |\itm{lhs'}|
 \end{lstlisting}
+\fi}
+%
+{\if\edition\pythonEd
+\begin{lstlisting}
+Assign([|\itm{lhs}|], TagOf(|$e$|))
+|$\Rightarrow$|
+movq |$e'$|, |\itm{lhs'}|
+andq $7, |\itm{lhs'}|
+\end{lstlisting}
+\fi}
 
-\paragraph{ValueOf}
 
-Like \key{make-any}, the instructions for \key{ValueOf} are different
-depending on whether the type $T$ is a pointer (vector or procedure)
-or not (Integer or Boolean). The following shows the instruction
-selection for Integer and Boolean.  We produce an untagged value by
-shifting it to the right by 3 bits.
+\paragraph{\code{ValueOf}}
+
+Like \code{make\_any}, the instructions for \key{ValueOf} are
+different depending on whether the type $T$ is a pointer (tuple or
+function) or not (integer or Boolean). The following shows the
+instruction selection for integers and Booleans.  We produce an
+untagged value by shifting it to the right by 3 bits.
+%
+{\if\edition\racketEd
 \begin{lstlisting}
 (Assign |\itm{lhs}| (ValueOf |$e$| |$T$|))
 |$\Rightarrow$|
 movq |$e'$|, |\itm{lhs'}|
 sarq $3, |\itm{lhs'}|
 \end{lstlisting}
+\fi}
 %
-In the case for vectors and procedures, there is no need to
-shift. Instead we just need to zero-out the rightmost 3 bits. We
-accomplish this by creating the bit pattern $\ldots 0111$ ($7$ in
-decimal) and apply \code{bitwise-not} to obtain $\ldots 11111000$ (-8
-in decimal) which we \code{movq} into the destination $\itm{lhs}$.  We
-then apply \code{andq} with the tagged value to get the desired
-result. \\
+{\if\edition\pythonEd
+\begin{lstlisting}
+Assign([|\itm{lhs}|], ValueOf(|$e$|, |$T$|))
+|$\Rightarrow$|
+movq |$e'$|, |\itm{lhs'}|
+sarq $3, |\itm{lhs'}|
+\end{lstlisting}
+\fi}
+%
+In the case for tuples and procedures, we just need to zero-out the
+rightmost 3 bits. We accomplish this by creating the bit pattern
+$\ldots 0111$ ($7$ in decimal) and apply bitwise-not to obtain $\ldots
+11111000$ (-8 in decimal) which we \code{movq} into the destination
+$\itm{lhs'}$.  Finally, we apply \code{andq} with the tagged value to
+get the desired result.
+%
+{\if\edition\racketEd
 \begin{lstlisting}
 (Assign |\itm{lhs}| (ValueOf |$e$| |$T$|))
 |$\Rightarrow$|
 movq $|$-8$|, |\itm{lhs'}|
 andq |$e'$|, |\itm{lhs'}|
 \end{lstlisting}
+\fi}
+%
+{\if\edition\pythonEd
+\begin{lstlisting}
+Assign([|\itm{lhs}|], ValueOf(|$e$|, |$T$|))
+|$\Rightarrow$|
+movq $|$-8$|, |\itm{lhs'}|
+andq |$e'$|, |\itm{lhs'}|
+\end{lstlisting}
+\fi}
+
 
 %% \paragraph{Type Predicates} We leave it to the reader to
 %% devise a sequence of instructions to implement the type predicates
 %% \key{boolean?}, \key{integer?}, \key{vector?}, and \key{procedure?}.
 
-\paragraph{Any-vector-length}
+\paragraph{\racket{Any-vector-length}\python{\code{any\_len}}}
 
+The \racket{\code{any-vector-length}}\python{\code{any\_len}}
+operation combines the effect of \code{ValueOf} with accessing the
+length of a tuple from the tag stored at the zero index of the tuple.
+
+{\if\edition\racketEd
 \begin{lstlisting}
-(Assign |$\itm{lhs}$| (Prim 'any-vector-length (list |$a_1$|)))
+(Assign |$\itm{lhs}$| (Prim 'any-vector-length (list |$e_1$|)))
 |$\Longrightarrow$|
-movq |$\neg 111$|, %r11
-andq |$a_1'$|,  %r11
+movq $|$-8$|, %r11
+andq |$e_1'$|,  %r11
 movq 0(%r11), %r11
 andq $126, %r11
 sarq $1, %r11
 movq %r11, |$\itm{lhs'}$|
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+Assign([|$\itm{lhs}$|], Call(Name('any_len'), [|$e_1$|]))
+|$\Longrightarrow$|
+movq $|$-8$|, %r11
+andq |$e_1'$|,  %r11
+movq 0(%r11), %r11
+andq $126, %r11
+sarq $1, %r11
+movq %r11, |$\itm{lhs'}$|
+\end{lstlisting}
+\fi}
 
-\paragraph{Any-vector-ref}
+\paragraph{\racket{Any-vector-ref}\python{\code{\code{any\_tuple\_load}}}}
 
-The index may be an arbitrary atom so instead of computing the offset
-at compile time, instructions need to be generated to compute the
-offset at runtime as follows. Note the use of the new instruction
-\code{imulq}.
+This operation combines the effect of \code{ValueOf} with reading an
+element of the tuple (see
+Section~\ref{sec:select-instructions-gc}). However, the index may be
+an arbitrary atom so instead of computing the offset at compile time,
+we must generate instructions to compute the offset at runtime as
+follows. Note the use of the new instruction \code{imulq}.
 \begin{center}
 \begin{minipage}{0.96\textwidth}
+{\if\edition\racketEd    
 \begin{lstlisting}
-(Assign |$\itm{lhs}$| (Prim 'any-vector-ref (list |$a_1$| |$a_2$|)))
+(Assign |$\itm{lhs}$| (Prim 'any-vector-ref (list |$e_1$| |$e_2$|)))
 |$\Longrightarrow$|
 movq |$\neg 111$|, %r11
-andq |$a_1'$|, %r11
-movq |$a_2'$|, %rax
+andq |$e_1'$|, %r11
+movq |$e_2'$|, %rax
 addq $1, %rax
 imulq $8, %rax
 addq %rax, %r11
 movq 0(%r11) |$\itm{lhs'}$|
 \end{lstlisting}
+\fi}
+%
+{\if\edition\pythonEd    
+\begin{lstlisting}
+Assign([|$\itm{lhs}$|], Call(Name('any_tuple_load'), [|$e_1$|,|$e_2$|]))
+|$\Longrightarrow$|
+movq $|$-8$|, %r11
+andq |$e_1'$|, %r11
+movq |$e_2'$|, %rax
+addq $1, %rax
+imulq $8, %rax
+addq %rax, %r11
+movq 0(%r11) |$\itm{lhs'}$|
+\end{lstlisting}
+\fi}
 \end{minipage}
 \end{center}
 
-\paragraph{Any-vector-set!}
+\paragraph{\racket{Any-vector-set!}\python{\code{any\_tuple\_store}}}
 
-The code generation for \code{any-vector-set!} is similar to the other
-\code{any-vector} operations.
+The code generation for
+\racket{\code{any-vector-set!}}\python{\code{any\_tuple\_store}} is
+analogous to the above translation for reading from a tuple.
+
+
+{\if\edition\pythonEd
+
+\paragraph{\code{arity}}
+
+Compile a call to the \code{arity} operator to a sequence of
+instructions that access the tag from position $0$ of the vector and
+extract the $5$-bits starting at position $58$ from the tag.
+
+\fi}
 
 \section{Register Allocation for \LangAny{}}
 \label{sec:register-allocation-Rany}
@@ -17884,7 +18040,6 @@ new operations (\code{inject}, \code{project}, \code{boolean?},
 etc.). Test your compiler on these new programs and all of your
 previously created test programs.
 \end{exercise}
-
 
 \begin{exercise}\normalfont
 Expand your compiler to handle \LangDyn{} as outlined in this chapter.
@@ -20056,7 +20211,7 @@ The concrete syntax for \LangCVar{}, \LangCIf{}, \LangCVec{} and
    &\MID& \gray{  \LP\key{allocate}\,\Int\,\Type\RP
    \MID \LP\key{vector-ref}\, \Atm\, \Int\RP  } \\
    &\MID& \gray{  \LP\key{vector-set!}\,\Atm\,\Int\,\Atm\RP \MID \LP\key{global-value} \,\itm{name}\RP \MID \LP\key{void}\RP } \\
-   &\MID& \LP\key{fun-ref}~\itm{label}\RP \MID \LP\key{call} \,\Atm\,\Atm\ldots\RP \\
+   &\MID& \LP\key{fun-ref}~\itm{label}~\Int\RP \MID \LP\key{call} \,\Atm\,\Atm\ldots\RP \\
 \Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \MID \RETURN{\Exp} 
        \MID \LP\key{collect} \,\itm{int}\RP }\\
 \Tail &::= & \gray{\RETURN{\Exp} \MID \LP\key{seq}\;\Stmt\;\Tail\RP} \\
