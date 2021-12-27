@@ -1963,9 +1963,9 @@ following code uses method overriding to interpret \LangInt{} and
 %
 \racket{the
   \href{https://docs.racket-lang.org/guide/classes.html}{\code{class}}
-  \index{subject}{class} feature of Racket}
+  \index{subject}{class} feature of Racket.}
 %
-\python{a Python \code{class} definition}.
+\python{a Python \code{class} definition.}
 %
 We define one class for each language and define a method for
 interpreting expressions inside each class. The class for \LangVar{}
@@ -2125,11 +2125,11 @@ value bound to a variable to all the uses of the variable. To
 accomplish this, we maintain a mapping from variables to values
 called an \emph{environment}\index{subject}{environment}.
 %
-We use%
+We use
 %
-\racket{an association list (alist)}
+\racket{an association list (alist) }%
 %
-\python{a Python \href{https://docs.python.org/3.10/library/stdtypes.html\#mapping-types-dict}{dictionary}}
+\python{a Python \href{https://docs.python.org/3.10/library/stdtypes.html\#mapping-types-dict}{dictionary} }%
 %
 to represent the environment.
 %
@@ -2165,7 +2165,9 @@ variable, it looks up the corresponding value in the dictionary.
                [else (error 'interp_exp "expected an integer" r)])]
         [(Prim '- (list e)) (fx- 0 ((interp_exp env) e))]
         [(Prim '+ (list e1 e2))
-         (fx+ ((interp_exp env) e1) ((interp_exp env) e2))]))
+         (fx+ ((interp_exp env) e1) ((interp_exp env) e2))]
+        [(Prim '- (list e1 e2))
+         (fx- ((interp_exp env) e1) ((interp_exp env) e2))]))
 
     (define/public (interp_program p)
       (match p
@@ -2180,6 +2182,8 @@ class InterpLint:
     match e:
       case BinOp(left, Add(), right):
         return self.interp_exp(left, env) + self.interp_exp(right, env)
+      case BinOp(left, Sub(), right):
+        return self.interp_exp(left, env) - self.interp_exp(right, env)
       case UnaryOp(USub(), v):
         return - self.interp_exp(v, env)
       case Constant(value):
@@ -2276,8 +2280,8 @@ criteria in the following diagram.
  \path[->] (p2) edge [right] node {\footnotesize\code{interp\_x86int}} (o);
 \end{tikzpicture}
 \]
-In the next section we introduce the \LangXInt{} subset of x86 that
-suffices for compiling \LangVar{}.
+Next we introduce the \LangXInt{} subset of x86 that suffices for
+compiling \LangVar{}.
 
 \section{The \LangXInt{} Assembly Language}
 \label{sec:x86}
@@ -2398,7 +2402,7 @@ puts $10$ into register \key{rax} and then \lstinline{addq $32, %rax}
 adds $32$ to the $10$ in \key{rax} and
 puts the result, $42$, back into \key{rax}.
 %
-The last instruction, \key{retq}, finishes the \key{main} function by
+The last instruction \key{retq} finishes the \key{main} function by
 returning the integer in \key{rax} to the operating system. The
 operating system interprets this integer as the program's exit
 code. By convention, an exit code of 0 indicates that a program
@@ -2436,13 +2440,13 @@ term \emph{pointer}\index{subject}{pointer} for something that
 contains an address. The stack grows downward in memory, so we
 increase the size of the stack by subtracting from the stack pointer.
 In the context of a procedure call, the \emph{return
-address}\index{subject}{return address} is the instruction after the
+  address}\index{subject}{return address} is the instruction after the
 call instruction on the caller side. The function call instruction,
 \code{callq}, pushes the return address onto the stack prior to
 jumping to the procedure.  The register \key{rbp} is the \emph{base
-pointer}\index{subject}{base pointer} and is used to access variables
-that are stored in the frame of the current procedure call.  The base
-pointer of the caller is store after the return address. In
+  pointer}\index{subject}{base pointer} and is used to access
+variables that are stored in the frame of the current procedure call.
+The base pointer of the caller is stored after the return address. In
 Figure~\ref{fig:frame} we number the variables from $1$ to
 $n$. Variable $1$ is stored at address $-8\key{(\%rbp)}$, variable $2$
 at $-16\key{(\%rbp)}$, etc.
@@ -2515,19 +2519,20 @@ which pushes its return address on the stack and then jumps to
 by 16 bytes prior to the execution of any \code{callq} instruction, so
 when control arrives at \code{main}, the \code{rsp} is 8 bytes out of
 alignment (because the \code{callq} pushed the return address).  The
-first three instructions are the typical \emph{prelude}\index{subject}{prelude}
-for a procedure.  The instruction \code{pushq \%rbp} first subtracts $8$ from the stack
-pointer and then saves the base pointer of the caller at address
-\code{rsp} on the stack. The next instruction \code{movq \%rsp, \%rbp} sets the
-base pointer to the current stack pointer, which is pointing at the location
-of the old base pointer. The instruction \code{subq \$16, \%rsp} moves the stack
-pointer down to make enough room for storing variables.  This program
-needs one variable ($8$ bytes) but we round up to 16 bytes so that
-\code{rsp} is 16-byte aligned and we're ready to make calls to other
-functions.
-\racket{The last instruction of the prelude is \code{jmp start},
-which transfers control to the instructions that were generated from
-the expression \racket{\code{(+ 52 (- 10))}}\python{52 + -10}.}
+first three instructions are the typical
+\emph{prelude}\index{subject}{prelude} for a procedure.  The
+instruction \code{pushq \%rbp} first subtracts $8$ from the stack
+pointer \code{rsp} and then saves the base pointer of the caller at
+address \code{rsp} on the stack. The next instruction \code{movq
+  \%rsp, \%rbp} sets the base pointer to the current stack pointer,
+which is pointing at the location of the old base pointer. The
+instruction \code{subq \$16, \%rsp} moves the stack pointer down to
+make enough room for storing variables.  This program needs one
+variable ($8$ bytes) but we round up to 16 bytes so that \code{rsp} is
+16-byte aligned and we're ready to make calls to other functions.
+\racket{The last instruction of the prelude is \code{jmp start}, which
+  transfers control to the instructions that were generated from the
+  expression \racket{\code{(+ 52 (- 10))}}\python{52 + -10}.}
 
 \racket{The first instruction under the \code{start} label is}
 %
@@ -2535,7 +2540,8 @@ the expression \racket{\code{(+ 52 (- 10))}}\python{52 + -10}.}
 %
 \code{movq \$10, -8(\%rbp)}, which stores $10$ in variable $1$.
 %
-The instruction \code{negq -8(\%rbp)} changes variable $1$ to $-10$.
+The instruction \code{negq -8(\%rbp)} changes the contents of variable
+$1$ to $-10$.
 %
 The next instruction moves the $-10$ from variable $1$ into the
 \code{rax} register.  Finally, \code{addq \$52, \%rax} adds $52$ to
@@ -2550,7 +2556,7 @@ the value in \code{rax}, updating its contents to $42$.
 The first two restore the \code{rsp} and \code{rbp} registers to the
 state they were in at the beginning of the procedure. In particular,
 \key{addq \$16, \%rsp} moves the stack pointer back to point at the
-old base pointer. Then \key{popq \%rbp} returns the old base pointer
+old base pointer. Then \key{popq \%rbp} restores the old base pointer
 to \key{rbp} and adds $8$ to the stack pointer.  The last instruction,
 \key{retq}, jumps back to the procedure that called this one and adds
 $8$ to the stack pointer.
@@ -2574,7 +2580,7 @@ label associated with every block, which is why the \key{X86Program}
 struct includes an alist mapping labels to blocks. The reason for this
 organization becomes apparent in Chapter~\ref{ch:Lif} when we
 introduce conditional branching. The \code{Block} structure includes
-an $\itm{info}$ field that is not needed for this chapter, but becomes
+an $\itm{info}$ field that is not needed for this chapter but becomes
 useful in Chapter~\ref{ch:register-allocation-Lvar}.  For now, the
 $\itm{info}$ field should contain an empty list.
 \fi}
@@ -2676,8 +2682,8 @@ down the problem into several steps, dealing with the above
 differences one at a time. Each of these steps is called a \emph{pass}
 of the compiler.\index{subject}{pass}\index{subject}{compiler pass}
 %
-This terminology comes from the way each step passes over, that is,
-traverses the AST of the program.
+This terminology comes from the way each step passes over, or
+traverses, the AST of the program.
 %
 Furthermore, we follow the nanopass approach, which means we strive
 for each pass to accomplish one clear objective (not two or three at
@@ -2712,10 +2718,10 @@ Our compiler for \LangVar{} consists of the following passes.
   
 {\if\edition\racketEd
 \item[\key{explicate\_control}] makes the execution order of the
-  program explicit. It converts the abstract syntax tree representation
-  into a control-flow graph in which each node contains a sequence of
-  statements and the edges between nodes say which nodes contain jumps
-  to other nodes.
+  program explicit. It converts the abstract syntax tree
+  representation into a graph in which each node contains a sequence
+  of statements and the edges between nodes say which nodes contain
+  jumps to other nodes.
 \fi}
 
 \item[\key{select\_instructions}] handles the difference between
@@ -2742,8 +2748,8 @@ The next question is: in what order should we apply these passes? This
 question can be challenging because it is difficult to know ahead of
 time which orderings will be better (easier to implement, produce more
 efficient code, etc.) so oftentimes trial-and-error is
-involved. Nevertheless, we can try to plan ahead and make educated
-choices regarding the ordering.
+involved. Nevertheless, we can plan ahead and make educated choices
+regarding the ordering.
 
 \racket{What should be the ordering of \key{explicate\_control} with respect to
 \key{uniquify}? The \key{uniquify} pass should come first because
@@ -2751,12 +2757,12 @@ choices regarding the ordering.
 become local variables whose scope is the entire program, which would
 confuse variables with the same name.}
 %
-\racket{We place \key{remove\_complex\_opera*} before \key{explicate\_control}
+\racket{We place \key{remove\_complex\_operands} before \key{explicate\_control}
 because the later removes the \key{let} form, but it is convenient to
-use \key{let} in the output of \key{remove\_complex\_opera*}.}
+use \key{let} in the output of \key{remove\_complex\_operands}.}
 %
 \racket{The ordering of \key{uniquify} with respect to
-\key{remove\_complex\_opera*} does not matter so we arbitrarily choose
+\key{remove\_complex\_operands} does not matter so we arbitrarily choose
 \key{uniquify} to come first.}
 
 The \key{select\_instructions} and \key{assign\_homes} passes are
@@ -2836,13 +2842,13 @@ The last pass, \key{prelude\_and\_conclusion}, places the program
 instructions inside a \code{main} function with instructions for the
 prelude and conclusion.
 %
-\racket{In the following section we discuss the \LangCVar{}
-  intermediate language.}
+\racket{In the next section we discuss the \LangCVar{} intermediate
+  language that serves as the output of \code{explicate\_control}.}
 %
 The remainder of this chapter provides guidance on the implementation
 of each of the compiler passes in Figure~\ref{fig:Lvar-passes}.
 
-%% The output of \key{uniquify} and \key{remove-complex-opera*}
+%% The output of \key{uniquify} and \key{remove-complex-operands}
 %% are programs that are still in the \LangVar{} language, though the
 %% output of the later is a subset of \LangVar{} named \LangVarANF{}
 %% (Section~\ref{sec:remove-complex-opera-Lvar}).
@@ -2882,8 +2888,8 @@ language~\citep{Kernighan:1988nx} in that it has separate syntactic
 categories for expressions and statements, so we name it \LangCVar{}.
 This style of intermediate language is also known as
 \emph{three-address code}, to emphasize that the typical form of a
-statement is \CASSIGN{\key{x}}{\CADD{\key{y}}{\key{z}}} involves three
-addresses~\citep{Aho:2006wb}.
+statement such as \CASSIGN{\key{x}}{\CADD{\key{y}}{\key{z}}} involves three
+addresses: \code{x}, \code{y}, and \code{z}~\citep{Aho:2006wb}.
 
 The concrete syntax for \LangCVar{} is defined in
 Figure~\ref{fig:c0-concrete-syntax} and the abstract syntax for
@@ -2897,7 +2903,8 @@ assignment statements which can be executed in sequence using the
 \key{Return}, a guarantee that is baked into the grammar rules for
 \itm{tail}. The naming of this non-terminal comes from the term
 \emph{tail position}\index{subject}{tail position}, which refers to an
-expression that is the last one to execute within a function.
+expression that is the last one to execute within a function or
+program.
 
 A \LangCVar{} program consists of an alist mapping labels to
 tails. This is more general than necessary for the present chapter, as
@@ -2990,40 +2997,42 @@ with a \key{let} nested inside the initializing expression of another
 \end{transformation}
 
 We recommend implementing \code{uniquify} by creating a structurally
-recursive function named \code{uniquify-exp} that mostly just copies
+recursive function named \code{uniquify\_exp} that mostly just copies
 an expression. However, when encountering a \key{let}, it should
 generate a unique name for the variable and associate the old name
 with the new name in an alist.\footnote{The Racket function
   \code{gensym} is handy for generating unique variable names.} The
-\code{uniquify-exp} function needs to access this alist when it gets
-to a variable reference, so we add a parameter to \code{uniquify-exp}
+\code{uniquify\_exp} function needs to access this alist when it gets
+to a variable reference, so we add a parameter to \code{uniquify\_exp}
 for the alist.
 
-The skeleton of the \code{uniquify-exp} function is shown in
-Figure~\ref{fig:uniquify-Lvar}.  The function is curried so that it is
-convenient to partially apply it to an alist and then apply it to
-different expressions, as in the last case for primitive operations in
-Figure~\ref{fig:uniquify-Lvar}.  The
+The skeleton of the \code{uniquify\_exp} function is shown in
+Figure~\ref{fig:uniquify-Lvar}.
+%% The function is curried so that it is
+%% convenient to partially apply it to an alist and then apply it to
+%% different expressions, as in the last case for primitive operations in
+%% Figure~\ref{fig:uniquify-Lvar}.
+The
 %
 \href{https://docs.racket-lang.org/reference/for.html#%28form._%28%28lib._racket%2Fprivate%2Fbase..rkt%29._for%2Flist%29%29}{\key{for/list}}
 %
-form of Racket is useful for transforming each element of a list to
+form of Racket is useful for transforming the element of a list to
 produce a new list.\index{subject}{for/list}
 
 \begin{figure}[tbp]
 \begin{lstlisting}
-(define (uniquify-exp env)
+(define (uniquify_exp env)
   (lambda (e)
     (match e
       [(Var x) ___]
       [(Int n) (Int n)]
       [(Let x e body) ___]
       [(Prim op es)
-       (Prim op (for/list ([e es]) ((uniquify-exp env) e)))])))
+       (Prim op (for/list ([e es]) ((uniquify_exp env) e)))])))
 
 (define (uniquify p)
   (match p
-    [(Program '() e) (Program '() ((uniquify-exp '()) e))]))
+    [(Program '() e) (Program '() ((uniquify_exp '()) e))]))
 \end{lstlisting}
 \caption{Skeleton for the \key{uniquify} pass.}
 \label{fig:uniquify-Lvar}
@@ -3328,7 +3337,7 @@ regarding file names described in Exercise~\ref{ex:Lvar}.
 In the \code{run-tests.rkt} script, add the following entry to the
 list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
-(list "remove-complex" remove-complex-opera* interp_Lvar type-check-Lvar)
+(list "remove-complex" remove-complex-operands interp_Lvar type-check-Lvar)
 \end{lstlisting}
 While debugging your compiler, it is often useful to see the
 intermediate programs that are output from each pass. To print the
@@ -6529,7 +6538,6 @@ respectively. The \LangIf{} language includes all of
 \FALSE{},\racket{ and} the \code{if} expression\python{, and the
   \code{if}  statement}. We expand the set of operators to include
 \begin{enumerate}
-\item subtraction on integers,
 \item the logical operators \key{and}, \key{or}, and \key{not},
 \item the \racket{\key{eq?} operation}\python{\key{==} and \key{!=} operations}
   for comparing integers or Booleans for equality, and
@@ -6550,7 +6558,7 @@ respectively. The \LangIf{} language includes all of
    \Type &::=& \key{Boolean} \\
     \itm{bool} &::=& \TRUE \MID \FALSE \\  
     \itm{cmp} &::= & \key{eq?} \MID \key{<} \MID \key{<=} \MID \key{>} \MID \key{>=} \\
-    \Exp &::=& \CSUB{\Exp}{\Exp} \MID \itm{bool}
+    \Exp &::=& \itm{bool}
         \MID (\key{and}\;\Exp\;\Exp) \MID (\key{or}\;\Exp\;\Exp)
         \MID (\key{not}\;\Exp) \\
         &\MID& (\itm{cmp}\;\Exp\;\Exp) \MID \CIF{\Exp}{\Exp}{\Exp} 
@@ -6736,8 +6744,6 @@ class InterpLif(InterpLvar):
           return self.interp_exp(body, env)
         else:
           return self.interp_exp(orelse, env)
-      case BinOp(left, Sub(), right):
-        return self.interp_exp(left, env) - self.interp_exp(right, env)
       case UnaryOp(Not(), v):
         return not self.interp_exp(v, env)
       case BoolOp(And(), values):
@@ -7623,7 +7629,7 @@ Run the script to test your compiler on all the test programs.
 \section{Uniquify Variables}
 \label{sec:uniquify-Lif}
 
-Add cases to \code{uniquify-exp} to handle Boolean constants and
+Add cases to \code{uniquify\_exp} to handle Boolean constants and
 \code{if} expressions.
 
 \begin{exercise}\normalfont
@@ -7728,7 +7734,7 @@ code in this pass.
 In the \code{run-tests.rkt} script, add the following entry to the
 list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
-(list "remove-complex" remove-complex-opera* interp-Lif type-check-Lif)
+(list "remove-complex" remove-complex-operands interp-Lif type-check-Lif)
 \end{lstlisting}
 \fi}
 \end{exercise}
