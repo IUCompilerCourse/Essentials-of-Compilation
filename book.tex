@@ -177,7 +177,7 @@ colleagues in the 1950s, computer scientists discovered techniques for
 constructing programs, called \emph{compilers}, that automatically
 translate high-level programs into machine code.
 
-We take you on a journey by constructing your own compiler for a small
+We take you on a journey of constructing your own compiler for a small
 but powerful language. Along the way we explain the essential
 concepts, algorithms, and data structures that underlie compilers. We
 develop your understanding of how programs are mapped onto computer
@@ -195,17 +195,18 @@ A compiler is typically organized as a sequence of stages that
 progressively translate a program to the code that runs on
 hardware. We take this approach to the extreme by partitioning our
 compiler into a large number of \emph{nanopasses}, each of which
-performs a single task. This allows us to test the output of each pass
-in isolation, and furthermore, allows us to focus our attention which
-makes the compiler far easier to understand.
+performs a single task. This enables the testing of each pass in
+isolation and focuses our attention, making the compiler far easier to
+understand.
 
-The most familiar approach to describing compilers is with one pass
-per chapter.  The problem with that approach is it obfuscates how
-language features motivate design choices in a compiler. We instead
-take an \emph{incremental} approach in which we build a complete
-compiler in each chapter, starting with a small input language that
-includes only arithmetic and variables and we add new language
-features in subsequent chapters.
+The most familiar approach to describing compilers is with each
+chapter dedicated to one pass.  The problem with that approach is it
+obfuscates how language features motivate design choices in a
+compiler. We instead take an \emph{incremental} approach in which we
+build a complete compiler in each chapter, starting with a small input
+language that includes only arithmetic and variables. We add new
+language features in subsequent chapters, extending the compiler as
+necessary.
 
 Our choice of language features is designed to elicit fundamental
 concepts and algorithms used in compilers.
@@ -216,23 +217,22 @@ concepts and algorithms used in compilers.
     syntax trees} and \emph{recursive functions}. 
 \item In Chapter~\ref{ch:register-allocation-Lvar} we apply
   \emph{graph coloring} to assign variables to machine registers.
-\item Chapter~\ref{ch:Lif} adds \code{if} expressions, which motivates
-  an elegant recursive algorithm for translating them into conditional
-  \code{goto}'s.
-\item Chapter~\ref{ch:Lwhile} fleshes out support for imperative
-  programming languages with the addition of loops\racket{ and mutable
+\item Chapter~\ref{ch:Lif} adds conditional expressions, which
+  motivates an elegant recursive algorithm for translating them into
+  conditional \code{goto}'s.
+\item Chapter~\ref{ch:Lwhile} adds loops\racket{ and mutable
   variables}. This elicits the need for \emph{dataflow
     analysis} in the register allocator.
 \item Chapter~\ref{ch:Lvec} adds heap-allocated tuples, motivating
   \emph{garbage collection}.
-\item Chapter~\ref{ch:Lfun} adds functions that are first-class values
-  but lack lexical scoping, similar to the C programming
-  language~\citep{Kernighan:1988nx} except that we generate efficient
-  tail calls. The reader learns about the procedure call stack,
-  \emph{calling conventions}, and their interaction with register
-  allocation and garbage collection.
+\item Chapter~\ref{ch:Lfun} adds functions as first-class values but
+  without lexical scoping, similar to functions in the C programming
+  language~\citep{Kernighan:1988nx}. The reader learns about the
+  procedure call stack and \emph{calling conventions} and how they interact
+  with register allocation and garbage collection. The chapter also
+  describes how to generate efficient tail calls.
 \item Chapter~\ref{ch:Llambda} adds anonymous functions with lexical
-  scoping, i.e., \emph{lambda abstraction}. The reader learns about
+  scoping, i.e., \emph{lambda} expressions. The reader learns about
   \emph{closure conversion}, in which lambdas are translated into a
   combination of functions and tuples.
 % Chapter about classes and objects?  
@@ -276,8 +276,8 @@ that we assign to the graduate students. The last two weeks of the
 course involve a final project in which students design and implement
 a compiler extension of their choosing.  The later chapters can be
 used in support of these projects.  For compiler courses at
-universities on the quarter system that are about 10 weeks in length,
-we recommend completing up through Chapter~\ref{ch:Lvec} or
+universities on the quarter system (about 10 weeks in length), we
+recommend completing up through Chapter~\ref{ch:Lvec} or
 Chapter~\ref{ch:Lfun} and providing some scafolding code to the
 students for each compiler pass.
 %
@@ -291,7 +291,7 @@ dynamically typed languages by including Chapter~\ref{ch:Ldyn}.
 %
 Figure~\ref{fig:chapter-dependences} depicts the dependencies between
 chapters. Chapter~\ref{ch:Lfun} (functions) depends on
-Chapter~\ref{ch:Lvec} (tuples) in the implementation of efficient
+Chapter~\ref{ch:Lvec} (tuples) only in the implementation of efficient
 tail calls.
 
 This book has been used in compiler courses at California Polytechnic
@@ -391,8 +391,8 @@ the following location:
 
 The compiler targets x86 assembly language~\citep{Intel:2015aa}, so it
 is helpful but not necessary for the reader to have taken a computer
-systems course~\citep{Bryant:2010aa}. This book introduces the parts
-of x86-64 assembly language that are needed.
+systems course~\citep{Bryant:2010aa}. We introduce the parts of x86-64
+assembly language that are needed in the compiler.
 %
 We follow the System V calling
 conventions~\citep{Bryant:2005aa,Matz:2013aa}, so the assembly code
@@ -434,12 +434,11 @@ incremental approach~\citep{Ghuloum:2006bh} that this book is based
 on.
 
 We thank the many students who served as teaching assistants for the
-compiler course at IU and made suggestions for improving the book
-including Carl Factora, Ryan Scott, Cameron Swords, and Chris
-Wailes. We thank Andre Kuhlenschmidt for work on the garbage collector
-and x86 interpreter, Michael Vollmer for work on efficient tail calls,
-and Michael Vitousek for help running the first offering of the
-incremental compiler course at IU.
+compiler course at IU including Carl Factora, Ryan Scott, Cameron
+Swords, and Chris Wailes. We thank Andre Kuhlenschmidt for work on the
+garbage collector and x86 interpreter, Michael Vollmer for work on
+efficient tail calls, and Michael Vitousek for help with the first
+offering of the incremental compiler course at IU.
 
 We thank professors Bor-Yuh Chang, John Clements, Jay McCarthy, Joseph
 Near, Ryan Newton, Nate Nystrom, Peter Thiemann, Andrew Tolmach, and
@@ -606,7 +605,8 @@ node it is the child of). If a node has no children, it is a
 We define a Racket \code{struct} for each kind of node.  For this
 chapter we require just two kinds of nodes: one for integer constants
 and one for primitive operations.  The following is the \code{struct}
-definition for integer constants.
+definition for integer constants.\footnote{All of the AST structures are
+defined in the file \code{utilities.rkt} in the support code.}
 \begin{lstlisting}
 (struct Int (value))
 \end{lstlisting}
@@ -625,16 +625,16 @@ The following is the \code{struct} definition for primitive operations.
 \end{lstlisting}
 A primitive operation node includes an operator symbol \code{op} and a
 list of child \code{args}. For example, to create an AST that negates
-the number $8$, we write \code{(Prim '- (list eight))}.
+the number $8$, we write the following.
 \begin{lstlisting}
 (define neg-eight (Prim '- (list eight)))
 \end{lstlisting}
 Primitive operations may have zero or more children. The \code{read}
-operator has zero children:
+operator has zero:
 \begin{lstlisting}
 (define rd (Prim 'read '()))
 \end{lstlisting}
-whereas the addition operator has two children:
+The addition operator has two children:
 \begin{lstlisting}
 (define ast1_1 (Prim '+ (list rd neg-eight)))
 \end{lstlisting}
@@ -726,9 +726,9 @@ we need to be able to access its two children. \racket{Racket}\python{Python}
 provides pattern matching to support these kinds of queries, as we see in
 Section~\ref{sec:pattern-matching}.
 
-In this book, we often write down the concrete syntax of a program
-even when we really have in mind the AST because the concrete syntax
-is more concise.  We recommend that, in your mind, you always think of
+We often write down the concrete syntax of a program even when we
+really have in mind the AST because the concrete syntax is more
+concise.  We recommend that, in your mind, you always think of
 programs as abstract syntax trees.
 
 \section{Grammars}
@@ -739,10 +739,10 @@ programs as abstract syntax trees.
 
 A programming language can be thought of as a \emph{set} of programs.
 The set is typically infinite (one can always create larger and larger
-programs), so one cannot simply describe a language by listing all of
+programs) so one cannot simply describe a language by listing all of
 the programs in the language. Instead we write down a set of rules, a
 \emph{grammar}, for building programs. Grammars are often used to
-define the concrete syntax of a language, but they can also be used to
+define the concrete syntax of a language but they can also be used to
 describe the abstract syntax. We write our rules in a variant of
 Backus-Naur Form (BNF)~\citep{Backus:1960aa,Knuth:1964aa}.
 \index{subject}{Backus-Naur Form}\index{subject}{BNF}
@@ -779,7 +779,7 @@ $\Int$ is a sequence of decimals ($0$ to $9$), possibly starting with
 $-$ (for negative integers), such that the sequence of decimals
 represent an integer in range $-2^{62}$ to $2^{62}-1$.  This enables
 the representation of integers using 63 bits, which simplifies several
-aspects of compilation. \racket{Thus, these integers corresponds to
+aspects of compilation. \racket{Thus, these integers correspond to
   the Racket \texttt{fixnum} datatype on a 64-bit machine.}
 \python{In contrast, integers in Python have unlimited precision, but
   the techniques needed to handle unlimited precision fall outside the
@@ -791,8 +791,8 @@ input integer from the user of the program.
   \Exp ::= \READ{} \label{eq:arith-read}
 \end{equation}
 
-The third rule says that, given an $\Exp$ node, the negation of that
-node is also an $\Exp$.
+The third rule categorizes the negation of an $\Exp$ node as an
+$\Exp$.
 \begin{equation}
   \Exp ::= \NEG{\Exp}  \label{eq:arith-neg}
 \end{equation}
@@ -836,7 +836,7 @@ is an $\Exp$ in the \LangInt{} language.
 If you have an AST for which the above rules do not apply, then the
 AST is not in \LangInt{}. For example, the program \racket{\code{(*
     (read) 8)}} \python{\code{input\_int() * 8}} is not in \LangInt{}
-because there are no rules for the \key{*} operator.  Whenever we
+because there is no rule for the \key{*} operator.  Whenever we
 define a language with a grammar, the language only includes those
 programs that are justified by the grammar rules.
 
@@ -1026,18 +1026,17 @@ match ast1_1:
 {\if\edition\racketEd
 %
 In the above example, the \texttt{match} form checks whether the AST
-\eqref{eq:arith-prog} is a binary operator, binds its parts to the
+\eqref{eq:arith-prog} is a binary operator and binds its parts to the
 three pattern variables \texttt{op}, \texttt{child1}, and
-\texttt{child2}, and then prints out the operator. In general, a match
-clause consists of a \emph{pattern} and a
-\emph{body}.\index{subject}{pattern} Patterns are recursively defined
-to be either a pattern variable, a structure name followed by a
-pattern for each of the structure's arguments, or an S-expression
-(symbols, lists, etc.).  (See Chapter 12 of The Racket
+\texttt{child2}. In general, a match clause consists of a
+\emph{pattern} and a \emph{body}.\index{subject}{pattern} Patterns are
+recursively defined to be either a pattern variable, a structure name
+followed by a pattern for each of the structure's arguments, or an
+S-expression (symbols, lists, etc.).  (See Chapter 12 of The Racket
 Guide\footnote{\url{https://docs.racket-lang.org/guide/match.html}}
 and Chapter 9 of The Racket
 Reference\footnote{\url{https://docs.racket-lang.org/reference/match.html}}
-for a complete description of \code{match}.)
+for complete descriptions of \code{match}.)
 %
 The body of a match clause may contain arbitrary Racket code.  The
 pattern variables can be used in the scope of the body, such as
@@ -1143,19 +1142,22 @@ print(leaf(Constant(8)))
 \end{minipage}
 \end{center}
 
-When writing a \code{match}, we refer to the grammar definition to
-identify which non-terminal we are expecting to match against, then we
-make sure that 1) we have one \racket{clause}\python{case} for each alternative of that
-non-terminal and 2) that the pattern in each \racket{clause}\python{case} corresponds to the
-corresponding right-hand side of a grammar rule. For the \code{match}
-in the \code{leaf} function, we refer to the grammar for \LangInt{} in
-Figure~\ref{fig:r0-syntax}. The $\Exp$ non-terminal has 4
-alternatives, so the \code{match} has 4 \racket{clauses}\python{cases}.
-The pattern in each \racket{clause}\python{case} corresponds to the right-hand side
-of a grammar rule. For example, the pattern \ADD{\code{e1}}{\code{e2}} corresponds to the
-right-hand side $\ADD{\Exp}{\Exp}$. When translating from grammars to
-patterns, replace non-terminals such as $\Exp$ with pattern variables
-of your choice (e.g. \code{e1} and \code{e2}).
+When constructing a \code{match} expression, we refer to the grammar
+definition to identify which non-terminal we are expecting to match
+against, then we make sure that 1) we have one
+\racket{clause}\python{case} for each alternative of that non-terminal
+and 2) that the pattern in each \racket{clause}\python{case}
+corresponds to the corresponding right-hand side of a grammar
+rule. For the \code{match} in the \code{leaf} function, we refer to
+the grammar for \LangInt{} in Figure~\ref{fig:r0-syntax}. The $\Exp$
+non-terminal has 4 alternatives, so the \code{match} has 4
+\racket{clauses}\python{cases}.  The pattern in each
+\racket{clause}\python{case} corresponds to the right-hand side of a
+grammar rule. For example, the pattern \ADDP{\code{e1}}{\code{e2}}
+corresponds to the right-hand side $\ADD{\Exp}{\Exp}$. When
+translating from grammars to patterns, replace non-terminals such as
+$\Exp$ with pattern variables of your choice (e.g. \code{e1} and
+\code{e2}).
 
 
 \section{Recursive Functions}
@@ -1165,7 +1167,7 @@ of your choice (e.g. \code{e1} and \code{e2}).
 Programs are inherently recursive. For example, an expression is often
 made of smaller expressions. Thus, the natural way to process an
 entire program is with a recursive function.  As a first example of
-such a recursive function, we define the function \code{exp} in
+such a recursive function, we define the function \code{is\_exp} in
 Figure~\ref{fig:exp-predicate}, which takes an arbitrary value and
 determines whether or not it is an expression in \LangInt{}.
 %
@@ -1175,74 +1177,74 @@ that correspond to a grammar, and the body of each
 \racket{clause}\python{case} makes a recursive call on each child
 node.\footnote{This principle of structuring code according to the
   data definition is advocated in the book \emph{How to Design
-    Programs} \url{https://htdp.org/2020-8-1/Book/index.html}.}
-\python{We define a second function, named \code{stmt}, that
-  recognizes whether a value is a \LangInt{} statement.}
-\python{Finally, } Figure~\ref{fig:exp-predicate} \racket{also}
-defines \code{Lint}, which determines whether an AST is a program in
-\LangInt{}.  In general we can expect to write one recursive function
-to handle each non-terminal in a grammar.\index{subject}{structural
-  recursion} Of the two examples at the bottom of the figure, the
-first is in \code{Lint} and the second is not.
+    Programs} by \citet{Felleisen:2001aa}.}  \python{We define a
+  second function, named \code{stmt}, that recognizes whether a value
+  is a \LangInt{} statement.}  \python{Finally, }
+Figure~\ref{fig:exp-predicate} \racket{also} defines \code{is\_Lint},
+which determines whether an AST is a program in \LangInt{}.  In
+general we can write one recursive function to handle each
+non-terminal in a grammar.\index{subject}{structural recursion} Of the
+two examples at the bottom of the figure, the first is in
+\LangInt{} and the second is not.
 
 \begin{figure}[tp]
 {\if\edition\racketEd
 \begin{lstlisting}
-(define (exp ast)
+(define (is_exp ast)
   (match ast
     [(Int n) #t]
     [(Prim 'read '()) #t]
-    [(Prim '- (list e)) (exp e)]
+    [(Prim '- (list e)) (is_exp e)]
     [(Prim '+ (list e1 e2))
-      (and (exp e1) (exp e2))]
+      (and (is_exp e1) (is_exp e2))]
     [else #f]))
 
-(define (Lint ast)
+(define (is_Lint ast)
   (match ast
-    [(Program '() e) (exp e)]
+    [(Program '() e) (is_exp e)]
     [else #f]))
 
-(Lint (Program '() ast1_1)
-(Lint (Program '()
+(is_Lint (Program '() ast1_1)
+(is_Lint (Program '()
        (Prim '- (list (Prim 'read '())
                       (Prim '+ (list (Int 8)))))))
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
-def exp(e):
+def is_exp(e):
   match e:
     case Constant(n):
       return True
     case Call(Name('input_int'), []):
       return True
     case UnaryOp(USub(), e1):
-      return exp(e1)
+      return is_exp(e1)
     case BinOp(e1, Add(), e2):
-      return exp(e1) and exp(e2)
+      return is_exp(e1) and is_exp(e2)
     case BinOp(e1, Sub(), e2):
-      return exp(e1) and exp(e2)
+      return is_exp(e1) and is_exp(e2)
     case _:
       return False
 
 def stmt(s):
   match s:
     case Expr(Call(Name('print'), [e])):
-      return exp(e)
+      return is_exp(e)
     case Expr(e):
-      return exp(e)
+      return is_exp(e)
     case _:
       return False
   
-def Lint(p):
+def is_Lint(p):
   match p:
     case Module(body):
       return all([stmt(s) for s in body])
     case _:
       return False
 
-print(Lint(Module([Expr(ast1_1)])))
-print(Lint(Module([Expr(BinOp(read, Sub(),
+print(is_Lint(Module([Expr(ast1_1)])))
+print(is_Lint(Module([Expr(BinOp(read, Sub(),
                   UnaryOp(Add(), Constant(8))))])))
 \end{lstlisting}
 \fi}
@@ -1292,14 +1294,15 @@ programming language.
 \python{For example, the Python language is defined in the Python
   Language Reference~\citep{PSF21:python_ref} and the CPython interpreter~\citep{PSF21:cpython}.}
 %
-In this book we use interpreters
-to specify each language that we consider. An interpreter that is
-designated as the definition of a language is called a
-\emph{definitional interpreter}~\citep{reynolds72:_def_interp}.
+In this book we use interpreters to specify each language that we
+consider. An interpreter that is designated as the definition of a
+language is called a \emph{definitional
+  interpreter}~\citep{reynolds72:_def_interp}.
 \index{subject}{definitional interpreter} We warm up by creating a
-definitional interpreter for the \LangInt{} language, which serves as
-a second example of structural recursion. The \code{interp\_Lint}
-function is defined in Figure~\ref{fig:interp_Lint}.
+definitional interpreter for the \LangInt{} language. This interpreter
+serves as a second example of structural recursion. The
+\code{interp\_Lint} function is defined in
+Figure~\ref{fig:interp_Lint}.
 %
 \racket{The body of the function is a match on the input program
   followed by a call to the \lstinline{interp_exp} helper function,
@@ -1384,9 +1387,10 @@ following program adds two integers.
 print(10 + 32)
 \end{lstlisting}
 \fi}
-The result is \key{42}, the answer to life, the universe, and
-everything: \code{42}!\footnote{\emph{The Hitchhiker's Guide to the
-    Galaxy} by Douglas Adams.}
+%
+\noindent The result is \key{42}, the answer to life, the universe,
+and everything: \code{42}!\footnote{\emph{The Hitchhiker's Guide to
+    the Galaxy} by Douglas Adams.}
 %
 We wrote the above program in concrete syntax whereas the parsed
 abstract syntax is:
@@ -1625,7 +1629,7 @@ def pe_P_int(p):
 
 
 To gain some confidence that the partial evaluator is correct, we can
-test whether it produces programs that get the same result as the
+test whether it produces programs that produce the same result as the
 input programs. That is, we can test whether it satisfies Diagram
 \ref{eq:compile-correct}.
 %
