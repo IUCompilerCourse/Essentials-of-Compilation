@@ -7300,7 +7300,7 @@ an assignment statement followed by a $\Tail$ expression, a
      \MID \CBINOP{\itm{binaryop}}{\Atm}{\Atm}
      \MID \CUNIOP{\itm{unaryop}}{\Atm} \\
      &\MID& \CCMP{\itm{cmp}}{\Atm}{\Atm} \\
-\Stmt &::=& \CPRINT{\Exp} \MID \Exp \\
+\Stmt &::=& \CPRINT{\Atm} \MID \Exp \\
      &\MID& \CASSIGN{\Var}{\Exp}  
      \MID \CRETURN{\Exp} \MID \CGOTO{\itm{label}} \\
     &\MID& \CIFSTMT{\CCMP{\itm{cmp}}{\Atm}{\Atm}}{\CGOTO{\itm{label}}}{\CGOTO{\itm{label}}} 
@@ -7313,7 +7313,7 @@ an assignment statement followed by a $\Tail$ expression, a
      &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm}
      \MID \UNIOP{\itm{unaryop}}{\Atm} \\
      &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \\
-\Stmt &::=& \PRINT{\Exp} \MID \EXPR{\Exp} \\
+\Stmt &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
      &\MID& \ASSIGN{\VAR{\Var}}{\Exp}  
      \MID \RETURN{\Exp} \MID \GOTO{\itm{label}} \\
     &\MID& \IFSTMT{\CMP{\Atm}{\itm{cmp}}{\Atm}}{\LS\GOTO{\itm{label}}\RS}{\LS\GOTO{\itm{label}}\RS} 
@@ -15163,13 +15163,14 @@ class TypeCheckLlambda(TypeCheckLfun):
           case _:
             raise Exception('expected a tuple, not '  + repr(tup_t))
         self.check_stmts(ss[1:], return_ty, env)
-      case AnnAssign(Name(id), ty, value, simple):
+      case AnnAssign(Name(id), ty_annot, value, simple):
         ss[0].annotation = ty_annot
         if id in env:
-            self.check_type_equal(env[id], ty)
+            self.check_type_equal(env[id], ty_annot)
         else:
             env[id] = ty_annot
         self.check_exp(value, ty_annot, env)
+        self.check_stmts(ss[1:], return_ty, env)
       case _:
         self.type_check_stmts(ss, env)
 
@@ -16320,7 +16321,7 @@ not (False if input_int() == 1 else 0)
 
 Languages that allow expressions to produce different kinds of values
 are called \emph{polymorphic}, a word composed of the Greek roots
-``poly'', meaning ``many'', and ``morph'', meaning ``shape''.  There
+``poly'', meaning ``many'', and ``morphos'', meaning ``form''.  There
 are several kinds of polymorphism in programming languages, such as
 subtype polymorphism and parametric
 polymorphism~\citep{Cardelli:1985kx}. The kind of polymorphism we
@@ -16432,7 +16433,7 @@ be a tuple, not a Boolean.
 \itm{bool} &::=& \code{True} \MID \code{False} \\
 \Exp{} &::=& \INT{\Int} \MID \READ{} \\
   &\MID& \UNIOP{\itm{unaryop}}{\Exp}
-    \MID  \BINOP{\itm{binaryop}}{\Exp}{\Exp}  
+    \MID  \BINOP{\Exp}{\itm{binaryop}}{\Exp}  
     \MID \VAR{\Var{}} \\
   &\MID& \BOOL{\itm{bool}} 
      \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp}\\
@@ -16446,7 +16447,7 @@ be a tuple, not a Boolean.
   \MID \WHILESTMT{\Exp}{\Stmt^{+}}\\
   &\MID& \RETURN{\Exp} \\
 \Params &::=& \LP\Var\key{,}\code{AnyType()}\RP^*   \\
-\Def &::=& \FUNDEF{\Var}{\Params}{\_}{}{\Stmt^{+}}  \\
+\Def &::=& \FUNDEF{\Var}{\Params}{\code{AnyType()}}{}{\Stmt^{+}}  \\
 \LangDynM{} &::=& \PROGRAM{}{\LS \Def \ldots \Stmt \ldots \RS}
 \end{array}
 \]
@@ -16461,8 +16462,8 @@ be a tuple, not a Boolean.
 The concrete and abstract syntax of \LangDyn{} is defined in
 Figures~\ref{fig:r7-concrete-syntax} and \ref{fig:r7-syntax}.
 %
-There is no type checker for \LangDyn{} because it is not a statically
-typed language.
+There is no type checker for \LangDyn{} because dynamically typed
+languages check types at runtime.
 
 The definitional interpreter for \LangDyn{} is presented in
 \racket{Figure~\ref{fig:interp-Ldyn}}
@@ -16488,7 +16489,6 @@ to represented tagged values.
 class Tagged(Value):
   value : Value
   tag : str
-  __match_args__ = ("value", "tag")
   def __str__(self):
     return str(self.value)
 \end{lstlisting}
@@ -16522,14 +16522,14 @@ If they are not, a \code{trapped-error} is raised.  Recall from
 Section~\ref{sec:interp_Lint} that when a definition interpreter
 raises a \code{trapped-error} error, the compiled code must also
 signal an error by exiting with return code \code{255}.  A
-\code{trapped-error} is also raised if the index is not less than
+\code{trapped-error} is also raised if the index is not less than the
 length of the vector.
 }
 %
 \python{If they are not, an exception is raised.  The compiled code
   must also signal an error by exiting with return code \code{255}.  A
-  exception is also raised if the index is not less than length of the
-  tuple.}
+  exception is also raised if the index is not less than the length of the
+  tuple or if it is negative.}
 
 \begin{figure}[tbp]
 {\if\edition\racketEd
@@ -16613,10 +16613,9 @@ class InterpLdyn(InterpLlambda):
           return self.tag(- self.untag(v, 'int', e))
       case IfExp(test, body, orelse):
         v = self.interp_exp(test, env)
-        match self.untag(v, 'bool', e):
-          case True:
+        if self.untag(v, 'bool', e):
             return self.interp_exp(body, env)
-          case False:
+        else:
             return self.interp_exp(orelse, env)
       case UnaryOp(Not(), e1):
         v = self.interp_exp(e1, env)
@@ -16624,18 +16623,16 @@ class InterpLdyn(InterpLlambda):
       case BoolOp(And(), values):
         left = values[0]; right = values[1]
         l = self.interp_exp(left, env)
-        match self.untag(l, 'bool', e):
-          case True:
+        if self.untag(l, 'bool', e):
             return self.interp_exp(right, env)
-          case False:
+        else:
             return self.tag(False)
       case BoolOp(Or(), values):
         left = values[0]; right = values[1]
         l = self.interp_exp(left, env)
-        match self.untag(l, 'bool', e):
-          case True:
-            return True
-          case False:
+        if self.untag(l, 'bool', e):
+            return self.tag(True)
+        else:
             return self.interp_exp(right, env)
       case Compare(left, [cmp], [right]):
         l = self.interp_exp(left, env)
@@ -16653,11 +16650,10 @@ class InterpLdyn(InterpLlambda):
         t = self.interp_exp(tup, env)
         return self.tag(len(self.untag(t, 'tuple', e)))
       case _:
-        return super().interp_exp(e, env)
-
+        return self.tag(super().interp_exp(e, env))
 \end{lstlisting}
 \fi}
-\caption{Interpreter for the \LangDyn{} language \python{, part 1}.}
+\caption{Interpreter for the \LangDyn{} language\python{, part 1}.}
 \label{fig:interp-Ldyn}
 \end{figure}
 
@@ -16671,10 +16667,9 @@ class InterpLdyn(InterpLlambda):
     match ss[0]:
       case If(test, body, orelse):
         v = self.interp_exp(test, env)
-        match self.untag(v, 'bool', ss[0]):
-          case True:
+        if self.untag(v, 'bool', ss[0]):
             return self.interp_stmts(body + ss[1:], env)
-          case False:
+        else:
             return self.interp_stmts(orelse + ss[1:], env)
       case While(test, body, []):
         while self.untag(self.interp_exp(test, env), 'bool', ss[0]):
@@ -16694,7 +16689,7 @@ class InterpLdyn(InterpLlambda):
       case _:
         return super().interp_stmts(ss, env)
 \end{lstlisting}
-\caption{Interpreter for the \LangDyn{} language \python{, part 2}.}
+\caption{Interpreter for the \LangDyn{} language\python{, part 2}.}
 \label{fig:interp-Ldyn-2}
 \end{figure}
 
@@ -16764,7 +16759,7 @@ class InterpLdyn(InterpLlambda):
           return Tagged(v, 'int')
       elif isinstance(v, Function):
           return Tagged(v, 'function')
-      elif isinstance(v, list):
+      elif isinstance(v, tuple):
           return Tagged(v, 'tuple')
       elif isinstance(v, type(None)):
           return Tagged(v, 'none')
@@ -16773,9 +16768,7 @@ class InterpLdyn(InterpLlambda):
 
   def untag(self, v, expected_tag, ast):
       match v:
-        case Tagged(val, tag):
-          if tag != expected_tag:
-            raise Exception('expected tag ' + expected_tag + ', not ' + ' ' + repr(v))
+        case Tagged(val, tag) if tag == expected_tag:
           return val
         case _:
           raise Exception('expected Tagged value with ' + expected_tag + ', not ' + ' ' + repr(v))
@@ -16800,7 +16793,7 @@ involves manipulating tagged values, the representation must be
 efficient. Recall that all of our values are 64 bits.  We shall steal
 the 3 right-most bits to encode the tag.  We use $001$ to identify
 integers, $100$ for Booleans, $010$ for vectors, $011$ for procedures,
-and $101$ for the void value. We define the following auxiliary
+and $101$ for the void value\python{, \key{None}}. We define the following auxiliary
 function for mapping types to tag codes.
 {\if\edition\racketEd
 \begin{align*}
@@ -16820,8 +16813,8 @@ function for mapping types to tag codes.
 \itm{tagof}(\key{type(None)}) &= 101
 \end{align*}
 \fi}
-This stealing of 3 bits comes at some price: our integers are reduced
-to ranging from $-2^{60}$ to $2^{60}$. The stealing does not adversely
+This stealing of 3 bits comes at some price: integers are now restricted
+to the range from $-2^{60}$ to $2^{60}$. The stealing does not adversely
 affect vectors and procedures because those values are addresses, and
 our addresses are 8-byte aligned so the rightmost 3 bits are unused,
 they are always $000$. Thus, we do not lose information by overwriting
@@ -16829,7 +16822,7 @@ the rightmost 3 bits with the tag and we can simply zero-out the tag
 to recover the original address.
 
 To make tagged values into first-class entities, we can give them a
-type, called \racket{\code{Any}}\python{AnyType}, and define operations
+type, called \racket{\code{Any}}\python{\code{AnyType()}}, and define operations
 such as \code{Inject} and \code{Project} for creating and using them,
 yielding the \LangAny{} intermediate language. We describe how to
 compile \LangDyn{} to \LangAny{} in Section~\ref{sec:compile-r7}
@@ -16854,13 +16847,13 @@ but first we describe the \LangAny{} language in greater detail.
 
 \newcommand{\LanyASTPython}{
 \begin{array}{lcl}
-\Type &::= & \key{AnyType} \\
+\Type &::= & \key{AnyType()} \\
 \FType &::=& \key{IntType()} \MID \key{BoolType()} \MID \key{VoidType()}
   \MID \key{TupleType}\LS\key{AnyType()}^+\RS \\
   &\MID& \key{FunctionType}\LP \key{AnyType()}^{*}\key{, }\key{AnyType()}\RP \\
-\Exp & ::= & \INJECT{\Exp}{\Type} \MID \PROJECT{\Exp}{\Type} \\
-     &\MID& \CALL{\VAR{\key{'any\_tuple\_load'}}}{\Exp\key{, }\INT{n}}\\
-     &\MID& \CALL{\VAR{\key{'any\_len'}}}{\Exp} 
+\Exp & ::= & \INJECT{\Exp}{\FType} \MID \PROJECT{\Exp}{\FType} \\
+     &\MID& \CALL{\VAR{\key{'any\_tuple\_load'}}}{\LS\Exp\key{, }\INT{n}\RS}\\
+     &\MID& \CALL{\VAR{\key{'any\_len'}}}{\LS\Exp\RS} 
      %% &\MID& \CALL{\VAR{\key{'is\_int'}}}{\Exp} 
      %% \MID \CALL{\VAR{\key{'is\_bool'}}}{\Exp} \\
      %% &\MID& \CALL{\VAR{\key{'is\_none'}}}{\Exp} 
@@ -16929,23 +16922,24 @@ The abstract syntax of \LangAny{} is defined in Figure~\ref{fig:Rany-syntax}.
 Figure~\ref{fig:Rany-concrete-syntax}.)}  The $\INJECT{e}{T}$ form
 converts the value produced by expression $e$ of type $T$ into a
 tagged value.  The $\PROJECT{e}{T}$ form converts the tagged value
-produced by expression $e$ into a value of type $T$ or else halts the
-program if the type tag is not equivalent to $T$.
+produced by expression $e$ into a value of type $T$ or halts the
+program if the type tag does not match $T$.
 %
 Note that in both \code{Inject} and \code{Project}, the type $T$ is
 restricted to a flat type $\FType$, which simplifies the
-implementation and corresponds with what is needed for compiling \LangDyn{}.
+implementation and corresponds with the needs for compiling \LangDyn{}.
 
-The \racket{\code{any-vector}}\python{\code{any\_tuple}} operators
+The \racket{\code{any-vector}} operators
+\python{\code{any\_tuple\_load} and \code{any\_len}}
 adapt the tuple operations so that they can be applied to a value of
-type \racket{\code{Any}}{\code{AnyType}}.  They also generalize the
+type \racket{\code{Any}}\python{\code{AnyType}}.  They also generalize the
 tuple operations in that the index is not restricted to be a literal
 integer in the grammar but is allowed to be any expression.
 
 \racket{The type predicates such as
 \racket{\key{boolean?}}\python{\key{is\_bool}} expect their argument
-to produce a tagged value; they return true if the tag corresponds to
-the predicate and they return false otherwise.}
+to produce a tagged value; they return  {\TRUE} if the tag corresponds to
+the predicate and they return {\FALSE} otherwise.}
 
 The type checker for \LangAny{} is shown in
 Figure~\ref{fig:type-check-Rany}
@@ -17542,7 +17536,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.7\textwidth}
 \begin{lstlisting}
-Call('any_tuple_load',[|$e_1'$|, |$e_2'$|])
+Call(Name('any_tuple_load'),[|$e_1'$|, |$e_2'$|])
 \end{lstlisting}
 \end{minipage}
 \\[2ex]\hline
@@ -17745,7 +17739,7 @@ Call(Name('any_tuple_load'), [|$e_1$|,|$e_2$|])
 |$\Rightarrow$|
 Block([Assign([|$t$|], |$e'_1$|), Assign([|$i$|], |$e'_2$|)],
       IfExp(Compare(TagOf(|$t$|), [Eq()], [Constant(2)]),
-            IfExp(Compare(|$i$|, [LtE()], [Call(Name('any_len'), [|$t$|])]),
+            IfExp(Compare(|$i$|, [Lt()], [Call(Name('any_len'), [|$t$|])]),
                   Call(Name('any_tuple_load'), [|$t$|, |$i$|]),
                   Call(Name('exit'), [])),
             Call(Name('exit'), [])))
@@ -17801,7 +17795,7 @@ whose syntax is defined in Figure~\ref{fig:c5-syntax}.
 \begin{array}{lcl}
 \Exp &::=& \CALL{\VAR{\key{'make\_any'}}}{\LS \Atm,\Atm \RS}\\
   &\MID& \key{TagOf}\LP \Atm \RP
-  \MID \key{ValueOf}\LP \Atm , \Type \RP \\
+  \MID \key{ValueOf}\LP \Atm , \FType \RP \\
   &\MID& \CALL{\VAR{\key{'any\_tuple\_load'}}}{\LS \Atm,\Atm \RS}\\
   &\MID& \CALL{\VAR{\key{'any\_tuple\_store'}}}{\LS \Atm,\Atm,\Atm \RS}\\
   &\MID& \CALL{\VAR{\key{'any\_len'}}}{\LS \Atm \RS} \\
@@ -18103,7 +18097,7 @@ not a tuple. We enable this differentiation by choosing not to use the
 tag $000$ in the $\itm{tagof}$ function. Instead, that bit pattern is
 reserved for identifying plain old pointers to tuples. That way, if
 one of the first three bits is set, then we have a tagged value and
-inspecting the tag can differentiation between tuples ($010$) and the
+inspecting the tag can differentiate between tuples ($010$) and the
 other kinds of values.
 
 %% \begin{exercise}\normalfont
