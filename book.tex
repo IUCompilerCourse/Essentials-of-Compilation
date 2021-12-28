@@ -4005,7 +4005,7 @@ registers. The goal of register allocation is to fit as many variables
 into registers as possible. Some programs have more variables than
 registers so we cannot always map each variable to a different
 register. Fortunately, it is common for different variables to be
-needed during different periods of time during program execution, and
+in-use during different periods of time during program execution, and
 in those cases we can map multiple variables to the same register.
 
 The program in Figure~\ref{fig:reg-eg} serves as a running
@@ -4013,7 +4013,7 @@ example. The source program is on the left and the output of
 instruction selection is on the right. The program is almost in the
 x86 assembly language but it still uses variables.  Consider variables
 \code{x} and \code{z}.  After the variable \code{x} is moved to
-\code{z} it is no longer needed.  Variable \code{z}, on the other
+\code{z} it is no longer in-use.  Variable \code{z}, on the other
 hand, is used only after this point, so \code{x} and \code{z} could
 share the same register.
 
@@ -4088,8 +4088,8 @@ callq print_int
 \end{figure}
 
 The topic of Section~\ref{sec:liveness-analysis-Lvar} is how to
-compute where a variable is needed.  Once we have that information, we
-compute which variables are needed at the same time, i.e., which ones
+compute where a variable is in-use.  Once we have that information, we
+compute which variables are in-use at the same time, i.e., which ones
 \emph{interfere}\index{subject}{interfere} with each other, and
 represent this relation as an undirected graph whose vertices are
 variables and edges indicate when two variables interfere
@@ -4192,12 +4192,12 @@ The next question is how these calling conventions impact register
 allocation. Consider the \LangVar{} program in
 Figure~\ref{fig:example-calling-conventions}.  We first analyze this
 example from the caller point of view and then from the callee point
-of view. We refer to a variable that is needed during a function call
+of view. We refer to a variable that is in-use during a function call
 as being a \emph{call-live variable}\index{subject}{call-live
   variable}.
 
 The program makes two calls to \READOP{}.  The variable \code{x} is
-call-live because it is needed during the second call to \READOP{}; we
+call-live because it is in-use during the second call to \READOP{}; we
 must ensure that the value in \code{x} does not get overwritten during
 the call to \READOP{}.  One obvious approach is to save all the values
 that reside in caller-saved registers to the stack prior to each
@@ -4220,7 +4220,7 @@ spill the variable to the stack.
 
 It is straightforward to implement this approach in a graph coloring
 register allocator. First, we know which variables are call-live
-because we already need to compute which variables are needed at every
+because we already need to compute which variables are in-use at every
 instruction (Section~\ref{sec:liveness-analysis-Lvar}). Second, when
 we build the interference graph
 (Section~\ref{sec:build-interference}), we can place an edge between
@@ -4333,10 +4333,9 @@ main:
 \label{sec:liveness-analysis-Lvar}
 \index{subject}{liveness analysis}
 
-The \code{uncover\_live} \racket{pass}\python{function}
-performs \emph{liveness analysis}, that
-is, it discovers which variables are in-use in different regions of a
-program.
+The \code{uncover\_live} \racket{pass}\python{function} performs
+\emph{liveness analysis}, that is, it discovers which variables are
+in-use in different regions of a program.
 %
 A variable or register is \emph{live} at a program point if its
 current value is used at some later point in the program.  We refer to
@@ -4344,7 +4343,8 @@ variables, stack locations, and registers collectively as
 \emph{locations}.
 %
 Consider the following code fragment in which there are two writes to
-\code{b}. Are \code{a} and \code{b} both live at the same time?
+\code{b}. Are variables \code{a} and \code{b} both live at the same
+time?
 \begin{center}
   \begin{minipage}{0.96\textwidth}
 \begin{lstlisting}[numbers=left,numberstyle=\tiny]
@@ -4361,18 +4361,17 @@ The answer is no because \code{a} is live from line 1 to 3 and
 line 2 is never used because it is overwritten (line 4) before the
 next read (line 5).
 
-The live locations can be computed by traversing the instruction
-sequence back to front (i.e., backwards in execution order).  Let
-$I_1,\ldots, I_n$ be the instruction sequence. We write
+The live locations for each instruction can be computed by traversing
+the instruction sequence back to front (i.e., backwards in execution
+order).  Let $I_1,\ldots, I_n$ be the instruction sequence. We write
 $L_{\mathsf{after}}(k)$ for the set of live locations after
 instruction $I_k$ and $L_{\mathsf{before}}(k)$ for the set of live
-locations before instruction $I_k$.
-\racket{We recommend representing these
-sets with the Racket \code{set} data structure described in
-Figure~\ref{fig:set}.}
-\python{We recommend representing these sets with the Python
+locations before instruction $I_k$.  \racket{We recommend representing
+  these sets with the Racket \code{set} data structure described in
+  Figure~\ref{fig:set}.}  \python{We recommend representing these sets
+  with the Python
   \href{https://docs.python.org/3.10/library/stdtypes.html\#set-types-set-frozenset}{\code{set}}
-data structure.}
+  data structure.}
 
 {\if\edition\racketEd
 \begin{figure}[tp]
@@ -4418,15 +4417,17 @@ where $W(k)$ are the locations written to by instruction $I_k$ and
 $R(k)$ are the locations read by instruction $I_k$.
 
 {\if\edition\racketEd
+%
 There is a special case for \code{jmp} instructions.  The locations
 that are live before a \code{jmp} should be the locations in
 $L_{\mathtt{before}}$ at the target of the jump. So we recommend
 maintaining an alist named \code{label->live} that maps each label to
 the $L_{\mathtt{before}}$ for the first instruction in its block. For
-now the only \code{jmp} in a \LangXVar{} program is the one at the
-end, to the conclusion. (For example, see Figure~\ref{fig:reg-eg}.)
-The conclusion reads from \ttm{rax} and \ttm{rsp}, so the alist should
-map \code{conclusion} to the set $\{\ttm{rax},\ttm{rsp}\}$.
+now the only \code{jmp} in a \LangXVar{} program is the jump to the
+conclusion. (For example, see Figure~\ref{fig:reg-eg}.)  The
+conclusion reads from \ttm{rax} and \ttm{rsp}, so the alist should map
+\code{conclusion} to the set $\{\ttm{rax},\ttm{rsp}\}$.
+%
 \fi}
 
 Let us walk through the above example, applying these formulas
@@ -4490,7 +4491,7 @@ L_{\mathsf{after}}(5)=  \emptyset
 \end{figure}
 
 \begin{exercise}\normalfont\normalsize
-  Perform liveness analysis on the running example in
+  Perform liveness analysis by hand on the running example in
   Figure~\ref{fig:reg-eg}, computing the live-before and live-after
   sets for each instruction. Compare your answers to the solution
   shown in Figure~\ref{fig:live-eg}.
