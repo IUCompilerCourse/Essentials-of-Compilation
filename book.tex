@@ -11995,13 +11995,13 @@ The x86 instructions \code{andq} (for bitwise-and) and \code{sarq}
 
 We compile the \code{allocate} form to operations on the
 \code{free\_ptr}, as shown below. This approach is called \emph{inline
-allocation} as it implements allocation by bumping the allocation
-pointer. It is much more efficient than calling a function for each
-allocation. The address in the \code{free\_ptr}
-is the next free address in the FromSpace, so we copy it into
-\code{r11} and then move it forward by enough space for the tuple
-being allocated, which is $8(\itm{len}+1)$ bytes because each element
-is 8 bytes (64 bits) and we use 8 bytes for the tag.  We then
+  allocation} as it implements allocation without a function call, by
+simply bumping the allocation pointer. It is much more efficient than
+calling a function for each allocation. The address in the
+\code{free\_ptr} is the next free address in the FromSpace, so we copy
+it into \code{r11} and then move it forward by enough space for the
+tuple being allocated, which is $8(\itm{len}+1)$ bytes because each
+element is 8 bytes (64 bits) and we use 8 bytes for the tag.  We then
 initialize the \itm{tag} and finally copy the address in \code{r11} to
 the left-hand-side. Refer to Figure~\ref{fig:tuple-rep} to see how the
 tag is organized.
@@ -12017,10 +12017,14 @@ during compilation.}
 The type annotation in the \code{allocate} form is used to determine
 the pointer mask region of the tag.
 %
-Do not worry about the addressing mode \verb!free_ptr(%rip)!. It
-essentially stands for the address \code{free\_ptr}, but uses a
-special instruction-pointer relative addressing mode of the x86-64
-processor. 
+The addressing mode \verb!free_ptr(%rip)! essentially stands for the
+address of the \code{free\_ptr} global variable but uses a special
+instruction-pointer relative addressing mode of the x86-64 processor.
+In particular, the assembler computes the distance $d$ between the
+address of \code{free\_ptr} and where the \code{rip} would be at that
+moment and then changes the \code{free\_ptr(\%rip)} argument to
+\code{$d$(\%rip)}, which at runtime will compute the address of
+\code{free\_ptr}.
 %
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -13458,22 +13462,19 @@ class TypeCheckLfun(TypeCheckLtup):
 
 The x86 architecture provides a few features to support the
 implementation of functions. We have already seen that there are
-labels in x86 so that one can refer to the location of an instruction, as is
-needed for jump instructions. Labels can also be used to mark the
-beginning of the instructions for a function.  Going further, we can
-obtain the address of a label by using the \key{leaq} instruction and
-PC-relative addressing. For example, the following puts the
-address of the \code{inc} label into the \code{rbx} register.
+labels in x86 so that one can refer to the location of an instruction,
+as is needed for jump instructions. Labels can also be used to mark
+the beginning of the instructions for a function.  Going further, we
+can obtain the address of a label by using the \key{leaq} instruction
+and instruction-pointer relative addressing. For example, the
+following puts the address of the \code{inc} label into the \code{rbx}
+register.
 \begin{lstlisting}
    leaq inc(%rip), %rbx
 \end{lstlisting}
-The instruction pointer register \key{rip} (aka. the program counter
-\index{subject}{program counter}) always points to the next
-instruction to be executed. When combined with a label, as in
-\code{inc(\%rip)}, the assembler computes the distance $d$ between the
-address of \code{inc} and where the \code{rip} would be at that moment
-and then changes the \code{inc(\%rip)} argument to \code{$d$(\%rip)},
-which at runtime will compute the address of \code{inc}.
+Recall from Section~\ref{sec:select-instructions-gc} that
+\verb!inc(%rip)! is an example of instruction-pointer relative
+addressing. It computes the address of \code{inc}.
 
 In Section~\ref{sec:x86} we used the \code{callq} instruction to jump
 to functions whose locations were given by a label, such as
