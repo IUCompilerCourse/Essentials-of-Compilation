@@ -3996,14 +3996,26 @@ all, fast code is useless if it produces incorrect results!
 
 \index{subject}{register allocation}
 
-In Chapter~\ref{ch:Lvar} we learned how to store variables on the
-stack. In this chapter we learn how to improve the performance of the
-generated code by assigning some variables to registers.  The CPU can
-access a register in a single cycle, whereas accessing the stack can
-take 10s to 100s of cycles.  The program in Figure~\ref{fig:reg-eg}
-serves as a running example. The source program is on the left and the
-output of instruction selection is on the right. The program is almost
-in the x86 assembly language but it still uses variables.
+In Chapter~\ref{ch:Lvar} we compiled \LangVar{} to x86, storing
+variables on the procedure call stack.  It can take 10s to 100s of
+cycles for the CPU to access locations on the stack whereas accessing
+a register takes only a single cycle. In this chapter we improve the
+efficiency of our generated code by storing some variables in
+registers. The goal of register allocation is to fit as many variables
+into registers as possible. Some programs have more variables than
+registers so we cannot always map each variable to a different
+register. Fortunately, it is common for different variables to be
+needed during different periods of time during program execution, and
+in those cases we can map multiple variables to the same register.
+
+The program in Figure~\ref{fig:reg-eg} serves as a running
+example. The source program is on the left and the output of
+instruction selection is on the right. The program is almost in the
+x86 assembly language but it still uses variables.  Consider variables
+\code{x} and \code{z}.  After the variable \code{x} is moved to
+\code{z} it is no longer needed.  Variable \code{z}, on the other
+hand, is used only after this point, so \code{x} and \code{z} could
+share the same register.
 
 \begin{figure}
 \begin{minipage}{0.45\textwidth}
@@ -4075,30 +4087,22 @@ callq print_int
 \label{fig:reg-eg}
 \end{figure}
 
-The goal of register allocation is to fit as many variables into
-registers as possible. Some programs have more variables than
-registers so we cannot always map each variable to a different
-register. Fortunately, it is common for different variables to be
-needed during different periods of time during program execution, and
-in such cases several variables can be mapped to the same register.
-Consider variables \code{x} and \code{z} in Figure~\ref{fig:reg-eg}.
-After the variable \code{x} is moved to \code{z} it is no longer
-needed.  Variable \code{z}, on the other hand, is used only after this
-point, so \code{x} and \code{z} could share the same register. The
-topic of Section~\ref{sec:liveness-analysis-Lvar} is how to compute
-where a variable is needed.  Once we have that information, we compute
-which variables are needed at the same time, i.e., which ones
-\emph{interfere} with each other, and represent this relation as an
-undirected graph whose vertices are variables and edges indicate when
-two variables interfere (Section~\ref{sec:build-interference}). We
-then model register allocation as a graph coloring problem
+The topic of Section~\ref{sec:liveness-analysis-Lvar} is how to
+compute where a variable is needed.  Once we have that information, we
+compute which variables are needed at the same time, i.e., which ones
+\emph{interfere}\index{subject}{interfere} with each other, and
+represent this relation as an undirected graph whose vertices are
+variables and edges indicate when two variables interfere
+(Section~\ref{sec:build-interference}). We then model register
+allocation as a graph coloring problem
 (Section~\ref{sec:graph-coloring}).
 
 If we run out of registers despite these efforts, we place the
 remaining variables on the stack, similar to what we did in
-Chapter~\ref{ch:Lvar}. It is common to use the verb \emph{spill} for
-assigning a variable to a stack location. The decision to spill a
-variable is handled as part of the graph coloring process.
+Chapter~\ref{ch:Lvar}. It is common to use the verb
+\emph{spill}\index{subject}{spill} for assigning a variable to a stack
+location. The decision to spill a variable is handled as part of the
+graph coloring process.
 
 We make the simplifying assumption that each variable is assigned to
 one location (a register or stack address). A more sophisticated
@@ -4108,7 +4112,7 @@ in short sequence and then only used again after many other
 instructions, it could be more efficient to assign the variable to a
 register during the initial sequence and then move it to the stack for
 the rest of its lifetime. We refer the interested reader to
-\citet{Cooper:2011aa} Chapter 13 for more information about that
+\citet{Cooper:2011aa} (Chapter 13) for more information about that
 approach.
 
 % discuss prioritizing variables based on how much they are used.
@@ -4117,9 +4121,9 @@ approach.
 \label{sec:calling-conventions}
 \index{subject}{calling conventions}
 
-As we perform register allocation, we need to be aware of the
-\emph{calling conventions} \index{subject}{calling conventions} that govern how
-functions calls are performed in x86.
+As we perform register allocation, we must be aware of the
+\emph{calling conventions} \index{subject}{calling conventions} that
+govern how functions calls are performed in x86.
 %
 Even though \LangVar{} does not include programmer-defined functions,
 our generated code includes a \code{main} function that is called by
@@ -4154,8 +4158,7 @@ view, the caller view and the callee view:
 \item The caller should assume that all the caller-saved registers get
   overwritten with arbitrary values by the callee.  On the other hand,
   the caller can safely assume that all the callee-saved registers
-  contain the same values after the call that they did before the
-  call.
+  retain their original values.
 \item The callee can freely use any of the caller-saved registers.
   However, if the callee wants to use a callee-saved register, the
   callee must arrange to put the original value back in the register
@@ -4165,8 +4168,10 @@ view, the caller view and the callee view:
 \end{itemize}
 
 In x86, registers are also used for passing arguments to a function
-and for the return value.  In particular, the first six arguments to a
+and for the return value.  In particular, the first six arguments of a
 function are passed in the following six registers, in this order.
+\index{subject}{argument-passing registers}
+\index{subject}{parameter-passing registers}
 \begin{lstlisting}
 rdi rsi rdx rcx r8 r9
 \end{lstlisting}
@@ -4187,38 +4192,40 @@ The next question is how these calling conventions impact register
 allocation. Consider the \LangVar{} program in
 Figure~\ref{fig:example-calling-conventions}.  We first analyze this
 example from the caller point of view and then from the callee point
-of view.
+of view. We refer to a variable that is needed during a function call
+as being a \emph{call-live variable}\index{subject}{call-live
+  variable}.
 
-The program makes two calls to \READOP{}.  Also, the variable \code{x}
-is in use during the second call to \READOP{}, so we need to make sure
-that the value in \code{x} does not get accidentally wiped out by the
-call to \READOP{}.  One obvious approach is to save all the values in
-caller-saved registers to the stack prior to each function call, and
-restore them after each call. That way, if the register allocator
-chooses to assign \code{x} to a caller-saved register, its value will
-be preserved across the call to \READOP{}.  However, saving and
-restoring to the stack is relatively slow. If \code{x} is not used
-many times, it may be better to assign \code{x} to a stack location in
-the first place. Or better yet, if we can arrange for \code{x} to be
-placed in a callee-saved register, then it won't need to be saved and
-restored during function calls.
+The program makes two calls to \READOP{}.  The variable \code{x} is
+call-live because it is needed during the second call to \READOP{}; we
+must ensure that the value in \code{x} does not get overwritten during
+the call to \READOP{}.  One obvious approach is to save all the values
+that reside in caller-saved registers to the stack prior to each
+function call, and restore them after each call. That way, if the
+register allocator chooses to assign \code{x} to a caller-saved
+register, its value will be preserved across the call to \READOP{}.
+However, saving and restoring to the stack is relatively slow. If
+\code{x} is not used many times, it may be better to assign \code{x}
+to a stack location in the first place. Or better yet, if we can
+arrange for \code{x} to be placed in a callee-saved register, then it
+won't need to be saved and restored during function calls.
 
-The approach that we recommend for variables that are in use during a
-function call is to either assign them to callee-saved registers or to
-spill them to the stack. On the other hand, for variables that are not
-in use during a function call, we try the following alternatives in
-order 1) look for an available caller-saved register (to leave room
-for other variables in the callee-saved register), 2) look for a
-callee-saved register, and 3) spill the variable to the stack.
+The approach that we recommend for call-live variables is to either
+assign them to callee-saved registers or to spill them to the
+stack. On the other hand, for variables that are not call-live, we try
+the following alternatives in order 1) look for an available
+caller-saved register (to leave room for other variables in the
+callee-saved register), 2) look for a callee-saved register, and 3)
+spill the variable to the stack.
 
 It is straightforward to implement this approach in a graph coloring
-register allocator. First, we know which variables are in use during
-every function call because we compute that information for every
+register allocator. First, we know which variables are call-live
+because we already need to compute which variables are needed at every
 instruction (Section~\ref{sec:liveness-analysis-Lvar}). Second, when
 we build the interference graph
 (Section~\ref{sec:build-interference}), we can place an edge between
-each of these call-live variables and the caller-saved registers in
-the interference graph. This will prevent the graph coloring algorithm
+each of the call-live variables and the caller-saved registers in the
+interference graph. This will prevent the graph coloring algorithm
 from assigning them to caller-saved registers.
 
 Returning to the example in
@@ -4227,8 +4234,8 @@ generated x86 code on the right-hand side. Notice that variable
 \code{x} is assigned to \code{rbx}, a callee-saved register. Thus, it
 is already in a safe place during the second call to
 \code{read\_int}. Next, notice that variable \code{y} is assigned to
-\code{rcx}, a caller-saved register, because \code{y} is not in the
-live-after set of a \code{callq} instruction.
+\code{rcx}, a caller-saved register, because \code{y} is not a
+call-live variable.
 
 Next we analyze the example from the callee point of view, focusing on
 the prelude and conclusion of the \code{main} function. As usual the
