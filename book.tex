@@ -4659,14 +4659,14 @@ A better way to compute the interference graph is to focus on
 writes~\citep{Appel:2003fk}. The writes performed by an instruction
 must not overwrite something in a live location. So for each
 instruction, we create an edge between the locations being written to
-and the live locations. (Except that one should not create self
-edges.)  Note that for the \key{callq} instruction, we consider all of
-the caller-saved registers as being written to, so an edge is added
+and the live locations. (Except that a location never interferes with
+itself.) For the \key{callq} instruction, we consider all of the
+caller-saved registers as being written to, so an edge is added
 between every live variable and every caller-saved register. Also, for
-\key{movq} there is the above-mentioned special case to deal with. If
-a live variable $v$ is the same as the source of the \key{movq}, then
-there is no need to add an edge between $v$ and the destination,
-because they both hold the same value.
+\key{movq} there is the special case of two variables holding the same
+value. If a live variable $v$ is the same as the source of the
+\key{movq}, then there is no need to add an edge between $v$ and the
+destination, because they both hold the same value.
 %
 So we have the following two rules.
 
@@ -4859,12 +4859,13 @@ the program, under the key \code{conflicts}.}
 \index{subject}{Sudoku}
 \index{subject}{color}
 
-We come to the main event, mapping variables to registers and stack
-locations. Variables that interfere with each other must be mapped to
-different locations.  In terms of the interference graph, this means
-that adjacent vertices must be mapped to different locations.  If we
-think of locations as colors, the register allocation problem becomes
-the graph coloring problem~\citep{Balakrishnan:1996ve,Rosen:2002bh}.
+We come to the main event of this chapter, mapping variables to
+registers and stack locations. Variables that interfere with each
+other must be mapped to different locations.  In terms of the
+interference graph, this means that adjacent vertices must be mapped
+to different locations.  If we think of locations as colors, the
+register allocation problem becomes the graph coloring
+problem~\citep{Balakrishnan:1996ve,Rosen:2002bh}.
 
 The reader may be more familiar with the graph coloring problem than he
 or she realizes; the popular game of Sudoku is an instance of the
@@ -5556,24 +5557,23 @@ callq print_int
 \end{center}
 
 \begin{exercise}\normalfont\normalsize
-%
-Implement the compiler pass \code{allocate\_registers}.
-%
+Implement the \code{allocate\_registers} pass.
 Create five programs that exercise all aspects of the register
 allocation algorithm, including spilling variables to the stack.
 %
-\racket{Replace \code{assign\_homes} in the list of \code{passes} in the
+{\if\edition\racketEd      
+Replace \code{assign\_homes} in the list of \code{passes} in the
 \code{run-tests.rkt} script with the three new passes:
 \code{uncover\_live}, \code{build\_interference}, and
 \code{allocate\_registers}.
-%
-Temporarily remove the \code{print\_x86} pass from the list of passes
-and the call to \code{compiler-tests}.
+Temporarily remove the call to \code{compiler-tests}.
 Run the script to test the register allocator.
-}
+\fi}
 %
-\python{Run the \code{run-tests.py} script to to check whether the
-  output programs produce the same result as the input programs.}
+{\if\edition\pythonEd      
+Run the \code{run-tests.py} script to to check whether the
+output programs produce the same result as the input programs.
+\fi}
 \end{exercise}
 
 
@@ -5700,10 +5700,20 @@ variables. The \code{prelude\_and\_conclusion} pass can then access
 this information to decide which callee-saved registers need to be
 saved and restored.
 %
-When calculating the size of the frame to adjust the \code{rsp} in the
-prelude, make sure to take into account the space used for saving the
+When calculating the amount to adjust the \code{rsp} in the prelude,
+make sure to take into account the space used for saving the
 callee-saved registers. Also, don't forget that the frame needs to be
-a multiple of 16 bytes!
+a multiple of 16 bytes! We recommend using the following equation for
+the amount $A$ to subtract from the \code{rsp}. Let $S$ be the number
+of spilled variables and $C$ be the number of callee-saved registers
+that were allocated to variables. The $\itm{align}$ function rounds a
+number up to the nearest 16 bytes.
+\[
+   \itm{A} = \itm{align}(8\itm{S} + 8\itm{C}) - 8\itm{C}
+\]
+The reason we subtract $8\itm{C}$ in the above equation is because the
+prelude uses \code{pushq} to save each of the callee-saved registers,
+and \code{pushq} subtracts $8$ from the \code{rsp}.
 
 \racket{An overview of all of the passes involved in register
   allocation is shown in Figure~\ref{fig:reg-alloc-passes}.}
@@ -5745,7 +5755,7 @@ use of registers and the stack, we limit the register allocator for
 this example to use just two registers: \code{rbx} and \code{rcx}.  In
 the prelude\index{subject}{prelude} of the \code{main} function, we
 push \code{rbx} onto the stack because it is a callee-saved register
-and it was assigned to variable by the register allocator.  We
+and it was assigned to a variable by the register allocator.  We
 subtract \code{8} from the \code{rsp} at the end of the prelude to
 reserve space for the one spilled variable.  After that subtraction,
 the \code{rsp} is aligned to 16 bytes.
