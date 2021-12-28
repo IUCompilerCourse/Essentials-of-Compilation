@@ -3122,6 +3122,16 @@ print(tmp_1)
 \end{transformation}
 \fi}
 
+
+\newcommand{\LvarMonadASTRacket}{
+\begin{array}{rcl}
+\Atm &::=& \INT{\Int} \MID \VAR{\Var} \\
+\Exp &::=& \Atm \MID \READ{} \\
+     &\MID& \NEG{\Atm} \MID \ADD{\Atm}{\Atm} \MID \SUB{\Atm}{\Atm} \\
+     &\MID&  \LET{\Var}{\Exp}{\Exp} \\
+\end{array}
+}  
+
 \newcommand{\LvarMonadASTPython}{
 \begin{array}{rcl}
 \Atm &::=& \INT{\Int} \MID \VAR{\Var} \\  
@@ -3138,12 +3148,11 @@ print(tmp_1)
 \begin{minipage}{0.96\textwidth}
 {\if\edition\racketEd
 \[
+\begin{array}{l}
+  \LvarMonadASTRacket \\
 \begin{array}{rcl}
-\Atm &::=& \INT{\Int} \MID \VAR{\Var} \\
-\Exp &::=& \Atm \MID \READ{} \\
-     &\MID& \NEG{\Atm} \MID \ADD{\Atm}{\Atm}  \\
-     &\MID&  \LET{\Var}{\Exp}{\Exp} \\
 \LangVarANFM{}  &::=& \PROGRAM{\code{'()}}{\Exp}
+\end{array}
 \end{array}
 \]
 \fi}
@@ -3170,12 +3179,12 @@ operator arguments are restricted to be atomic expressions that are
 defined by the \Atm{} non-terminal. In particular, integer constants
 and variables are atomic.
 
-The atomic expressions are pure (they do not cause side-effects or
-depend on them) whereas complex expressions may have side effects,
-such as \READ{}.  A language with this separation between pure versus
+The atomic expressions are pure (they do not cause or depend on
+side-effects) whereas complex expressions may have side effects, such
+as \READ{}.  A language with this separation between pure versus
 side-effecting expressions is said to be in monadic normal
 form~\citep{Moggi:1991in,Danvy:2003fk} which explains the \textit{mon}
-in \LangVarANF{}. An important invariant of the
+in the name \LangVarANF{}. An important invariant of the
 \code{remove\_complex\_operands} pass is that the relative ordering
 among complex expressions is not changed, but the relative ordering
 between atomic expressions and complex expressions can change and
@@ -3201,11 +3210,6 @@ things: an atomic expression and an alist mapping temporary variables to
 complex subexpressions. You can return multiple things from a function
 using Racket's \key{values} form and you can receive multiple things
 from a function call using the \key{define-values} form.
-Also, the
-\href{https://docs.racket-lang.org/reference/for.html#%28form._%28%28lib._racket%2Fprivate%2Fbase..rkt%29._for%2Flists%29%29}{\code{for/lists}}
-  form is useful for applying a function to each element of a list, in
-  the case where the function returns multiple values.
-  \index{subject}{for/lists}
 \fi}
 %
 {\if\edition\pythonEd
@@ -3220,11 +3224,12 @@ variables with their initializing expressions.
 \fi}
 
 {\if\edition\racketEd
+%
 Returning to the example program with the expression \code{(+ 42 (-
   10))}, the subexpression \code{(- 10)} should be processed using the
-\code{rco\_atom} function because it is an argument of the \code{+} and
-therefore needs to become atomic.  The output of \code{rco\_atom}
-applied to \code{(- 10)} is as follows.
+\code{rco\_atom} function because it is an argument of the \code{+}
+operator and therefore needs to become atomic.  The output of
+\code{rco\_atom} applied to \code{(- 10)} is as follows.
 \begin{transformation}
 \begin{lstlisting}
   (- 10)
@@ -3260,9 +3265,9 @@ tmp_1
 
 Take special care of programs such as the following that
 %
-\racket{bind a variable to an atomic expression}
+\racket{bind a variable to an atomic expression.}
 %
-\python{assign an atomic expression to a variable}.
+\python{assign an atomic expression to a variable.}
 %
 You should leave such \racket{variable bindings}\python{assignments}
 unchanged, as shown in the program on the right\\
@@ -3337,7 +3342,7 @@ regarding file names described in Exercise~\ref{ex:Lvar}.
 In the \code{run-tests.rkt} script, add the following entry to the
 list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
-(list "remove-complex" remove-complex-operands interp_Lvar type-check-Lvar)
+(list "remove-complex" remove_complex_operands interp_Lvar type-check-Lvar)
 \end{lstlisting}
 While debugging your compiler, it is often useful to see the
 intermediate programs that are output from each pass. To print the
@@ -3402,12 +3407,13 @@ sequence of assignment statements. For example, consider the following
 \end{lstlisting}
 \end{minipage}\\
 %
-The output of the previous pass and of \code{explicate\_control} is
-shown below. Recall that the right-hand-side of a \key{let} executes
-before its body, so the order of evaluation for this program is to
-assign \code{20} to \code{x.1}, \code{22} to \code{x.2}, and
-\code{(+ x.1 x.2)} to \code{y}, then return \code{y}. Indeed, the
-output of \code{explicate\_control} makes this ordering explicit.
+The output of the previous pass is shown below, on the left, and the
+output of \code{explicate\_control} is on the right. Recall that the
+right-hand-side of a \key{let} executes before its body, so the order
+of evaluation for this program is to assign \code{20} to \code{x.1},
+\code{22} to \code{x.2}, and \code{(+ x.1 x.2)} to \code{y}, then
+return \code{y}. Indeed, the output of \code{explicate\_control} makes
+this ordering explicit.
 \begin{transformation}
 \begin{lstlisting}
 (let ([y (let ([x.1 20]) 
@@ -3452,7 +3458,7 @@ start:
 \end{figure}
 
 The organization of this pass depends on the notion of tail position
-that we have alluded to earlier.
+that we have alluded to earlier. Here is the definition.
 
 \begin{definition}
   The following rules define when an expression is in \textbf{\emph{tail
@@ -3484,6 +3490,11 @@ The \code{explicate\_assign} function is in accumulator-passing style:
 the \code{cont} parameter is used for accumulating the output. This
 accumulator-passing style plays an important role in how we generate
 high-quality code for conditional expressions in Chapter~\ref{ch:Lif}.
+The abbreviation \code{cont} is for continuation because it contains
+the generated code that should come after the current assignment.
+This code organization is also related to continuation-passing style,
+except that \code{cont} is not what happens next during compilation,
+but what happens next in the generated code.
 
 \begin{exercise}\normalfont
 %
@@ -7734,7 +7745,7 @@ code in this pass.
 In the \code{run-tests.rkt} script, add the following entry to the
 list of \code{passes} and then run the script to test your compiler.
 \begin{lstlisting}
-(list "remove-complex" remove-complex-operands interp-Lif type-check-Lif)
+(list "remove-complex" remove_complex_operands interp-Lif type-check-Lif)
 \end{lstlisting}
 \fi}
 \end{exercise}
