@@ -7259,18 +7259,19 @@ expected.
 
 {\if\edition\racketEd
 %
+The \LangCIf{} language builds on \LangCVar{} by adding logical and
+comparison operators to the \Exp{} non-terminal and the literals
+\TRUE{} and \FALSE{} to the \Arg{} non-terminal.  Regarding control
+flow, \LangCIf{} adds \key{goto} and \code{if} statements to the
+\Tail{} non-terminal. The condition of an \code{if} statement is a
+comparison operation and the branches are \code{goto} statements,
+making it straightforward to compile \code{if} statements to x86.  The
+\key{CProgram} construct contains an alist mapping labels to $\Tail$
+expressions. A \code{goto} statement transfers control to the $\Tail$
+expression corresponding to its label.
 Figure~\ref{fig:c1-concrete-syntax} defines the concrete syntax of the
 \LangCIf{} intermediate language and Figure~\ref{fig:c1-syntax}
-defines its abstract syntax. Compared to \LangCVar{}, the \LangCIf{}
-language adds logical and comparison operators to the \Exp{}
-non-terminal and the literals \TRUE{} and \FALSE{} to the \Arg{}
-non-terminal.
-
-Regarding control flow, \LangCIf{} adds \key{goto} and \code{if}
-statements to the \Tail{} non-terminal. The condition of an \code{if}
-statement is a comparison operation and the branches are \code{goto}
-statements, making it straightforward to compile \code{if} statements
-to x86.
+defines its abstract syntax.
 %
 \fi}
 %
@@ -7278,10 +7279,7 @@ to x86.
 %
 The output of \key{explicate\_control} is a language similar to the
 $C$ language~\citep{Kernighan:1988nx} in that it has labels and
-\code{goto} statements, so we name it \LangCIf{}.  The
-concrete syntax for \LangCIf{} is defined in
-Figure~\ref{fig:c1-concrete-syntax}
-and the abstract syntax is defined in Figure~\ref{fig:c1-syntax}.
+\code{goto} statements, so we name it \LangCIf{}.  
 %
 The \LangCIf{} language supports the same operators as \LangIf{} but
 the arguments of operators are restricted to atomic expressions. The
@@ -7289,29 +7287,25 @@ the arguments of operators are restricted to atomic expressions. The
 include a restricted form of \code{if} statment. The condition must be
 a comparison and the two branches may only contain \code{goto}
 statements. These restrictions make it easier to translate \code{if}
-statements to x86. 
+statements to x86.  The \LangCIf{} language also adds a \code{return}
+statement to finish the program with a specified value.
+%
+The \key{CProgram} construct contains a dictionary mapping labels to
+lists of statements that end with a \code{return} statement, a
+\code{goto}, or a conditional \code{goto}.  Statement lists of this
+form are called \emph{basic blocks}\index{subject}{basic block}: there
+is a control transfer at the end and control only enters at the
+beginning of the list, which is marked by the label.
+%
+A \code{goto} statement transfers control to basic block corresponding
+to its label.
+%
+The concrete syntax for \LangCIf{} is defined in
+Figure~\ref{fig:c1-concrete-syntax} and the abstract syntax is defined
+in Figure~\ref{fig:c1-syntax}.
 %
 \fi}
 %
-Besides the \code{goto} statement, \LangCIf{}, also adds a
-\code{return} statement to finish a function call with a specified value.
-%
-The \key{CProgram} construct contains
-%
-\racket{an alist}\python{a dictionary}
-%
-mapping labels to
-\racket{$\Tail$ expressions, which can be \code{return} statements,
-an assignment statement followed by a $\Tail$ expression, a
-\code{goto}, or a conditional \code{goto}.}
-\python{lists of statements, which comprise of assignment statements
-  and end in a \code{return} statement, a \code{goto}, or a
-  conditional \code{goto}.
-  \index{subject}{basic block}
-  Statement lists of this form are called
-  \emph{basic blocks}: there is a control transfer at the end and
-  control only enters at the beginning of the list, which is marked by
-  the label. }
 
 \newcommand{\CifGrammarRacket}{
 \begin{array}{lcl}
@@ -7426,12 +7420,13 @@ an assignment statement followed by a $\Tail$ expression, a
 \section{The \LangXIf{} Language}
 \label{sec:x86-if}
 
-\index{subject}{x86} To implement the new logical operations, the comparison
-operations, and the \key{if} expression\python{ and statement}, we need to delve further into
-the x86 language. Figures~\ref{fig:x86-1-concrete} and \ref{fig:x86-1}
-define the concrete and abstract syntax for the \LangXIf{} subset
-of x86, which includes instructions for logical operations,
-comparisons, and \racket{conditional} jumps.
+\index{subject}{x86} To implement the new logical operations, the
+comparison operations, and the \key{if} expression\python{ and
+  statement}, we delve further into the x86
+language. Figures~\ref{fig:x86-1-concrete} and \ref{fig:x86-1} define
+the concrete and abstract syntax for the \LangXIf{} subset of x86,
+which includes instructions for logical operations, comparisons, and
+\racket{conditional} jumps.
 
 One challenge is that x86 does not provide an instruction that
 directly implements logical negation (\code{not} in \LangIf{} and
@@ -7510,8 +7505,8 @@ $\Atm$.
        \MID \BININSTR{\code{subq}}{\Arg}{\Arg} } \\
        &\MID& \gray{ \BININSTR{\code{'movq}}{\Arg}{\Arg} 
        \MID \UNIINSTR{\code{negq}}{\Arg} } \\
-       &\MID& \gray{ \CALLQ{\itm{label}}{\itm{int}} \MID \RETQ{} 
-       \MID \PUSHQ{\Arg} \MID \POPQ{\Arg} \MID \JMP{\itm{label}} } \\
+       &\MID& \gray{ \CALLQ{\itm{label}}{\itm{int}} \MID \RETQ{}  }\\
+       &\MID& \gray{ \PUSHQ{\Arg} \MID \POPQ{\Arg} \MID \JMP{\itm{label}} } \\
        &\MID& \BININSTR{\code{xorq}}{\Arg}{\Arg}
        \MID \BININSTR{\code{cmpq}}{\Arg}{\Arg}\\
        &\MID& \BININSTR{\code{set}}{\itm{cc}}{\Arg} 
