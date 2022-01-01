@@ -1550,12 +1550,12 @@ evaluator for the \LangInt{} language. The output of the partial evaluator
 is a program in \LangInt{}. In Figure~\ref{fig:pe-arith}, the structural
 recursion over $\Exp$ is captured in the \code{pe\_exp} function
 whereas the code for partially evaluating the negation and addition
-operations is factored into two auxiliary functions:
-\code{pe\_neg} and \code{pe\_add}. The input to these 
+operations is factored into three auxiliary functions:
+\code{pe\_neg}, \code{pe\_add} and \code{pe\_sub}. The input to these 
 functions is the output of partially evaluating the children.
-The \code{pe\_neg} and \code{pe\_add} functions check whether their
+The \code{pe\_neg}, \code{pe\_add} and \code{pe\_sub} functions check whether their
 arguments are integers and if they are, perform the appropriate
-arithmetic.  Otherwise, they create an AST node for the arithmetic
+arithmetic. Otherwise, they create an AST node for the arithmetic
 operation.
 
 \begin{figure}[tp]
@@ -1571,14 +1571,18 @@ operation.
     [((Int n1) (Int n2)) (Int (fx+ n1 n2))]
     [(_ _) (Prim '+ (list r1 r2))]))
 
+(define (pe_sub r1 r2)
+  (match* (r1 r2)
+    [((Int n1) (Int n2)) (Int (fx- n1 n2))]
+    [(_ _) (Prim '- (list r1 r2))]))
+
 (define (pe_exp e)
   (match e
     [(Int n) (Int n)]
     [(Prim 'read '()) (Prim 'read '())]
     [(Prim '- (list e1)) (pe_neg (pe_exp e1))]
     [(Prim '+ (list e1 e2)) (pe_add (pe_exp e1) (pe_exp e2))]
-    [(Prim '- (list e1 e2)) (pe-add ((pe-exp env) e1)
-                                    (pe-neg ((pe-exp env) e2)))]))
+    [(Prim '- (list e1 e2)) (pe_sub (pe_exp e1) (pe_exp e2))]))
 
 (define (pe_Lint p)
   (match p
