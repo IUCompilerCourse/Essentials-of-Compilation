@@ -2615,10 +2615,11 @@ register allocation (Chapter~\ref{ch:register-allocation-Lvar}).
 \Arg &::=&  \IMM{\Int} \MID \REG{\Reg}
    \MID \DEREF{\Reg}{\Int} \\
 \Instr &::=& \BININSTR{\code{addq}}{\Arg}{\Arg} 
-       \MID \BININSTR{\code{subq}}{\Arg}{\Arg} \\
-      &\MID& \BININSTR{\code{movq}}{\Arg}{\Arg}
+       \MID \BININSTR{\code{subq}}{\Arg}{\Arg}
        \MID \UNIINSTR{\code{negq}}{\Arg}\\
-      &\MID& \PUSHQ{\Arg} \MID \POPQ{\Arg} \\
+      &\MID& \BININSTR{\code{movq}}{\Arg}{\Arg}
+       \MID \PUSHQ{\Arg}
+       \MID \POPQ{\Arg} \\
       &\MID& \CALLQ{\itm{label}}{\itm{int}}
        \MID \RETQ{}
        \MID \JMP{\itm{label}}  \\
@@ -2628,7 +2629,7 @@ register allocation (Chapter~\ref{ch:register-allocation-Lvar}).
 
 \begin{figure}[tp]
 \fbox{
-\begin{minipage}{0.98\textwidth}
+\begin{minipage}{0.94\textwidth}
 \small
 {\if\edition\racketEd    
 \[
@@ -7022,7 +7023,7 @@ Figure~\ref{fig:type-check-Lvar}.  The type of an integer constant is
 
     (define/public (operator-types)
       '((+ . ((Integer Integer) . Integer))
-        (- . ((Integer) . Integer))
+        (- . ((Integer Integer) . Integer))
         (read . (() . Integer))))
 
     (define/public (type-equal? t1 t2) (equal? t1 t2))
@@ -7132,15 +7133,13 @@ class TypeCheckLvar:
     (inherit check-type-equal?)
     
     (define/override (operator-types)
-      (append '((- . ((Integer Integer) . Integer))
-                (and . ((Boolean Boolean) . Boolean))
+      (append '((and . ((Boolean Boolean) . Boolean))
                 (or . ((Boolean Boolean) . Boolean))
                 (< . ((Integer Integer) . Boolean))
                 (<= . ((Integer Integer) . Boolean))
                 (> . ((Integer Integer) . Boolean))
                 (>= . ((Integer Integer) . Boolean))
-                (not . ((Boolean) . Boolean))
-                )
+                (not . ((Boolean) . Boolean)))
               (super operator-types)))
 
     (define/override (type-check-exp env)
@@ -7233,8 +7232,8 @@ The type of a Boolean constant is \BOOLTY{}.
 \python{Logical not requires its argument to be a \BOOLTY{} and
   produces a \BOOLTY{}. Similarly for logical and and logical or. }
 %
-The equality operators require the two arguments to have the same
-type.
+The equality operator requires the two arguments to have the same type
+and therefore we handle it separately from the other operators.
 %
 \python{The other comparisons (less-than, etc.) require their
 arguments to be of type \INTTY{} and they produce a \BOOLTY{}.}
@@ -7525,7 +7524,7 @@ $\Atm$ to x86.
 
   \begin{figure}[tp]
 \fbox{
-\begin{minipage}{0.98\textwidth}
+\begin{minipage}{0.96\textwidth}
 \small    
 {\if\edition\racketEd    
 \[
@@ -7628,20 +7627,6 @@ By performing these translations in the front-end of the compiler,
 subsequent passes of the compiler do not need to deal with these features,
 making the passes shorter.
 
-%% For example, subtraction is
-%% expressible using addition and negation.
-%% \[
-%%  \key{(-}\; e_1 \; e_2\key{)} \quad \Rightarrow \quad \LP\key{+} \; e_1 \; \LP\key{-} \; e_2\RP\RP
-%% \]
-%% Several of the comparison operations are expressible using less-than
-%% and logical negation.
-%% \[
-%% \LP\key{<=}\; e_1 \; e_2\RP \quad \Rightarrow \quad
-%% \LP\key{let}~\LP\LS\key{tmp.1}~e_1\RS\RP~\LP\key{not}\;\LP\key{<}\;e_2\;\key{tmp.1})\RP\RP
-%% \]
-%% The \key{let} is needed in the above translation to ensure that
-%% expression $e_1$ is evaluated before $e_2$.
-
 On the other hand, sometimes translations reduce the efficiency of the
 generated code by increasing the number of instructions. For example,
 expressing subtraction in terms of negation
@@ -7651,12 +7636,6 @@ expressing subtraction in terms of negation
 \]
 produces code with two x86 instructions (\code{negq} and \code{addq})
 instead of just one (\code{subq}).
-
-
-%% However,
-%% these differences typically do not affect the number of accesses to
-%% memory, which is the primary factor that determines execution time on
-%% modern computer architectures.
 
 \begin{exercise}\normalfont\normalsize
 %
@@ -7703,7 +7682,7 @@ Run the script to test your compiler.
 \label{sec:remove-complex-opera-Lif}
 
 The output language of \code{remove\_complex\_operands} is
-\LangIfANF{} (Figure~\ref{fig:Lif-anf-syntax}), the administrative
+\LangIfANF{} (Figure~\ref{fig:Lif-anf-syntax}), the monadic
 normal form of \LangIf{}.  A Boolean constant is an atomic expressions
 but the \code{if} expression is not.  All three sub-expressions of an
 \code{if} are allowed to be complex expressions but the operands of
@@ -7721,13 +7700,15 @@ but the \code{if} expression is not.  All three sub-expressions of an
   form execute the statements $ss$ and then returns the result of
   expression $e$.}
 
-Add cases for Boolean constants, \python{comparisons,} and \code{if}
-expressions to the \code{rco\_exp} and \code{rco\_atom} functions
-according to whether the output needs to be \Exp{} or \Atm{} as
-specified in the grammar for \LangIfANF{}.  Regarding \code{if}, it is
-particularly important to \textbf{not} replace its condition with a
-temporary variable because that would interfere with the generation of
-high-quality output in the \code{explicate\_control} pass.
+Add cases to the \code{rco\_exp} and \code{rco\_atom} functions for
+the new features in \LangIf{}. When recursively processing
+subexpressions, recall that you should invoke \code{rco\_atom} when
+the output needs to be an \Atm{} (as specified in the grammar for
+\LangIfANF{}) and invoke \code{rco\_exp} when the output should be
+\Exp{}.  Regarding \code{if}, it is particularly important to
+\textbf{not} replace its condition with a temporary variable because
+that would interfere with the generation of high-quality output in the
+upcoming \code{explicate\_control} pass.
 
 \newcommand{\LifMonadASTRacket}{
 \begin{array}{rcl}
