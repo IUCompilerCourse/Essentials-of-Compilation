@@ -7918,22 +7918,123 @@ in the graph and the basic blocks are the nodes.
 %
 Likewise, our language \LangCIf{} provides the ability to label a
 sequence of statements and to jump to a label via \code{goto}.
-%
-%% In particular, we use a standard program representation called a
-%% \emph{control flow graph} (CFG), due to Frances Elizabeth
-%% \citet{Allen:1970uq}.  \index{subject}{control-flow graph} Each vertex
-%% is a labeled sequence of code, called a \emph{basic block}, and each
-%% edge represents a jump to another block.
-%
 
-%% The nice thing about the output of \code{explicate\_control} is that
-%% there are no unnecessary comparisons and every comparison is part of a
-%% conditional jump.
+As a preview of what \code{explicate\_control} will do,
+Figure~\ref{fig:explicate-control-s1-38} shows the output of
+\code{explicate\_control} on the above example. Note how the condition
+of every \code{if} is a comparison operation and that we have not
+duplicated any code, but instead used labels and \code{goto} to enable
+sharing of code.
 
-%% The down-side of this output is that it includes
-%% trivial blocks, such as the blocks labeled \code{block92} through
-%% \code{block95}, that only jump to another block. We discuss a solution
-%% to this problem in Section~\ref{sec:opt-jumps}.
+\begin{figure}[tbp]
+{\if\edition\racketEd        
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+% cond_test_41.rkt
+\begin{lstlisting}
+(let ([x (read)])
+   (let ([y (read)])
+      (if (if (< x 1)
+             (eq? x 0)
+             (eq? x 2))
+         (+ y 2)
+         (+ y 10))))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.55\textwidth}
+\begin{lstlisting}
+start:
+    x = (read);
+    y = (read);
+    if (< x 1)
+       goto block_4;
+    else
+       goto block_5;
+block_4:
+    if (eq? x 0)
+       goto block_2;
+    else
+       goto block_3;
+block_5:
+    if (eq? x 2)
+       goto block_2;
+    else
+       goto block_3;
+block_2:
+    return (+ y 2);
+block_3:
+    return (+ y 10);
+\end{lstlisting}
+\end{minipage}
+\end{tabular} 
+\fi}
+{\if\edition\pythonEd
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+% cond_test_41.rkt
+\begin{lstlisting}
+x = input_int()
+y = input_int()
+print(y + 2             \
+      if (x == 0        \
+          if x < 1      \
+          else x == 2) \
+      else y + 10)
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.55\textwidth}
+\begin{lstlisting}
+start:
+  x = input_int()
+  y = input_int()
+  if x < 1:
+    goto block_8
+  else:
+    goto block_9
+block_8:
+  if x == 0:
+    goto block_4
+  else:
+    goto block_5
+block_9:
+  if x == 2:
+    goto block_6
+  else:
+    goto block_7
+block_4:
+  goto block_2
+block_5:
+  goto block_3
+block_6:
+  goto block_2
+block_7:
+  goto block_3
+block_2:
+  tmp_0 = y + 2
+  goto block_1
+block_3:
+  tmp_0 = y + 10
+  goto block_1
+block_1:
+  print(tmp_0)
+  return 0
+\end{lstlisting}
+\end{minipage}
+\end{tabular} 
+\fi}
+\caption{Translation from \LangIf{} to \LangCIf{}
+  via the \code{explicate\_control}.}
+\label{fig:explicate-control-s1-38}
+\end{figure}
+
+
+
 
 {\if\edition\racketEd        
 %
@@ -7942,10 +8043,10 @@ Recall that in Section~\ref{sec:explicate-control-Lvar} we implement
 functions, \code{explicate\_tail} and \code{explicate\_assign}.  The
 former function translates expressions in tail position whereas the
 later function translates expressions on the right-hand-side of a
-\key{let}. With the addition of \key{if} expression in \LangIf{} we
+\key{let}. With the addition of \key{if} expression to \LangIf{} we
 have a new kind of position to deal with: the predicate position of
 the \key{if}. We need another function, \code{explicate\_pred}, that
-decides how to compile an \key{if} by analyzing its predicate.  So
+decides how to compile an \key{if} by analyzing its condition.  So
 \code{explicate\_pred} takes an \LangIf{} expression and two
 \LangCIf{} tails for the then-branch and else-branch and outputs a
 tail.  In the following paragraphs we discuss specific cases in the
@@ -8101,8 +8202,7 @@ position.
 \end{lstlisting}
 The two branches are recursively compiled to \code{return 42;} and
 \code{return 777;}. We then delegate to \code{explicate\_pred},
-passing the condition \code{(eq? x 0)} and the two return statements, which is
-used as the result for \code{explicate\_tail}.
+passing the condition \code{(eq? x 0)} and the two return statements.
 
 Next let us consider a program with an \code{if} on the right-hand
 side of a \code{let}.
@@ -8114,13 +8214,14 @@ side of a \code{let}.
 Note that the body of the inner \code{let} will have already been
 compiled to \code{return (+ x 2);} and passed as the \code{cont}
 parameter of \code{explicate\_assign}. We'll need to use \code{cont}
-to recursively process both branches of the \code{if}, so we generate
-the following block using an auxiliary function named \code{create\_block}.
+to recursively process both branches of the \code{if}, and we do not
+want to duplicate code, so we generate the following block using an
+auxiliary function named \code{create\_block}.
 \begin{lstlisting}
 block_6:
   return (+ x 2)
 \end{lstlisting}
-and use \code{goto block\_6;} as the \code{cont} argument for
+We then use \code{goto block\_6;} as the \code{cont} argument for
 compiling the branches. So the two branches compile to
 \begin{lstlisting}
 x = 40;
@@ -8131,8 +8232,8 @@ and
 x = 777;
 goto block_6;
 \end{lstlisting}
-We then delegate to \code{explicate\_pred}, passing the condition \code{(eq? y
-  0)} and the above code for the branches.
+Finally, we delegate to \code{explicate\_pred}, passing the condition
+\code{(eq? y 0)} and the above code for the branches.
 
 \fi}
 
@@ -8388,13 +8489,13 @@ and then the comparison \racket{\code{(< x 1)}}\python{\code{x < 1}}
 in the predicate of the inner \key{if}.  In the output of
 \code{explicate\_control}, in the
 block labeled \code{start}, are two assignment statements followed by a
-\code{if} statement that branches to \code{block\_8} or
-\code{block\_9}. The blocks associated with those labels contain the
+\code{if} statement that branches to \code{block\_4} or
+\code{block\_5}. The blocks associated with those labels contain the
 translations of the code
 \racket{\code{(eq? x 0)}}\python{\code{x == 0}}
 and
 \racket{\code{(eq? x 2)}}\python{\code{x == 2}},
-respectively.  In particular, we start \code{block\_8} with the
+respectively.  In particular, we start \code{block\_4} with the
 comparison
 \racket{\code{(eq? x 0)}}\python{\code{x == 0}}
 and then branch to \code{block\_4} or \code{block\_5}.
@@ -8409,125 +8510,11 @@ corresponds to the two branches of the outer \key{if}, i.e.,
 \racket{\code{(+ y 2)}}\python{\code{y + 2}} and
 \racket{\code{(+ y 10)}}\python{\code{y + 10}}.
 %
-The story for \code{block\_9} is similar to that of \code{block\_8}.
+The story for \code{block\_5} is similar to that of \code{block\_4}.
 %
 \python{The \code{block\_1} corresponds to the \code{print} statment
   at the end of the program.}
 
-\begin{figure}[tbp]
-{\if\edition\racketEd        
-\begin{tabular}{lll}
-\begin{minipage}{0.4\textwidth}
-% cond_test_41.rkt
-\begin{lstlisting}
-(let ([x (read)])
-   (let ([y (read)])
-      (if (if (< x 1)
-             (eq? x 0)
-             (eq? x 2))
-         (+ y 2)
-         (+ y 10))))
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.55\textwidth}
-\begin{lstlisting}
-start:
-    x = (read);
-    y = (read);
-    if (< x 1)
-       goto block_8;
-    else
-       goto block_9;
-block_8:
-    if (eq? x 0)
-       goto block_4;
-    else
-       goto block_5;
-block_9:
-    if (eq? x 2)
-       goto block_6;
-    else
-       goto block_7;
-block_4:
-    goto block_2;
-block_5:
-    goto block_3;
-block_6:
-    goto block_2;
-block_7:
-    goto block_3;
-block_2:
-    return (+ y 2);
-block_3:
-    return (+ y 10);
-\end{lstlisting}
-\end{minipage}
-\end{tabular} 
-\fi}
-{\if\edition\pythonEd
-\begin{tabular}{lll}
-\begin{minipage}{0.4\textwidth}
-% cond_test_41.rkt
-\begin{lstlisting}
-x = input_int()
-y = input_int()
-print(y + 2             \
-      if (x == 0        \
-          if x < 1      \
-          else x == 2) \
-      else y + 10)
-\end{lstlisting}
-\end{minipage}
-&
-$\Rightarrow$
-&
-\begin{minipage}{0.55\textwidth}
-\begin{lstlisting}
-start:
-  x = input_int()
-  y = input_int()
-  if x < 1:
-    goto block_8
-  else:
-    goto block_9
-block_8:
-  if x == 0:
-    goto block_4
-  else:
-    goto block_5
-block_9:
-  if x == 2:
-    goto block_6
-  else:
-    goto block_7
-block_4:
-  goto block_2
-block_5:
-  goto block_3
-block_6:
-  goto block_2
-block_7:
-  goto block_3
-block_2:
-  tmp_0 = y + 2
-  goto block_1
-block_3:
-  tmp_0 = y + 10
-  goto block_1
-block_1:
-  print(tmp_0)
-  return 0
-\end{lstlisting}
-\end{minipage}
-\end{tabular} 
-\fi}
-\caption{Translation from \LangIf{} to \LangCIf{}
-  via the \code{explicate\_control}.}
-\label{fig:explicate-control-s1-38}
-\end{figure}
 
 {\if\edition\racketEd
 The way in which the \code{shrink} pass transforms logical operations
