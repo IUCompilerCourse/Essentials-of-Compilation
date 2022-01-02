@@ -2587,9 +2587,9 @@ Figure~\ref{fig:x86-int-ast}. We refer to this language as
 The main difference compared to the concrete syntax of \LangXInt{}
 (Figure~\ref{fig:x86-int-concrete}) is that labels are not allowed in
 front of every instruction. Instead instructions are grouped into
-\emph{blocks}\index{subject}{block} with a
-label associated with every block, which is why the \key{X86Program}
-struct includes an alist mapping labels to blocks. The reason for this
+\emph{basic blocks}\index{subject}{basic block} with a
+label associated with every basic block, which is why the \key{X86Program}
+struct includes an alist mapping labels to basic blocks. The reason for this
 organization becomes apparent in Chapter~\ref{ch:Lif} when we
 introduce conditional branching. The \code{Block} structure includes
 an $\itm{info}$ field that is not needed for this chapter but becomes
@@ -2741,9 +2741,8 @@ Our compiler for \LangVar{} consists of the following passes.
 {\if\edition\racketEd
 \item[\key{explicate\_control}] makes the execution order of the
   program explicit. It converts the abstract syntax tree
-  representation into a graph in which each node contains a sequence
-  of statements and the edges between nodes say which nodes contain
-  jumps to other nodes.
+  representation into a graph in which each node is a labeled sequence
+  of statements and the edges are \code{goto} statements.
 \fi}
 
 \item[\key{select\_instructions}] handles the difference between
@@ -7285,6 +7284,7 @@ making it straightforward to compile \code{if} statements to x86.  The
 \key{CProgram} construct contains an alist mapping labels to $\Tail$
 expressions. A \code{goto} statement transfers control to the $\Tail$
 expression corresponding to its label.
+%
 Figure~\ref{fig:c1-concrete-syntax} defines the concrete syntax of the
 \LangCIf{} intermediate language and Figure~\ref{fig:c1-syntax}
 defines its abstract syntax.
@@ -7308,13 +7308,14 @@ statement to finish the program with a specified value.
 %
 The \key{CProgram} construct contains a dictionary mapping labels to
 lists of statements that end with a \code{return} statement, a
-\code{goto}, or a conditional \code{goto}.  Statement lists of this
-form are called \emph{basic blocks}\index{subject}{basic block}: there
-is a control transfer at the end and control only enters at the
-beginning of the list, which is marked by the label.
+\code{goto}, or a conditional \code{goto}.
+%% Statement lists of this
+%% form are called \emph{basic blocks}\index{subject}{basic block}: there
+%% is a control transfer at the end and control only enters at the
+%% beginning of the list, which is marked by the label.
 %
-A \code{goto} statement transfers control to basic block corresponding
-to its label.
+A \code{goto} statement transfers control to the sequence of statements
+associated with its label.
 %
 The concrete syntax for \LangCIf{} is defined in
 Figure~\ref{fig:c1-concrete-syntax} and the abstract syntax is defined
@@ -7366,7 +7367,7 @@ in Figure~\ref{fig:c1-syntax}.
 \Stmt &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
      &\MID& \ASSIGN{\VAR{\Var}}{\Exp}  
      \MID \RETURN{\Exp} \MID \GOTO{\itm{label}} \\
-    &\MID& \IFSTMT{\CMP{\Atm}{\itm{cmp}}{\Atm}}{\LS\GOTO{\itm{label}}\RS}{\LS\GOTO{\itm{label}}\RS} 
+     &\MID& \IFSTMT{\CMP{\Atm}{\itm{cmp}}{\Atm}}{\LS\GOTO{\itm{label}}\RS}{\LS\GOTO{\itm{label}}\RS}
 \end{array}
 }
   
@@ -7444,6 +7445,11 @@ language. Figures~\ref{fig:x86-1-concrete} and \ref{fig:x86-1} define
 the concrete and abstract syntax for the \LangXIf{} subset of x86,
 which includes instructions for logical operations, comparisons, and
 \racket{conditional} jumps.
+%
+\python{The abstract syntax for an \LangXIf{} program contains a
+  dictionary mapping labels to sequences of instructions, each of
+  which we refer to as a \emph{basic block}\index{subject}{basic
+    block}.}
 
 One challenge is that x86 does not provide an instruction that
 directly implements logical negation (\code{not} in \LangIf{} and
@@ -7484,7 +7490,7 @@ $\Atm$ to x86.
    \MID \key{cmpq}~\Arg\key{,}~\Arg
     \MID  \key{set}cc~\Arg 
     \MID \key{movzbq}~\Arg\key{,}~\Arg \\
-    &\MID& \key{j}cc~\itm{label}
+    &\MID& \key{j}cc~\itm{label} \\
 \end{array}
 }
 
@@ -7558,7 +7564,8 @@ $\Atm$ to x86.
        &\MID& \BININSTR{\scode{set}}{\itm{cc}}{\Arg} 
        \MID \BININSTR{\scode{movzbq}}{\Arg}{\Arg}\\
        &\MID&  \JMPIF{\itm{cc}}{\itm{label}} \\
-\LangXIfM{} &::= & \XPROGRAM{\itm{info}}{\LC\itm{label} \,\key{:}\, \Instr^{*} \key{,} \ldots \RC }
+\Block &::= & \Instr^{+} \\
+\LangXIfM{} &::= & \XPROGRAM{\itm{info}}{\LC\itm{label} \,\key{:}\, \Block \key{,} \ldots \RC }
 \end{array}
 \]
 \fi}
@@ -7897,16 +7904,17 @@ Unfortunately, this approach duplicates the two branches from the
 outer \code{if} and a compiler must never duplicate code!  After all,
 the two branches could be very large expressions.
 
-We need a way to perform the above transformation but without
-duplicating code. That is, we need a way for different parts of a
-program to refer to the same piece of code.
+How can we apply the above transformation but without duplicating
+code? In other words, how can two different parts of a program refer
+to one piece of code.
 %
-Put another way, we need to move away from abstract syntax
-\emph{trees} and instead use \emph{graphs}.
+The answer is that we must move away from abstract syntax \emph{trees}
+and instead use \emph{graphs}.
 %
 At the level of x86 assembly this is straightforward because we can
 label the code for each branch and insert jumps in all the places that
-need to execute the branch.
+need to execute the branch. In this way, jump instructions are edges
+in the graph and the basic blocks are the nodes.
 %
 Likewise, our language \LangCIf{} provides the ability to label a
 sequence of statements and to jump to a label via \code{goto}.
@@ -14101,8 +14109,8 @@ language, whose syntax is defined in Figure~\ref{fig:x86-3}.
 \Instr &::=& \ldots
      \MID \key{callq}\;\key{*}\Arg \MID \key{tailjmp}\;\Arg 
      \MID \key{leaq}\;\Arg\key{,}\;\key{\%}\Reg \\
-\Block &::= & \itm{label}\key{:}\, \Instr^{*} \\
-\Def &::= & \key{.globl}\,\itm{label}\; \Block^{*} \\
+\Block &::= & \Instr^{+} \\
+\Def &::= & \key{.globl}\,\itm{label}\; (\itm{label}\key{:}\, \Block)^{*} \\
 \LangXIndCallM{} &::= & \Def\ldots
 \end{array}
 \]
