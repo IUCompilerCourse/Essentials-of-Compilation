@@ -8187,7 +8187,9 @@ def explicate_control(p):
 
 
 {\if\edition\racketEd
-%
+
+\subsection{Explicate Tail and Assign}
+  
 The \code{explicate\_tail} and \code{explicate\_assign} functions need
 additional cases for Boolean constants and \key{if}.  The cases for
 \code{if} should recursively compile the two branches using either
@@ -8196,13 +8198,15 @@ cases should then invoke \code{explicate\_pred} on the condition
 expression, passing in the generated code for the two branches.  For
 example, consider the following program with an \code{if} in tail
 position.
+% cond_test_6.rkt
 \begin{lstlisting}
 (let ([x (read)])
   (if (eq? x 0) 42 777))
 \end{lstlisting}
-The two branches are recursively compiled to \code{return 42;} and
-\code{return 777;}. We then delegate to \code{explicate\_pred},
-passing the condition \code{(eq? x 0)} and the two return statements.
+The two branches are recursively compiled to return statements.  We
+then delegate to \code{explicate\_pred}, passing the condition
+\code{(eq? x 0)} and the two return statements.  We return to this
+example shortly when we discuss \code{explicate\_pred}.
 
 Next let us consider a program with an \code{if} on the right-hand
 side of a \code{let}.
@@ -8216,28 +8220,60 @@ compiled to \code{return (+ x 2);} and passed as the \code{cont}
 parameter of \code{explicate\_assign}. We'll need to use \code{cont}
 to recursively process both branches of the \code{if}, and we do not
 want to duplicate code, so we generate the following block using an
-auxiliary function named \code{create\_block}.
+auxiliary function named \code{create\_block} that we discuss below.
 \begin{lstlisting}
 block_6:
   return (+ x 2)
 \end{lstlisting}
 We then use \code{goto block\_6;} as the \code{cont} argument for
 compiling the branches. So the two branches compile to
+\begin{center}
+\begin{minipage}{0.2\textwidth}
 \begin{lstlisting}
 x = 40;
 goto block_6;
 \end{lstlisting}
-and
+\end{minipage}
+\hspace{0.5in} and \hspace{0.5in}
+\begin{minipage}{0.2\textwidth}
 \begin{lstlisting}
 x = 777;
 goto block_6;
 \end{lstlisting}
+\end{minipage}
+\end{center}
 Finally, we delegate to \code{explicate\_pred}, passing the condition
 \code{(eq? y 0)} and the above code for the branches.
 
+\subsection{Create Block}
+
+We recommend implementing the \code{create\_block} auxiliary function
+as follows, using a global variable \code{basic-blocks} to store a
+dictionary that maps labels to $\Tail$ expressions. The main idea is
+that \code{create\_block} generates a new label and then associates
+the given \code{tail} with the new label in the \code{basic-blocks}
+dictionary. The result of \code{create\_block} is a \code{Goto} to the
+new label. However, if the given \code{tail} is already a \code{Goto},
+then there is no need to generate a new label and entry in
+\code{basic-blocks}; we can simply return that \code{Goto}.
+%
+\begin{lstlisting}
+(define (create_block tail)
+  (match tail
+    [(Goto label) (Goto label)]
+    [else
+      (let ([label (gensym 'block)])
+        (set! basic-blocks (cons (cons label tail) basic-blocks))
+        (Goto label))]))
+\end{lstlisting}
+
+
 \fi}
 
-{\if\edition\racketEd        
+{\if\edition\racketEd
+
+\subsection{Explicate Predicate}
+  
 \begin{figure}[tbp]
 \begin{lstlisting}
 (define (explicate_pred cnd thn els)
@@ -8277,26 +8313,29 @@ Consider the case for comparison operators. We translate the
 comparison to an \code{if} statement whose branches are \code{goto}
 statements created by applying \code{create\_block} to the code
 generated for the \code{thn} and \code{els} branches. Let us
-illustrate this translation with an example.  Returning
-to the program with an \code{if} expression in tail position,
-we invoke \code{explicate\_pred} on its condition
-\racket{\code{(eq? x 0)}}
-\python{\code{x == 0}}
-which happens to be a comparison operator.
+illustrate this translation by returning to the program with an
+\code{if} expression in tail position, shown again below. We invoke
+\code{explicate\_pred} on its condition \racket{\code{(eq? x 0)}}
+\python{\code{x == 0}}.
+%
 {\if\edition\racketEd
 \begin{lstlisting}
 (let ([x (read)])
   (if (eq? x 0) 42 777))
 \end{lstlisting}
-  \fi}
+\fi}
+%
 {\if\edition\pythonEd
 \begin{lstlisting}
 x = input_int()
 42 if x == 0 else 777
 \end{lstlisting}
-  \fi}
-The two branches \code{42} and \code{777} were already compiled to \code{return}
-statements, from which we now create the following blocks.
+\fi}
+%
+\noindent The two branches \code{42} and \code{777} were already
+compiled to \code{return} statements, from which we now create the
+following blocks.
+%
 \begin{center}
 \begin{minipage}{\textwidth}
 \begin{lstlisting}
@@ -8308,7 +8347,7 @@ block_2:
   \end{minipage}
 \end{center}
 %
-So \code{explicate\_pred} compiles the comparison
+After that, \code{explicate\_pred} compiles the comparison
 \racket{\code{(eq? x 0)}}
 \python{\code{x == 0}}
 to the following \code{if} statement.
@@ -8343,38 +8382,23 @@ either the \code{thn} or \code{els} branch depending on whether the
 constant is \TRUE{} or \FALSE{}. Let us illustrate this with the
 following program.
 {\if\edition\racketEd
-\begin{center}
-\begin{minipage}{\textwidth}
 \begin{lstlisting}
 (if #t 42 777)
 \end{lstlisting}
-\end{minipage}
-\end{center}
 \fi}
 {\if\edition\pythonEd
-\begin{center}
-\begin{minipage}{\textwidth}
 \begin{lstlisting}
 42 if True else 777
 \end{lstlisting}
-\end{minipage}
-\end{center}
 \fi}
 %
-Again, the two branches \code{42} and \code{777} were compiled to
-\code{return} statements, so \code{explicate\_pred} compiles the
-constant
-\racket{\code{\#t}}
-\python{\code{True}}
-to the code for the ``then'' branch.
-\begin{center}
-\begin{minipage}{\textwidth}
+\noindent Again, the two branches \code{42} and \code{777} were
+compiled to \code{return} statements, so \code{explicate\_pred}
+compiles the constant \racket{\code{\#t}} \python{\code{True}} to the
+code for the ``then'' branch.
 \begin{lstlisting}
 return 42;
 \end{lstlisting}
-\end{minipage}
-\end{center}
-%
 This case demonstrates that we sometimes discard the \code{thn} or
 \code{els} blocks that are input to \code{explicate\_pred}.
 
@@ -8498,15 +8522,8 @@ and
 respectively.  In particular, we start \code{block\_4} with the
 comparison
 \racket{\code{(eq? x 0)}}\python{\code{x == 0}}
-and then branch to \code{block\_4} or \code{block\_5}.
-Here was see that our algorithm sometimes inserts unnecessary blocks:
-\code{block\_4} is just a \code{goto} to \code{block\_2}
-and \code{block\_5} is just a \code{goto} to \code{block\_3}.
-It would be better to skip blocks \code{block\_4} and \code{block\_5}
-and go directly to \code{block\_2} and \code{block\_3},
-which we investigate in Section~\ref{sec:opt-jumps}.
-Getting back to the example, \code{block\_2} and \code{block\_3},
-corresponds to the two branches of the outer \key{if}, i.e.,
+and then branch to \code{block\_2} or \code{block\_3},
+which correspond to the two branches of the outer \key{if}, i.e.,
 \racket{\code{(+ y 2)}}\python{\code{y + 2}} and
 \racket{\code{(+ y 10)}}\python{\code{y + 10}}.
 %
@@ -8517,6 +8534,9 @@ The story for \code{block\_5} is similar to that of \code{block\_4}.
 
 
 {\if\edition\racketEd
+
+\subsection{Interactions between Explicate and Shrink}
+  
 The way in which the \code{shrink} pass transforms logical operations
 such as \code{and} and \code{or} can impact the quality of code
 generated by \code{explicate\_control}. For example, consider the
