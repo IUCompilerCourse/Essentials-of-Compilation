@@ -10519,7 +10519,7 @@ Figure~\ref{fig:Lwhile-anf-syntax} defines the output language
 {\if\edition\racketEd    
 \[
 \begin{array}{l}
-  \gray{\LvarMonadASTRacket} \\ 
+  \gray{\LvarMonadASTRacket} \\ \hline
   \gray{\LifMonadASTRacket} \\ \hline
   \LwhileMonadASTRacket \\ 
 \begin{array}{rcl}
@@ -11370,15 +11370,15 @@ the bottom). In a two-space collector, the heap is divided into two
 parts named the FromSpace\index{subject}{FromSpace} and the
 ToSpace\index{subject}{ToSpace}.  Initially, all allocations go to the
 FromSpace until there is not enough room for the next allocation
-request. At that point, the garbage collector goes to work to room for
-the next allocation.
+request. At that point, the garbage collector goes to work to make
+room for the next allocation.
 
 A copying collector makes more room by copying all of the live objects
 from the FromSpace into the ToSpace and then performs a sleight of
 hand, treating the ToSpace as the new FromSpace and the old FromSpace
 as the new ToSpace.  In the example of
-Figure~\ref{fig:copying-collector}, there are three pointers in the
-root set, one in a register and two on the stack.  All of the live
+Figure~\ref{fig:copying-collector}, the root set consists of three
+pointers, one in a register and two on the stack.  All of the live
 objects have been copied to the ToSpace (the right-hand side of
 Figure~\ref{fig:copying-collector}) in a way that preserves the
 pointer relationships. For example, the pointer in the register still
@@ -11389,8 +11389,9 @@ not get copied into the ToSpace.
 The exact situation in Figure~\ref{fig:copying-collector} cannot be
 created by a well-typed program in \LangVec{} because it contains a
 cycle. However, creating cycles will be possible once we get to
-\LangDyn{}.  We design the garbage collector to deal with cycles to
-begin with so we will not need to revisit this issue.
+\LangDyn{} (Chapter~\ref{ch:Ldyn}).  We design the garbage collector
+to deal with cycles to begin with so we will not need to revisit this
+issue.
 
 \begin{figure}[tbp]
 \centering
@@ -11433,10 +11434,10 @@ that any pointers inside the copied tuples in the queue still point
 back to the FromSpace. Once the initial queue has been created, the
 algorithm enters a loop in which it repeatedly processes the tuple at
 the front of the queue and pops it off the queue.  To process a tuple,
-the algorithm copies all the tuple that are directly reachable from it
+the algorithm copies all the objects that are directly reachable from it
 to the ToSpace, placing them at the back of the queue. The algorithm
 then updates the pointers in the popped tuple so they point to the
-newly copied tuples.
+newly copied objects.
 
 \begin{figure}[tbp]
 \centering
@@ -11470,10 +11471,9 @@ integers. There are several ways to accomplish this.
   object it is~\citep{McCarthy:1960dz}.
 \item Store different types of objects in different
   regions~\citep{Steele:1977ab}.
-\item Use type information from the program to either generate
-  type-specific code for collecting or to generate tables that can
-  guide the
-  collector~\citep{Appel:1989aa,Goldberg:1991aa,Diwan:1992aa}.
+\item Use type information from the program to either (a) generate
+  type-specific code for collecting or (b) generate tables that 
+  guide the collector~\citep{Appel:1989aa,Goldberg:1991aa,Diwan:1992aa}.
 \end{enumerate}
 Dynamically typed languages, such as \racket{Racket}\python{Python},
 need to tag objects anyways, so option 1 is a natural choice for those
@@ -11555,23 +11555,23 @@ and the heap size. Both need to be multiples of $64$ and $16384$ is a
 good choice for both.  The \code{initialize} function puts the address
 of the beginning of the FromSpace into the global variable
 \code{free\_ptr}. The global variable \code{fromspace\_end} points to
-the address that is 1-past the last element of the FromSpace. (We use
+the address that is 1-past the last element of the FromSpace. We use
 half-open intervals to represent chunks of
-memory~\citep{Dijkstra:1982aa}.)  The \code{rootstack\_begin} variable
+memory~\citep{Dijkstra:1982aa}.  The \code{rootstack\_begin} variable
 points to the first element of the root stack.
 
 As long as there is room left in the FromSpace, your generated code
 can allocate tuples simply by moving the \code{free\_ptr} forward.
 %
-The amount of room left in FromSpace is the difference between the
+The amount of room left in the FromSpace is the difference between the
 \code{fromspace\_end} and the \code{free\_ptr}.  The \code{collect}
 function should be called when there is not enough room left in the
 FromSpace for the next allocation.  The \code{collect} function takes
 a pointer to the current top of the root stack (one past the last item
 that was pushed) and the number of bytes that need to be
 allocated. The \code{collect} function performs the copying collection
-and leaves the heap in a state such that the next allocation will
-succeed.
+and leaves the heap in a state such that there is enough room for the
+next allocation.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -11615,13 +11615,15 @@ succeed.
 
 The introduction of garbage collection has a non-trivial impact on our
 compiler passes. We introduce a new compiler pass named
-\code{expose\_allocation}. We make significant changes to
+\code{expose\_allocation} that elaborates the code for allocating
+tuples. We also make significant changes to
 \code{select\_instructions}, \code{build\_interference},
 \code{allocate\_registers}, and \code{prelude\_and\_conclusion} and
-make minor changes in several more passes.  The following program will
-serve as our running example.  It creates two tuples, one nested
-inside the other. Both tuples have length one. The program accesses
-the element in the inner tuple.
+make minor changes in several more passes.
+
+The following program will serve as our running example.  It creates
+two tuples, one nested inside the other. Both tuples have length
+one. The program accesses the element in the inner tuple.
 % tests/vectors_test_17.rkt
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -11655,12 +11657,12 @@ The pass \code{expose\_allocation} lowers tuple creation into a
 conditional call to the collector followed by allocating the
 appropriate amount of memory and initializing it.  We choose to place
 the \code{expose\_allocation} pass before
-\code{remove\_complex\_operands} because the code generated by
-\code{expose\_allocation} contains complex operands.
+\code{remove\_complex\_operands} because it generates
+code that contains complex operands.
 
 The output of \code{expose\_allocation} is a language \LangAlloc{}
-that extends \LangVec{} with new forms that we use in the translation
-of tuple creation.
+replaces tuple creation with new lower-level forms that we use in the
+translation of tuple creation.
 %
 {\if\edition\racketEd
 \[
@@ -11683,9 +11685,8 @@ of tuple creation.
    \Stmt &::= & \CASSIGN{\CPUT{\Exp}{\itm{int}}}{\Exp}
 \end{array}
 \]
-
 \fi}
-
+%
 The \CCOLLECT{$n$} form runs the garbage collector, requesting that it
 make sure that there are $n$ bytes ready to be allocated. During
 instruction selection, the \CCOLLECT{$n$} form will become a call to
@@ -11707,7 +11708,7 @@ as \code{free\_ptr}.
   at the end.}
 
 The following shows the transformation of tuple creation into 1) a
-sequence of temporary variables bindings for the initializing
+sequence of temporary variable bindings for the initializing
 expressions, 2) a conditional call to \code{collect}, 3) a call to
 \code{allocate}, and 4) the initialization of the tuple. The
 \itm{len} placeholder refers to the length of the tuple and
@@ -11772,28 +11773,23 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
 \begin{lstlisting}
 (vector-ref
  (vector-ref
-  (let ([vecinit7976
-         (let ([vecinit7972 42])
-           (let ([collectret7974
-                  (if (< (+ (global-value free_ptr) 16) 
-                         (global-value fromspace_end))
-                      (void)
-                      (collect 16)
-                      )])
-             (let ([alloc7971 (allocate 1 (Vector Integer))])
-               (let ([initret7973 (vector-set! alloc7971 0 vecinit7972)])
-                 alloc7971))))])
-    (let ([collectret7978
-           (if (< (+ (global-value free_ptr) 16)
-                  (global-value fromspace_end))
-               (void)
-               (collect 16)
-               )])
-      (let ([alloc7975 (allocate 1 (Vector (Vector Integer)))])
-        (let ([initret7977 (vector-set! alloc7975 0 vecinit7976)])
-          alloc7975))))
+  (let ([vecinit6
+         (let ([_4 (if (< (+ (global-value free_ptr) 16)
+                                 (global-value fromspace_end))
+                           (void)
+                           (collect 16))])
+         (let ([alloc2 (allocate 1 (Vector Integer))])
+         (let ([_3 (vector-set! alloc2 0 42)])
+           alloc2)))])
+  (let ([_8 (if (< (+ (global-value free_ptr) 16)
+                          (global-value fromspace_end))
+                    (void)
+                    (collect 16))])
+  (let ([alloc5 (allocate 1 (Vector (Vector Integer)))])
+  (let ([_7 (vector-set! alloc5 0 vecinit6)])
+    alloc5))))
   0)
- 0)
+0)
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
@@ -11855,6 +11851,14 @@ Figure~\ref{fig:Lvec-anf-syntax}
 shows the grammar for the output language \LangAllocANF{} of this
 pass, which is \LangAlloc{} in monadic normal form.
 
+\newcommand{\LtupMonadASTRacket}{
+\begin{array}{rcl}
+\Exp &::=& \COLLECT{\Int} \RP \MID \ALLOCATE{\Int}{\Type}
+   \MID \GLOBALVALUE{\Var}
+\end{array}
+
+}
+
 \newcommand{\LtupMonadASTPython}{
 \begin{array}{rcl}
 \Exp &::=& \GET{\Atm}{\Atm} \\
@@ -11873,18 +11877,14 @@ pass, which is \LangAlloc{} in monadic normal form.
 \small
 {\if\edition\racketEd    
 \[
+\begin{array}{l}
+  \gray{\LvarMonadASTRacket} \\ \hline
+  \gray{\LifMonadASTRacket} \\ \hline
+  \gray{\LwhileMonadASTRacket} \\ \hline
+    \LtupMonadASTRacket \\
 \begin{array}{rcl}
-  \Atm &::=& \gray{ \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} 
-       \MID \VOID{} } \\
-\Exp &::=& \gray{ \Atm \MID \READ{} } \\
-   &\MID& \gray{ \NEG{\Atm} \MID \ADD{\Atm}{\Atm} } \\
-   &\MID& \gray{ \LET{\Var}{\Exp}{\Exp} } \\
-   &\MID& \gray{ \UNIOP{\key{'not}}{\Atm} } \\
-   &\MID& \gray{ \BINOP{\itm{cmp}}{\Atm}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} }\\
-   &\MID& \COLLECT{\Int} \RP \MID \ALLOCATE{\Int}{\Type}
-   \MID \GLOBALVALUE{\Var}\\
-%  &\MID& \LP\key{HasType}~\Exp~\Type\RP \\
-\LangAllocANFM{}  &::=& \gray{ \PROGRAM{\code{'()}}{\Exp} }
+\LangAllocANFM{}  &::=& \PROGRAM{\code{'()}}{\Exp} 
+\end{array}
 \end{array}
 \]
 \fi}
@@ -12000,8 +12000,8 @@ The output of \code{explicate\_control} is a program in the
 intermediate language \LangCVec{}, whose abstract syntax is defined in
 Figure~\ref{fig:c2-syntax}.
 %
-\racket{(The concrete syntax is defined in
-  Figure~\ref{fig:c2-concrete-syntax} of the Appendix.)}
+%% \racket{(The concrete syntax is defined in
+%%   Figure~\ref{fig:c2-concrete-syntax} of the Appendix.)}
 %
 The new expressions of \LangCVec{} include \key{allocate},
 %
@@ -12017,7 +12017,10 @@ assignment to a tuple element.}
 \racket{\LangCVec{} also includes the new \code{collect} statement.}
 %
 The \code{explicate\_control} pass can treat these new forms much like
-the other forms that we've already encoutered.
+the other forms that we've already encountered.  The output of the
+\code{explicate\_control} pass on the running example is shown on the
+left-side of Figure~\ref{fig:select-instr-output-gc} in the next
+section.
 
 
 \section{Select Instructions and the \LangXGlobal{} Language}
@@ -12041,8 +12044,8 @@ different concrete syntax (see Figures~\ref{fig:x86-2-concrete} and
 \ref{fig:x86-2}).  \index{subject}{x86}
 
 The tuple read and write forms translate into \code{movq}
-instructions.  (The plus one in the offset is to get past the tag at
-the beginning of the tuple representation.)
+instructions.  (The $+1$ in the offset is to move past the tag at the
+beginning of the tuple representation.)
 %
 \begin{center}
 \begin{minipage}{\textwidth}
@@ -12081,7 +12084,7 @@ are obtained by translating from \LangCVec{} to x86.
 %
 The move of $\itm{tup}'$ to
 register \code{r11} ensures that offset expression
-\code{$-8(n+1)$(\%r11)} contains a register operand.  This requires
+\code{$8(n+1)$(\%r11)} contains a register operand.  This requires
 removing \code{r11} from consideration by the register allocating.
 
 Why not use \code{rax} instead of \code{r11}? Suppose we instead used
@@ -12110,17 +12113,17 @@ The x86 instructions \code{andq} (for bitwise-and) and \code{sarq}
 (shift right) can be used to accomplish this.
 
 We compile the \code{allocate} form to operations on the
-\code{free\_ptr}, as shown below. This approach is called \emph{inline
-  allocation} as it implements allocation without a function call, by
-simply bumping the allocation pointer. It is much more efficient than
-calling a function for each allocation. The address in the
-\code{free\_ptr} is the next free address in the FromSpace, so we copy
-it into \code{r11} and then move it forward by enough space for the
-tuple being allocated, which is $8(\itm{len}+1)$ bytes because each
-element is 8 bytes (64 bits) and we use 8 bytes for the tag.  We then
-initialize the \itm{tag} and finally copy the address in \code{r11} to
-the left-hand-side. Refer to Figure~\ref{fig:tuple-rep} to see how the
-tag is organized.
+\code{free\_ptr}, as shown below.  This approach is called
+\emph{inline allocation} as it implements allocation without a
+function call, by simply bumping the allocation pointer. It is much
+more efficient than calling a function for each allocation. The
+address in the \code{free\_ptr} is the next free address in the
+FromSpace, so we copy it into \code{r11} and then move it forward by
+enough space for the tuple being allocated, which is $8(\itm{len}+1)$
+bytes because each element is 8 bytes (64 bits) and we use 8 bytes for
+the tag.  We then initialize the \itm{tag} and finally copy the
+address in \code{r11} to the left-hand-side. Refer to
+Figure~\ref{fig:tuple-rep} to see how the tag is organized.
 %
 \racket{We recommend using the Racket operations
 \code{bitwise-ior} and \code{arithmetic-shift} to compute the tag
@@ -12188,14 +12191,31 @@ available for use by the register allocator.
 \fi}
 
 
+\newcommand{\GrammarXGlobal}{
+\begin{array}{lcl}
+  \Arg &::=& \Var \key{(\%rip)} 
+\end{array}
+}
+
+\newcommand{\ASTXGlobalRacket}{
+\begin{array}{lcl}
+  \Arg &::=&  \GLOBAL{\Var} 
+\end{array}
+}
+
+
 \begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \[
+\begin{array}{l}
+  \gray{\GrammarXInt} \\ \hline
+  \gray{\GrammarXIf} \\ \hline
+  \GrammarXGlobal \\
 \begin{array}{lcl}
-  \Arg &::=& \gray{ \key{\$}\Int \MID \key{\%}\Reg \MID \Int\key{(}\key{\%}\Reg\key{)} \MID \key{\%}\itm{bytereg} } \MID \Var \key{(\%rip)} \\
-\LangXGlobalM{} &::= & \gray{ \key{.globl main} }\\
-      &    & \gray{ \key{main:} \; \Instr^{*} }
+\LangXGlobalM{} &::= &  \key{.globl main} \\
+      &    &  \key{main:} \; \Instr^{*} 
+\end{array}
 \end{array}
 \]
 \end{minipage}
@@ -12209,11 +12229,13 @@ available for use by the register allocator.
   \begin{minipage}{0.96\textwidth}
     \small
 \[
+\begin{array}{l}
+  \gray{\ASTXIntRacket} \\ \hline
+  \gray{\ASTXIfRacket} \\ \hline
+  \ASTXGlobalRacket \\
 \begin{array}{lcl}
-  \Arg &::=&  \gray{  \INT{\Int} \MID \REG{\Reg} \MID \DEREF{\Reg}{\Int}
-   \MID \BYTEREG{\Reg}} \\
-   &\MID& \GLOBAL{\Var} \\
-\LangXGlobalM{} &::= & \gray{ \XPROGRAM{\itm{info}}{\LP\LP\itm{label} \,\key{.}\, \Block \RP\ldots\RP} }
+\LangXGlobalM{} &::= & \XPROGRAM{\itm{info}}{\LP\LP\itm{label} \,\key{.}\, \Block \RP\ldots\RP}
+\end{array}
 \end{array}
 \]
 \end{minipage}
@@ -12232,69 +12254,108 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
 \begin{figure}[tbp]
 \centering
 % tests/s2_17.rkt
-\begin{minipage}[t]{0.5\textwidth}
-\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-block35:
-    movq free_ptr(%rip), alloc9024
-    addq $16, free_ptr(%rip)
-    movq alloc9024, %r11
-    movq $131, 0(%r11)
-    movq alloc9024, %r11
-    movq vecinit9025, 8(%r11)
-    movq $0, initret9026
-    movq alloc9024, %r11
-    movq 8(%r11), tmp9034
-    movq tmp9034, %r11
-    movq 8(%r11), %rax
-    jmp conclusion
-block36:
-    movq $0, collectret9027
-    jmp block35
-block38:
-    movq free_ptr(%rip), alloc9020
-    addq $16, free_ptr(%rip)
-    movq alloc9020, %r11
-    movq $3, 0(%r11)
-    movq alloc9020, %r11
-    movq vecinit9021, 8(%r11)
-    movq $0, initret9022
-    movq alloc9020, vecinit9025
-    movq free_ptr(%rip), tmp9031
-    movq tmp9031, tmp9032
-    addq $16, tmp9032
-    movq fromspace_end(%rip), tmp9033
-    cmpq tmp9033, tmp9032
-    jl block36
-    jmp block37
-block37:
-    movq %r15, %rdi
-    movq $16, %rsi
-    callq 'collect
-    jmp block35
-block39:
-    movq $0, collectret9023
-    jmp block38
-\end{lstlisting}
-\end{minipage}
-\begin{minipage}[t]{0.45\textwidth}
+\begin{tabular}{lll}
+\begin{minipage}{0.5\textwidth}
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
 start:
-    movq $42, vecinit9021
-    movq free_ptr(%rip), tmp9028
-    movq tmp9028, tmp9029
-    addq $16, tmp9029
-    movq fromspace_end(%rip), tmp9030
-    cmpq tmp9030, tmp9029
-    jl block39
-    jmp block40
-block40:
-    movq %r15, %rdi
-    movq $16, %rsi
-    callq 'collect
-    jmp block38
+  tmp9 = (global-value free_ptr);
+  tmp0 = (+ tmp9 16);
+  tmp1 = (global-value fromspace_end);
+  if (< tmp0 tmp1)
+     goto block0;
+  else
+     goto block1;
+block0:
+  _4 = (void);
+  goto block9;
+block1:
+  (collect 16)
+  goto block9;
+block9:
+  alloc2 = (allocate 1 (Vector Integer));
+  _3 = (vector-set! alloc2 0 42);
+  vecinit6 = alloc2;
+  tmp2 = (global-value free_ptr);
+  tmp3 = (+ tmp2 16);
+  tmp4 = (global-value fromspace_end);
+  if (< tmp3 tmp4)
+     goto block7;
+  else
+     goto block8;
+block7:
+  _8 = (void);
+  goto block6;
+block8:
+  (collect 16)
+  goto block6;
+block6:
+  alloc5 = (allocate 1 (Vector (Vector Integer)));
+  _7 = (vector-set! alloc5 0 vecinit6);
+  tmp5 = (vector-ref alloc5 0);
+  return (vector-ref tmp5 0);
 \end{lstlisting}
 \end{minipage}
-\caption{Output of the \code{select\_instructions} pass.}
+&$\Rightarrow$&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+start:
+    movq free_ptr(%rip), tmp9
+    movq tmp9, tmp0
+    addq $16, tmp0
+    movq fromspace_end(%rip), tmp1
+    cmpq tmp1, tmp0
+    jl block0
+    jmp block1
+block0:
+    movq $0, _4
+    jmp block9
+block1:
+    movq %r15, %rdi
+    movq $16, %rsi
+    callq collect
+    jmp block9
+block9:
+    movq free_ptr(%rip), %r11
+    addq $16, free_ptr(%rip)
+    movq $3, 0(%r11)
+    movq %r11, alloc2
+    movq alloc2, %r11
+    movq $42, 8(%r11)
+    movq $0, _3
+    movq alloc2, vecinit6
+    movq free_ptr(%rip), tmp2
+    movq tmp2, tmp3
+    addq $16, tmp3
+    movq fromspace_end(%rip), tmp4
+    cmpq tmp4, tmp3
+    jl block7
+    jmp block8
+block7:
+    movq $0, _8
+    jmp block6
+block8:
+    movq %r15, %rdi
+    movq $16, %rsi
+    callq collect
+    jmp block6
+block6:
+    movq free_ptr(%rip), %r11
+    addq $16, free_ptr(%rip)
+    movq $131, 0(%r11)
+    movq %r11, alloc5
+    movq alloc5, %r11
+    movq vecinit6, 8(%r11)
+    movq $0, _7
+    movq alloc5, %r11
+    movq 8(%r11), tmp5
+    movq tmp5, %r11
+    movq 8(%r11), %rax
+    jmp conclusion
+\end{lstlisting}
+\end{minipage}
+\end{tabular}
+\caption{Output of the \code{explicate\_control} (left)
+  and \code{select\_instructions} (right) passes on the running example.}
 \label{fig:select-instr-output-gc}
 \end{figure}
 
@@ -12359,10 +12420,10 @@ Figure~\ref{fig:print-x86-output-gc} shows the output of the
 \code{prelude\_and\_conclusion} pass on the running example. In the
 prelude and conclusion of the \code{main} function, we allocate space
 on the root stack to make room for the spills of tuple-typed
-variables. We do so by bumping the root stack
-pointer (\code{r15}) taking care that the root stack grows up instead of down.  For the running
-example, there was just one spill so we increment \code{r15} by 8
-bytes. In the conclusion we decrement \code{r15} by 8 bytes. 
+variables. We do so by bumping the root stack pointer (\code{r15})
+taking care that the root stack grows up instead of down.  For the
+running example, there was just one spill so we increment \code{r15}
+by 8 bytes. In the conclusion we decrement \code{r15} by 8 bytes.
 
 One issue that deserves special care is that there may be a call to
 \code{collect} prior to the initializing assignments for all the
@@ -12382,89 +12443,27 @@ if it is null prior to dereferencing it.
 \begin{figure}[htbp]
   % TODO: Python Version -Jeremy
 \begin{minipage}[t]{0.5\textwidth}
-\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-block35:
-	movq	free_ptr(%rip), %rcx
-	addq	$16, free_ptr(%rip)
-	movq	%rcx, %r11
-	movq	$131, 0(%r11)
-	movq	%rcx, %r11
-	movq	-8(%r15), %rax
-	movq	%rax, 8(%r11)
-	movq	$0, %rdx
-	movq	%rcx, %r11
-	movq	8(%r11), %rcx
-	movq	%rcx, %r11
-	movq	8(%r11), %rax
-	jmp conclusion
-block36:
-	movq	$0, %rcx
-	jmp block35
-block38:
-	movq	free_ptr(%rip), %rcx
-	addq	$16, free_ptr(%rip)
-	movq	%rcx, %r11
-	movq	$3, 0(%r11)
-	movq	%rcx, %r11
-	movq	%rbx, 8(%r11)
-	movq	$0, %rdx
-	movq	%rcx, -8(%r15)
-	movq	free_ptr(%rip), %rcx
-	addq	$16, %rcx
-	movq	fromspace_end(%rip), %rdx
-	cmpq	%rdx, %rcx
-	jl block36
-	movq	%r15, %rdi
-	movq	$16, %rsi
-	callq	collect
-	jmp block35
-block39:
-	movq	$0, %rcx
-	jmp block38
-\end{lstlisting}
-\end{minipage}
-\begin{minipage}[t]{0.45\textwidth}
-\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-start:
-	movq	$42, %rbx
-	movq	free_ptr(%rip), %rdx
-	addq	$16, %rdx
-	movq	fromspace_end(%rip), %rcx
-	cmpq	%rcx, %rdx
-	jl block39
-	movq	%r15, %rdi
-	movq	$16, %rsi
-	callq	collect
-	jmp block38
-        
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 	.globl main
 main:
-	pushq	%rbp
-	movq	%rsp, %rbp
-	pushq	%r13
-	pushq	%r12
-	pushq	%rbx
-	pushq	%r14
-	subq	$0, %rsp
-	movq $16384, %rdi
-	movq $16384, %rsi
-	callq initialize
-	movq rootstack_begin(%rip), %r15
-	movq $0, 0(%r15)
-	addq $8, %r15
-	jmp start
+    pushq %rbp
+    movq %rsp, %rbp
+    subq $0, %rsp
+    movq $65536, %rdi
+    movq $65536, %rsi
+    callq initialize
+    movq rootstack_begin(%rip), %r15
+    movq $0, 0(%r15)
+    addq $8, %r15
+    jmp start
 conclusion:
-	subq $8, %r15
-	addq	$0, %rsp
-	popq	%r14
-	popq	%rbx
-	popq	%r12
-	popq	%r13
-	popq	%rbp
-	retq
+    subq $8, %r15
+    addq $0, %rsp
+    popq %rbp
+    retq
 \end{lstlisting}
 \end{minipage}
-\caption{Output of the \code{prelude\_and\_conclusion} pass.}
+\caption{The prelude and conclusion generated by the \code{prelude\_and\_conclusion} pass for the running example.}
 \label{fig:print-x86-output-gc}
 \end{figure}
 
@@ -12475,7 +12474,8 @@ conclusion:
 \node (Lvec-2) at (3,2)  {\large \LangVec{}};
 \node (Lvec-3) at (6,2)  {\large \LangVec{}};
 \node (Lvec-4) at (9,2)  {\large \LangVec{}};
-\node (Lvec-5) at (9,0)  {\large \LangAllocANF{}};
+\node (Lvec-5) at (9,0)  {\large \LangAlloc{}};
+\node (Lvec-6) at (6,0)  {\large \LangAllocANF{}};
 \node (C2-4) at (3,0)  {\large \LangCVec{}};
 
 \node (x86-2) at (3,-2)  {\large \LangXGlobalVar{}};
@@ -12490,14 +12490,16 @@ conclusion:
 \path[->,bend left=15] (Lvec) edge [above] node {\ttfamily\footnotesize shrink} (Lvec-2);
 \path[->,bend left=15] (Lvec-2) edge [above] node {\ttfamily\footnotesize uniquify} (Lvec-3);
 \path[->,bend left=15] (Lvec-3) edge [above] node {\ttfamily\footnotesize expose\_alloc.} (Lvec-4);
-\path[->,bend left=15] (Lvec-4) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Lvec-5);
-\path[->,bend left=10] (Lvec-5) edge [above] node {\ttfamily\footnotesize explicate\_control} (C2-4);
+\path[->,bend left=15] (Lvec-4) edge [right] node
+     {\ttfamily\footnotesize uncover\_get!} (Lvec-5);
+\path[->,bend left=15] (Lvec-5) edge [below] node {\ttfamily\footnotesize remove\_complex.} (Lvec-6);
+\path[->,bend right=10] (Lvec-6) edge [above] node {\ttfamily\footnotesize explicate\_control} (C2-4);
 \path[->,bend left=15] (C2-4) edge [right] node {\ttfamily\footnotesize select\_instr.} (x86-2);
 \path[->,bend right=15] (x86-2) edge [left] node {\ttfamily\footnotesize uncover\_live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build\_inter.} (x86-2-2);
 \path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate\_reg.} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch\_instr.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print\_x86} (x86-5);
+\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize prelude\_and\_concl.} (x86-5);
 \end{tikzpicture}
 \caption{Diagram of the passes for \LangVec{}, a language with tuples.}
 \label{fig:Lvec-passes}
@@ -14064,8 +14066,8 @@ and \racket{\code{Apply}}\python{\code{Call}} in the grammar for expressions.
 Figure~\ref{fig:c3-syntax} defines the abstract syntax for \LangCFun{}, the
 output of \code{explicate\_control}.
 %
-\racket{(The concrete syntax is given in
-  Figure~\ref{fig:c3-concrete-syntax} of the Appendix.)}
+%% \racket{(The concrete syntax is given in
+%%   Figure~\ref{fig:c3-concrete-syntax} of the Appendix.)}
 %
 The auxiliary functions for assignment\racket{and tail contexts} should
 be updated with cases for
@@ -17040,10 +17042,10 @@ but first we describe the \LangAny{} language in greater detail.
 \label{fig:Rany-syntax}
 \end{figure}
 
-
 The abstract syntax of \LangAny{} is defined in Figure~\ref{fig:Rany-syntax}.
-\racket{(The concrete syntax of \LangAny{} is in the Appendix,
-Figure~\ref{fig:Rany-concrete-syntax}.)}  The $\INJECT{e}{T}$ form
+%% \racket{(The concrete syntax of \LangAny{} is in the Appendix,
+%%   Figure~\ref{fig:Rany-concrete-syntax}.)}
+The $\INJECT{e}{T}$ form
 converts the value produced by expression $e$ of type $T$ into a
 tagged value.  The $\PROJECT{e}{T}$ form converts the tagged value
 produced by expression $e$ into a value of type $T$ or halts the
@@ -20331,107 +20333,107 @@ registers.
   \label{tab:x86-instr}
 \end{table}
 
-\if\edition\racketEd
-\cleardoublepage
-\section{Concrete Syntax for Intermediate Languages}
+%% \if\edition\racketEd
+%% \cleardoublepage
+%% \section{Concrete Syntax for Intermediate Languages}
 
-The concrete syntax of \LangAny{} is defined in
-Figure~\ref{fig:Rany-concrete-syntax}.
+%% The concrete syntax of \LangAny{} is defined in
+%% Figure~\ref{fig:Rany-concrete-syntax}.
 
-\begin{figure}[tp]
-\centering
-\fbox{
-\begin{minipage}{0.97\textwidth}\small
-\[
-\begin{array}{lcl}
-  \Type &::=& \gray{\key{Integer} \MID \key{Boolean}
-     \MID \LP\key{Vector}\;\Type\ldots\RP \MID \key{Void}} \\
-    &\MID& \gray{\LP\Type\ldots \; \key{->}\; \Type\RP} \MID \ANYTY{} \\
-\FType &::=& \key{Integer} \MID \key{Boolean} \MID \key{Void} 
-      \MID \LP\key{Vector}\; \ANYTY{}\ldots\RP \\
-     &\MID& \LP\ANYTY{}\ldots \; \key{->}\; \ANYTY{}\RP\\
-\Exp &::=& \ldots \CINJECT{\Exp}{\FType}\RP \MID \CPROJECT{\Exp}{\FType}\\
-  &\MID& \LP\key{any-vector-length}\;\Exp\RP
-   \MID \LP\key{any-vector-ref}\;\Exp\;\Exp\RP \\
-  &\MID& \LP\key{any-vector-set!}\;\Exp\;\Exp\;\Exp\RP\\
-  &\MID& \LP\key{boolean?}\;\Exp\RP \MID \LP\key{integer?}\;\Exp\RP
-   \MID \LP\key{void?}\;\Exp\RP \\
-  &\MID& \LP\key{vector?}\;\Exp\RP \MID \LP\key{procedure?}\;\Exp\RP \\
-  \Def &::=& \gray{ \CDEF{\Var}{\LS\Var \key{:} \Type\RS\ldots}{\Type}{\Exp} } \\
-  \LangAnyM{} &::=& \gray{\Def\ldots \; \Exp}
-\end{array}
-\]
-\end{minipage}
-}
-\caption{The concrete syntax of \LangAny{}, extending \LangLam{}
-  (Figure~\ref{fig:Rlam-syntax}).}
-\label{fig:Rany-concrete-syntax}
-\end{figure}
+%% \begin{figure}[tp]
+%% \centering
+%% \fbox{
+%% \begin{minipage}{0.97\textwidth}\small
+%% \[
+%% \begin{array}{lcl}
+%%   \Type &::=& \gray{\key{Integer} \MID \key{Boolean}
+%%      \MID \LP\key{Vector}\;\Type\ldots\RP \MID \key{Void}} \\
+%%     &\MID& \gray{\LP\Type\ldots \; \key{->}\; \Type\RP} \MID \ANYTY{} \\
+%% \FType &::=& \key{Integer} \MID \key{Boolean} \MID \key{Void} 
+%%       \MID \LP\key{Vector}\; \ANYTY{}\ldots\RP \\
+%%      &\MID& \LP\ANYTY{}\ldots \; \key{->}\; \ANYTY{}\RP\\
+%% \Exp &::=& \ldots \CINJECT{\Exp}{\FType}\RP \MID \CPROJECT{\Exp}{\FType}\\
+%%   &\MID& \LP\key{any-vector-length}\;\Exp\RP
+%%    \MID \LP\key{any-vector-ref}\;\Exp\;\Exp\RP \\
+%%   &\MID& \LP\key{any-vector-set!}\;\Exp\;\Exp\;\Exp\RP\\
+%%   &\MID& \LP\key{boolean?}\;\Exp\RP \MID \LP\key{integer?}\;\Exp\RP
+%%    \MID \LP\key{void?}\;\Exp\RP \\
+%%   &\MID& \LP\key{vector?}\;\Exp\RP \MID \LP\key{procedure?}\;\Exp\RP \\
+%%   \Def &::=& \gray{ \CDEF{\Var}{\LS\Var \key{:} \Type\RS\ldots}{\Type}{\Exp} } \\
+%%   \LangAnyM{} &::=& \gray{\Def\ldots \; \Exp}
+%% \end{array}
+%% \]
+%% \end{minipage}
+%% }
+%% \caption{The concrete syntax of \LangAny{}, extending \LangLam{}
+%%   (Figure~\ref{fig:Rlam-syntax}).}
+%% \label{fig:Rany-concrete-syntax}
+%% \end{figure}
 
-The concrete syntax for \LangCVar{}, \LangCIf{}, \LangCVec{} and
-\LangCFun{} is defined in Figures~\ref{fig:c0-concrete-syntax},
-\ref{fig:c1-concrete-syntax}, \ref{fig:c2-concrete-syntax}, and
-\ref{fig:c3-concrete-syntax}, respectively.
+%% The concrete syntax for \LangCVar{}, \LangCIf{}, \LangCVec{} and
+%% \LangCFun{} is defined in Figures~\ref{fig:c0-concrete-syntax},
+%% \ref{fig:c1-concrete-syntax}, \ref{fig:c2-concrete-syntax}, and
+%% \ref{fig:c3-concrete-syntax}, respectively.
 
 
-\begin{figure}[tbp]
-\fbox{
-\begin{minipage}{0.96\textwidth}
-\small    
-\[
-\begin{array}{lcl}
-\Atm &::=& \gray{ \Int \MID \Var \MID \itm{bool} } \\
-\itm{cmp} &::= & \gray{ \key{eq?} \MID \key{<} } \\
-\Exp &::=& \gray{ \Atm \MID \key{(read)} \MID \key{(-}~\Atm\key{)} \MID \key{(+}~\Atm~\Atm\key{)} } \\
-  &\MID& \gray{ \LP \key{not}~\Atm \RP \MID \LP \itm{cmp}~\Atm~\Atm\RP } \\
-&\MID& \LP \key{allocate}~\Int~\Type \RP \\
-  &\MID& (\key{vector-ref}\;\Atm\;\Int) \MID (\key{vector-set!}\;\Atm\;\Int\;\Atm)\\
-  &\MID& \LP \key{global-value}~\Var \RP \MID \LP \key{void} \RP \\
-\Stmt &::=& \gray{ \Var~\key{=}~\Exp\key{;} } \MID \LP\key{collect}~\Int \RP\\
-\Tail &::= & \gray{ \key{return}~\Exp\key{;} \MID \Stmt~\Tail } 
-   \MID \gray{ \key{goto}~\itm{label}\key{;} }\\
-   &\MID& \gray{ \key{if}~\LP \itm{cmp}~\Atm~\Atm \RP~ \key{goto}~\itm{label}\key{;} ~\key{else}~\key{goto}~\itm{label}\key{;} } \\
-\LangCVecM{} & ::= & \gray{ (\itm{label}\key{:}~ \Tail)\ldots }
-\end{array}
-\]
-\end{minipage}
-}
-\caption{The concrete syntax of the \LangCVec{} intermediate language.}
-\label{fig:c2-concrete-syntax}
-\end{figure}
+%% \begin{figure}[tbp]
+%% \fbox{
+%% \begin{minipage}{0.96\textwidth}
+%% \small    
+%% \[
+%% \begin{array}{lcl}
+%% \Atm &::=& \gray{ \Int \MID \Var \MID \itm{bool} } \\
+%% \itm{cmp} &::= & \gray{ \key{eq?} \MID \key{<} } \\
+%% \Exp &::=& \gray{ \Atm \MID \key{(read)} \MID \key{(-}~\Atm\key{)} \MID \key{(+}~\Atm~\Atm\key{)} } \\
+%%   &\MID& \gray{ \LP \key{not}~\Atm \RP \MID \LP \itm{cmp}~\Atm~\Atm\RP } \\
+%% &\MID& \LP \key{allocate}~\Int~\Type \RP \\
+%%   &\MID& (\key{vector-ref}\;\Atm\;\Int) \MID (\key{vector-set!}\;\Atm\;\Int\;\Atm)\\
+%%   &\MID& \LP \key{global-value}~\Var \RP \MID \LP \key{void} \RP \\
+%% \Stmt &::=& \gray{ \Var~\key{=}~\Exp\key{;} } \MID \LP\key{collect}~\Int \RP\\
+%% \Tail &::= & \gray{ \key{return}~\Exp\key{;} \MID \Stmt~\Tail } 
+%%    \MID \gray{ \key{goto}~\itm{label}\key{;} }\\
+%%    &\MID& \gray{ \key{if}~\LP \itm{cmp}~\Atm~\Atm \RP~ \key{goto}~\itm{label}\key{;} ~\key{else}~\key{goto}~\itm{label}\key{;} } \\
+%% \LangCVecM{} & ::= & \gray{ (\itm{label}\key{:}~ \Tail)\ldots }
+%% \end{array}
+%% \]
+%% \end{minipage}
+%% }
+%% \caption{The concrete syntax of the \LangCVec{} intermediate language.}
+%% \label{fig:c2-concrete-syntax}
+%% \end{figure}
 
-\begin{figure}[tp]
-\fbox{
-\begin{minipage}{0.96\textwidth}
-\small
-\[
-\begin{array}{lcl}
-\Atm &::=& \gray{ \Int \MID \Var \MID \key{\#t} \MID \key{\#f} }
-  \\
-\itm{cmp} &::= & \gray{  \key{eq?} \MID \key{<} } \\
-\Exp &::= & \gray{ \Atm \MID \LP\key{read}\RP \MID \LP\key{-}\;\Atm\RP \MID \LP\key{+} \; \Atm\;\Atm\RP
-      \MID \LP\key{not}\;\Atm\RP \MID \LP\itm{cmp}\;\Atm\;\Atm\RP  } \\
-   &\MID& \gray{  \LP\key{allocate}\,\Int\,\Type\RP
-   \MID \LP\key{vector-ref}\, \Atm\, \Int\RP  } \\
-   &\MID& \gray{  \LP\key{vector-set!}\,\Atm\,\Int\,\Atm\RP \MID \LP\key{global-value} \,\itm{name}\RP \MID \LP\key{void}\RP } \\
-   &\MID& \LP\key{fun-ref}~\itm{label}~\Int\RP \MID \LP\key{call} \,\Atm\,\Atm\ldots\RP \\
-\Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \MID \RETURN{\Exp} 
-       \MID \LP\key{collect} \,\itm{int}\RP }\\
-\Tail &::= & \gray{\RETURN{\Exp} \MID \LP\key{seq}\;\Stmt\;\Tail\RP} \\
-      &\MID& \gray{\LP\key{goto}\,\itm{label}\RP
-       \MID \IF{\LP\itm{cmp}\, \Atm\,\Atm\RP}{\LP\key{goto}\,\itm{label}\RP}{\LP\key{goto}\,\itm{label}\RP}} \\
-      &\MID& \LP\key{tail-call}\,\Atm\,\Atm\ldots\RP \\
-  \Def &::=& \LP\key{define}\; \LP\itm{label} \; [\Var \key{:} \Type]\ldots\RP \key{:} \Type \; \LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP\RP \\
-\LangCFunM{} & ::= & \Def\ldots
-\end{array}
-\]
-\end{minipage}
-}
-\caption{The \LangCFun{} language, extending \LangCVec{} (Figure~\ref{fig:c2-concrete-syntax}) with functions.}
-\label{fig:c3-concrete-syntax}
-\end{figure}
+%% \begin{figure}[tp]
+%% \fbox{
+%% \begin{minipage}{0.96\textwidth}
+%% \small
+%% \[
+%% \begin{array}{lcl}
+%% \Atm &::=& \gray{ \Int \MID \Var \MID \key{\#t} \MID \key{\#f} }
+%%   \\
+%% \itm{cmp} &::= & \gray{  \key{eq?} \MID \key{<} } \\
+%% \Exp &::= & \gray{ \Atm \MID \LP\key{read}\RP \MID \LP\key{-}\;\Atm\RP \MID \LP\key{+} \; \Atm\;\Atm\RP
+%%       \MID \LP\key{not}\;\Atm\RP \MID \LP\itm{cmp}\;\Atm\;\Atm\RP  } \\
+%%    &\MID& \gray{  \LP\key{allocate}\,\Int\,\Type\RP
+%%    \MID \LP\key{vector-ref}\, \Atm\, \Int\RP  } \\
+%%    &\MID& \gray{  \LP\key{vector-set!}\,\Atm\,\Int\,\Atm\RP \MID \LP\key{global-value} \,\itm{name}\RP \MID \LP\key{void}\RP } \\
+%%    &\MID& \LP\key{fun-ref}~\itm{label}~\Int\RP \MID \LP\key{call} \,\Atm\,\Atm\ldots\RP \\
+%% \Stmt &::=& \gray{ \ASSIGN{\Var}{\Exp} \MID \RETURN{\Exp} 
+%%        \MID \LP\key{collect} \,\itm{int}\RP }\\
+%% \Tail &::= & \gray{\RETURN{\Exp} \MID \LP\key{seq}\;\Stmt\;\Tail\RP} \\
+%%       &\MID& \gray{\LP\key{goto}\,\itm{label}\RP
+%%        \MID \IF{\LP\itm{cmp}\, \Atm\,\Atm\RP}{\LP\key{goto}\,\itm{label}\RP}{\LP\key{goto}\,\itm{label}\RP}} \\
+%%       &\MID& \LP\key{tail-call}\,\Atm\,\Atm\ldots\RP \\
+%%   \Def &::=& \LP\key{define}\; \LP\itm{label} \; [\Var \key{:} \Type]\ldots\RP \key{:} \Type \; \LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP\RP \\
+%% \LangCFunM{} & ::= & \Def\ldots
+%% \end{array}
+%% \]
+%% \end{minipage}
+%% }
+%% \caption{The \LangCFun{} language, extending \LangCVec{} (Figure~\ref{fig:c2-concrete-syntax}) with functions.}
+%% \label{fig:c3-concrete-syntax}
+%% \end{figure}
 
-\fi % racketEd
+%% \fi % racketEd
 
 \backmatter
 \addtocontents{toc}{\vspace{11pt}}
