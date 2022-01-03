@@ -10846,8 +10846,9 @@ for the compilation of \LangLoop{}.
 %% \margincomment{\scriptsize Be more explicit about how to deal with
 %%   the root stack. \\ --Jeremy}
 
-In this chapter we study the implementation of
-tuples\racket{, called vectors in Racket}.
+In this chapter we study the implementation of tuples\racket{, called
+  vectors in Racket}.  A tuple is a fixed-length sequence of elements
+where each element may have a different type.
 %
 This language feature is the first to use the computer's
 \emph{heap}\index{subject}{heap} because the lifetime of a tuple is
@@ -12636,13 +12637,12 @@ mark. The following example uses \code{set-point-x!} to change the
 \section{Challenge: Arrays}
 \label{sec:arrays}
 
-In Chapter~\ref{ch:Lvec} we studied tuples, that is, sequences of
-elements whose length is determined at compile-time and where each
-element of a tuple may have a different type (they are
-heterogeous). This challenge is also about sequences, but this time
-the length is determined at run-time and all the elements have the same
-type (they are homogeneous). We use the term ``array'' for this later
-kind of sequence.
+In Chapter~\ref{ch:Lvec} we studied tuples, that is, a heterogeous
+sequences of elements whose length is determined at compile-time. This
+challenge is also about sequences, but this time the length is
+determined at run-time and all the elements have the same type (they
+are homogeneous). We use the term ``array'' for this later kind of
+sequence.
 
 The Racket language does not distinguish between tuples and arrays,
 they are both represented by vectors. However, Typed Racket
@@ -12661,6 +12661,13 @@ We also include integer multiplication in \LangArray{}, as it is
 useful in many examples involving arrays such as computing the
 inner-product of two arrays (Figure~\ref{fig:inner-product}).
 
+\newcommand{\LarrayGrammarRacket}{
+\begin{array}{lcl}
+  \Type &::=& \LP \key{Vectorof}~\Type \RP \\
+  \Exp &::=& \CMUL{\Exp}{\Exp}
+       \MID \CMAKEVEC{\Exp}{\Exp} \\
+\end{array}
+}
 
 \begin{figure}[tp]
 \centering
@@ -12669,28 +12676,16 @@ inner-product of two arrays (Figure~\ref{fig:inner-product}).
     \small
 {\if\edition\racketEd    
 \[
+\begin{array}{l}
+  \gray{\LintGrammarRacket{}} \\ \hline
+  \gray{\LvarGrammarRacket{}} \\ \hline
+  \gray{\LifGrammarRacket{}} \\ \hline
+  \gray{\LwhileGrammarRacket} \\ \hline
+  \gray{\LtupGrammarRacket} \\ \hline
+  \LarrayGrammarRacket \\
 \begin{array}{lcl}
-  \Type &::=& \ldots \MID \LP \key{Vectorof}~\Type \RP \\
-  \Exp &::=& \gray{ \Int \MID \CREAD{} \MID \CNEG{\Exp}
-     \MID \CADD{\Exp}{\Exp} \MID \CSUB{\Exp}{\Exp} }  \MID \CMUL{\Exp}{\Exp}\\
-    &\MID&  \gray{ \Var \MID \CLET{\Var}{\Exp}{\Exp} }\\
-    &\MID& \gray{\key{\#t} \MID \key{\#f} 
-     \MID \LP\key{and}\;\Exp\;\Exp\RP 
-     \MID \LP\key{or}\;\Exp\;\Exp\RP 
-     \MID \LP\key{not}\;\Exp\RP } \\
-    &\MID& \gray{ \LP\key{eq?}\;\Exp\;\Exp\RP \MID \CIF{\Exp}{\Exp}{\Exp} } \\
-    &\MID& \gray{ \LP\key{vector}\;\Exp\ldots\RP \MID
-          \LP\key{vector-ref}\;\Exp\;\Int\RP} \\
-    &\MID& \gray{\LP\key{vector-set!}\;\Exp\;\Int\;\Exp\RP\MID \LP\key{void}\RP
-    \MID \LP\Exp \; \Exp\ldots\RP } \\
-    &\MID& \gray{ \LP \key{procedure-arity}~\Exp\RP 
-    \MID \CLAMBDA{\LP\LS\Var \key{:} \Type\RS\ldots\RP}{\Type}{\Exp} } \\
-  &\MID& \gray{ \CSETBANG{\Var}{\Exp}
-  \MID \CBEGIN{\Exp\ldots}{\Exp}
-  \MID \CWHILE{\Exp}{\Exp} } \\
-  &\MID& \CMAKEVEC{\Exp}{\Exp} \\
-  \Def &::=& \gray{ \CDEF{\Var}{\LS\Var \key{:} \Type\RS\ldots}{\Type}{\Exp} } \\
-  \LangArray{} &::=& \gray{\Def\ldots \; \Exp}
+  \LangArray{} &::=& \Exp
+\end{array}
 \end{array}
 \]
 \fi}
@@ -12707,7 +12702,7 @@ UNDER CONSTRUCTION
 \begin{figure}[tp]
 \begin{lstlisting}
 (define (inner-product [A : (Vectorof Integer)] [B : (Vectorof Integer)]
-                       [n : Integer]) : Integer
+                          [n : Integer]) : Integer
   (let ([i 0])
     (let ([prod 0])
       (begin
@@ -12730,7 +12725,7 @@ UNDER CONSTRUCTION
 \end{figure}
 
 
-The type checker for \LangArray{} is define in
+The type checker for \LangArray{} is defined in
 Figure~\ref{fig:type-check-Lvecof}. The result type of
 \code{make-vector} is \code{(Vectorof T)} where \code{T} is the type
 of the intializing expression.  The length expression is required to
@@ -12741,23 +12736,15 @@ updated to handle the situation where the vector has type
 \code{vectorof} form so that later passes can easily distinguish
 between operations on tuples versus arrays. We override the
 \code{operator-types} method to provide the type signature for
-multiplication: it takes two integers and returns an integer.  To
-support injection and projection of arrays to the \code{Any} type
-(Section~\ref{sec:Rany-lang}), we also override the \code{flat-ty?}
-predicate.
+multiplication: it takes two integers and returns an integer.
 
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define type-check-Lvecof-class
-  (class type-check-Lwhile-class
+  (class type-check-Lvec-class
     (super-new)
     (inherit check-type-equal?)
 
-    (define/override (flat-ty? ty)
-      (match ty
-        ['(Vectorof Any) #t]
-        [else (super flat-ty? ty)]))
-    
     (define/override (operator-types)
       (append '((* . ((Integer Integer) . Integer)))
               (super operator-types)))
@@ -12813,11 +12800,10 @@ integers.
 \begin{figure}[tbp]
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define interp-Lvecof-class
-  (class interp-Lwhile-class
+  (class interp-Lvec-class
     (super-new)
 
     (define/override (interp-op op)
-      (verbose "Lvecof/interp-op" op)
       (match op
         ['make-vector make-vector]
         ['* fx*]
@@ -12864,59 +12850,65 @@ an array:
 \end{itemize}
 
 
-Recall that in Chapter~\ref{ch:Ldyn}, we use a $3$-bit tag to
-differentiate the kinds of values that have been injected into the
-\code{Any} type. We use the bit pattern \code{110} (or $6$ in decimal)
-to indicate that the value is an array.
+%% Recall that in Chapter~\ref{ch:Ldyn}, we use a $3$-bit tag to
+%% differentiate the kinds of values that have been injected into the
+%% \code{Any} type. We use the bit pattern \code{110} (or $6$ in decimal)
+%% to indicate that the value is an array.
 
 In the following subsections we provide hints regarding how to update
 the passes to handle arrays.
 
+\subsection{Bounds Checking}
 
-\subsection{Reveal Casts}
+We recommend inserting a new pass named \code{check\_bounds} that
+inserts code around each the \code{vector-ref} and \code{vector-set!}
+operation to ensure that the index is greater than or equal to zero
+and less than the \code{vector-length}.
 
-The array-access operators \code{vectorof-ref} and
-\code{vectorof-set!} are similar to the \code{any-vector-ref} and
-\code{any-vector-set!} operators of Chapter~\ref{ch:Ldyn} in
-that the type checker cannot tell whether the index will be in bounds,
-so the bounds check must be performed at run time.  Recall that the
-\code{reveal-casts} pass (Section~\ref{sec:reveal-casts-Rany}) wraps
-an \code{If} arround a vector reference for update to check whether
-the index is less than the length.  You should do the same for
-\code{vectorof-ref} and \code{vectorof-set!} .
+%% \subsection{Reveal Casts}
 
-In addition, the handling of the \code{any-vector} operators in
-\code{reveal-casts} needs to be updated to account for arrays that are
-injected to \code{Any}. For the \code{any-vector-length} operator, the
-generated code should test whether the tag is for tuples (\code{010})
-or arrays (\code{110}) and then dispatch to either
-\code{any-vector-length} or \code{any-vectorof-length}.  For the later
-we add a case in \code{select\_instructions} to generate the
-appropriate instructions for accessing the array length from the
-header of an array.
+%% The array-access operators \code{vectorof-ref} and
+%% \code{vectorof-set!} are similar to the \code{any-vector-ref} and
+%% \code{any-vector-set!} operators of Chapter~\ref{ch:Ldyn} in
+%% that the type checker cannot tell whether the index will be in bounds,
+%% so the bounds check must be performed at run time.  Recall that the
+%% \code{reveal-casts} pass (Section~\ref{sec:reveal-casts-Rany}) wraps
+%% an \code{If} arround a vector reference for update to check whether
+%% the index is less than the length.  You should do the same for
+%% \code{vectorof-ref} and \code{vectorof-set!} .
 
-For the \code{any-vector-ref} and \code{any-vector-set!} operators,
-the generated code needs to check that the index is less than the
-vector length, so like the code for \code{any-vector-length}, check
-the tag to determine whether to use \code{any-vector-length} or
-\code{any-vectorof-length} for this purpose.  Once the bounds checking
-is complete, the generated code can use \code{any-vector-ref} and
-\code{any-vector-set!} for both tuples and arrays because the
-instructions used for those operators do not look at the tag at the
-front of the tuple or array.
+%% In addition, the handling of the \code{any-vector} operators in
+%% \code{reveal-casts} needs to be updated to account for arrays that are
+%% injected to \code{Any}. For the \code{any-vector-length} operator, the
+%% generated code should test whether the tag is for tuples (\code{010})
+%% or arrays (\code{110}) and then dispatch to either
+%% \code{any-vector-length} or \code{any-vectorof-length}.  For the later
+%% we add a case in \code{select\_instructions} to generate the
+%% appropriate instructions for accessing the array length from the
+%% header of an array.
+
+%% For the \code{any-vector-ref} and \code{any-vector-set!} operators,
+%% the generated code needs to check that the index is less than the
+%% vector length, so like the code for \code{any-vector-length}, check
+%% the tag to determine whether to use \code{any-vector-length} or
+%% \code{any-vectorof-length} for this purpose.  Once the bounds checking
+%% is complete, the generated code can use \code{any-vector-ref} and
+%% \code{any-vector-set!} for both tuples and arrays because the
+%% instructions used for those operators do not look at the tag at the
+%% front of the tuple or array.
 
 \subsection{Expose Allocation}
 
 This pass should translate the \code{make-vector} operator into
 lower-level operations. In particular, the new AST node
-$\LP\key{AllocateArray}~\Exp~\Type\RP$ allocates an array of the
+$\LP\key{AllocateArray}~\Exp~\Type\RP$ is analogous to the
+\code{Allocate} AST node for tuples.  It allocates an array of the
 length specified by the $\Exp$, but does not initialize the elements
-of the array. (Analogous to the \code{Allocate} AST node for tuples.)
-The $\Type$ argument must be $\LP\key{Vectorof}~T\RP$ where $T$ is the
-element type for the array. Regarding the initialization of the array,
-we recommend generated a \code{while} loop that uses
-\code{vector-set!} to put the initializing value into every element of
-the array.
+of the array. The $\Type$ argument must be $\LP\key{Vectorof}~T\RP$
+where $T$ is the element type for the array. Regarding the
+initialization of the array, we recommend generated a \code{while}
+loop that uses \code{vector-set!} to put the initializing value into
+every element of the array.
 
 \subsection{Remove Complex Operands}
 
@@ -12943,23 +12935,21 @@ Section~\ref{sec:array-rep}.
 The instructions generated for \code{vectorof-ref} differ from those
 for \code{vector-ref} (Section~\ref{sec:select-instructions-gc}) in
 that the index is not a constant so the offset must be computed at
-runtime, similar to the instructions generated for
-\code{any-vector-of-ref} (Section~\ref{sec:select-Rany}).  The same is
-true for \code{vectorof-set!}.  Also, the \code{vectorof-set!} may
-appear in an assignment and as a stand-alone statement, so make sure
-to handle both situations in this pass.
+runtime. The same is true for \code{vectorof-set!}.  Also, the
+\code{vectorof-set!} may appear in an assignment and as a stand-alone
+statement, so make sure to handle both situations in this pass.
 
-Finally, the instructions for \code{any-vectorof-length} should be
-similar to those for \code{vectorof-length}, except that one must
-first project the array by writing zeroes into the $3$-bit tag
+%% Finally, the instructions for \code{any-vectorof-length} should be
+%% similar to those for \code{vectorof-length}, except that one must
+%% first project the array by writing zeroes into the $3$-bit tag
 
 \begin{exercise}\normalfont\normalsize
 
 Implement a compiler for the \LangArray{} language by extending your
 compiler for \LangLoop{}. Test your compiler on a half dozen new
 programs, including the one in Figure~\ref{fig:inner-product} and also
-a program that multiplies two matrices. Note that matrices are
-2-dimensional arrays, but those can be encoded into 1-dimensional
+a program that multiplies two matrices. Note that although matrices
+are 2-dimensional arrays, they can be encoded into 1-dimensional
 arrays by laying out each row in the array, one after the next.
   
 \end{exercise}
@@ -17237,6 +17227,7 @@ class TypeCheckLany(TypeCheckLlambda):
   (match ty
     [(or `Integer `Boolean '_ `Void) #t]
     [`(Vector ,ts ...) (for/and ([t ts]) (eq? t 'Any))]
+    ['(Vectorof Any) #t]
     [`(,ts ... -> ,rt)
       (and (eq? rt 'Any) (for/and ([t ts]) (eq? t 'Any)))]
     [else #f]))
