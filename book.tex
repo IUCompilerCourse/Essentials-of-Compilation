@@ -10713,14 +10713,13 @@ the condition expression.
 \section{Select Instructions}
 \label{sec:select-instructions-loop}
 
-Only three small additions are needed in the
-\code{select\_instructions} pass to handle the changes to
-\LangCLoop{}.  That is, a call to
-\racket{\code{read}}\python{\code{input\_int}} may appear as a
-stand-alone statement instead of only appearing on the right-hand side
-of an assignment statement. The code generation is nearly identical;
-just leave off the instruction for moving the result into the
-left-hand side.
+Only two small additions are needed in the \code{select\_instructions}
+pass to handle the changes to \LangCLoop{}. First, to handle the
+addition of \VOID{} we simply translate it to \code{0}.  Second,
+\code{read} may appear as a stand-alone statement instead of only
+appearing on the right-hand side of an assignment statement. The code
+generation is nearly identical to the one for assignment; just leave
+off the instruction for moving the result into the left-hand side.
 
 \fi}
 
@@ -10731,10 +10730,7 @@ As discussed in Section~\ref{sec:dataflow-analysis}, the presence of
 loops in \LangLoop{} means that the control-flow graphs may contain cycles,
 which complicates the liveness analysis needed for register
 allocation.
-
-\subsection{Liveness Analysis}
-\label{sec:liveness-analysis-r8}
-
+%
 We recommend using the generic \code{analyze\_dataflow} function that
 was presented at the end of Section~\ref{sec:dataflow-analysis} to
 perform liveness analysis, replacing the code in
@@ -10743,18 +10739,13 @@ order (Section~\ref{sec:liveness-analysis-Lif}).
 
 The \code{analyze\_dataflow} function has four parameters.
 \begin{enumerate}
-\item The first parameter \code{G} should be a directed graph from the
-  \racket{
-  \code{racket/graph} package (see the sidebar in
-  Section~\ref{sec:build-interference})}
-  \python{\code{graph.py} file in the support code}  
-  that represents the
-  control-flow graph.
-\item The second parameter \code{transfer} is a function that applies
-  liveness analysis to a basic block. It takes two parameters: the
-  label for the block to analyze and the live-after set for that
-  block.  The transfer function should return the live-before set for
-  the block.
+\item The first parameter \code{G} should be passed the transpose
+  of the control-flow graph.
+\item The second parameter \code{transfer} should be passed a function
+  that applies liveness analysis to a basic block. It takes two
+  parameters: the label for the block to analyze and the live-after
+  set for that block.  The transfer function should return the
+  live-before set for the block.
   %
   \racket{Also, as a side-effect, it should update the block's
     $\itm{info}$ with the liveness information for each instruction.}
@@ -10766,8 +10757,8 @@ The \code{analyze\_dataflow} function has four parameters.
   reuse the code you already have for analyzing basic blocks.
 \item The third and fourth parameters of \code{analyze\_dataflow} are
   \code{bottom} and \code{join} for the lattice of abstract states,
-  i.e.  sets of locations. The bottom of the lattice is the empty set
-  and the join operator is set union.
+  i.e.  sets of locations. For liveness analysis, the bottom of the
+  lattice is the empty set and the join operator is set union.
 \end{enumerate}
 
 
