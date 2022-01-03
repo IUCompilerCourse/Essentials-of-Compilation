@@ -10420,7 +10420,7 @@ and thereby preserve their ordering relative to the side-effects in
 other operands. So the first step is to collect all the mutable
 variables. We recommend creating an auxilliary function for this,
 named \code{collect-set!}, that recursively traverses expressions,
-returning a set of all variables that occur on the left-hand side of a
+returning the set of all variables that occur on the left-hand side of a
 \code{set!}. Here's an exerpt of its implementation.
 \begin{center}
 \begin{minipage}{\textwidth}
@@ -10438,7 +10438,7 @@ returning a set of all variables that occur on the left-hand side of a
 \end{minipage}
 \end{center}
 By placing this pass after \code{uniquify}, we need not worry about
-variable shadowing and our logic for \code{let} can remain simple, as
+variable shadowing and our logic for \code{Let} can remain simple, as
 in the exerpt above.
 
 The second step is to mark the occurences of the mutable variables
@@ -10492,6 +10492,15 @@ statement.
 Figure~\ref{fig:Lwhile-anf-syntax} defines the output language
 \LangLoopANF{} of this pass.
 
+\newcommand{\LwhileMonadASTRacket}{
+\begin{array}{rcl}
+\Atm &::=& \VOID{} \\
+\Exp &::=& \GETBANG{\Var}
+      \MID \SETBANG{\Var}{\Exp} 
+      \MID \BEGIN{\LP\Exp\ldots\RP}{\Exp} \\
+      &\MID& \WHILE{\Exp}{\Exp}
+\end{array}
+}
 
 \newcommand{\LwhileMonadASTPython}{
 \begin{array}{rcl}
@@ -10506,14 +10515,13 @@ Figure~\ref{fig:Lwhile-anf-syntax} defines the output language
 \small
 {\if\edition\racketEd    
 \[
+\begin{array}{l}
+  \gray{\LvarMonadASTRacket} \\ 
+  \gray{\LifMonadASTRacket} \\ \hline
+  \LwhileMonadASTRacket \\ 
 \begin{array}{rcl}
-\Atm &::=& \gray{ \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} } \MID \VOID{} \\
-\Exp &::=& \ldots \MID \gray{ \LET{\Var}{\Exp}{\Exp} } \\
-     &\MID& \GETBANG{\Var}
-      \MID \SETBANG{\Var}{\Exp} \\
-     &\MID& \BEGIN{\LP\Exp\ldots\RP}{\Exp}
-      \MID \WHILE{\Exp}{\Exp} \\
-\LangLoopANF  &::=& \gray{ \PROGRAM{\code{'()}}{\Exp} }
+\LangLoopANF  &::=& \PROGRAM{\code{'()}}{\Exp}
+\end{array}
 \end{array}
 \]
 \fi}
@@ -10547,34 +10555,53 @@ Figure~\ref{fig:Lwhile-anf-syntax} defines the output language
 \end{figure}
 
 {\if\edition\racketEd    
+%
 As usual, when a complex expression appears in a grammar position that
 needs to be atomic, such as the argument of a primitive operator, we
 must introduce a temporary variable and bind it to the complex
 expression.  This approach applies, unchanged, to handle the new
 language forms.  For example, in the following code there are two
-\code{begin} expressions appearing as arguments to \code{+}.  The
-output of \code{rco\_exp} is shown below, in which the \code{begin}
-expressions have been bound to temporary variables. Recall that
-\code{let} expressions in \LangLoopANF{} are allowed to have
-arbitrary expressions in their right-hand-side expression, so it is
-fine to place \code{begin} there.
+\code{begin} expressions appearing as arguments to the \code{+}
+operator.  The output of \code{rco\_exp} is shown below, in which the
+\code{begin} expressions have been bound to temporary
+variables. Recall that \code{let} expressions in \LangLoopANF{} are
+allowed to have arbitrary expressions in their right-hand-side
+expression, so it is fine to place \code{begin} there.
+%
 \begin{center}
-\begin{minipage}{\textwidth}
+\begin{tabular}{lcl}
+\begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-(let ([x0 10])
-  (let ([y1 0])
-    (+ (+ (begin (set! y1 (read)) x0)
-           (begin (set! x0 (read)) y1))
-       x0)))
-|$\Rightarrow$|
-(let ([x0 10])
-  (let ([y1 0])
-    (let ([tmp2 (begin (set! y1 (read)) x0)])
-      (let ([tmp3 (begin (set! x0 (read)) y1)])
-        (let ([tmp4 (+ tmp2 tmp3)])
-          (+ tmp4 x0))))))
+(let ([x2 10])
+(let ([y3 0])
+   (+ (+ (begin 
+            (set! y3 (read))
+            (get! x2))
+         (begin 
+            (set! x2 (read))
+            (get! y3)))
+      (get! x2))))
 \end{lstlisting}
 \end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}  
+(let ([x2 10])
+(let ([y3 0])
+(let ([tmp4 (begin 
+               (set! y3 (read))
+               x2)])
+(let ([tmp5 (begin 
+               (set! x2 (read))
+               y3)])
+(let ([tmp6 (+ tmp4 tmp5)])
+(let ([tmp7 x2])
+   (+ tmp6 tmp7)))))))
+\end{lstlisting}
+\end{minipage}
+\end{tabular}
 \end{center}
 
 \fi}
