@@ -9731,15 +9731,17 @@ the condition remains true.
   \begin{array}{lcl}
    \Type &::=& \key{Void}\\
    \Exp &::=& \CSETBANG{\Var}{\Exp}
-      \MID \CBEGIN{\Exp\ldots}{\Exp}
+      \MID \CBEGIN{\Exp^{*}}{\Exp}
       \MID \CWHILE{\Exp}{\Exp} \MID \LP\key{void}\RP 
   \end{array}
 }
 \newcommand{\LwhileASTRacket}{
 \begin{array}{lcl}
   \Type &::=& \key{Void}\\
-  \Exp &::=& \SETBANG{\Var}{\Exp} \MID \BEGIN{\LP\Exp\ldots\RP}{\Exp}\\
-    &\MID& \WHILE{\Exp}{\Exp} \MID \VOID{}  
+  \Exp &::=& \SETBANG{\Var}{\Exp}
+       \MID \BEGIN{\Exp^{*}}{\Exp}
+       \MID \WHILE{\Exp}{\Exp}
+       \MID \VOID{}  
 \end{array}
 }
 
@@ -10858,12 +10860,12 @@ needed, which is why we also study \emph{garbage collection}
 Section~\ref{sec:r3} introduces the \LangVec{} language including its
 interpreter and type checker. The \LangVec{} language extends the \LangLoop{}
 language of Chapter~\ref{ch:Lwhile} with tuples.
-
+%
 Section~\ref{sec:GC} describes a garbage collection algorithm based on
 copying live tuples back and forth between two halves of the heap. The
 garbage collector requires coordination with the compiler so that it
 can find all of the live tuples.
-
+%
 Sections~\ref{sec:expose-allocation} through \ref{sec:print-x86-gc}
 discuss the necessary changes and additions to the compiler passes,
 including a new compiler pass named \code{expose\_allocation}.
@@ -10915,16 +10917,16 @@ print( t[0] + t[2][0] if t[1] else 44 )
 
 \newcommand{\LtupGrammarRacket}{
 \begin{array}{lcl}
-  \Type &::=& \LP\key{Vector}\;\Type\ldots\RP \\
-  \Exp &::=& \LP\key{vector}\;\Exp\ldots\RP 
+  \Type &::=& \LP\key{Vector}\;\Type^{*}\RP \\
+  \Exp &::=& \LP\key{vector}\;\Exp^{*}\RP 
    \MID \LP\key{vector-length}\;\Exp\RP \\
   &\MID& \LP\key{vector-ref}\;\Exp\;\Int\RP
-   \MID \LP\key{vector-set!}\;\Exp\;\Int\;\Exp\RP 
+  \MID \LP\key{vector-set!}\;\Exp\;\Int\;\Exp\RP 
 \end{array}
 }
 \newcommand{\LtupASTRacket}{
 \begin{array}{lcl}
- \Type &::=& \LP\key{Vector}\;\Type\ldots\RP \\
+ \Type &::=& \LP\key{Vector}\;\Type^{*}\RP \\
 \itm{op} &::=& \code{vector} \MID \code{vector-length} \\
 \Exp &::=& \VECREF{\Exp}{\INT{\Int}} \\
      &\MID& \VECSET{\Exp}{\INT{\Int}}{\Exp} \\
@@ -10949,7 +10951,8 @@ print( t[0] + t[2][0] if t[1] else 44 )
 \begin{figure}[tbp]
 \centering
 \fbox{
-\begin{minipage}{0.96\textwidth}
+  \begin{minipage}{0.96\textwidth}
+    \small
 {\if\edition\racketEd    
 \[
 \begin{array}{l}
@@ -10988,7 +10991,8 @@ print( t[0] + t[2][0] if t[1] else 44 )
 \begin{figure}[tp]
 \centering
 \fbox{
-\begin{minipage}{0.96\textwidth}
+  \begin{minipage}{0.96\textwidth}
+    \small
 {\if\edition\racketEd    
 \[
 \begin{array}{l}
@@ -11144,7 +11148,7 @@ Figure~\ref{fig:interp-Lvec} shows the definitional interpreter for the
 {\if\edition\racketEd
 \begin{lstlisting}
 (define interp-Lvec-class
-  (class interp-Lif-class
+  (class interp-Lwhile-class
     (super-new)
 
     (define/override (interp-op op)
@@ -11163,10 +11167,8 @@ Figure~\ref{fig:interp-Lvec} shows the definitional interpreter for the
         ))
 
     (define/override ((interp-exp env) e)
-      (define recur (interp-exp env))
       (match e
-        [(HasType e t)  (recur e)]
-        [(Void)  (void)]
+        [(HasType e t)  ((interp-exp env) e)]
         [else ((super interp-exp env) e)]
         ))
     ))
@@ -11210,7 +11212,7 @@ Figure~\ref{fig:type-check-Lvec} not only computes the type of an
 expression, it also
 %
 \racket{wraps every tuple creation with the form $(\key{HasType}~e~T)$,
-  where $T$ is the vector's type.
+  where $T$ is the tuple's type.
 To create the s-expression for the \code{Vector} type in
 Figure~\ref{fig:type-check-Lvec}, we use the
 \href{https://docs.racket-lang.org/reference/quasiquote.html}{unquote-splicing
@@ -11234,7 +11236,6 @@ start and end parentheses. \index{subject}{unquote-slicing}}
       (lambda (e)
         (define recur (type-check-exp env))
         (match e
-          [(Void) (values (Void) 'Void)]
           [(Prim 'vector es)
            (define-values (e* t*) (for/lists (e* t*) ([e es]) (recur e)))
            (define t `(Vector ,@t*))
@@ -11325,7 +11326,7 @@ use the term \emph{object}\index{subject}{object} to refer to any
 value that is stored in the heap, which for now only includes
 tuples.%
 %
-\footnote{The term ``object'' as used in the context of
+\footnote{The term ``object'' as it is used in the context of
 object-oriented programming has a more specific meaning than how we
 are using the term here.}
 %
