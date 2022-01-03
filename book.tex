@@ -8603,7 +8603,7 @@ The \code{select\_instructions} pass translates \LangCIf{} to
 %
 \racket{Recall that we implement this pass using three auxiliary
   functions, one for each of the non-terminals $\Atm$, $\Stmt$, and
-  $\Tail$.}
+  $\Tail$ in \LangCIf{} (Figure~\ref{fig:c1-syntax}).}
 %
 \racket{For $\Atm$, we have new cases for the Booleans.}
 %
@@ -8615,10 +8615,10 @@ We take the usual approach of encoding them as integers.
 \FALSE{} \quad\Rightarrow\quad \key{0}
 \]
 
-For translating statements, we discuss a selection of cases.  The \code{not}
-operation can be implemented in terms of \code{xorq} as we discussed
-at the beginning of this section. Given an assignment, if the
-left-hand side variable is the same as the argument of \code{not},
+For translating statements, we discuss some of the cases.  The
+\code{not} operation can be implemented in terms of \code{xorq} as we
+discussed at the beginning of this section. Given an assignment, if
+the left-hand side variable is the same as the argument of \code{not},
 then just the \code{xorq} instruction suffices.
 \[
 \CASSIGN{\Var}{ \CUNIOP{\key{not}}{\Var} }
@@ -8637,11 +8637,11 @@ result of translating $\Atm$ to x86.
 \end{array}
 \]
 
-Next consider the cases for equality.  Translating this operation to
-x86 is slightly involved due to the unusual nature of the \key{cmpq}
-instruction discussed above.  We recommend translating an assignment
-with an equality on the right-hand side into a sequence of three
-instructions. \\
+Next consider the cases for equality comparisons.  Translating this
+operation to x86 is slightly involved due to the unusual nature of the
+\key{cmpq} instruction that we discussed in Section~\ref{sec:x86-if}.
+We recommend translating an assignment with an equality on the
+right-hand side into a sequence of three instructions. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
@@ -8660,8 +8660,7 @@ movzbq %al, |$\Var$|
 \end{minipage}
 \end{tabular}  \\
 The translations for the other comparison operators are similar to the
-above but use different suffixes for the \code{set} instruction.
-
+above but use different condition codes for the \code{set} instruction.
 
 \racket{Regarding the $\Tail$ non-terminal, we have two new cases:
   \key{goto} and \key{if} statements. Both are straightforward to
@@ -8696,7 +8695,7 @@ jmp |$\ell_2$|
 \end{minipage}
 \end{tabular}  \\
 Again, the translations for the other comparison operators are similar to the
-above but use different suffixes for the conditional jump instruction.
+above but use different condition codes for the conditional jump instruction.
 
 \python{Regarding the \key{return} statement, we recommend treating it
   as an assignment to the \key{rax} register followed by a jump to the
@@ -8704,7 +8703,7 @@ above but use different suffixes for the conditional jump instruction.
 
 \begin{exercise}\normalfont\normalsize
 Expand your \code{select\_instructions} pass to handle the new
-features of the \LangIf{} language.
+features of the \LangCIf{} language.
 %
 {\if\edition\racketEd
 Add the following entry to the list of \code{passes} in
@@ -8719,11 +8718,11 @@ Run the script to test your compiler on all the test programs.
 
 \section{Register Allocation}
 \label{sec:register-allocation-Lif}
-
 \index{subject}{register allocation}
-The changes required for \LangIf{} affect liveness analysis, building the
-interference graph, and assigning homes, but the graph coloring
-algorithm itself does not change.
+
+The changes required for compiling \LangIf{} affect liveness analysis,
+building the interference graph, and assigning homes, but the graph
+coloring algorithm itself does not change.
 
 \subsection{Liveness Analysis}
 \label{sec:liveness-analysis-Lif}
@@ -8785,7 +8784,7 @@ that we have many basic blocks, \code{label->live} needs to be updated
 as we process the blocks. In particular, after performing liveness
 analysis on a block, we take the live-before set of its first
 instruction and associate that with the block's label in the
-\code{label->live}.
+\code{label->live} alist.
 \fi}
 %
 {\if\edition\pythonEd
@@ -8805,11 +8804,11 @@ In \LangXIfVar{} we also have the conditional jump
 $\JMPIF{\itm{cc}}{\itm{label}}$ to deal with.  Liveness analysis for
 this instruction is particularly interesting because, during
 compilation, we do not know which way a conditional jump will go.  So
-we do not know whether to use the live-before set for the following
-instruction or the live-before set for the block associated with the
-$\itm{label}$.  However, there is no harm to the correctness of the
-generated code if we classify more locations as live than the ones
-that are truly live during one particular execution of the
+we do not know whether to use the live-before set for the block
+associated with the $\itm{label}$ or the live-before set for the
+following instruction.  However, there is no harm to the correctness
+of the generated code if we classify more locations as live than the
+ones that are truly live during one particular execution of the
 instruction. Thus, we can take the union of the live-before sets from
 the following instruction and from the mapping for $\itm{label}$ in
 \racket{\code{label->live}}\python{\code{live\_before\_block}}.
@@ -8866,7 +8865,7 @@ Add the following entries to the list of \code{passes} in the
 \code{run-tests.rkt} script.
 \begin{lstlisting}
 (list "build_interference" build_interference interp-pseudo-x86-1)
-(list "allocate_registers" allocate_registers interp-x86-1)
+(list "allocate_registers" allocate_registers interp-pseudo-x86-1)
 \end{lstlisting}
 \fi}
 % Check that the interference graph that you generate for
