@@ -9154,27 +9154,58 @@ control-flow of the program.
 
 The algorithm for \code{explicate\_control} that we discussed in
 Section~\ref{sec:explicate-control-Lif} sometimes generates too many
-blocks. It does so in two different ways.
+blocks. It creates a basic block whenever a continuation \emph{might}
+get used more than once (e.g., whenever the \code{cont} parameter is
+passed into two or more recursive calls). However, some continuation
+arguments may not be used at all. For example, consider the case for
+the constant \TRUE{} in \code{explicate\_pred}, where we discard the
+\code{els} continuation.
 %
-First, recall how in Figure~\ref{fig:explicate-control-s1-38},
-\code{block\_4} consists of just a jump to \code{block\_2}. We created
-a new basic block from a single \code{goto} statement, whereas we
-could have simply returned the \code{goto} statement. We can solve
-this problem by modifying the \code{create\_block} function to
-recognize this situation.
+ {\if\edition\racketEd
+The following example program falls into this
+case, and it creates two unused blocks.       
+\begin{center}
+\begin{tabular}{lll}
+\begin{minipage}{0.4\textwidth}
+% cond_test_82.rkt
+\begin{lstlisting}
+(let ([y (if #t
+            (read)
+            (if (eq? (read) 0)
+               777
+               (let ([x (read)])
+                  (+ 1 x))))])
+   (+ y 2))
+\end{lstlisting}
+\end{minipage}
+&
+$\Rightarrow$
+&
+\begin{minipage}{0.55\textwidth}
+\begin{lstlisting}
+start:
+    y = (read);
+    goto block_5;
+block_5:
+    return (+ y 2);
+block_6:
+    y = 777;
+    goto block_5;
+block_7:
+    x = (read);
+    y = (+ 1 x2);
+    goto block_5;
+\end{lstlisting}
+\end{minipage}
+\end{tabular} 
+\end{center}
+\fi}
 
-Second, \code{explicate\_control} creates a basic block whenever a
-continuation \emph{might} get used more than once (whenever a
-continuation is passed into two or more recursive calls). However,
-some continuation parameters may not be used at all. For example, consider the
-case for the constant \TRUE{} in \code{explicate\_pred}, where we
-discard the \code{els} branch.  So the question is how can we decide
-whether to create a basic block?
-
-The solution to this conundrum is to use \emph{lazy
-  evaluation}\index{subject}{lazy evaluation}~\citep{Friedman:1976aa}
-to delay creating a basic block until the point in time where we know
-it will be used.
+So the question is how can we decide whether to create a basic block?
+\emph{Lazy evaluation}\index{subject}{lazy
+  evaluation}~\citep{Friedman:1976aa} can solve this conundrum by
+delaying the creation of a basic block until the point in time where
+we know it will be used.
 %
 {\if\edition\racketEd
 %
@@ -9222,32 +9253,40 @@ We use promises for the input and output of the functions
 %
 \racket{ and \code{explicate\_tail}}\python{ \code{explicate\_effect}, and \code{explicate\_stmt}}.
 %
-So instead of taking and returning lists of statments, they take and
-return promises. Furthermore, when we come to a situation in which a
+So instead of taking and returning \racket{$\Tail$
+  expressions}\python{lists of statments}, they take and return
+promises. Furthermore, when we come to a situation in which a
 continuation might be used more than once, as in the case for
 \code{if} in \code{explicate\_pred}, we create a delayed computation
 that creates a basic block for each continuation (if there is not
 already one) and then returns a \code{goto} statement to that basic
-block.
+block. When we come to a situation where we have a promise but need an
+actual piece of code, e.g. to create a larger piece of code with a
+constructor such as \code{Seq}, then insert a call to \code{force}.
 %
 {\if\edition\racketEd
 %
-The following auxiliary function named \code{create\_block} accomplishes
-this task. It begins with \code{delay} to create a promise. When
-forced, this promise will force the original promise. If that returns
-a \code{goto} (because the block was already added to the control-flow
-graph), then we return the \code{goto}. Otherwise we add the block to
-the control-flow graph with another auxiliary function named
-\code{add-node}. That function returns the label for the new block,
-which we use to create a \code{goto}.
+Also we must modify the \code{create\_block} function to begin with
+\code{delay} to create a promise. When forced, this promise forces the
+original promise. If that returns a \code{Goto} (because the block was
+already added to \code{basic-blocks}), then we return the
+\code{Goto}. Otherwise we add the block to \code{basic-blocks} and
+return a \code{Goto} to the new label.
+\begin{center}
+\begin{minipage}{\textwidth}
 \begin{lstlisting}
 (define (create_block tail)
   (delay
     (define t (force tail))
     (match t
       [(Goto label) (Goto label)]
-      [else (Goto (add-node t))])))
+      [else
+        (let ([label (gensym 'block)])
+          (set! basic-blocks (cons (cons label tail) basic-blocks))
+          (Goto label))]))
 \end{lstlisting}
+\end{minipage}
+\end{center}
 \fi}
 {\if\edition\pythonEd
 %
@@ -9271,24 +9310,23 @@ def create_block(promise, basic_blocks):
 \fi}
 
 Figure~\ref{fig:explicate-control-challenge} shows the output of
-\code{explicate\_control} on the example of the nested \code{if}
-expressions with the two improvements discussed above.  As you can
-see, the number of basic blocks has been reduced from 10 blocks (see
-Figure~\ref{fig:explicate-control-s1-38}) down to 6 blocks.
+improved \code{explicate\_control} on the above example.  As you can
+see, the number of basic blocks has been reduced from 4 blocks (see
+Figure~\ref{fig:explicate-control-s1-38}) down to 2 blocks.
 
 \begin{figure}[tbp]
 {\if\edition\racketEd        
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
-% cond_test_41.rkt
+% cond_test_82.rkt
 \begin{lstlisting}
-(let ([x (read)])
-   (let ([y (read)])
-      (if (if (< x 1)
-             (eq? x 0)
-             (eq? x 2))
-         (+ y 2)
-         (+ y 10))))
+(let ([y (if #t
+            (read)
+            (if (eq? (read) 0)
+               777
+               (let ([x (read)])
+                  (+ 1 x))))])
+   (+ y 2))
 \end{lstlisting}
 \end{minipage}
 &
@@ -9297,20 +9335,10 @@ $\Rightarrow$
 \begin{minipage}{0.55\textwidth}
 \begin{lstlisting}
 start:
-    x = (read);
     y = (read);
-    if (< x 1) goto block40;
-    else goto block41;
-block40:
-    if (eq? x 0) goto block38;
-    else goto block39;
-block41:
-    if (eq? x 2) goto block38;
-    else goto block39;
-block38:
+    goto block_5;
+block_5:
     return (+ y 2);
-block39:
-    return (+ y 10);
 \end{lstlisting}
 \end{minipage}
 \end{tabular} 
@@ -9318,7 +9346,7 @@ block39:
 {\if\edition\pythonEd
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
-% cond_test_41.rkt
+  % cond_test_41.rkt
 \begin{lstlisting}
 x = input_int()
 y = input_int()
@@ -9489,31 +9517,27 @@ block_1:
 
 There is an opportunity for removing jumps that is apparent in the
 example of Figure~\ref{fig:if-example-x86}. The \code{start} block
-ends with a jump to \code{block7953} and there are no other jumps to
-\code{block7953} in the rest of the program. In this situation we can
-avoid the runtime overhead of this jump by merging \code{block7953}
+ends with a jump to \code{block\_5} and there are no other jumps to
+\code{block\_5} in the rest of the program. In this situation we can
+avoid the runtime overhead of this jump by merging \code{block\_5}
 into the preceding block, in this case the \code{start} block.
 Figure~\ref{fig:remove-jumps} shows the output of
-\code{select\_instructions} on the left and the result of this
+\code{allocate\_registers} on the left and the result of this
 optimization on the right.
 
 \begin{figure}[tbp]
 {\if\edition\racketEd        
 \begin{tabular}{lll}
 \begin{minipage}{0.5\textwidth}
-% cond_test_20.rkt
+% cond_test_82.rkt
 \begin{lstlisting}
 start:
     callq read_int
-    movq %rax, tmp7951
-    cmpq $1, tmp7951
-    je block7952
-    jmp block7953
-block7953:
-    movq $0, %rax
-    jmp conclusion
-block7952:
-    movq $42, %rax
+    movq %rax, %rcx
+    jmp block_5
+block_5:
+    movq %rcx, %rax
+    addq $2, %rax
     jmp conclusion
 \end{lstlisting}
 \end{minipage}
@@ -9523,13 +9547,9 @@ $\Rightarrow\qquad$
 \begin{lstlisting}
 start:
     callq read_int
-    movq %rax, tmp7951
-    cmpq $1, tmp7951
-    je block7952
-    movq $0, %rax
-    jmp conclusion
-block7952:
-    movq $42, %rax
+    movq %rax, %rcx
+    movq %rcx, %rax
+    addq $2, %rax
     jmp conclusion
 \end{lstlisting}
 \end{minipage}
@@ -9622,7 +9642,7 @@ style~\citep{Wijngaarden:1966,Fischer:1972,reynolds72:_def_interp,Plotkin:1975,F
 The treatment of conditionals in the \code{explicate\_control} pass is
 similar to short-cut boolean
 evaluation~\citep{Logothetis:1981,Aho:2006wb,Clarke:1989,Danvy:2003fk}
-and the case-of-case transformation of \citet{PeytonJones:1998}.
+and the case-of-case transformation~\citep{PeytonJones:1998}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Loops and Dataflow Analysis}
