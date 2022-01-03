@@ -10021,10 +10021,9 @@ that we introduce the changes necessary to the existing passes.
 \section{Cyclic Control Flow and Dataflow Analysis}
 \label{sec:dataflow-analysis}
 
-Up until this point the control-flow graphs of the programs generated
-in \code{explicate\_control} were guaranteed to be acyclic. However,
-each \code{while} loop introduces a cycle in the control-flow graph.
-But does that matter?
+Up until this point the programs generated in
+\code{explicate\_control} were guaranteed to be acyclic. However, each
+\code{while} loop introduces a cycle. But does that matter?
 %
 Indeed it does.  Recall that for register allocation, the compiler
 performs liveness analysis to determine which variables can share the
@@ -10102,22 +10101,22 @@ Recall that liveness analysis works backwards, starting at the end
 of each function. For this example we could start with \code{block8}
 because we know what is live at the beginning of the conclusion,
 just \code{rax} and \code{rsp}. So the live-before set
-for \code{block8} is $\{\ttm{rsp},\ttm{sum}\}$.
+for \code{block8} is \code{\{rsp,sum\}}.
 %
 Next we might try to analyze \code{block5} or \code{block7}, but
 \code{block5} jumps to \code{block7} and vice versa, so it seems that
 we are stuck.
 
 The way out of this impasse is to realize that we can compute an
-under-approximation of the live-before set by starting with empty
+under-approximation of each live-before set by starting with empty
 live-after sets.  By \emph{under-approximation}, we mean that the set
 only contains variables that are live for some execution of the
-program, but the set may be missing some variables.  Next, the
-under-approximations for each block can be improved by 1) updating the
-live-after set for each block using the approximate live-before sets
-from the other blocks and 2) perform liveness analysis again on each
-block.  In fact, by iterating this process, the under-approximations
-eventually become the correct solutions!
+program, but the set may be missing some variables that are live.
+Next, the under-approximations for each block can be improved by 1)
+updating the live-after set for each block using the approximate
+live-before sets from the other blocks and 2) perform liveness
+analysis again on each block.  In fact, by iterating this process, the
+under-approximations eventually become the correct solutions!
 %
 This approach of iteratively analyzing a control-flow graph is
 applicable to many static analysis problems and goes by the name
@@ -10317,9 +10316,10 @@ def analyze_dataflow(G, transfer, bottom, join):
 {\if\edition\racketEd
 \section{Mutable Variables \& Remove Complex Operands}
 
-There is a subtle interaction between the addition of \code{set!}, the
-\code{remove\_complex\_operands} pass, and the left-to-right order of
-evaluation of Racket. Consider the following example.
+There is a subtle interaction between the
+\code{remove\_complex\_operands} pass, the addition of \code{set!},
+and the left-to-right order of evaluation of Racket. Consider the
+following example.
 \begin{lstlisting}
 (let ([x 2])
   (+ x (begin (set! x 40) x)))
@@ -10351,9 +10351,9 @@ following variation that also involves a variable that is not mutated.
   (let ([y 0])
     (+ y (+ x (begin (set! x 40) x)))))
 \end{lstlisting}
-We analyze the above program to discover that variable \code{x} is
-mutable but \code{y} is not. We then transform the program as follows,
-replacing each occurence of \code{x} with \code{(get! x)}.
+We first analyze the above program to discover that variable \code{x}
+is mutable but \code{y} is not. We then transform the program as
+follows, replacing each occurence of \code{x} with \code{(get! x)}.
 \begin{lstlisting}
 (let ([x 2])
   (let ([y 0])
@@ -10364,7 +10364,8 @@ immutable variables, we can apply the \code{remove\_complex\_operands}
 pass, where reads from immutable variables are still classified as
 atomic expressions but reads from mutable variables are classified as
 complex.  Thus, \code{remove\_complex\_operands} yields the following
-program.
+program.\\
+\begin{minipage}{\textwidth}
 \begin{lstlisting}
 (let ([x 2])
   (let ([y 0])
@@ -10372,6 +10373,7 @@ program.
            (let ([t2 (begin (set! x 40) (get! x))])
              (+ t1 t2))))))
 \end{lstlisting}
+\end{minipage}
 The temporary variable \code{t1} gets the value of \code{x} before the
 \code{set!}, so it is \code{2}.  The temporary variable \code{t2} gets
 the value of \code{x} after the \code{set!}, so it is \code{40}.  We
