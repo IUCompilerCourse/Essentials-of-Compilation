@@ -12194,13 +12194,13 @@ available for use by the register allocator.
 
 \newcommand{\GrammarXGlobal}{
 \begin{array}{lcl}
-  \Arg &::=& \Var \key{(\%rip)} 
+  \Arg &::=& \itm{label} \key{(\%rip)} 
 \end{array}
 }
 
 \newcommand{\ASTXGlobalRacket}{
 \begin{array}{lcl}
-  \Arg &::=&  \GLOBAL{\Var} 
+  \Arg &::=&  \GLOBAL{\itm{label}} 
 \end{array}
 }
 
@@ -13598,6 +13598,7 @@ before the register name.\index{subject}{indirect function call}
 
 
 \subsection{Calling Conventions}
+\label{sec:calling-conventions-fun}
 
 \index{subject}{calling conventions}
 
@@ -14141,29 +14142,52 @@ appropriate explicate functions for the various contexts.
 \label{fig:c3-syntax}
 \end{figure}
 
+\clearpage
 
 \section{Select Instructions and the \LangXIndCall{} Language}
 \label{sec:select-r4}
 \index{subject}{instruction selection}
 
 The output of select instructions is a program in the \LangXIndCall{}
-language, whose syntax is defined in Figure~\ref{fig:x86-3}.
-\index{subject}{x86}
+language, whose concrete syntax is defined in
+Figure~\ref{fig:x86-3-concrete} and abstract syntax is defined in
+Figure~\ref{fig:x86-3}.  We use the \code{align} directive on the
+labels of function definitions to make sure the bottom three bits are
+zero, which we make use of in Chapter~\ref{ch:Ldyn}. We discuss the
+new instructions as needed in this section.  \index{subject}{x86}
+
+\newcommand{\GrammarXIndCall}{
+\begin{array}{lcl}
+\Instr &::=&  \key{callq}\;\key{*}\Arg \MID \key{tailjmp}\;\Arg 
+     \MID \key{leaq}\;\Arg\key{,}\;\key{\%}\Reg \\
+\Block &::= & \Instr^{+} \\
+\Def &::= & \code{.globl}\,\code{.align 8}\,\itm{label}\; (\itm{label}\key{:}\, \Block)^{*} 
+\end{array}
+}
+
+\newcommand{\ASTXIndCallRacket}{
+\begin{array}{lcl}
+  \Instr &::=& \INDCALLQ{\Arg}{\itm{int}}
+    \MID \TAILJMP{\Arg}{\itm{int}}\\
+    &\MID& \BININSTR{\code{'leaq}}{\Arg}{\REG{\Reg}}\\
+  \Block &::= & \BLOCK{\itm{info}}{\LP\Instr\ldots\RP}\\
+  \Def &::= & \DEF{\itm{label}}{\code{'()}}{\Type}{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Block\RP\ldots\RP} 
+\end{array}
+}
 
 \begin{figure}[tp]
 \fbox{
 \begin{minipage}{0.96\textwidth}
 \small
 \[
+\begin{array}{l}
+  \gray{\GrammarXInt} \\ \hline
+  \gray{\GrammarXIf} \\ \hline
+  \gray{\GrammarXGlobal} \\ \hline
+  \GrammarXIndCall \\
 \begin{array}{lcl}
-  \Arg &::=& \gray{ \key{\$}\Int \MID \key{\%}\Reg \MID \Int\key{(}\key{\%}\Reg\key{)} \MID \key{\%}\itm{bytereg} } \MID \Var \key{(\%rip)} \\
-\itm{cc} & ::= & \gray{  \key{e} \MID \key{ne} \MID \key{l} \MID \key{le} \MID \key{g} \MID \key{ge}  } \\
-\Instr &::=& \ldots
-     \MID \key{callq}\;\key{*}\Arg \MID \key{tailjmp}\;\Arg 
-     \MID \key{leaq}\;\Arg\key{,}\;\key{\%}\Reg \\
-\Block &::= & \Instr^{+} \\
-\Def &::= & \key{.globl}\,\itm{label}\; (\itm{label}\key{:}\, \Block)^{*} \\
-\LangXIndCallM{} &::= & \Def\ldots
+\LangXIndCallM{} &::= & \Def^{*}
+\end{array}
 \end{array}
 \]
 \end{minipage}
@@ -14178,16 +14202,14 @@ language, whose syntax is defined in Figure~\ref{fig:x86-3}.
     \small
 {\if\edition\racketEd
 \[
+\begin{array}{l}
+  \gray{\ASTXIntRacket} \\ \hline
+  \gray{\ASTXIfRacket} \\ \hline
+  \gray{\ASTXGlobalRacket} \\ \hline
+  \ASTXIndCallRacket \\
 \begin{array}{lcl}
-  \Arg &::=&  \gray{  \INT{\Int} \MID \REG{\Reg} \MID \DEREF{\Reg}{\Int}
-     \MID \BYTEREG{\Reg} } \\
-     &\MID& \gray{ \GLOBAL{\Var} } \MID \FUNREF{\itm{label}}{\Int} \\
-  \Instr &::=& \ldots \MID \INDCALLQ{\Arg}{\itm{int}}
-    \MID \TAILJMP{\Arg}{\itm{int}}\\
-    &\MID& \BININSTR{\code{'leaq}}{\Arg}{\REG{\Reg}}\\
-  \Block &::= & \BLOCK{\itm{info}}{\LP\Instr\ldots\RP}\\
-  \Def &::= & \DEF{\itm{label}}{\code{'()}}{\Type}{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Block\RP\ldots\RP} \\
 \LangXIndCallM{} &::= & \PROGRAMDEFS{\itm{info}}{\LP\Def\ldots\RP}
+\end{array}
 \end{array}
 \]
 \fi}
@@ -14196,7 +14218,7 @@ language, whose syntax is defined in Figure~\ref{fig:x86-3}.
 \begin{array}{lcl}
   \Arg &::=&  \gray{  \INT{\Int} \MID \REG{\Reg} \MID \DEREF{\Reg}{\Int}
      \MID \BYTEREG{\Reg} } \\
-     &\MID& \gray{ \GLOBAL{\Var} } \MID \FUNREF{\itm{label}}{\Int} \\
+     &\MID& \gray{ \GLOBAL{\itm{label}} } \MID \FUNREF{\itm{label}}{\Int} \\
   \Instr &::=& \ldots \MID \INDCALLQ{\Arg}{\itm{int}}
     \MID \TAILJMP{\Arg}{\itm{int}}\\
     &\MID& \BININSTR{\scode{leaq}}{\Arg}{\REG{\Reg}}\\
@@ -14214,12 +14236,15 @@ language, whose syntax is defined in Figure~\ref{fig:x86-3}.
 \label{fig:x86-3}
 \end{figure}
 
-
 An assignment of a function reference to a variable becomes a
-load-effective-address instruction as follows, where $\itm{lhs}'$
-is the translation of $\itm{lhs}$ from \Atm{} in \LangCFun{}
-to \Arg{} in \LangXIndCallVar{}. \\
-\begin{tabular}{lcl}
+load-effective-address instruction as follows, where $\itm{lhs}'$ is
+the translation of $\itm{lhs}$ from \Atm{} in \LangCFun{} to \Arg{} in
+\LangXIndCallVar{}. The \code{FunRef} becomes a \code{Global} AST
+node, whose concrete syntax is instruction-pointer relative
+addressing.
+
+\begin{center}
+  \begin{tabular}{lcl}
 \begin{minipage}{0.35\textwidth}
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -14228,7 +14253,7 @@ to \Arg{} in \LangXIndCallVar{}. \\
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
-  |$\itm{lhs}$| = FunRef(|$f$|, |$n$|);
+  |$\itm{lhs}$| = FunRef(|$f$| |$n$|);
 \end{lstlisting}
 \fi}
 \end{minipage}
@@ -14236,25 +14261,21 @@ to \Arg{} in \LangXIndCallVar{}. \\
 $\Rightarrow$\qquad\qquad
 &
 \begin{minipage}{0.3\textwidth}
-{\if\edition\racketEd
-\begin{lstlisting}
-leaq (fun-ref |$f$| |$n$|), |$\itm{lhs}'$|
-\end{lstlisting}
-\fi}
-{\if\edition\pythonEd
 \begin{lstlisting}
 leaq |$f$|(%rip), |$\itm{lhs}'$|
 \end{lstlisting}
-\fi}
 \end{minipage}
-\end{tabular} \\
+  \end{tabular}
+\end{center}
+
 
 Regarding function definitions, we need to remove the parameters and
 instead perform parameter passing using the conventions discussed in
 Section~\ref{sec:fun-x86}. That is, the arguments are passed in
 registers. We recommend turning the parameters into local variables
 and generating instructions at the beginning of the function to move
-from the argument passing registers to these local variables.
+from the argument passing registers
+(Section~\ref{sec:calling-conventions-fun}) to these local variables.
 
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -14288,6 +14309,7 @@ $\Rightarrow$
 \begin{lstlisting}
 start:
   movq %rdi, |$x_1$|
+  movq %rsi, |$x_2$|
   |$\cdots$|
   |$\itm{instr}_1$|
   |$\cdots$|
@@ -14320,19 +14342,20 @@ graph. So, for example, $x_1$ will be marked as interfering with
 that needs to move into $x_2$.
 
 Next, consider the compilation of function calls. In the mirror image
-of handling the parameters of function definitions, the arguments need
-to be moved to the argument passing registers.  The function call
-itself is performed with an indirect function call. The return value
-from the function is stored in \code{rax}, so it needs to be moved
-into the \itm{lhs}.
+of the handling of parameters in function definitions, the arguments
+are moved to the argument passing registers.  Note that the function
+is not given as a label, but its address is produced by the argument
+$\itm{arg}_0$. So we translate the call into an indirect function
+call. The return value from the function is stored in \code{rax}, so
+it needs to be moved into the \itm{lhs}.
 \begin{lstlisting}
-  |\itm{lhs}| = |$\CALL{\itm{fun}}{\itm{arg}_1\ldots}$|
+  |\itm{lhs}| = |$\CALL{\itm{arg}_0}{\itm{arg}_1~\itm{arg}_2 \ldots}$|
   |$\Rightarrow$|
   movq |$\itm{arg}_1$|, %rdi
   movq |$\itm{arg}_2$|, %rsi
   |$\vdots$|
-  callq *|\itm{fun}|
-  movq %rax, |\itm{lhs}|
+  callq *|$\itm{arg}_0$|
+  movq %rax, |$\itm{lhs}$|
 \end{lstlisting}
 The \code{IndirectCallq} AST node includes an integer for the arity of
 the function, i.e., the number of parameters. That information is
@@ -14364,6 +14387,8 @@ to obtain unique labels.
 \section{Register Allocation}
 \label{sec:register-allocation-r4}
 
+The addition of functions requires some changes to all three aspects
+of register allocation, which we discuss in the following subsections.
 
 \subsection{Liveness Analysis}
 \label{sec:liveness-analysis-r4}
@@ -14393,17 +14418,17 @@ With the addition of function definitions, we compute a separate interference
 graph for each function (not just one for the whole program).
 
 Recall that in Section~\ref{sec:reg-alloc-gc} we discussed the need to
-spill vector-typed variables that are live during a call to 
-\code{collect}, the garbage collector.  With the addition of functions to our language, we
-need to revisit this issue. Functions that perform allocation contain
-calls to the collector. Thus, we should 
-not only spill a vector-typed variable when it is live during a call
-to \code{collect}, but we should spill the variable if it is live
-during call to a user-defined function. Thus, in the \code{build\_interference} pass,
-we recommend adding interference edges between call-live vector-typed
-variables and the callee-saved registers (in addition to the usual
-addition of edges between call-live variables and the caller-saved
-registers).
+spill tuple-typed variables that are live during a call to
+\code{collect}, the garbage collector.  With the addition of functions
+to our language, we need to revisit this issue. Functions that perform
+allocation contain calls to the collector. Thus, we should not only
+spill a tuple-typed variable when it is live during a call to
+\code{collect}, but we should spill the variable if it is live during
+call to any user-defined function. Thus, in the
+\code{build\_interference} pass, we recommend adding interference
+edges between call-live tuple-typed variables and the callee-saved
+registers (in addition to the usual addition of edges between
+call-live variables and the caller-saved registers).
 
 
 \subsection{Allocate Registers}
@@ -14422,32 +14447,25 @@ instead of just once for the whole program.
 In \code{patch\_instructions}, you should deal with the x86
 idiosyncrasy that the destination argument of \code{leaq} must be a
 register. Additionally, you should ensure that the argument of
-\code{TailJmp} is \itm{rax}, our reserved register---mostly to make
-code generation more convenient, because we trample many registers
-before the tail call (as explained in the next section).
+\code{TailJmp} is \itm{rax}, our reserved register---because we
+trample many other registers before the tail call (as explained in the
+next section).
 
 \section{Prelude and Conclusion}
 
-%% For the \code{print\_x86} pass, the cases for \code{FunRef} and
-%% \code{IndirectCallq} are straightforward: output their concrete
-%% syntax.
-%% \begin{lstlisting}
-%%   (FunRef |\itm{label}|) |$\Rightarrow$| |\itm{label}|(%rip)
-%%   (IndirectCallq |\itm{arg}| |\itm{int}|) |$\Rightarrow$| callq *|\itm{arg}'|
-%% \end{lstlisting}
-
 Now that register allocation is complete, we can translate the
-\code{TailJmp} into a sequence of instructions. A straightforward
-translation of \code{TailJmp} would simply be \code{jmp *$\itm{arg}$}.
-However, before the jump we need to pop the current frame. This
-sequence of instructions is the same as the code for the conclusion of
-a function, except the \code{retq} is replaced with \code{jmp *$\itm{arg}$}.
+\code{TailJmp} into a sequence of instructions. A naive translation of
+\code{TailJmp} would simply be \code{jmp *$\itm{arg}$}.  However,
+before the jump we need to pop the current frame to achieve efficient
+tail calls.  This sequence of instructions is the same as the code for
+the conclusion of a function, except the \code{retq} is replaced with
+\code{jmp *$\itm{arg}$}.
 
-Regarding function definitions, you need to generate a prelude
-and conclusion for each one. This code is similar to the prelude and
-conclusion generated for the \code{main} function in
-Chapter~\ref{ch:Lvec}. To review, the prelude of every function
-should carry out the following steps.
+Regarding function definitions, we generate a prelude and conclusion
+for each one. This code is similar to the prelude and conclusion
+generated for the \code{main} function in Chapter~\ref{ch:Lvec}. To
+review, the prelude of every function should carry out the following
+steps.
 % TODO: .align the functions!
 \begin{enumerate}
 %% \item Start with \code{.global} and \code{.align} directives followed
@@ -14457,25 +14475,23 @@ should carry out the following steps.
   pointer.
 \item Push to the stack all of the callee-saved registers that were
   used for register allocation.
-\item Move the stack pointer \code{rsp} down by the size of the stack
-  frame for this function, which depends on the number of regular
-  spills. (Aligned to 16 bytes.)
+\item Move the stack pointer \code{rsp} down to make room for the
+  regular spills. (Aligned to 16 bytes.)
 \item Move the root stack pointer \code{r15} up by the size of the
   root-stack frame for this function, which depends on the number of
-  spilled vectors. \label{root-stack-init}
+  spilled tuple-typed variables. \label{root-stack-init}
 \item Initialize to zero all new entries in the root-stack frame.
 \item Jump to the start block.
 \end{enumerate}
-The prelude of the \code{main} function has one additional task: call
+The prelude of the \code{main} function has an additional task: call
 the \code{initialize} function to set up the garbage collector and
-move the value of the global \code{rootstack\_begin} in
+then move the value of the global \code{rootstack\_begin} in
 \code{r15}. This initialization should happen before step \ref{root-stack-init}
 above, which depends on \code{r15}.
 
 The conclusion of every function should do the following.
 \begin{enumerate}
-\item Move the stack pointer back up by the size of the stack frame
-  for this function.
+\item Move the stack pointer back up past the regular spills.
 \item Restore the callee-saved registers by popping them from the
   stack.
 \item Move the root stack pointer back down by the size of the
@@ -14487,7 +14503,7 @@ The conclusion of every function should do the following.
 
 \begin{exercise}\normalfont\normalsize
 Expand your compiler to handle \LangFun{} as outlined in this chapter.
-Create 5 new programs that use functions, including examples that pass
+Create 8 new programs that use functions, including examples that pass
 functions and return functions from other functions, recursive
 functions, functions that create vectors, and functions that make tail
 calls. Test your compiler on these new programs and all of your
@@ -14503,7 +14519,8 @@ previously created test programs.
 \node (F1-1) at (9,2)  {\large \LangFunRef{}};
 \node (F1-2) at (9,0)  {\large \LangFunRef{}};
 \node (F1-3) at (6,0)  {\large \LangFunRefAlloc{}};
-\node (F1-4) at (3,0)  {\large \LangFunANF{}};
+\node (F1-4) at (3,0)  {\large \LangFunRefAlloc{}};
+\node (F1-5) at (0,0)  {\large \LangFunANF{}};
 \node (C3-2) at (3,-2)  {\large \LangCFun{}};
 
 \node (x86-2) at (3,-4)  {\large \LangXIndCallVar{}};
@@ -14520,13 +14537,15 @@ previously created test programs.
      {\ttfamily\footnotesize uniquify} (Lfun-2);
 \path[->,bend left=15] (Lfun-2) edge [above] node
      {\ttfamily\footnotesize ~~reveal\_functions} (F1-1);
-\path[->,bend left=15] (F1-1) edge [right] node
+\path[->,bend left=15] (F1-1) edge [left] node
      {\ttfamily\footnotesize limit\_functions} (F1-2);
-\path[->,bend right=15] (F1-2) edge [above] node
+\path[->,bend left=15] (F1-2) edge [below] node
      {\ttfamily\footnotesize expose\_alloc.} (F1-3);
-\path[->,bend right=15] (F1-3) edge [above] node
-     {\ttfamily\footnotesize remove\_complex.} (F1-4);
-\path[->,bend left=15] (F1-4) edge [right] node
+\path[->,bend left=15] (F1-3) edge [below] node
+     {\ttfamily\footnotesize uncover\_get!} (F1-4);
+\path[->,bend right=15] (F1-4) edge [above] node
+     {\ttfamily\footnotesize remove\_complex.} (F1-5);
+\path[->,bend right=15] (F1-5) edge [left] node
      {\ttfamily\footnotesize explicate\_control} (C3-2);
 \path[->,bend right=15] (C3-2) edge [left] node
      {\ttfamily\footnotesize select\_instr.} (x86-2);
@@ -14538,7 +14557,7 @@ previously created test programs.
      {\ttfamily\footnotesize allocate\_reg.} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node
      {\ttfamily\footnotesize patch\_instr.} (x86-4);
-\path[->,bend right=15] (x86-4) edge [left] node {\ttfamily\footnotesize print-x86} (x86-5);
+\path[->,bend right=15] (x86-4) edge [left] node {\ttfamily\footnotesize prelude.} (x86-5);
 \end{tikzpicture}
 \caption{Diagram of the passes for \LangFun{}, a language with functions.}
 \label{fig:Lfun-passes}
@@ -14560,9 +14579,11 @@ function in \LangFun{} to x86. The figure also includes the results of the
 % s3_2.rkt
 {\if\edition\racketEd
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define (add [x : Integer] [y : Integer])
-   : Integer
+(define (add [x : Integer]
+              [y : Integer])
+          : Integer
    (+ x y))
+
 (add 40 2)
 \end{lstlisting}
 \fi}
@@ -14578,10 +14599,12 @@ $\Downarrow$
 {\if\edition\racketEd
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define (add86 [x87 : Integer]
-                 [y88 : Integer]) : Integer
+                 [y88 : Integer])
+          : Integer
    add86start:
       return (+ x87 y88);
    )
+
 (define (main) : Integer ()
    mainstart:
       tmp89 = (fun-ref add86 2);
@@ -14617,6 +14640,7 @@ $\Rightarrow$
       addq y88, %rax
       jmp inc1389conclusion
    )
+
 (define (main) : Integer
    mainstart:
       leaq (fun-ref add86 2), tmp89
@@ -14657,7 +14681,7 @@ $\Downarrow$
 {\if\edition\racketEd
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 	.globl add86
-	.align 16
+	.align 8
 add86:
 	pushq	%rbp
 	movq	%rsp, %rbp
@@ -14673,7 +14697,7 @@ add86conclusion:
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-  .align 16
+  .align 8
 add:
   pushq %rbp
   movq %rsp, %rbp
@@ -14698,7 +14722,7 @@ addconclusion:
 {\if\edition\racketEd
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 	.globl main
-	.align 16
+	.align 8
 main:
 	pushq	%rbp
 	movq	%rsp, %rbp
@@ -14722,7 +14746,7 @@ mainconclusion:
 {\if\edition\pythonEd
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
   .globl main
-  .align 16
+  .align 8
 main:
   pushq %rbp
   movq %rsp, %rbp
