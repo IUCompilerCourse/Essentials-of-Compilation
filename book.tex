@@ -15710,30 +15710,14 @@ def g(x_0 : int)-> int:
 \end{lstlisting}
 \fi}
 
-%% Recall the second example in Section~\ref{sec:assignment-scoping}
-%% involving a counter abstraction. The following is the output of
-%% assignment version for function \code{f}.
-%% \begin{lstlisting}
-%% (define (f0 [x1 : Integer]) : (Vector ( -> Integer) ( -> Void))
-%%   (vector
-%%    (lambda: () : Integer x1)
-%%    (lambda: () : Void (set! x1 (+ 1 x1)))))
-%% |$\Rightarrow$|
-%% (define (f0 [param_x1 : Integer]) : (Vector (-> Integer) (-> Void))
-%%   (let ([x1 (vector param_x1)])
-%%     (vector (lambda: () : Integer (vector-ref x1 0))
-%%              (lambda: () : Void
-%%                 (vector-set! x1 0 (+ 1 (vector-ref x1 0)))))))
-%% \end{lstlisting}
-
 \section{Closure Conversion}
 \label{sec:closure-conversion}
 \index{subject}{closure conversion}
 
 The compiling of lexically-scoped functions into top-level function
-definitions is accomplished in the pass \code{convert\_to\_closures}
-that comes after \code{reveal\_functions} and before
-\code{limit\_functions}. 
+definitions and flat closures is accomplished in the pass
+\code{convert\_to\_closures} that comes after \code{reveal\_functions}
+and before \code{limit\_functions}.
 
 As usual, we implement the pass as a recursive function over the
 AST. The interesting cases are the ones for \key{lambda} and function
@@ -15848,7 +15832,7 @@ to avoid code duplication.
 (Apply |$e$| |$\itm{es}$|)
 |$\Rightarrow$|
 (Let |$\itm{tmp}$| |$e'$|
-  (Apply (Prim 'vector-ref (list (Var |$\itm{tmp}$|) (Int 0))) (cons |$\itm{tmp}$| |$\itm{es'}$|)))
+  (Apply (Prim 'vector-ref (list (Var |$\itm{tmp}$|) (Int 0))) (cons (Var |$\itm{tmp}$|) |$\itm{es'}$|)))
 \end{lstlisting}
 \fi}
 %
@@ -15904,7 +15888,8 @@ to support the type checking of \code{lambda} expressions, so we
 translate it to a regular \code{Assign} statement.
 
 The top-level function definitions need to be updated to take an extra
-closure parameter.
+closure parameter but that parameter is ignored in the body of those
+functions.
 
 \section{An Example Translation}
 \label{sec:example-lambda}
@@ -16010,17 +15995,26 @@ The only difference is replacing the use of
 The output language of \code{explicate\_control} is \LangCLam{} whose
 abstract syntax is defined in Figure~\ref{fig:Clam-syntax}.
 %
-\racket{The only difference with respect to \LangCFun{} is the
+\racket{The only differences with respect to \LangCFun{} is the
   addition of the \code{AllocateClosure} form to the grammar for
-  $\Exp$.  The handling of \code{AllocateClosure} in the
-  \code{explicate\_control} pass is similar to the handling of other
-  expressions such as primitive operators.}
+  $\Exp$ and the \code{procedure-arity} operator.  The handling of
+  \code{AllocateClosure} in the \code{explicate\_control} pass is
+  similar to the handling of other expressions such as primitive
+  operators.}
 %
 \python{The differences with respect to \LangCFun{} are the
   additions of \code{Uninitialized}, \code{AllocateClosure},
   and \code{arity} to the grammar for $\Exp$.  The handling of them in the
   \code{explicate\_control} pass is similar to the handling of other
   expressions such as primitive operators.}
+
+
+\newcommand{\ClambdaASTRacket}{
+\begin{array}{lcl}
+  \Exp &::= & \ALLOCCLOS{\Int}{\Type}{\Int} \\
+  \itm{op} &::= & \code{procedure-arity}
+\end{array}
+}
 
 \newcommand{\ClambdaASTPython}{
 \begin{array}{lcl}
@@ -16036,17 +16030,16 @@ abstract syntax is defined in Figure~\ref{fig:Clam-syntax}.
 \small
 {\if\edition\racketEd
 \[
+\begin{array}{l}
+  \gray{\CvarASTRacket} \\ \hline
+  \gray{\CifASTRacket} \\ \hline
+  \gray{\CloopASTRacket} \\ \hline
+  \gray{\CtupASTRacket} \\ \hline
+  \gray{\CfunASTRacket} \\ \hline
+  \ClambdaASTRacket \\
 \begin{array}{lcl}
-\Exp &::= & \ldots
-   \MID \ALLOCCLOS{\Int}{\Type}{\Int} \\
-\Stmt &::=& \gray{ \ASSIGN{\VAR{\Var}}{\Exp} 
-       \MID \LP\key{Collect} \,\itm{int}\RP } \\
-\Tail &::= & \gray{ \RETURN{\Exp} \MID \SEQ{\Stmt}{\Tail} 
-       \MID \GOTO{\itm{label}} } \\
-    &\MID& \gray{ \IFSTMT{\BINOP{\itm{cmp}}{\Atm}{\Atm}}{\GOTO{\itm{label}}}{\GOTO{\itm{label}}}  }\\
-    &\MID& \gray{ \TAILCALL{\Atm}{\Atm\ldots} } \\
-\Def &::=& \gray{ \DEF{\itm{label}}{\LP[\Var\key{:}\Type]\ldots\RP}{\Type}{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Tail\RP\ldots\RP} }\\
-\LangCLamM{} & ::= & \gray{ \PROGRAMDEFS{\itm{info}}{\LP\Def\ldots\RP} }
+\LangCLamM{} & ::= & \PROGRAMDEFS{\itm{info}}{\Def^{*}}
+\end{array}
 \end{array}
 \]
 \fi}
@@ -16099,11 +16092,12 @@ $58$ from the tag.}
 \node (Lfun-2) at (3,2)  {\large \LangLam{}};
 \node (Lfun-3) at (6,2)  {\large \LangLam{}};
 \node (F1-0) at (9,2)  {\large \LangLamFunRef{}};
-\node (F1-1) at (12,0)  {\large \LangLamFunRef{}};
-\node (F1-2) at (9,0)  {\large \LangFunRef{}};
-\node (F1-3) at (6,0)  {\large \LangFunRef{}};
-\node (F1-4) at (3,0)  {\large \LangFunRefAlloc{}};
-\node (F1-5) at (0,0)  {\large \LangFunANF{}};
+\node (F1-1) at (12,2)  {\large \LangLamFunRef{}};
+\node (F1-2) at (12,0)  {\large \LangFunRef{}};
+\node (F1-3) at (9,0)  {\large \LangFunRef{}};
+\node (F1-4) at (6,0)  {\large \LangFunRefAlloc{}};
+\node (F1-5) at (3,0)  {\large \LangFunRefAlloc{}};
+\node (F1-6) at (0,0)  {\large \LangFunANF{}};
 \node (C3-2) at (3,-2)  {\large \LangCFun{}};
 
 \node (x86-2) at (3,-4)  {\large \LangXIndCallVar{}};
@@ -16119,17 +16113,19 @@ $58$ from the tag.}
      {\ttfamily\footnotesize uniquify} (Lfun-3);
 \path[->,bend left=15] (Lfun-3) edge [above] node
      {\ttfamily\footnotesize reveal\_functions} (F1-0);
-\path[->,bend left=15] (F1-0) edge [right] node
+\path[->,bend left=15] (F1-0) edge [above] node
      {\ttfamily\footnotesize convert\_assign.} (F1-1);
-\path[->,bend left=15] (F1-1) edge [below] node
+\path[->,bend left=15] (F1-1) edge [left] node
      {\ttfamily\footnotesize convert\_to\_clos.} (F1-2);
-\path[->,bend right=15] (F1-2) edge [above] node
+\path[->,bend left=15] (F1-2) edge [below] node
      {\ttfamily\footnotesize limit\_fun.} (F1-3);
 \path[->,bend right=15] (F1-3) edge [above] node
      {\ttfamily\footnotesize expose\_alloc.} (F1-4);
-\path[->,bend right=15] (F1-4) edge [above] node
-     {\ttfamily\footnotesize remove\_complex.} (F1-5);
-\path[->,bend right=15] (F1-5) edge [right] node
+\path[->,bend left=15] (F1-4) edge [below] node
+     {\ttfamily\footnotesize uncover\_get!} (F1-5);
+\path[->,bend right=15] (F1-5) edge [above] node
+     {\ttfamily\footnotesize remove\_complex.} (F1-6);
+\path[->,bend right=15] (F1-6) edge [right] node
      {\ttfamily\footnotesize explicate\_control} (C3-2);
 \path[->,bend left=15] (C3-2) edge [left] node
      {\ttfamily\footnotesize select\_instr.} (x86-2);
@@ -16142,15 +16138,15 @@ $58$ from the tag.}
 \path[->,bend left=15] (x86-3) edge [above] node
      {\ttfamily\footnotesize patch\_instr.} (x86-4);
 \path[->,bend left=15] (x86-4) edge [right] node
-     {\ttfamily\footnotesize print\_x86} (x86-5);
+     {\ttfamily\footnotesize prelude\_and\_conc.} (x86-5);
 \end{tikzpicture}
   \caption{Diagram of the passes for \LangLam{}, a language with lexically-scoped
   functions.}
 \label{fig:Llambda-passes}
 \end{figure}
 
-Figure~\ref{fig:Llambda-passes} provides an overview of all the passes needed
-for the compilation of \LangLam{}.
+Figure~\ref{fig:Llambda-passes} provides an overview of the passes
+needed for the compilation of \LangLam{}.
 
 \clearpage
 
@@ -16365,7 +16361,7 @@ particular application is quite challenging in general and the topic
 of considerable research~\citep{Shivers:1988aa,Gilray:2016aa}. For the
 following exercise we recommend that you compile an application to a
 direct call when the operator is a variable and \racket{the variable
-  is \code{let}-bound to a closure} \python{the previous assignment to
+  is \code{let}-bound to a closure}\python{the previous assignment to
   the variable is a closure}.  This can be accomplished by maintaining
 an environment mapping variables to function names.  Extend the
 environment whenever you encounter a closure on the right-hand side of
