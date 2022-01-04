@@ -14938,7 +14938,7 @@ the syntax and semantics of \LangLam{} in Section~\ref{sec:r5}.
 
 The concrete and abstract syntax for \LangLam{}, a language with anonymous
 functions and lexical scoping, is defined in
-Figures~\ref{fig:Rlam-concrete-syntax} and \ref{fig:Rlam-syntax}. It adds
+Figures~\ref{fig:Llam-concrete-syntax} and \ref{fig:Llam-syntax}. It adds
 the \key{lambda} form to the grammar for \LangFun{}, which already has
 syntax for function application. 
 %
@@ -15029,7 +15029,7 @@ syntax for function application.
 }
 \caption{The concrete syntax of \LangLam{}, extending \LangFun{} (Figure~\ref{fig:Lfun-concrete-syntax}) 
   with \key{lambda}.}
-\label{fig:Rlam-concrete-syntax}
+\label{fig:Llam-concrete-syntax}
 \end{figure}
 
 \begin{figure}[tp]
@@ -15072,7 +15072,7 @@ syntax for function application.
 \end{minipage}
 }
 \caption{The abstract syntax of \LangLam{}, extending \LangFun{} (Figure~\ref{fig:Lfun-syntax}).}
-\label{fig:Rlam-syntax}
+\label{fig:Llam-syntax}
 \end{figure}
 
 \index{subject}{interpreter}
@@ -17029,7 +17029,7 @@ language in greater detail.
 \fi}
 \end{minipage}
 }
-\caption{The abstract syntax of \LangAny{}, extending \LangLam{} (Figure~\ref{fig:Rlam-syntax}).}
+\caption{The abstract syntax of \LangAny{}, extending \LangLam{} (Figure~\ref{fig:Llam-syntax}).}
 \label{fig:Lany-syntax}
 \end{figure}
 
@@ -19478,23 +19478,23 @@ UNDER CONSTRUCTION
 
 This chapter studies the compilation of parametric
 polymorphism\index{subject}{parametric polymorphism}
-(aka. generics\index{subject}{generics}) in the subset \LangPoly{} of Typed
-Racket. Parametric polymorphism enables improved code reuse by
-parameterizing functions and data structures with respect to the types
-that they operate on. For example, Figure~\ref{fig:map-poly}
-revisits the \code{map} example but this time gives it a more
-fitting type.  This \code{map} function is parameterized with
-respect to the element type of the tuple. The type of \code{map}
-is the following polymorphic type as specified by the \code{All} and
-the type parameter \code{a}.
+(aka. generics\index{subject}{generics}), compiling the \LangPoly{}
+subset of Typed Racket. Parametric polymorphism enables programmers to
+make code more reusable by parameterizing functions and data
+structures with respect to the types that they operate on. For
+example, Figure~\ref{fig:map-poly} revisits the \code{map} example but
+this time gives it a more fitting type.  This \code{map} function is
+parameterized with respect to the element type of the tuple. The type
+of \code{map} is the following polymorphic type as specified by the
+\code{All} and the type parameter \code{a}.
 \begin{lstlisting}
   (All (a) ((a -> a) (Vector a a) -> (Vector a a)))
 \end{lstlisting}
 The idea is that \code{map} can be used at \emph{all} choices of a
 type for parameter \code{a}. In Figure~\ref{fig:map-poly} we apply
 \code{map} to a tuple of integers, a choice of \code{Integer} for
-\code{a}, but we could have just as well applied \code{map} to a
-tuple of Booleans (and a function on Booleans).
+\code{a}, but we could have just as well applied \code{map} to a tuple
+of Booleans.
 
 \begin{figure}[tbp]
   % poly_test_2.rkt
@@ -19511,8 +19511,8 @@ tuple of Booleans (and a function on Booleans).
 \label{fig:map-poly}
 \end{figure}
 
-Figure~\ref{fig:Rpoly-concrete-syntax} defines the concrete syntax of
-\LangPoly{} and Figure~\ref{fig:Rpoly-syntax} defines the abstract
+Figure~\ref{fig:Lpoly-concrete-syntax} defines the concrete syntax of
+\LangPoly{} and Figure~\ref{fig:Lpoly-syntax} defines the abstract
 syntax. We add a second form for function definitions in which a type
 declaration comes before the \code{define}. In the abstract syntax,
 the return type in the \code{Def} is \code{Any}, but that should be
@@ -19523,46 +19523,74 @@ enables the use of an \code{All} type for a function, thereby making
 it polymorphic. The grammar for types is extended to include
 polymorphic types and type variables.
 
+\newcommand{\LpolyGrammarRacket}{
+\begin{array}{lcl}
+  \Type &::=& \LP\key{All}~\LP\Var\ldots\RP~ \Type\RP \MID \Var \\
+  \Def &::=& \LP\key{:}~\Var~\Type\RP \\
+    &&       \LP\key{define}~ \LP\Var ~ \Var\ldots\RP ~ \Exp\RP 
+\end{array}
+}
+
+\newcommand{\LpolyASTRacket}{
+\begin{array}{lcl}
+  \Type &::=& \LP\key{All}~\LP\Var\ldots\RP~ \Type\RP \MID \Var \\
+  \Def &::=& \DECL{\Var}{\Type} \\
+   &&  \DEF{\Var}{\LP\Var \ldots\RP}{\key{'Any}}{\code{'()}}{\Exp}  
+\end{array}
+}  
+
 \begin{figure}[tp]
 \centering
 \fbox{
   \begin{minipage}{0.96\textwidth}
-\small
+\footnotesize
 \[
+\begin{array}{l}
+  \gray{\LintGrammarRacket{}} \\ \hline
+  \gray{\LvarGrammarRacket{}} \\ \hline
+  \gray{\LifGrammarRacket{}} \\ \hline
+  \gray{\LwhileGrammarRacket} \\ \hline
+  \gray{\LtupGrammarRacket} \\   \hline
+  \gray{\LfunGrammarRacket} \\   \hline
+  \gray{\LlambdaGrammarRacket} \\ \hline
+  \LpolyGrammarRacket \\
 \begin{array}{lcl}
-  \Type &::=& \ldots \MID \LP\key{All}~\LP\Var\ldots\RP~ \Type\RP \MID \Var \\
-  \Def &::=& \gray{ \CDEF{\Var}{\LS\Var \key{:} \Type\RS \ldots}{\Type}{\Exp} } \\
-   &\MID& \LP\key{:}~\Var~\Type\RP \\
-   &&       \LP\key{define}~ \LP\Var ~ \Var\ldots\RP ~ \Exp\RP  \\
-  \LangPoly{} &::=& \gray{ \Def \ldots ~ \Exp }
+  \LangPoly{} &::=& \Def \ldots ~ \Exp
+\end{array}
 \end{array}
 \]
 \end{minipage}
 }
 \caption{The concrete syntax of \LangPoly{}, extending \LangLam{}
-    (Figure~\ref{fig:Llambda-concrete-syntax}).}
-\label{fig:Rpoly-concrete-syntax}
+    (Figure~\ref{fig:Llam-concrete-syntax}).}
+\label{fig:Lpoly-concrete-syntax}
 \end{figure}
 
 \begin{figure}[tp]
 \centering
 \fbox{
   \begin{minipage}{0.96\textwidth}
-\small
+\footnotesize
 \[
+\begin{array}{l}
+  \gray{\LintOpAST} \\ \hline
+  \gray{\LvarASTRacket{}} \\ \hline
+  \gray{\LifASTRacket{}} \\ \hline
+  \gray{\LwhileASTRacket{}} \\ \hline
+  \gray{\LtupASTRacket{}} \\ \hline
+  \gray{\LfunASTRacket} \\ \hline
+  \gray{\LlambdaASTRacket} \\ \hline
+  \LpolyASTRacket \\
 \begin{array}{lcl}
-  \Type &::=& \ldots \MID \LP\key{All}~\LP\Var\ldots\RP~ \Type\RP \MID \Var \\
-  \Def &::=& \gray{ \DEF{\Var}{\LP\LS\Var \key{:} \Type\RS \ldots\RP}{\Type}{\code{'()}}{\Exp} } \\
-   &\MID& \DECL{\Var}{\Type} \\
-   &&  \DEF{\Var}{\LP\Var \ldots\RP}{\key{'Any}}{\code{'()}}{\Exp}  \\
-  \LangPoly{} &::=& \gray{ \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp} }
+  \LangPoly{} &::=& \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp}
+\end{array}
 \end{array}
 \]
 \end{minipage}
 }
 \caption{The abstract syntax of \LangPoly{}, extending \LangLam{}
-    (Figure~\ref{fig:Llambda-syntax}).}
-\label{fig:Rpoly-syntax}
+    (Figure~\ref{fig:Llam-syntax}).}
+\label{fig:Lpoly-syntax}
 \end{figure}
 
 By including polymorphic types in the $\Type$ non-terminal we choose
@@ -19570,13 +19598,14 @@ to make them first-class which has interesting repercussions on the
 compiler. Many languages with polymorphism, such as
 C++~\citep{stroustrup88:_param_types} and Standard
 ML~\citep{Milner:1990fk}, only support second-class polymorphism, so
-it is useful to see an example of first-class polymorphism. In
-Figure~\ref{fig:apply-twice} we define a function \code{apply-twice}
-whose parameter is a polymorphic function. The occurrence of a
-polymorphic type underneath a function type is enabled by the normal
-recursive structure of the grammar for $\Type$ and the categorization
-of the \code{All} type as a $\Type$.  The body of \code{apply-twice}
-applies the polymorphic function to a Boolean and to an integer.
+it may be helpful to see an example of first-class polymorphism in
+action. In Figure~\ref{fig:apply-twice} we define a function
+\code{apply-twice} whose parameter is a polymorphic function. The
+occurrence of a polymorphic type underneath a function type is enabled
+by the normal recursive structure of the grammar for $\Type$ and the
+categorization of the \code{All} type as a $\Type$.  The body of
+\code{apply-twice} applies the polymorphic function to a Boolean and
+to an integer.
 
 \begin{figure}[tbp]
 \begin{lstlisting}
@@ -19618,26 +19647,25 @@ arguments. The return type of the application is the return type of
 the polymorphic function, but with the type parameters replaced by the
 deduced type arguments, using the \code{subst-type} function.
 
-The second responsibility of the type checker is extending the
-function \code{type-equal?} to handle the \code{All} type.  This is
-not quite a simple as equal on other types, such as function and
-tuple types, because two polymorphic types can be syntactically
-different even though they are equivalent types. For example,
-\code{(All (a) (a -> a))} is equivalent to \code{(All (b) (b -> b))}.
-Two polymorphic types should be considered equal if they differ only
-in the choice of the names of the type parameters. The
-\code{type-equal?} function in Figure~\ref{fig:type-check-Lvar0-aux}
-renames the type parameters of the first type to match the type
-parameters of the second type.
+The second responsibility of the type checker to extend the
+\code{type-equal?} function to handle the \code{All} type.  This is
+not quite as simple as for other types, such as function and tuple
+types, because two polymorphic types can be syntactically different
+even though they are equivalent types. For example, \code{(All (a) (a
+  -> a))} is equivalent to \code{(All (b) (b -> b))}.  Two polymorphic
+types should be considered equal if they differ only in the choice of
+the names of the type parameters. The \code{type-equal?} function in
+Figure~\ref{fig:type-check-Lvar0-aux} renames the type parameters of
+the first type to match the type parameters of the second type.
 
-The third responsibility of the type checker is making sure that only
+The third responsibility of the type checker is to make sure that only
 defined type variables appear in type annotations. The
 \code{check-well-formed} function defined in
 Figure~\ref{fig:well-formed-types} recursively inspects a type, making
 sure that each type variable has been defined.
 
 The output language of the type checker is \LangInst{}, defined in
-Figure~\ref{fig:Rpoly-prime-syntax}. The type checker combines the type
+Figure~\ref{fig:Lpoly-prime-syntax}. The type checker combines the type
 declaration and polymorphic function into a single definition, using
 the \code{Poly} form, to make polymorphic functions more convenient to
 process in next pass of the compiler.
@@ -19653,14 +19681,14 @@ process in next pass of the compiler.
   \Exp &::=& \ldots \MID \INST{\Exp}{\Type}{\LP\Type\ldots\RP} \\
   \Def &::=& \gray{ \DEF{\Var}{\LP\LS\Var \key{:} \Type\RS \ldots\RP}{\Type}{\code{'()}}{\Exp} } \\
    &\MID& \LP\key{Poly}~\LP\Var\ldots\RP~ \DEF{\Var}{\LP\LS\Var \key{:} \Type\RS \ldots\RP}{\Type}{\code{'()}}{\Exp}\RP  \\
-  \LangInst{} &::=& \gray{ \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp} }
+  \LangInst{} &::=& \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp}
 \end{array}
 \]
 \end{minipage}
 }
 \caption{The abstract syntax of \LangInst{}, extending \LangLam{}
-    (Figure~\ref{fig:Llambda-syntax}).}
-\label{fig:Rpoly-prime-syntax}
+    (Figure~\ref{fig:Llam-syntax}).}
+\label{fig:Lpoly-prime-syntax}
 \end{figure}
 
 The output of the type checker on the polymorphic \code{map}
@@ -19846,6 +19874,7 @@ example is listed in Figure~\ref{fig:map-type-check}.
 \end{figure}
 
 % TODO: interpreter for R'_10
+\clearpage
 
 \section{Compiling Polymorphism}
 \label{sec:compiling-poly}
@@ -19863,24 +19892,24 @@ polymorphism, which we describe below.
   polymorphism, it is sometimes not possible to determine which
   generic functions are used with which type arguments during
   compilation. (It can be done at runtime, with just-in-time
-  compilation.) This approach is used to compile C++
+  compilation.) Monomorphization is used to compile C++
   templates~\citep{stroustrup88:_param_types} and polymorphic
   functions in NESL~\citep{Blelloch:1993aa} and
   ML~\citep{Weeks:2006aa}.
   
 \item[Uniform representation] generates one version of each
-  polymorphic function but requires all values have a common ``boxed''
-  format, such as the tagged values of type \code{Any} in
-  \LangAny{}. Non-polymorphic code (i.e. monomorphic code) is compiled
-  similarly to code in a dynamically typed language (like \LangDyn{}),
-  in which primitive operators require their arguments to be projected
-  from \code{Any} and their results are injected into \code{Any}.  (In
-  object-oriented languages, the projection is accomplished via
-  virtual method dispatch.) The uniform representation approach is
-  compatible with separate compilation and with first-class
-  polymorphism.  However, it produces the least-efficient code because
-  it introduces overhead in the entire program, including
-  non-polymorphic code. This approach is used in implementations of
+  polymorphic function but requires all values to have a common
+  ``boxed'' format, such as the tagged values of type \code{Any} in
+  \LangAny{}. Both polymorphic and non-polymorphic (i.e. monomorhic)
+  code is compiled similarly to code in a dynamically typed language
+  (like \LangDyn{}), in which primitive operators require their
+  arguments to be projected from \code{Any} and their results are
+  injected into \code{Any}.  (In object-oriented languages, the
+  projection is accomplished via virtual method dispatch.) The uniform
+  representation approach is compatible with separate compilation and
+  with first-class polymorphism.  However, it produces the
+  least-efficient code because it introduces overhead in the entire
+  program. This approach is used in implementations of
   CLU~\cite{liskov79:_clu_ref,Liskov:1993dk},
   ML~\citep{Cardelli:1984aa,Appel:1987aa}, and
   Java~\citep{Bracha:1998fk}.
@@ -19891,9 +19920,9 @@ polymorphism, which we describe below.
   and conversions are performed at the boundaries between monomorphic
   and polymorphic (e.g. when a polymorphic function is instantiated
   and called). This approach is compatible with separate compilation
-  and first-class polymorphism and maintains the efficiency of
-  monomorphic code. The tradeoff is increased overhead at the boundary
-  between monomorphic and polymorphic code.  This approach is used in
+  and first-class polymorphism and maintains efficiency in monomorphic
+  code. The tradeoff is increased overhead at the boundary between
+  monomorphic and polymorphic code.  This approach is used in
   implementations of ML~\citep{Leroy:1992qb} and Java, starting in
   Java 5 with the addition of autoboxing.
   
@@ -19962,10 +19991,10 @@ After erasure, the type of \code{map} is
 ((Any -> Any) (Vector Any Any) -> (Vector Any Any))
 \end{lstlisting}
 but we need to convert it to the instantiated type.  This is easy to
-do in the target language \LangCast{} with a single \code{cast}.  In
-Figure~\ref{fig:map-erase}, the instantiation of \code{map}
-has been compiled to a \code{cast} from the type of \code{map} to
-the instantiated type. The source and target type of a cast must be
+do in the language \LangCast{} with a single \code{cast}.  In
+Figure~\ref{fig:map-erase}, the instantiation of \code{map} has been
+compiled to a \code{cast} from the type of \code{map} to the
+instantiated type. The source and target type of a cast must be
 consistent (Figure~\ref{fig:consistent}), which indeed is the case
 because both the source and target are obtained from the same
 polymorphic type of \code{map}, replacing the type parameters with
@@ -19993,9 +20022,9 @@ the program.
 Regarding the translation of expressions, the case for \code{Inst} is
 the interesting one. We translate it into a \code{Cast}, as shown
 below. The type of the subexpression $e$ is the polymorphic type
-$\LP\key{All} xs T\RP$. The source type of the cast is the erasure of
+$\LP\key{All}~\itm{xs}~T\RP$. The source type of the cast is the erasure of
 $T$, the type $T'$. The target type $T''$ is the result of
-substituting the arguments types $ts$ for the type parameters $xs$ in
+substituting the argument types $ts$ for the type parameters $xs$ in
 $T$ followed by doing type erasure.
 \begin{lstlisting}
 (Inst |$e$| (All |$xs$| |$T$|) |$ts$|)
@@ -20006,7 +20035,7 @@ where $T'' = \LP\code{erase-type}~\LP\code{subst-type}~s~T\RP\RP$
 and $s = \LP\code{map}~\code{cons}~xs~ts\RP$.
 
 Finally, each polymorphic function is translated to a regular
-functions in which type erasure has been applied to all the type
+function in which type erasure has been applied to all the type
 annotations and the body.
 \begin{lstlisting}
 (Poly |$ts$| (Def |$f$| ([|$x_1$| : |$T_1$|] |$\ldots$|) |$T_r$| |$\itm{info}$| |$e$|))
@@ -20023,20 +20052,21 @@ annotations and the body.
 
 \begin{figure}[p]
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
-\node (Rpoly) at (9,4)  {\large \LangPoly{}};
-\node (Rpolyp) at (6,4)  {\large \LangInst{}};
-\node (Lgradualp) at (3,4)  {\large \LangCast{}};
-\node (Llambdapp) at (0,4)  {\large \LangProxy{}};
-\node (Llambdaproxy) at (0,2)  {\large \LangPVec{}};
-\node (Llambdaproxy-2) at (3,2)  {\large \LangPVec{}};
-\node (Llambdaproxy-3) at (6,2)  {\large \LangPVec{}};
-\node (Llambdaproxy-4) at (9,2)  {\large \LangPVecFunRef{}};
-\node (Llambdaproxy-5) at (12,2)  {\large \LangPVecFunRef{}};
-\node (F1-1) at (12,0)  {\large \LangPVecFunRef{}};
-\node (F1-2) at (9,0)  {\large \LangPVecFunRef{}};
-\node (F1-3) at (6,0)  {\large \LangPVecFunRef{}};
-\node (F1-4) at (3,0)  {\large \LangPVecAlloc{}};
-\node (F1-5) at (0,0)  {\large \LangPVecAlloc{}};
+\node (Lpoly) at (12,4)  {\large \LangPoly{}};
+\node (Lpolyp) at (9,4)  {\large \LangInst{}};
+\node (Lgradualp) at (6,4)  {\large \LangCast{}};
+\node (Llambdapp) at (3,4)  {\large \LangProxy{}};
+\node (Llambdaproxy) at (0,4)  {\large \LangPVec{}};
+\node (Llambdaproxy-2) at (0,2)  {\large \LangPVec{}};
+\node (Llambdaproxy-3) at (3,2)  {\large \LangPVec{}};
+\node (Llambdaproxy-4) at (6,2)  {\large \LangPVecFunRef{}};
+\node (Llambdaproxy-5) at (9,2)  {\large \LangPVecFunRef{}};
+\node (F1-1) at (12,2)  {\large \LangPVecFunRef{}};
+\node (F1-2) at (12,0)  {\large \LangPVecFunRef{}};
+\node (F1-3) at (9,0)  {\large \LangPVecFunRef{}};
+\node (F1-4) at (6,0)  {\large \LangPVecAlloc{}};
+\node (F1-5) at (3,0)  {\large \LangPVecAlloc{}};
+\node (F1-6) at (0,0)  {\large \LangPVecAlloc{}};
 \node (C3-2) at (3,-2)  {\large \LangCLoopPVec{}};
 
 \node (x86-2) at (3,-4)  {\large \LangXIndCallVar{}};
@@ -20047,15 +20077,15 @@ annotations and the body.
 \node (x86-5) at (9,-6) {\large \LangXIndCall{}};
 
 
-\path[->,bend right=15] (Rpoly) edge [above] node
-     {\ttfamily\footnotesize type\_check} (Rpolyp);
-\path[->,bend right=15] (Rpolyp) edge [above] node
+\path[->,bend right=15] (Lpoly) edge [above] node
+     {\ttfamily\footnotesize type\_check} (Lpolyp);
+\path[->,bend right=15] (Lpolyp) edge [above] node
      {\ttfamily\footnotesize erase\_types} (Lgradualp);
 \path[->,bend right=15] (Lgradualp) edge [above] node
      {\ttfamily\footnotesize lower\_casts} (Llambdapp);
-\path[->,bend right=15] (Llambdapp) edge [right] node
+\path[->,bend right=15] (Llambdapp) edge [above] node
      {\ttfamily\footnotesize differentiate\_proxies} (Llambdaproxy);
-\path[->,bend left=15] (Llambdaproxy) edge [above] node
+\path[->,bend right=15] (Llambdaproxy) edge [right] node
      {\ttfamily\footnotesize shrink} (Llambdaproxy-2);
 \path[->,bend left=15] (Llambdaproxy-2) edge [above] node
      {\ttfamily\footnotesize uniquify} (Llambdaproxy-3);
@@ -20063,17 +20093,19 @@ annotations and the body.
      {\ttfamily\footnotesize reveal\_functions} (Llambdaproxy-4);
 \path[->,bend left=15] (Llambdaproxy-4) edge [above] node
      {\ttfamily\footnotesize reveal\_casts} (Llambdaproxy-5);
-\path[->,bend left=15] (Llambdaproxy-5) edge [left] node
+\path[->,bend left=15] (Llambdaproxy-5) edge [above] node
      {\ttfamily\footnotesize convert\_assignments} (F1-1);
-\path[->,bend left=15] (F1-1) edge [below] node
+\path[->,bend left=15] (F1-1) edge [left] node
      {\ttfamily\footnotesize convert\_to\_clos.} (F1-2);
-\path[->,bend right=15] (F1-2) edge [above] node
+\path[->,bend left=15] (F1-2) edge [below] node
      {\ttfamily\footnotesize limit\_fun.} (F1-3);
 \path[->,bend right=15] (F1-3) edge [above] node
      {\ttfamily\footnotesize expose\_alloc.} (F1-4);
 \path[->,bend right=15] (F1-4) edge [above] node
-     {\ttfamily\footnotesize remove\_complex.} (F1-5);
-\path[->,bend right=15] (F1-5) edge [right] node
+     {\ttfamily\footnotesize uncover\_get!} (F1-5);
+\path[->,bend right=15] (F1-5) edge [above] node
+     {\ttfamily\footnotesize remove\_complex.} (F1-6);
+\path[->,bend right=15] (F1-6) edge [right] node
      {\ttfamily\footnotesize explicate\_control} (C3-2);
 \path[->,bend left=15] (C3-2) edge [left] node
      {\ttfamily\footnotesize select\_instr.} (x86-2);
@@ -20085,14 +20117,14 @@ annotations and the body.
      {\ttfamily\footnotesize allocate\_reg.} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node
      {\ttfamily\footnotesize patch\_instr.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize print\_x86} (x86-5);
+\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize prelude\_and\_conc.} (x86-5);
 \end{tikzpicture}
   \caption{Diagram of the passes for \LangPoly{} (parametric polymorphism).}
-\label{fig:Rpoly-passes}
+\label{fig:Lpoly-passes}
 \end{figure}
 
-Figure~\ref{fig:Rpoly-passes} provides an overview of all the passes needed
-for the compilation of \LangPoly{}.
+Figure~\ref{fig:Lpoly-passes} provides an overview of the passes
+needed to compile \LangPoly{}.
 
 % TODO: challenge problem: specialization of instantiations
 
@@ -20326,7 +20358,7 @@ registers.
 %% \end{minipage}
 %% }
 %% \caption{The concrete syntax of \LangAny{}, extending \LangLam{}
-%%   (Figure~\ref{fig:Rlam-syntax}).}
+%%   (Figure~\ref{fig:Llam-syntax}).}
 %% \label{fig:Lany-concrete-syntax}
 %% \end{figure}
 
