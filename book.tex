@@ -13575,10 +13575,9 @@ implementation of functions. We have already seen that there are
 labels in x86 so that one can refer to the location of an instruction,
 as is needed for jump instructions. Labels can also be used to mark
 the beginning of the instructions for a function.  Going further, we
-can obtain the address of a label by using the \key{leaq} instruction
-and instruction-pointer relative addressing. For example, the
-following puts the address of the \code{inc} label into the \code{rbx}
-register.
+can obtain the address of a label by using the \key{leaq}
+instruction. For example, the following puts the address of the
+\code{inc} label into the \code{rbx} register.
 \begin{lstlisting}
    leaq inc(%rip), %rbx
 \end{lstlisting}
@@ -13590,10 +13589,9 @@ In Section~\ref{sec:x86} we used the \code{callq} instruction to jump
 to functions whose locations were given by a label, such as
 \code{read\_int}. To support function calls in this chapter we instead
 will be jumping to functions whose location are given by an address in
-a register, that is, we need to make an \emph{indirect function
-call}. The x86 syntax for this is a \code{callq} instruction but with
-an asterisk before the register name.\index{subject}{indirect function
-  call}
+a register, that is, we shall use \emph{indirect function calls}. The
+x86 syntax for this is a \code{callq} instruction but with an asterisk
+before the register name.\index{subject}{indirect function call}
 \begin{lstlisting}
    callq *%rbx
 \end{lstlisting}
@@ -13613,21 +13611,19 @@ the target. However, \code{callq} does not handle
 \item determining how registers are shared by different functions.
 \end{enumerate}
 
-Regarding (1) parameter passing, recall that the x86-64 calling convention
-for Unix-based system uses the following six
-registers to pass arguments to a function, in this order.
+Regarding (1) parameter passing, recall that the x86-64 calling
+convention for Unix-based system uses the following six registers to
+pass arguments to a function, in this order.
 \begin{lstlisting}
 rdi rsi rdx rcx r8 r9
 \end{lstlisting}
-If there are
-more than six arguments, then the calling convention mandates to use space on the
-frame of the caller for the rest of the arguments. However, to ease
-the implementation of efficient tail calls
+If there are more than six arguments, then the calling convention
+mandates to use space on the frame of the caller for the rest of the
+arguments. However, to ease the implementation of efficient tail calls
 (Section~\ref{sec:tail-call}), we arrange never to need more than six
 arguments.
 %
-Also recall that the register \code{rax} is for the return value of
-the function.
+The return value of the function is stored in register \code{rax}.
 
 \index{subject}{prelude}\index{subject}{conclusion}
 
@@ -13640,13 +13636,13 @@ frame. The callee must not change anything in the caller's frame, that
 is, anything that is at or above the stack pointer. The callee is free
 to use locations that are below the stack pointer.
 
-Recall that we are storing variables of tuple type on the root stack.
-So the prelude needs to move the root stack pointer \code{r15} up
-according to the number of variables of tuple type and
+Recall that we store variables of tuple type on the root stack.  So
+the prelude of a function needs to move the root stack pointer
+\code{r15} up according to the number of variables of tuple type and
 the conclusion needs to move the root stack pointer back down.  Also,
 the prelude must initialize to \code{0} this frame's slots in the root
 stack to signal to the garbage collector that those slots do not yet
-contain a pointer to a vector. Otherwise the garbage collector will
+contain a valid pointer. Otherwise the garbage collector will
 interpret the garbage bits in those slots as memory addresses and try
 to traverse them, causing serious mayhem!
 
@@ -13741,11 +13737,11 @@ $-8(j+k)$(\key{\%rbp}) &  & local variable $k$ \\
 
 In general, the amount of stack space used by a program is determined
 by the longest chain of nested function calls. That is, if function
-$f_1$ calls $f_2$, $f_2$ calls $f_3$, $\ldots$, $f_n$, then the amount
-of stack space is linear in $n$.  The depth $n$ can grow quite large
-if functions are (mutually) recursive. However, in
-some cases we can arrange to use only a constant amount of space for a
-long chain of nested function calls.
+$f_1$ calls $f_2$, $f_2$ calls $f_3$, and so on to $f_n$, then the
+amount of stack space is linear in $n$.  The depth $n$ can grow quite
+large if functions are recursive. However, in some cases we can
+arrange to use only a constant amount of space for a long chain of
+nested function calls.
 
 A \emph{tail call}\index{subject}{tail call} is a function call that
 happens as the last action in a function body. 
@@ -13792,8 +13788,8 @@ and callee's frames overlap in memory.  As we begin to copy the
 arguments from their sources in the caller's frame, the target
 locations in the callee's frame might collide with the sources for
 later arguments! We solve this problem by using the heap instead of
-the stack for passing more than six arguments, which we describe in
-the Section~\ref{sec:limit-functions-r4}.
+the stack for passing more than six arguments
+(Section~\ref{sec:limit-functions-r4}).
 
 As mentioned above, for a tail call we pop the caller's frame prior to
 making the tail call. The instructions for popping a frame are the
@@ -13807,13 +13803,13 @@ One last note regarding which instruction to use to make the tail
 call. When the callee is finished, it should not return to the current
 function, but it should return to the function that called the current
 one. Thus, the return address that is already on the stack is the
-right one, and we should not use \key{callq} to make the tail call, as
-that would unnecessarily overwrite the return address. Instead we can
-simply use the \key{jmp} instruction. Like the indirect function call,
-we write an \emph{indirect jump}\index{subject}{indirect jump} with a
-register prefixed with an asterisk.  We recommend using \code{rax} to
-hold the jump target because the preceding conclusion can overwrite
-just about everything else.
+right one and we should not use \key{callq} to make the tail call, as
+that would overwrite the return address. Instead we simply use the
+\key{jmp} instruction. Like the indirect function call, we write an
+\emph{indirect jump}\index{subject}{indirect jump} with a register
+prefixed with an asterisk.  We recommend using \code{rax} to hold the
+jump target because the conclusion can overwrite just about everything
+else.
 \begin{lstlisting}
    jmp *%rax
 \end{lstlisting}
@@ -13856,44 +13852,46 @@ FunctionDef('main', [], int, None, |$\Stmt\ldots$|Return(Constant(0)), None)
 The syntax of \LangFun{} is inconvenient for purposes of compilation
 in that it conflates the use of function names and local
 variables. This is a problem because we need to compile the use of a
-function name differently than the use of a local variable; we need to
-use \code{leaq} to convert the function name (a label in x86) to an
-address in a register.  Thus, we create a new pass that changes
-function references from $\VAR{f}$ to $\FUNREF{f}{n}$ where $n$ is the
-arity of the function.\python{\footnote{The arity is not needed in this
-    chapter but is used in Chapter~\ref{ch:Ldyn}.}}  This pass is
-named \code{reveal\_functions} and the output language, \LangFunRef{},
-is defined in Figure~\ref{fig:f1-syntax}.
+function name differently than the use of a local variable.  In
+particular, we use \code{leaq} to convert the function name (a label
+in x86) to an address in a register.  Thus, we create a new pass that
+changes function references from $\VAR{f}$ to $\FUNREF{f}{n}$ where
+$n$ is the arity of the function.\python{\footnote{The arity is not
+    needed in this chapter but is used in Chapter~\ref{ch:Ldyn}.}}
+This pass is named \code{reveal\_functions} and the output language
+is \LangFunRef{}.
+
+%is defined in Figure~\ref{fig:f1-syntax}.
 %% The concrete syntax for a
 %% function reference is $\CFUNREF{f}$.
 
-\begin{figure}[tp]
-\centering
-\fbox{
-\begin{minipage}{0.96\textwidth}
-{\if\edition\racketEd   
-\[
-\begin{array}{lcl}
-\Exp &::=& \ldots \MID \FUNREF{\Var}{\Int}\\
- \Def &::=& \gray{ \FUNDEF{\Var}{([\Var \code{:} \Type]\ldots)}{\Type}{\code{'()}}{\Exp} }\\
-  \LangFunRefM{} &::=& \PROGRAMDEFS{\code{'()}}{\LP \Def\ldots \RP}
-\end{array}
-\]
-\fi}
-{\if\edition\pythonEd  
-\[
-\begin{array}{lcl}
-\Exp &::=& \FUNREF{\Var}{\Int}\\
-  \LangFunRefM{} &::=& \PROGRAM{}{\LS \Def \code{,} \ldots \RS}
-\end{array}
-\]
-\fi}
-\end{minipage}
-}
-\caption{The abstract syntax \LangFunRef{}, an extension of \LangFun{}
-  (Figure~\ref{fig:Lfun-syntax}).}
-\label{fig:f1-syntax}
-\end{figure}
+%% \begin{figure}[tp]
+%% \centering
+%% \fbox{
+%% \begin{minipage}{0.96\textwidth}
+%% {\if\edition\racketEd   
+%% \[
+%% \begin{array}{lcl}
+%% \Exp &::=& \ldots \MID \FUNREF{\Var}{\Int}\\
+%%  \Def &::=& \gray{ \FUNDEF{\Var}{([\Var \code{:} \Type]\ldots)}{\Type}{\code{'()}}{\Exp} }\\
+%%   \LangFunRefM{} &::=& \PROGRAMDEFS{\code{'()}}{\LP \Def\ldots \RP}
+%% \end{array}
+%% \]
+%% \fi}
+%% {\if\edition\pythonEd  
+%% \[
+%% \begin{array}{lcl}
+%% \Exp &::=& \FUNREF{\Var}{\Int}\\
+%%   \LangFunRefM{} &::=& \PROGRAM{}{\LS \Def \code{,} \ldots \RS}
+%% \end{array}
+%% \]
+%% \fi}
+%% \end{minipage}
+%% }
+%% \caption{The abstract syntax \LangFunRef{}, an extension of \LangFun{}
+%%   (Figure~\ref{fig:Lfun-syntax}).}
+%% \label{fig:f1-syntax}
+%% \end{figure}
 
 %% Distinguishing between calls in tail position and non-tail position
 %% requires the pass to have some notion of context. We recommend using
@@ -13919,7 +13917,7 @@ arguments, we have some work to do!
 
 This pass transforms functions and function calls that involve more
 than six arguments to pass the first five arguments as usual, but it
-packs the rest of the arguments into a vector and passes it as the
+packs the rest of the arguments into a tuple and passes it as the
 sixth argument.
 
 Each function definition with seven or more parameters is transformed as
@@ -13992,14 +13990,15 @@ Call(|$e_0$|, [|$e_1,\ldots,e_5$|,Tuple([|$e_6,\ldots,e_n$|])])
 \section{Remove Complex Operands}
 \label{sec:rco-r4}
 
-The primary decisions to make for this pass is whether to classify
+The primary decisions to make for this pass are whether to classify
 \code{FunRef} and \racket{\code{Apply}}\python{\code{Call}} as either
-atomic or complex expressions. Recall that a simple expression will
-eventually end up as just an immediate argument of an x86
-instruction. Function application will be translated to a sequence of
-instructions, so \racket{\code{Apply}}\python{\code{Call}} must be
-classified as complex expression.  On the other hand, the arguments of
-\racket{\code{Apply}}\python{\code{Call}} should be atomic expressions.
+atomic or complex expressions. Recall that an atomic expression will
+end up as an immediate argument of an x86 instruction. Function
+application will be translated to a sequence of instructions, so
+\racket{\code{Apply}}\python{\code{Call}} must be classified as
+complex expression.  On the other hand, the arguments of
+\racket{\code{Apply}}\python{\code{Call}} should be atomic
+expressions.
 %
 Regarding \code{FunRef}, as discussed above, the function label needs
 to be converted to an address using the \code{leaq} instruction. Thus,
