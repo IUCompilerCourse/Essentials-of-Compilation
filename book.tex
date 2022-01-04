@@ -14797,21 +14797,22 @@ that a function's body may refer to variables whose binding site is
 outside of the function, in an enclosing scope.
 %
 Consider the example in Figure~\ref{fig:lexical-scoping} written in
-\LangLam{}, which extends \LangFun{} with lexically scoped functions
-using the \key{lambda} form.  The body of the \key{lambda} refers to
-three variables: \code{x}, \code{y}, and \code{z}. The binding sites
-for \code{x} and \code{y} are outside of the \key{lambda}. Variable
-\code{y} is \racket{bound by the enclosing \key{let}}\python{a local
-  variable of function \code{f}} and \code{x} is a parameter of
-function \code{f}. The \key{lambda} is returned from the function
-\code{f}. The main expression of the program includes two calls to
-\code{f} with different arguments for \code{x}, first \code{5} then
-\code{3}. The functions returned from \code{f} are bound to variables
-\code{g} and \code{h}. Even though these two functions were created by
-the same \code{lambda}, they are really different functions because
-they use different values for \code{x}. Applying \code{g} to \code{11}
-produces \code{20} whereas applying \code{h} to \code{15} produces
-\code{22}. The result of this program is \code{42}.
+\LangLam{}, which extends \LangFun{} with the \key{lambda} form for
+creating lexically scoped functions.  The body of the \key{lambda}
+refers to three variables: \code{x}, \code{y}, and \code{z}. The
+binding sites for \code{x} and \code{y} are outside of the
+\key{lambda}. Variable \code{y} is \racket{bound by the enclosing
+  \key{let}}\python{a local variable of function \code{f}} and
+\code{x} is a parameter of function \code{f}. Note that function
+\code{f} returns the \key{lambda} as its result value. The main
+expression of the program includes two calls to \code{f} with
+different arguments for \code{x}, first \code{5} then \code{3}. The
+functions returned from \code{f} are bound to variables \code{g} and
+\code{h}. Even though these two functions were created by the same
+\code{lambda}, they are really different functions because they use
+different values for \code{x}. Applying \code{g} to \code{11} produces
+\code{20} whereas applying \code{h} to \code{15} produces \code{22},
+so the result of the program is \code{42}.
 
 \begin{figure}[btp]
 {\if\edition\racketEd
@@ -14883,22 +14884,22 @@ of the free variables together with a function pointer into a tuple,
 an arrangement called a \emph{flat closure} (which we shorten to just
 ``closure'').\index{subject}{closure}\index{subject}{flat closure}
 %
-Fortunately, we have all the ingredients to make closures:
+By design, we have all the ingredients to make closures:
 Chapter~\ref{ch:Lvec} gave us tuples and Chapter~\ref{ch:Lfun} gave us
 function pointers. The function pointer resides at index $0$ and the
 values for the free variables fill in the rest of the tuple.
 
 Let us revisit the example in Figure~\ref{fig:lexical-scoping} to see
-how closures work. It's a three-step dance. The program calls function
-\code{f}, which creates a closure for the \code{lambda}. The closure
-is a tuple whose first element is a pointer to the top-level function
-that we will generate for the \code{lambda}, the second element is the
-value of \code{x}, which is \code{5}, and the third element is
-\code{4}, the value of \code{y}. The closure does not contain an
-element for \code{z} because \code{z} is not a free variable of the
-\code{lambda}. Creating the closure is step 1 of the dance. The
-closure is returned from \code{f} and bound to \code{g}, as shown in
-Figure~\ref{fig:closures}.
+how closures work. It is a three-step dance. The program calls
+function \code{f}, which creates a closure for the \code{lambda}. The
+closure is a tuple whose first element is a pointer to the top-level
+function that we will generate for the \code{lambda}, the second
+element is the value of \code{x}, which is \code{5}, and the third
+element is \code{4}, the value of \code{y}. The closure does not
+contain an element for \code{z} because \code{z} is not a free
+variable of the \code{lambda}. Creating the closure is step 1 of the
+dance. The closure is returned from \code{f} and bound to \code{g}, as
+shown in Figure~\ref{fig:closures}.
 %
 The second call to \code{f} creates another closure, this time with
 \code{3} in the second slot (for \code{x}). This closure is also
@@ -14914,7 +14915,7 @@ Figure~\ref{fig:closures}.
 
 Continuing with the example, consider the application of \code{g} to
 \code{11} in Figure~\ref{fig:lexical-scoping}.  To apply a closure, we
-obtain the function pointer in the first element of the closure and
+obtain the function pointer from the first element of the closure and
 call it, passing in the closure itself and then the regular arguments,
 in this case \code{11}. This technique for applying a closure is step
 2 of the dance.
@@ -14928,9 +14929,9 @@ appropriate elements from the closure parameter.
 %
 This three-step dance is known as \emph{closure conversion}.  We
 discuss the details of closure conversion in
-Section~\ref{sec:closure-conversion} and the code generated from the
-example in Section~\ref{sec:example-lambda}. But first we define the
-syntax and semantics of \LangLam{} in Section~\ref{sec:r5}.
+Section~\ref{sec:closure-conversion} and show the code generated from
+the example in Section~\ref{sec:example-lambda}. But first we define
+the syntax and semantics of \LangLam{} in Section~\ref{sec:r5}.
 
 \section{The \LangLam{} Language}
 \label{sec:r5}
@@ -14946,6 +14947,10 @@ syntax for function application.
   facilitates the type checking of \code{lambda} expressions that we
   discuss later in this section.}
 %
+\racket{The \code{procedure-arity} operation returns the number of parameters
+  of a given function, an operation that we need for the translation
+  of dynamic typing in Chapter~\ref{ch:Ldyn}.}
+%
 \python{The \code{arity} operation returns the number of parameters of
   a given function, an operation that we need for the translation
   of dynamic typing in Chapter~\ref{ch:Ldyn}.
@@ -14955,14 +14960,14 @@ syntax for function application.
 
 \newcommand{\LlambdaGrammarRacket}{
   \begin{array}{lcl}
-  \Exp &::=& \LP \key{procedure-arity}~\Exp\RP \\
-    &\MID& \CLAMBDA{\LP\LS\Var \key{:} \Type\RS\ldots\RP}{\Type}{\Exp} 
+  \Exp &::=&  \CLAMBDA{\LP\LS\Var \key{:} \Type\RS\ldots\RP}{\Type}{\Exp} \\
+    &\MID& \LP \key{procedure-arity}~\Exp\RP
   \end{array}
 }
 \newcommand{\LlambdaASTRacket}{
   \begin{array}{lcl}
-  \itm{op} &::=& \code{procedure-arity} \\
-  \Exp &::=& \LAMBDA{\LP\LS\Var\code{:}\Type\RS\ldots\RP}{\Type}{\Exp}
+  \Exp &::=& \LAMBDA{\LP\LS\Var\code{:}\Type\RS\ldots\RP}{\Type}{\Exp}\\
+  \itm{op} &::=& \code{procedure-arity} 
   \end{array}
 }
 
@@ -15071,9 +15076,9 @@ syntax for function application.
 \end{figure}
 
 \index{subject}{interpreter}
-\label{sec:interp-Rlambda}
+\label{sec:interp-Llambda}
 
-Figure~\ref{fig:interp-Rlambda} shows the definitional interpreter for
+Figure~\ref{fig:interp-Llambda} shows the definitional interpreter for
 \LangLam{}. The case for \key{Lambda} saves the current environment
 inside the returned function value. Recall that during function
 application, the environment stored in the function value, extended
@@ -15104,7 +15109,7 @@ interpret the body of the function.
         [else ((super interp-exp env) e)]))
     ))
 
-(define (interp-Rlambda p)
+(define (interp-Llambda p)
   (send (new interp-Llambda-class) interp-program p))
 \end{lstlisting}
 \fi}
@@ -15141,7 +15146,7 @@ class InterpLlambda(InterpLfun):
 \end{lstlisting}
 \fi}
 \caption{Interpreter for \LangLam{}.}
-\label{fig:interp-Rlambda}
+\label{fig:interp-Llambda}
 \end{figure}
 
 
@@ -15204,7 +15209,7 @@ information is used later in this chapter.
 \begin{figure}[tbp]
 {\if\edition\racketEd 
 \begin{lstlisting}
-(define (type-check-Rlambda env)
+(define (type-check-Llambda env)
   (lambda (e)
     (match e
       [(Lambda (and params `([,xs : ,Ts] ...)) rT body)
@@ -15331,10 +15336,10 @@ class TypeCheckLlambda(TypeCheckLfun):
 \label{sec:assignment-scoping}
 
 The combination of lexically-scoped functions and assignment to
-variables raises a challenge with our approach to implementing
-lexically-scoped functions. Consider the following example in which
-function \code{f} has a free variable \code{x} that is changed after
-\code{f} is created but before the call to \code{f}.
+variables raises a challenge with the flat-closure approach to
+implementing lexically-scoped functions. Consider the following
+example in which function \code{f} has a free variable \code{x} that
+is changed after \code{f} is created but before the call to \code{f}.
 % loop_test_11.rkt
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -15361,42 +15366,24 @@ def g(z : int) -> int:
 
 print( g(20) )
 \end{lstlisting}
-\fi}
-The correct output for this example is \code{42} because the call to
-\code{f} is required to use the current value of \code{x} (which is
+\fi} The correct output for this example is \code{42} because the call
+to \code{f} is required to use the current value of \code{x} (which is
 \code{10}). Unfortunately, the closure conversion pass
 (Section~\ref{sec:closure-conversion}) generates code for the
 \code{lambda} that copies the old value of \code{x} into a
-closure. Thus, if we naively add support for assignment to our current
-compiler, the output of this program would be \code{32}.
+closure. Thus, if we naively apply closure conversion, the output of
+this program would be \code{32}.
 
 A first attempt at solving this problem would be to save a pointer to
 \code{x} in the closure and change the occurrences of \code{x} inside
 the lambda to dereference the pointer. Of course, this would require
 assigning \code{x} to the stack and not to a register. However, the
 problem goes a bit deeper.
-%% Consider the following example in which we
-%% create a counter abstraction by creating a pair of functions that
-%% share the free variable \code{x}.
 Consider the following example that returns a function that refers to
 a local variable of the enclosing function.
 \begin{center}
 \begin{minipage}{\textwidth}
 {\if\edition\racketEd
-% similar to loop_test_10.rkt
-%% \begin{lstlisting}
-%% (define (f [x : Integer]) : (Vector ( -> Integer) ( -> Void))
-%%   (vector
-%%    (lambda: () : Integer x)
-%%    (lambda: () : Void (set! x (+ 1 x)))))
-
-%% (let ([counter (f 0)])
-%%   (let ([get (vector-ref counter 0)])
-%%     (let ([inc (vector-ref counter 1)])
-%%       (begin
-%%         (inc)
-%%         (get)))))
-%% \end{lstlisting}
 \begin{lstlisting}
 (define (f []) : Integer
   (let ([x 0])
@@ -15431,23 +15418,11 @@ the variable needs to live on the heap.  The verb
 \emph{box}\index{subject}{box} is often used for allocating a single
 value on the heap, producing a pointer, and
 \emph{unbox}\index{subject}{unbox} for dereferencing the pointer.
-
-%% {\if\edition\racketEd
-%% We recommend solving these problems by boxing the local variables that
-%% are in the intersection of 1) variables that appear on the
-%% left-hand-side of a \code{set!}  and 2) variables that occur free
-%% inside a \code{lambda}.
-%% \fi}
-%% {\if\edition\pythonEd
-%% We recommend solving these problems by boxing the local variables that
-%% are in the intersection of 1) variables whose values may change and 2)
-%% variables that occur free inside a \code{lambda}.
-%% \fi}
-We shall introduce a new pass named
-\code{convert\_assignments} in Section~\ref{sec:convert-assignments}
-to address this challenge.
 %
-\racket{But before diving into the compiler passes, we have one more
+We introduce a new pass named \code{convert\_assignments} to address
+this challenge.
+%
+\python{But before diving into that, we have one more
   problem to discuss.}
 
 \if\edition\pythonEd
@@ -15520,20 +15495,21 @@ def main() -> int :
 \label{sec:convert-assignments}
 
 The purpose of the \code{convert\_assignments} pass is to address the
-challenge posed in Section~\ref{sec:assignment-scoping} regarding the
-interaction between variable assignments and closure conversion.
-First we identify which variables need to be boxed, then we transform
-the program to box those variables. In general, boxing introduces
-runtime overhead that we would like to avoid, so we should box as few
-variables as possible. We recommend boxing the variables in the
-intersection of the following two sets of variables:
+challenge regarding the interaction between variable assignments and
+closure conversion.  First we identify which variables need to be
+boxed, then we transform the program to box those variables. In
+general, boxing introduces runtime overhead that we would like to
+avoid, so we should box as few variables as possible. We recommend
+boxing the variables in the intersection of the following two sets of
+variables:
 \begin{enumerate}
 \item The variables that are free in a \code{lambda}.
 \item The variables that appear on the left-hand side of an
   assignment.
 \end{enumerate}
-The first condition is a must, but the second condition is quite conservative and it is possible to
-develop a more liberal condition. 
+The first condition is a must but the second condition is
+conservative. It is possible to develop a more liberal condition using
+static program analysis.
 
 Consider again the first example from
 Section~\ref{sec:assignment-scoping}:
@@ -15657,10 +15633,10 @@ $\VAR{x}$ to a tuple read.
 \end{lstlisting}
 \fi}
 %
-%
-In the case for assignment, recursively process the right-hand side
-\itm{rhs} to obtain \itm{rhs'}.  If $x$ is in $\mathit{AF}$, translate
-the assignment into a tuple-write as follows.
+\noindent In the case for assignment, recursively process the
+right-hand side \itm{rhs} to obtain \itm{rhs'}.  If the left-hand side
+$x$ is in $\mathit{AF}$, translate the assignment into a tuple-write
+as follows.
 %
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -15681,7 +15657,7 @@ the assignment into a tuple-write as follows.
 The case for \code{Lambda} is non-trivial, but it is similar to the
 case for function definitions, which we discuss next.
 \fi}
-
+%
 To translate a function definition, we first compute $\mathit{AF}$,
 the intersection of the variables that are free in a \code{lambda} and
 that are assigned-to. We then apply assignment conversion to the body
@@ -15710,7 +15686,7 @@ def g(x : int) -> int:
 %
 \noindent We box parameter \code{x} by creating a local variable named
 \code{x} that is initialized to a tuple whose contents is the value of
-the parameter, which we has been renamed.
+the parameter, which has been renamed to \code{x\_0}.
 %
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -16095,7 +16071,7 @@ abstract syntax is defined in Figure~\ref{fig:Clam-syntax}.
 
 
 \section{Select Instructions}
-\label{sec:select-instructions-Rlambda}
+\label{sec:select-instructions-Llambda}
 
 Compile \ALLOCCLOS{\itm{len}}{\itm{type}}{\itm{arity}} in almost the
 same way as the \ALLOC{\itm{len}}{\itm{type}} form
@@ -16170,10 +16146,10 @@ $58$ from the tag.}
 \end{tikzpicture}
   \caption{Diagram of the passes for \LangLam{}, a language with lexically-scoped
   functions.}
-\label{fig:Rlambda-passes}
+\label{fig:Llambda-passes}
 \end{figure}
 
-Figure~\ref{fig:Rlambda-passes} provides an overview of all the passes needed
+Figure~\ref{fig:Llambda-passes} provides an overview of all the passes needed
 for the compilation of \LangLam{}.
 
 \clearpage
@@ -17092,7 +17068,7 @@ its auxiliary functions are in Figure~\ref{fig:interp-Lany-aux}.
 {\if\edition\racketEd
 \begin{lstlisting}[basicstyle=\ttfamily\small]
 (define type-check-Rany-class
-  (class type-check-Rlambda-class
+  (class type-check-Llambda-class
     (super-new)
     (inherit check-type-equal?)
 
@@ -20516,7 +20492,7 @@ registers.
 % LocalWords:  InterpLfun FunRef TypeCheckLfun leaq callee's mainDef
 % LocalWords:  ProgramDefs TailCall tailjmp IndirectCallq TailJmp rT
 % LocalWords:  prepending addstart addconclusion Cardelli Llambda typ
-% LocalWords:  Rlambda InterpLlambda AnnAssign Dunfield bodyT str fvs
+% LocalWords:  Llambda InterpLlambda AnnAssign Dunfield bodyT str fvs
 % LocalWords:  TypeCheckLlambda annot dereference clos fvts closTy
 % LocalWords:  Minamide AllocateClosure Gilray Milner morphos subtype
 % LocalWords:  polymorphism untyped AnyType dataclass untag Rdyn
