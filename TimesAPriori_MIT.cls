@@ -1729,7 +1729,7 @@ Chapter \arabic{chapter}}%
 \let\subparagraph\appsubparagraph%
 %        \appendtrue
 \def\chaptername{Appendix}%
-\footnotesize%
+%\footnotesize%
 }
 
 
