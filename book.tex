@@ -17404,16 +17404,6 @@ class InterpLany(InterpLlambda):
             return v[n]
           case _:
             raise Exception('interp any_tuple_load unexpected ' + repr(tv))
-      case Call(Name('any_tuple_store'), [tup, index, value]):
-        tv = self.interp_exp(tup, env)
-        n = self.interp_exp(index, env)
-        val = self.interp_exp(value, env)
-        match tv:
-          case Tagged(v, tag):
-            v[n] = val
-            return None
-          case _:
-            raise Exception('interp any_tuple_load unexpected ' + repr(tv))
       case Call(Name('any_len'), [value]):
         v = self.interp_exp(value, env)
         match v:
@@ -17938,7 +17928,7 @@ Call(Name('any_tuple_load'), [|$e_1$|,|$e_2$|])
 Block([Assign([|$t$|], |$e'_1$|), Assign([|$i$|], |$e'_2$|)],
       IfExp(Compare(TagOf(|$t$|), [Eq()], [Constant(2)]),
             IfExp(Compare(|$i$|, [Lt()], [Call(Name('any_len'), [|$t$|])]),
-                  Call(Name('any_tuple_load'), [|$t$|, |$i$|]),
+                  Call(Name('any_tuple_load_unsafe'), [|$t$|, |$i$|]),
                   Call(Name('exit'), [])),
             Call(Name('exit'), [])))
 \end{lstlisting}
@@ -17994,8 +17984,7 @@ whose syntax is defined in Figure~\ref{fig:c5-syntax}.
 \Exp &::=& \CALL{\VAR{\key{'make\_any'}}}{\LS \Atm,\Atm \RS}\\
   &\MID& \key{TagOf}\LP \Atm \RP
   \MID \key{ValueOf}\LP \Atm , \FType \RP \\
-  &\MID& \CALL{\VAR{\key{'any\_tuple\_load'}}}{\LS \Atm,\Atm \RS}\\
-  &\MID& \CALL{\VAR{\key{'any\_tuple\_store'}}}{\LS \Atm,\Atm,\Atm \RS}\\
+  &\MID& \CALL{\VAR{\key{'any\_tuple\_load\_unsafe'}}}{\LS \Atm,\Atm \RS}\\
   &\MID& \CALL{\VAR{\key{'any\_len'}}}{\LS \Atm \RS} \\
   &\MID& \CALL{\VAR{\key{'exit'}}}{\LS\RS}
 \end{array}
@@ -18229,7 +18218,7 @@ movq %r11, |$\itm{lhs'}$|
 \end{lstlisting}
 \fi}
 
-\paragraph{\racket{\code{any-vector-ref}}\python{\code{\code{any\_tuple\_load}}}}
+\paragraph{\racket{\code{any-vector-ref}}\python{\code{\code{any\_tuple\_load\_unsafe}}}}
 
 This operation combines the effect of \code{ValueOf} with reading an
 element of the tuple (see
@@ -18255,7 +18244,7 @@ movq 0(%r11) |$\itm{lhs'}$|
 %
 {\if\edition\pythonEd    
 \begin{lstlisting}
-Assign([|$\itm{lhs}$|], Call(Name('any_tuple_load'), [|$e_1$|,|$e_2$|]))
+Assign([|$\itm{lhs}$|], Call(Name('any_tuple_load_unsafe'), [|$e_1$|,|$e_2$|]))
 |$\Longrightarrow$|
 movq $|$-8$|, %r11
 andq |$e_1'$|, %r11
@@ -18269,11 +18258,11 @@ movq 0(%r11) |$\itm{lhs'}$|
 \end{minipage}
 \end{center}
 
-\paragraph{\racket{\code{any-vector-set!}}\python{\code{any\_tuple\_store}}}
+%% \paragraph{\racket{\code{any-vector-set!}}\python{\code{any\_tuple\_store}}}
 
-The code generation for
-\racket{\code{any-vector-set!}}\python{\code{any\_tuple\_store}} is
-analogous to the above translation for reading from a tuple.
+%% The code generation for
+%% \racket{\code{any-vector-set!}}\python{\code{any\_tuple\_store}} is
+%% analogous to the above translation for reading from a tuple.
 
 
 \section{Register Allocation for \LangAny{}}
