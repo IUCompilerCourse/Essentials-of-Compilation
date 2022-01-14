@@ -26,7 +26,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{0}
+\def\edition{1}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd{#1}\fi}}
@@ -13256,8 +13256,7 @@ nested inside each other.
         &\MID& \key{FunctionType}\LP \Type^{*} \key{, } \Type \RP \\
     \Exp &::=& \CALL{\Exp}{\Exp^{*}}\\
     \Stmt &::=& \RETURN{\Exp} \\
-   \Params &::=&                  \LP\Var\key{,}\Type\RP^*
-    \\
+   \Params &::=&  \LP\Var\key{,}\Type\RP^* \\
    \Def &::=& \FUNDEF{\Var}{\Params}{\Type}{}{\Stmt^{+}} 
   \end{array}
 }
@@ -18408,14 +18407,6 @@ for the compilation of \LangDyn{}.
 \label{ch:Lgrad}
 \index{subject}{gradual typing}
 
-\if\edition\pythonEd
-
-UNDER CONSTRUCTION
-
-\fi
-
-\if\edition\racketEd
-
 This chapter studies a language, \LangGrad{}, in which the programmer
 can choose between static and dynamic type checking in different parts
 of a program, thereby mixing the statically typed \LangLam{} language
@@ -18431,7 +18422,7 @@ variables~\citep{Anderson:2002kd,Siek:2006bh}.
 The concrete syntax of \LangGrad{} is defined in
 Figure~\ref{fig:Lgrad-concrete-syntax} and its abstract syntax is defined
 in Figure~\ref{fig:Lgrad-syntax}. The main syntactic difference between
-\LangLam{} and \LangGrad{} is the additional \itm{param} and \itm{ret}
+\LangLam{} and \LangGrad{} is the additional \Param and \itm{ret}
 non-terminals that make type annotations optional. The return types
 are not optional in the abstract syntax; the parser fills in
 \code{Any} when the return type is not specified in the concrete
@@ -18440,30 +18431,62 @@ syntax.
 \newcommand{\LgradGrammarRacket}{
 \begin{array}{lcl}
   \Type &::=& (\Type \ldots \; \key{->}\; \Type) \\
-  \itm{param} &::=& \Var \MID \LS\Var \key{:} \Type\RS \\
+  \Param &::=& \Var \MID \LS\Var \key{:} \Type\RS \\
   \itm{ret} &::=& \epsilon \MID \key{:} \Type \\
   \Exp &::=& \LP\Exp \; \Exp \ldots\RP 
-      \MID \CGLAMBDA{\LP\itm{param}\ldots\RP}{\itm{ret}}{\Exp} \\
+      \MID \CGLAMBDA{\LP\Param\ldots\RP}{\itm{ret}}{\Exp} \\
     &\MID& \LP \key{procedure-arity}~\Exp\RP \\
-  \Def &::=& \CGDEF{\Var}{\itm{param}\ldots}{\itm{ret}}{\Exp} 
+  \Def &::=& \CGDEF{\Var}{\Param\ldots}{\itm{ret}}{\Exp} 
 \end{array}
 }
 
 \newcommand{\LgradASTRacket}{
 \begin{array}{lcl}
   \Type &::=& (\Type \ldots \; \key{->}\; \Type) \\
-  \itm{param} &::=& \Var \MID \LS\Var \key{:} \Type\RS \\
+  \Param &::=& \Var \MID \LS\Var \key{:} \Type\RS \\
   \Exp &::=& \APPLY{\Exp}{\Exp\ldots}
-  \MID \LAMBDA{\LP\itm{param}\ldots\RP}{\Type}{\Exp} \\
+  \MID \LAMBDA{\LP\Param\ldots\RP}{\Type}{\Exp} \\
   \itm{op} &::=& \code{procedure-arity} \\
- \Def &::=& \FUNDEF{\Var}{\LP\itm{param}\ldots\RP}{\Type}{\code{'()}}{\Exp} 
+ \Def &::=& \FUNDEF{\Var}{\LP\Param\ldots\RP}{\Type}{\code{'()}}{\Exp} 
 \end{array}
 }
 
+\newcommand{\LgradGrammarPython}{
+\begin{array}{lcl}
+  \Type &::=& \key{Any}
+                \MID \key{int}
+                \MID \key{bool}
+                \MID \key{tuple}\LS \Type \code{, } \ldots  \RS
+                \MID \key{Callable}\LS \LS \Type \key{,} \ldots \RS \key{, } \Type \RS \\
+  \Exp &::=& \CAPPLY{\Exp}{\Exp\code{,} \ldots} 
+      \MID \CLAMBDA{\Var\code{, }\ldots}{\Exp}
+      \MID \CARITY{\Exp} \\
+  \Stmt &::=& \CANNASSIGN{\Var}{\Type}{\Exp} \MID \CRETURN{\Exp} \\ 
+  \Param &::=& \Var \MID \Var \key{:} \Type \\
+  \itm{ret} &::=& \epsilon \MID \key{->}~\Type \\
+  \Def &::=& \CGDEF{\Var}{\Param\key{, }\ldots}{\itm{ret}}{\Stmt^{+}} 
+\end{array}
+}
+
+\newcommand{\LgradASTPython}{
+  \begin{array}{lcl}
+  \Type &::=& \key{AnyType()} \MID \key{IntType()} \MID \key{BoolType()} \MID \key{VoidType()}\\
+        &\MID& \key{TupleType}\LP\Type^{*}\RP
+        \MID \key{FunctionType}\LP \Type^{*} \key{, } \Type \RP \\
+  \Exp &::=& \CALL{\Exp}{\Exp^{*}} \MID \LAMBDA{\Var^{*}}{\Exp}\\
+        &\MID& \ARITY{\Exp} \\
+  \Stmt &::=& \ANNASSIGN{\Var}{\Type}{\Exp}
+       \MID \RETURN{\Exp} \\
+   \Param &::=& \LP\Var\key{,}\Type\RP \\
+   \Def &::=& \FUNDEF{\Var}{\Param^{*}}{\Type}{}{\Stmt^{+}} 
+  \end{array}
+}  
+  
 \begin{figure}[tp]
 \centering
 \begin{tcolorbox}[colback=white]
     \small
+{\if\edition\racketEd    
 \[
 \begin{array}{l}
   \gray{\LintGrammarRacket{}} \\ \hline
@@ -18477,6 +18500,22 @@ syntax.
 \end{array}
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd
+\[
+\begin{array}{l}
+  \gray{\LintGrammarPython{}} \\ \hline
+  \gray{\LvarGrammarPython{}} \\ \hline
+  \gray{\LifGrammarPython{}} \\ \hline
+  \gray{\LwhileGrammarPython} \\ \hline
+  \gray{\LtupGrammarPython} \\   \hline
+  \LgradGrammarPython \\
+  \begin{array}{lcl}
+    \LangGradM{} &::=& \Def\ldots \Stmt\ldots
+  \end{array}
+\end{array}
+\]
+\fi}
 \end{tcolorbox}
 
 \caption{The concrete syntax of \LangGrad{}, extending \LangVec{} (Figure~\ref{fig:Lvec-concrete-syntax}).}
@@ -18487,6 +18526,7 @@ syntax.
 \centering
 \begin{tcolorbox}[colback=white]
     \small
+{\if\edition\racketEd
 \[
 \begin{array}{l}
   \gray{\LintOpAST} \\ \hline
@@ -18500,6 +18540,22 @@ syntax.
 \end{array}
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd
+\[
+\begin{array}{l}
+  \gray{\LintASTPython{}} \\ \hline
+  \gray{\LvarASTPython{}} \\ \hline
+  \gray{\LifASTPython{}} \\ \hline
+  \gray{\LwhileASTPython} \\ \hline
+  \gray{\LtupASTPython} \\   \hline
+  \LgradASTPython \\
+  \begin{array}{lcl}
+    \LangGradM{} &::=& \PROGRAM{}{\LS \Def \ldots \Stmt \ldots \RS}
+  \end{array}
+\end{array}
+\]
+\fi}
 \end{tcolorbox}
 
 \caption{The abstract syntax of \LangGrad{}, extending \LangVec{} (Figure~\ref{fig:Lvec-syntax}).}
@@ -19633,8 +19689,6 @@ recommend the reader to the online gradual typing bibliography:
 % TODO: challenge problem:
 %   type analysis and type specialization?
 %   coercions?
-
-\fi
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Parametric Polymorphism}
