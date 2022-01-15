@@ -18618,7 +18618,7 @@ are allowed so long as the types are \emph{consistent}, that is, they
 are equal except in places where there is an \code{Any} type. The type
 \code{Any} is consistent with every other type.
 Figure~\ref{fig:consistent} defines the
-\racket{\code{consistent?}}\python{\code{consistent}} predicate.
+\racket{\code{consistent?}}\python{\code{consistent}} method.
 Returning to the \code{map} example of
 Figure~\ref{fig:gradual-map}, the \code{inc} function has type
 \racket{\code{(Any -> Any)}}\python{\code{Callable[[Any],Any]}}
@@ -18648,24 +18648,24 @@ because the two types are consistent.
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
-def consistent(self, t1, t2):
-    match (t1, t2):
-      case (AnyType(), _):
-        return True
-      case (_, AnyType()):
-        return True
-      case (FunctionType(ps1, rt1), FunctionType(ps2, rt2)):
-        return all([consistent(p1, p2) for (p1,p2) in zip(ps1,ps2)]) \
-            and consistent(rt1, rt2)
-      case (TupleType(ts1), TupleType(ts2)):
-        return all([consistent(ty1, ty2) for (ty1,ty2) in zip(ts1,ts2)])
-      case (_, _):
-        return t1 == t2
+  def consistent(self, t1, t2):
+      match (t1, t2):
+        case (AnyType(), _):
+          return True
+        case (_, AnyType()):
+          return True
+        case (FunctionType(ps1, rt1), FunctionType(ps2, rt2)):
+          return all([self.consistent(p1, p2) for (p1,p2) in zip(ps1,ps2)]) \
+              and consistent(rt1, rt2)
+        case (TupleType(ts1), TupleType(ts2)):
+          return all([self.consistent(ty1, ty2) for (ty1,ty2) in zip(ts1,ts2)])
+        case (_, _):
+          return t1 == t2
 \end{lstlisting}  
   \fi}
   \end{tcolorbox}
 
-  \caption{The consistency predicate on types.}
+  \caption{The consistency method on types.}
 \label{fig:consistent}
 \end{figure}
 
@@ -18807,11 +18807,226 @@ print(t[1])
 \end{figure}
 
 
+{\if\edition\pythonEd        
+\begin{figure}[tbp]
+\begin{tcolorbox}[colback=white]  
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+class TypeCheckLgrad(TypeCheckLlambda):
+  def type_check_exp(self, e, env):
+    match e:
+      case Name(id):
+        return env[id]
+      case Constant(value) if value is True or value is False:
+        return BoolType()
+      case Constant(value) if isinstance(value, int):
+        return IntType()
+      case Call(Name('input_int'), []):
+        return IntType()
+      case BinOp(left, op, right) if op == Add() or op == Sub():
+        left_type = self.type_check_exp(left, env)
+        self.check_consistent(left_type, IntType(), left)
+        right_type = self.type_check_exp(right, env)
+        self.check_consistent(right_type, IntType(), right)
+        return IntType()
+      case UnaryOp(USub(), v):
+        ty = self.type_check_exp(v, env)
+        self.check_consistent(ty, IntType(), v)
+        return IntType()
+      case IfExp(test, body, orelse):
+        test_t = self.type_check_exp(test, env)
+        self.check_consistent(test_t, BoolType(), test)
+        body_t = self.type_check_exp(body, env)
+        orelse_t = self.type_check_exp(orelse, env)
+        self.check_consistent(body_t, orelse_t, e)
+        return self.join_types(body_t, orelse_t)
+      case UnaryOp(Not(), v):
+        ty = self.type_check_exp(v, env)
+        self.check_consistent(ty, BoolType(), v)
+        return BoolType()
+      case BoolOp(op, values):
+        left = values[0]; right = values[1]
+        left_type = self.type_check_exp(left, env)
+        self.check_consistent(left_type, BoolType(), left)
+        right_type = self.type_check_exp(right, env)
+        self.check_consistent(right_type, BoolType(), right)
+        return BoolType()
+      case Compare(left, [cmp], [right]) \
+          if isinstance(cmp, Eq) or isinstance(cmp, NotEq):
+        left_type = self.type_check_exp(left, env)
+        right_type = self.type_check_exp(right, env)
+        self.check_consistent(left_type, right_type, e)
+        return BoolType()
+      case Compare(left, [cmp], [right]) \
+          if isinstance(cmp, Lt()) or isinstance(cmp, LtE()) \
+             or isinstance(cmp, Gt()) or isinstance(cmp, GtE()):
+        left_type = self.type_check_exp(left, env)
+        self.check_consistent(left_type, IntType(), left)
+        right_type = self.type_check_exp(right, env)
+        self.check_consistent(right_type, IntType(), right)
+        return BoolType()
+      case Compare(left, [cmp], [right]) if isinstance(cmp, Is):
+        left_type = self.type_check_exp(left, env)
+        right_type = self.type_check_exp(right, env)
+        self.check_consistent(left_type, right_type, e)
+        return BoolType()
+      case Call(func, args):
+        func_t = self.type_check_exp(func, env)
+        args_t = unzip([self.type_check_exp(arg, env) for arg in args])
+        match func_t:
+          case FunctionType(params_t, return_t):
+            for (arg_t, param_t) in zip(args_t, params_t):
+                self.check_consistent(param_t, arg_t, e)
+            return return_t
+          case AnyType():
+            return AnyType()
+          case _:
+            raise Exception('type_check_exp: in call, unexpected ' + repr(func_t))
+      case _:
+        raise Exception('type_check_exp: unexpected ' + repr(e))
+\end{lstlisting}
+\end{tcolorbox}
 
+\caption{Type checker for the \LangGrad{} language, part 1.}
+\label{fig:type-check-Lgradual-1}
+\end{figure}
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]  
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+      case Tuple(es, Load()):
+        ts = unzip([self.type_check_exp(e, env) for e in es])
+        return TupleType(ts)
+      case Subscript(tup, Constant(index), Load()) if isinstance(index,int)::
+        tup_ty = self.type_check_exp(tup, env)
+        match tup_ty:
+          case TupleType(ts):
+            return ts[index]
+          case AnyType():
+            return AnyType()
+          case _:
+            raise Exception('subscript expected a tuple, not ' + repr(tup_ty))
+      case Subscript(tup, index, Load()):
+        tup_ty = self.type_check_exp(tup, env)
+        index_ty = self.type_check_exp(index, env)
+        self.check_consistent(index_ty, IntType(), index)
+        match tup_ty:
+          case TupleType(ts):
+            return AnyType()
+          case AnyType():
+            return AnyType()
+          case _:
+            raise Exception('subscript a tuple, not ' + repr(tup_ty))
+      case Call(Name('len'), [tup]):
+        tup_t = self.type_check_exp(tup, env)
+        match tup_t:
+          case TupleType(ts):
+            return IntType()
+          case AnyType():
+            return IntType()
+          case _:
+            raise Exception('len expected a tuple, not ' + repr(tup_t))
+
+  def check_exp(self, e, ty, env):
+    match e:
+      case Lambda(params, body):
+        match ty:
+          case FunctionType(params_t, return_t):
+            new_env = {x:t for (x,t) in env.items()}
+            for (p,t) in zip(new_params, params_t):
+                new_env[p] = t
+            e.has_type = ty
+          case AnyType():
+            new_env = {x:t for (x,t) in env.items()}
+            for p in new_params:
+                new_env[p] = AnyType()
+            e.has_type = FunctionType([AnyType() for _ in new_params], AnyType())
+          case _:
+            raise Exception('lambda does not have type ' + str(ty))
+      case _:
+        e_ty = self.type_check_exp(e, env)
+        self.check_consistent(e_ty, ty, e)
+\end{lstlisting}
+\end{tcolorbox}
+\caption{Type checker for the \LangGrad{} language, part 2.}
+\label{fig:type-check-Lgradual-2}
+\end{figure}
+
+\begin{figure}[tbp]
+\begin{tcolorbox}[colback=white]
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+  def type_check_stmt(self, s, env, return_type):
+    match s:
+      case Assign([Name(id)], value):
+        value_ty = self.type_check_exp(value, env)
+        if id in env:
+          self.check_consistent(env[id], value_ty, value)
+        else:
+          env[id] = t
+      case Expr(Call(Name('print'), [arg])):
+        arg_ty = self.type_check_exp(arg, env)
+        self.check_type_equal(arg_ty, IntType(), arg)
+      case Expr(value):
+        value_ty = self.type_check_exp(value, env)
+      case If(test, body, orelse):
+        test_ty = self.type_check_exp(test, env)
+        self.check_consistent(BoolType(), test_ty, test)
+        body_ty = self.type_check_stmts(body, env)
+        orelse_ty = self.type_check_stmts(orelse, env)
+        self.check_consistent(body_ty, orelse_ty, ss[0])
+      case FunctionDef(name, params, body, dl, returns, comment):
+        new_env = {x: t for (x,t) in env.items()}
+        for (x,t) in params:
+            new_env[x] = t
+        self.type_check_stmts(body, new_env, returns)
+      case Return(value):
+        self.check_exp(value, return_type, env)
+      case _:
+        raise Exception('type_check_stmts: unexpected ' + repr(ss))
+
+  def type_check_stmts(self, ss, env, return_type):
+    for s in ss:
+      self.type_check_stmt(s, env, return_type)
+\end{lstlisting}
+\end{tcolorbox}
+\caption{Type checker for the \LangGrad{} language, part 3.}
+\label{fig:type-check-Lgradual-3}
+\end{figure}
+
+\begin{figure}[tbp]
+\begin{tcolorbox}[colback=white]  
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+  def join_types(self, t1, t2):
+      match (t1, t2):
+        case (AnyType(), _):
+          return t2
+        case (_, AnyType()):
+          return t1
+        case (FunctionType(ps1, rt1), FunctionType(ps2, rt2)):
+          return FunctionType([self.join_types(p1, p2) for (p1,p2) in zip(ps1, ps2)],
+                              self.join_types(rt1,rt2))
+        case (TupleType(ts1), TupleType(ts2)):
+          return TupleType([self.join_types(ty1, ty2) for (ty1,ty2) in zip(ts1,ts2)])
+        case (_, _):
+          return t1
+        
+  def check_consistent(self, t1, t2, e):
+    if not self.consistent(t1, t2):
+      raise Exception('error: ' + repr(t1) + ' inconsistent with ' + repr(t2) \
+                      + ' in ' + repr(e))
+
+\end{lstlisting}
+\end{tcolorbox}
+
+\caption{Auxiliary methods for type checking \LangGrad{}.}
+\label{fig:type-check-Lgradual-aux}
+\end{figure}
+
+\fi}
+
+
 {\if\edition\racketEd        
+\begin{figure}[tbp]
+\begin{tcolorbox}[colback=white]  
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
 (define type-check-gradual-class
   (class type-check-Llambda-class
@@ -18871,19 +19086,13 @@ print(t[1])
               (values (Prim 'any-vector-set! (list e1^ e2^^ e3^^)) 'Void)]
 	     [else (error 'type-check "expected vector not ~a\nin ~v" t1 e)])]
 \end{lstlisting}
-\fi}
-{\if\edition\pythonEd        
-UNDER CONSTRUCTION
-\fi}
 \end{tcolorbox}
-
 \caption{Type checker for the \LangGrad{} language, part 1.}
 \label{fig:type-check-Lgradual-1}
 \end{figure}
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]  
-  {\if\edition\racketEd
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
           [(Prim 'eq? (list e1 e2))
            (define-values (e1^ t1) (recur e1))
@@ -18945,20 +19154,13 @@ UNDER CONSTRUCTION
            (define-values (e2^ T2) ((type-check-exp env) e2))
            (values (WhileLoop (make-cast e1^ T1 'Boolean) e2^) 'Void)]
 \end{lstlisting}
-\fi}
-{\if\edition\pythonEd        
-UNDER CONSTRUCTION
-\fi}
 \end{tcolorbox}
-
 \caption{Type checker for the \LangGrad{} language, part 2.}
 \label{fig:type-check-Lgradual-2}
 \end{figure}
 
-
 \begin{figure}[tbp]
-  \begin{tcolorbox}[colback=white]
-{\if\edition\racketEd            
+\begin{tcolorbox}[colback=white]
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
 	  [(Apply e1 e2s)
 	   (define-values (e1^ T1) (recur e1))
@@ -18990,20 +19192,13 @@ UNDER CONSTRUCTION
           [else  ((super type-check-exp env) e)]
           )))
 \end{lstlisting}
-\fi}
-{\if\edition\pythonEd        
-UNDER CONSTRUCTION
-\fi}
 \end{tcolorbox}
-
 \caption{Type checker for the \LangGrad{} language, part 3.}
 \label{fig:type-check-Lgradual-3}
 \end{figure}
 
-
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]  
-{\if\edition\racketEd            
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
     (define/public (join t1 t2)
       (match* (t1 t2)
@@ -19067,15 +19262,13 @@ UNDER CONSTRUCTION
 	 `(,@ps -> ,rt)]
 	[else (error 'fun-def-type "ill-formed function definition in ~a" d)]))
 \end{lstlisting}
-\fi}
-{\if\edition\pythonEd        
-UNDER CONSTRUCTION
-\fi}
 \end{tcolorbox}
 
 \caption{Auxiliary functions for type checking \LangGrad{}.}
 \label{fig:type-check-Lgradual-aux}
 \end{figure}
+
+\fi}
 
 \clearpage
 
