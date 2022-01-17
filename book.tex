@@ -12716,39 +12716,83 @@ mark. The following example uses \code{set-point-x!} to change the
 % TODO: create an interpreter for L_struct
 
 \clearpage
+\fi}
 
 \section{Challenge: Arrays}
 \label{sec:arrays}
 
-In Chapter~\ref{ch:Lvec} we studied tuples, that is, a heterogeneous
+In this chapter we have studied tuples, that is, a heterogeneous
 sequences of elements whose length is determined at compile-time. This
 challenge is also about sequences, but this time the length is
 determined at run-time and all the elements have the same type (they
 are homogeneous). We use the term ``array'' for this later kind of
 sequence.
-
+%
+\racket{
 The Racket language does not distinguish between tuples and arrays,
 they are both represented by vectors. However, Typed Racket
 distinguishes between tuples and arrays: the \code{Vector} type is for
-tuples and the \code{Vectorof} type is for arrays.
-%
+tuples and the \code{Vectorof} type is for arrays.}
+\python{
+Arrays correspond to the \code{list} type in Python language.
+}
+
 Figure~\ref{fig:Lvecof-concrete-syntax} defines the concrete syntax
-for \LangArray{}, extending \LangLoop{} with the \code{Vectorof} type
-and the \code{make-vector} primitive operator for creating an array,
-whose arguments are the length of the array and an initial value for
-all the elements in the array. The \code{vector-length},
-\code{vector-ref}, and \code{vector-ref!} operators that we defined
-for tuples become overloaded for use with arrays.
+for \LangArray{} and Figure~\ref{fig:Lvecof-syntax} defines the
+abstract syntax, extending \LangVec{} with the
+\racket{\code{Vectorof}}\python{\code{list}} type and the
 %
-We also include integer multiplication in \LangArray{}, as it is
+\racket{\code{make-vector} primitive operator for creating an array,
+whose arguments are the length of the array and an initial value for
+all the elements in the array.}
+\python{bracket notation for creating an array literal.}
+\racket{
+The \code{vector-length},
+\code{vector-ref}, and \code{vector-ref!} operators that we defined
+for tuples become overloaded for use with arrays.}
+\python{
+The subscript operator becomes overloaded for use with arrays and tuples
+and now may appear on the left-hand side of an assignment.
+Note that the index of the subscript may be an arbitrary expression
+and not just a constant integers.
+The \code{len} function is also applicable to arrays.
+}
+%
+We include integer multiplication in \LangArray{}, as it is
 useful in many examples involving arrays such as computing the
-inner-product of two arrays (Figure~\ref{fig:inner-product}).
+inner product of two arrays (Figure~\ref{fig:inner_product}).
 
 \newcommand{\LarrayGrammarRacket}{
 \begin{array}{lcl}
   \Type &::=& \LP \key{Vectorof}~\Type \RP \\
   \Exp &::=& \CMUL{\Exp}{\Exp}
-       \MID \CMAKEVEC{\Exp}{\Exp} \\
+       \MID \CMAKEVEC{\Exp}{\Exp} 
+\end{array}
+}
+\newcommand{\LarrayASTRacket}{
+\begin{array}{lcl}
+  \Type &::=& \LP \key{Vectorof}~\Type \RP \\
+  \Exp &::=& \MUL{\Exp}{\Exp}
+       \MID \MAKEVEC{\Exp}{\Exp} 
+\end{array}
+}
+
+\newcommand{\LarrayGrammarPython}{
+\begin{array}{lcl}
+  \Type &::=& \key{list}\LS\Type\RS \\
+  \Exp &::=& \CMUL{\Exp}{\Exp}
+    \MID \CGET{\Exp}{\Exp}
+    \MID \LS \Exp \code{,} \ldots \RS \\
+  \Stmt &::= & \CGET{\Exp}{\Exp} \mathop{\key{=}}\Exp
+\end{array}
+}
+\newcommand{\LarrayASTPython}{
+\begin{array}{lcl}
+  \Type &::=& \key{ListType}\LP\Type\RP \\
+  \Exp &::=& \MUL{\Exp}{\Exp}
+    \MID \GET{\Exp}{\Exp} \\
+    &\MID& \key{List}\LP \Exp \code{,} \ldots \code{, } \code{Load()} \RP \\
+  \Stmt &::= & \ASSIGN{ \PUT{\Exp}{\Exp} }{\Exp}
 \end{array}
 }
 
@@ -12772,43 +12816,102 @@ inner-product of two arrays (Figure~\ref{fig:inner-product}).
 \]
 \fi}
 {\if\edition\pythonEd    
-UNDER CONSTRUCTION
+\[
+\begin{array}{l}
+  \gray{\LintGrammarPython{}} \\ \hline
+  \gray{\LvarGrammarPython{}} \\ \hline
+  \gray{\LifGrammarPython{}} \\ \hline
+  \gray{\LwhileGrammarPython} \\ \hline
+  \gray{\LtupGrammarPython} \\ \hline
+  \LarrayGrammarPython \\
+\begin{array}{rcl}
+  \LangArrayM{} &::=& \Stmt^{*}
+\end{array}
+\end{array}
+\]
 \fi}
 \end{tcolorbox}
-\caption{The concrete syntax of \LangArray{}, extending \LangLoop{} (Figure~\ref{fig:Lwhile-concrete-syntax}).}
+\caption{The concrete syntax of \LangArray{}, extending \LangVec{} (Figure~\ref{fig:Lvec-concrete-syntax}).}
 \label{fig:Lvecof-concrete-syntax}
+\end{figure}
+
+\begin{figure}[tp]
+\centering
+\begin{tcolorbox}[colback=white]
+    \small
+{\if\edition\racketEd    
+\[
+\begin{array}{l}
+  \gray{\LintASTRacket{}} \\ \hline
+  \gray{\LvarASTRacket{}} \\ \hline
+  \gray{\LifASTRacket{}} \\ \hline
+  \gray{\LwhileASTRacket} \\ \hline
+  \gray{\LtupASTRacket} \\ \hline
+  \LarrayASTRacket \\
+\begin{array}{lcl}
+  \LangArray{} &::=& \Exp
+\end{array}
+\end{array}
+\]
+\fi}
+{\if\edition\pythonEd    
+\[
+\begin{array}{l}
+  \gray{\LintASTPython{}} \\ \hline
+  \gray{\LvarASTPython{}} \\ \hline
+  \gray{\LifASTPython{}} \\ \hline
+  \gray{\LwhileASTPython} \\ \hline
+  \gray{\LtupASTPython} \\ \hline
+  \LarrayASTPython \\
+\begin{array}{rcl}
+  \LangArrayM{} &::=& \Stmt^{*}
+\end{array}
+\end{array}
+\]
+\fi}
+\end{tcolorbox}
+\caption{The abstract syntax of \LangArray{}, extending \LangVec{} (Figure~\ref{fig:Lvec-syntax}).}
+\label{fig:Lvecof-syntax}
 \end{figure}
 
 
 \begin{figure}[tp]
 \begin{tcolorbox}[colback=white]  
+{\if\edition\racketEd
+% TODO: remove the function from the following example, like the python version -Jeremy    
 \begin{lstlisting}
-(define (inner-product [A : (Vectorof Integer)] [B : (Vectorof Integer)]
-                          [n : Integer]) : Integer
-  (let ([i 0])
-    (let ([prod 0])
-      (begin
-        (while (< i n)
-          (begin
-            (set! prod (+ prod (* (vector-ref A i)
-                                  (vector-ref B i))))
-            (set! i (+ i 1))
-            ))
-        prod))))
-  
-
 (let ([A (make-vector 2 2)])
-  (let ([B (make-vector 2 3)])
-    (+ (inner-product A B 2)
-       30)))
+(let ([B (make-vector 2 3)])
+(let ([i 0])
+(let ([prod 0])
+(begin
+  (while (< i n)
+    (begin
+      (set! prod (+ prod (* (vector-ref A i)
+                            (vector-ref B i))))
+      (set! i (+ i 1))))
+  prod)))))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd    
+\begin{lstlisting}
+A = [2, 2]
+B = [3, 3]
+i = 0
+prod = 0
+while i != len(A):
+  prod =  prod + A[i] * B[i]
+  i = i + 1
+print( prod )
+\end{lstlisting}
+\fi}
 \end{tcolorbox}
 
-\caption{Example program that computes the inner-product.}
-\label{fig:inner-product}
+\caption{Example program that computes the inner product.}
+\label{fig:inner_product}
 \end{figure}
 
-
+{\if\edition\racketEd
 The type checker for \LangArray{} is defined in
 Figure~\ref{fig:type-check-Lvecof}. The result type of
 \code{make-vector} is \code{(Vectorof T)} where \code{T} is the type
@@ -12821,9 +12924,23 @@ updated to handle the situation where the vector has type
 between operations on tuples versus arrays. We override the
 \code{operator-types} method to provide the type signature for
 multiplication: it takes two integers and returns an integer.
+\fi}
+{\if\edition\pythonEd    
+%
+The type checker for \LangArray{} is defined in
+Figure~\ref{fig:type-check-Lvecof}. The result type of a list literal
+is \code{list[T]} where \code{T} is the type of the initializing
+expressions.  The type checking of the \code{len} function and the
+subscript operator is updated to handle lists. The type checker now
+also handles a subscript on the left-hand side of an assignment.
+Regarding multiplication, it takes two integers and returns an
+integer.
+%
+\fi}
 
 \begin{figure}[tbp]
   \begin{tcolorbox}[colback=white]
+{\if\edition\racketEd    
     \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define type-check-Lvecof-class
   (class type-check-Lvec-class
@@ -12871,7 +12988,74 @@ multiplication: it takes two integers and returns an integer.
 
 (define (type-check-Lvecof p)
   (send (new type-check-Lvecof-class) type-check-program p))
+    \end{lstlisting}
+    \fi}
+{\if\edition\pythonEd    
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+class TypeCheckLarray(TypeCheckLtup):
+  def type_check_exp(self, e, env):
+    match e:
+      case ast.List(es, Load()):
+        ts = [self.type_check_exp(e, env) for e in es]
+        elt_ty = ts[0]
+        for (ty, elt) in zip(ts, es):
+            self.check_type_equal(elt_ty, ty, elt)
+        e.has_type = ListType(elt_ty)
+        return e.has_type
+      case Call(Name('len'), [tup]):
+        tup_t = self.type_check_exp(tup, env)
+        tup.has_type = tup_t
+        match tup_t:
+          case TupleType(ts):
+            return IntType()
+          case ListType(ty):
+            return IntType()
+          case _:
+            raise Exception('len expected a tuple, not ' + repr(tup_t))
+      case Subscript(tup, index, Load()):
+        tup_ty = self.type_check_exp(tup, env)
+        index_ty = self.type_check_exp(index, env)
+        self.check_type_equal(index_ty, IntType(), index)
+        match tup_ty:
+          case TupleType(ts):
+            match index:
+              case Constant(i):
+                return ts[i]
+              case _:
+                raise Exception('subscript required constant integer index')
+          case ListType(ty):
+            return ty
+          case _:
+            raise Exception('subscript expected a tuple, not ' + repr(tup_ty))
+      case BinOp(left, Mult(), right):
+        l = self.type_check_exp(left, env)
+        self.check_type_equal(l, IntType(), left)
+        r = self.type_check_exp(right, env)
+        self.check_type_equal(r, IntType(), right)
+        return IntType()
+      case _:
+        return super().type_check_exp(e, env)
+
+  def type_check_stmts(self, ss, env):
+    if len(ss) == 0:
+      return VoidType()
+    match ss[0]:
+      case Assign([Subscript(tup, index, Store())], value):
+        tup_t = self.type_check_exp(tup, env)
+        value_t = self.type_check_exp(value, env)
+        index_ty = self.type_check_exp(index, env)
+        self.check_type_equal(index_ty, IntType(), index)
+        match tup_t:
+          case ListType(ty):
+            self.check_type_equal(ty, value_t, ss[0])          
+          case _:
+            raise Exception('type_check_stmts: expected a list, not ' \
+                            + repr(tup_t))
+        return self.type_check_stmts(ss[1:], env)
+      case _:
+        return super().type_check_stmts(ss, env)
 \end{lstlisting}
+\fi}
   \end{tcolorbox}
 
   \caption{Type checker for the \LangArray{} language.}
@@ -12879,14 +13063,22 @@ multiplication: it takes two integers and returns an integer.
 \end{figure}
 
 The interpreter for \LangArray{} is defined in
-Figure~\ref{fig:interp-Lvecof}.  The \code{make-vector} operator is
+Figure~\ref{fig:interp-Lvecof}.
+\racket{The \code{make-vector} operator is
 implemented with Racket's \code{make-vector} function and
 multiplication is \code{fx*}, multiplication for \code{fixnum}
-integers.
+integers.}
+%
+\python{We implement list creation with a Python list comprehension
+  and multiplication is implemented with Python multiplication.  We
+  add a case to handle a subscript on the left-hand side of
+  assignment. Other uses of subscript can be handled by the existing
+  code for tuples.}
 
 \begin{figure}[tbp]
   \begin{tcolorbox}[colback=white]
-    \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+{\if\edition\racketEd    
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define interp-Lvecof-class
   (class interp-Lvec-class
     (super-new)
@@ -12901,6 +13093,34 @@ integers.
 (define (interp-Lvecof p)
   (send (new interp-Lvecof-class) interp-program p))
 \end{lstlisting}
+    \fi}
+{\if\edition\pythonEd
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+class InterpLarray(InterpLtup):
+
+  def interp_exp(self, e, env):
+    match e:
+      case ast.List(es, Load()):
+        return [self.interp_exp(e, env) for e in es]
+      case BinOp(left, Mult(), right):
+          l = self.interp_exp(left, env); r = self.interp_exp(right, env)
+          return l * r
+      case _:
+        return super().interp_exp(e, env)
+
+  def interp_stmts(self, ss, env):
+    if len(ss) == 0:
+      return
+    match ss[0]:
+      case Assign([Subscript(lst, index)], value):
+        lst = self.interp_exp(lst, env)
+        index = self.interp_exp(index, env)
+        lst[index] = self.interp_exp(value, env)
+        return self.interp_stmts(ss[1:], env)
+      case _:
+        return super().interp_stmts(ss, env)
+\end{lstlisting}
+\fi}
   \end{tcolorbox}
 
   \caption{Interpreter for \LangArray{}.}
@@ -12951,9 +13171,9 @@ the passes to handle arrays.
 \subsection{Bounds Checking}
 
 We recommend inserting a new pass named \code{check\_bounds} that
-inserts code around each the \code{vector-ref} and \code{vector-set!}
-operation to ensure that the index is greater than or equal to zero
-and less than the \code{vector-length}.
+inserts code around each the \racket{\code{vector-ref} and \code{vector-set!}}
+\python{subscript} operation to ensure that the index is greater than or equal to zero
+and less than the array's length.
 
 %% \subsection{Reveal Casts}
 
@@ -13037,13 +13257,14 @@ statement, so make sure to handle both situations in this pass.
 
 Implement a compiler for the \LangArray{} language by extending your
 compiler for \LangLoop{}. Test your compiler on a half dozen new
-programs, including the one in Figure~\ref{fig:inner-product} and also
+programs, including the one in Figure~\ref{fig:inner_product} and also
 a program that multiplies two matrices. Note that although matrices
 are 2-dimensional arrays, they can be encoded into 1-dimensional
 arrays by laying out each row in the array, one after the next.
   
 \end{exercise}
 
+{\if\edition\racketEd
 \section{Challenge: Generational Collection}
 
 The copying collector described in Section~\ref{sec:GC} can incur
@@ -18647,7 +18868,7 @@ because the two types are consistent.
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
-\begin{lstlisting}
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
   def consistent(self, t1, t2):
       match (t1, t2):
         case (AnyType(), _):
@@ -19302,29 +19523,47 @@ wrapping \code{maybe\_inc} in a new function that casts its parameter
 from \INTTY{} to \CANYTY{}, applies \code{maybe\_inc}, and then
 casts the return value from \CANYTY{} to \code{Integer}.
 
-UNDER CONSTRUCTION
 
-Turning our attention to casts involving tuple types, we consider the
-example in Figure~\ref{fig:map-bang} that defines a
-partially-typed version of \code{map} whose parameter \code{v} has
-type \code{(Vector Any Any)} and that updates \code{v} in place
+{\if\edition\pythonEd
+%
+Casts that involve mutable data require special care. So to
+demonstrate these issues, we use the \code{list} type introduced in
+the challenge assignment of Section~\ref{sec:arrays}.
+%
+\fi}
+%
+Turning our attention to casts involving \racket{tuple}\python{list}
+types, we consider the example in Figure~\ref{fig:map-bang} that
+defines a partially-typed version of \code{map} whose parameter
+\code{v} has type \racket{\code{(Vector Any
+    Any)}}\python{\code{list[Any]}} and that updates \code{v} in place
 instead of returning a new tuple. So we name this function
-\code{map!}. We apply \code{map!} to a tuple of integers, so
-the type checker inserts a cast from \code{(Vector Integer Integer)}
-to \code{(Vector Any Any)}. A naive way for the \LangCast{} interpreter to
-cast between tuple types would be a build a new tuple whose elements
-are the result of casting each of the original elements to the
-appropriate target type. However, this approach is only valid for
-immutable tuples; and our tuples are mutable. In the example of
-Figure~\ref{fig:map-bang}, if the cast created a new tuple, then
-the updates inside of \code{map!} would happen to the new tuple
-and not the original one.
+\code{map\_inplace}. We apply \code{map\_inplace} to a
+\racket{tuple}\python{list} of integers, so the type checker inserts a
+cast from
+\racket{\code{(Vector Integer Integer)}}
+\python{\code{list[int]}}
+to
+\racket{\code{(Vector Any Any)}}
+\python{\code{list[Any]}}.
+A naive way for the \LangCast{} interpreter to cast between
+\racket{tuple}\python{list} types would be a build a new
+\racket{tuple}\python{list}
+whose elements are the result
+of casting each of the original elements to the appropriate target
+type.
+However, this approach is not valid for mutable data structures.
+In the example of Figure~\ref{fig:map-bang},
+if the cast created a new \racket{tuple}\python{list}, then the updates inside of
+\code{map\_inplace} would happen to the new \racket{tuple}\python{list} and not
+the original one.
 
 \begin{figure}[tbp]
   \begin{tcolorbox}[colback=white]
     % gradual_test_11.rkt
+{\if\edition\racketEd
 \begin{lstlisting}
-(define (map! [f : (Any -> Any)]
+(define (map_inplace [f : (Any -> Any)]
                   [v : (Vector Any Any)]) : Void
   (begin
     (vector-set! v 0 (f (vector-ref v 0)))
@@ -19333,8 +19572,25 @@ and not the original one.
 (define (inc x) (+ x 1))
 
 (let ([v (vector 0 41)])
-  (begin (map! inc v) (vector-ref v 1)))
+  (begin (map_inplace inc v) (vector-ref v 1)))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+def map_inplace(f : Callable[[Any], Any], v : list[Any]) -> None:
+  i = 0
+  while i != len(v):
+    v[i] = f(v[i])
+    i = i + 1
+
+def inc(x):
+    return x + 1
+
+v = [0, 41]
+map_inplace(inc, v)
+print( v[1] )
+\end{lstlisting}
+\fi}
   \end{tcolorbox}
 
   \caption{An example involving casts on vectors.}
@@ -19342,31 +19598,43 @@ and not the original one.
 \end{figure}
 
 Instead the interpreter needs to create a new kind of value, a
-\emph{tuple proxy}, that intercepts every tuple operation. On a
-read, the proxy reads from the underlying tuple and then applies a
+\emph{proxy}, that intercepts every \racket{tuple}\python{list} operation.
+On a read, the proxy reads from the underlying \racket{tuple}\python{list}
+and then applies a
 cast to the resulting value.  On a write, the proxy casts the argument
-value and then performs the write to the underlying tuple. For the
-first \code{(vector-ref v 0)} in \code{map!}, the proxy casts
-\code{0} from \code{Integer} to \CANYTY{}.  For the first
-\code{vector-set!}, the proxy casts a tagged \code{1} from \CANYTY{}
-to \code{Integer}.
+value and then performs the write to the underlying tuple.
+\racket{
+For the first \code{(vector-ref v 0)} in \code{map\_inplace}, the proxy casts
+\code{0} from \code{Integer} to \CANYTY{}.
+For the first \code{vector-set!}, the proxy casts a tagged \code{1}
+from \CANYTY{} to \code{Integer}.
+}
+\python{
+  For the subscript \code{v[i]} in \code{f([v[i])} of \code{map\_inplace},
+  the proxy casts integer from \INTTY{} to \CANYTY{}.
+  Then for the subscript on the left of the assignment,
+  the proxy casts the tagged value from from \CANYTY{} to \INTTY{}.
+}
 
 The final category of cast that we need to consider are casts between
-the \CANYTY{} type and either a function or a tuple
-type. Figure~\ref{fig:map-any} shows a variant of \code{map!}
-in which parameter \code{v} does not have a type annotation, so it is
-given type \CANYTY{}. In the call to \code{map!}, the tuple has
-type \code{(Vector Integer Integer)} so the type checker inserts a
-cast from \code{(Vector Integer Integer)} to \CANYTY{}. A first
-thought is to use \code{Inject}, but that doesn't work because
-\code{(Vector Integer Integer)} is not a flat type. Instead, we must
-first cast to \code{(Vector Any Any)} (which is flat) and then inject
-to \CANYTY{}.
+the \CANYTY{} type and higher-order types such as functions or
+\racket{tuples}\python{lists}. Figure~\ref{fig:map-any} shows a
+variant of \code{map\_inplace} in which parameter \code{v} does not
+have a type annotation, so it is given type \CANYTY{}. In the call to
+\code{map\_inplace}, the \racket{tuple}\python{list} has type
+\racket{\code{(Vector Integer Integer)}}\python{\code{list[int]}}
+so the type checker inserts a cast to \CANYTY{}. A first thought is to use
+\code{Inject}, but that doesn't work because
+\racket{\code{(Vector Integer Integer)}}\python{\code{list[int]}} is not
+a flat type. Instead, we must first cast to
+\racket{\code{(Vector Any Any)}}\python{\code{list[Any]}} (which is flat)
+and then inject to \CANYTY{}.
 
 \begin{figure}[tbp]
   \begin{tcolorbox}[colback=white]
+{\if\edition\racketEd
 \begin{lstlisting}
-(define (map! [f : (Any -> Any)] v) : Void
+(define (map_inplace [f : (Any -> Any)] v) : Void
   (begin
     (vector-set! v 0 (f (vector-ref v 0)))
     (vector-set! v 1 (f (vector-ref v 1)))))
@@ -19374,23 +19642,41 @@ to \CANYTY{}.
 (define (inc x) (+ x 1))
 
 (let ([v (vector 0 41)])
-  (begin (map! inc v) (vector-ref v 1)))
+  (begin (map_inplace inc v) (vector-ref v 1)))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}
+def map_inplace(f : Callable[[Any], Any], v) -> None:
+  i = 0
+  while i != len(v):
+    v[i] = f(v[i])
+    i = i + 1
+
+def inc(x):
+    return x + 1
+
+v v = [0, 41]
+map_inplace(inc, v)
+print( v[1] )
+\end{lstlisting}
+\fi}
   \end{tcolorbox}
 
-  \caption{Casting a tuple to \CANYTY{}.}
+  \caption{Casting a \racket{tuple}\python{list} to \CANYTY{}.}
 \label{fig:map-any}
 \end{figure}
 
 The \LangCast{} interpreter uses an auxiliary function named
-\code{apply-cast} to cast a value from a source type to a target type,
-shown in Figure~\ref{fig:apply-cast}. You'll find that it handles all
+\code{apply\_cast} to cast a value from a source type to a target type,
+shown in Figure~\ref{fig:apply_cast}. You'll find that it handles all
 of the kinds of casts that we've discussed in this section.
 
 \begin{figure}[tbp]
-\begin{tcolorbox}[colback=white]  
+  \begin{tcolorbox}[colback=white]
+{\if\edition\racketEd    
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-(define/public (apply-cast v s t)
+(define/public (apply_cast v s t)
   (match* (s t)
     [(t1 t2) #:when (equal? t1 t2) v]
     [('Any t2) 
@@ -19398,21 +19684,21 @@ of the kinds of casts that we've discussed in this section.
        [`(,ts ... -> ,rt)
         (define any->any `(,@(for/list ([t ts]) 'Any) -> Any))
         (define v^ (apply-project v any->any))
-        (apply-cast v^ any->any `(,@ts -> ,rt))]
+        (apply_cast v^ any->any `(,@ts -> ,rt))]
        [`(Vector ,ts ...)
         (define vec-any `(Vector ,@(for/list ([t ts]) 'Any)))
         (define v^ (apply-project v vec-any))
-        (apply-cast v^ vec-any `(Vector ,@ts))]
+        (apply_cast v^ vec-any `(Vector ,@ts))]
        [else (apply-project v t2)])]
     [(t1 'Any) 
      (match t1
        [`(,ts ... -> ,rt)
         (define any->any `(,@(for/list ([t ts]) 'Any) -> Any))
-        (define v^ (apply-cast v `(,@ts -> ,rt) any->any))
+        (define v^ (apply_cast v `(,@ts -> ,rt) any->any))
         (apply-inject v^ (any-tag any->any))]
        [`(Vector ,ts ...)
         (define vec-any `(Vector ,@(for/list ([t ts]) 'Any)))
-        (define v^ (apply-cast v `(Vector ,@ts) vec-any))
+        (define v^ (apply_cast v `(Vector ,@ts) vec-any))
         (apply-inject v^ (any-tag vec-any))]
        [else (apply-inject v (any-tag t1))])]
     [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))
@@ -19433,19 +19719,26 @@ of the kinds of casts that we've discussed in this section.
                       rt1 rt2) ())]
     ))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+UNDER CONSTRUCTION
+\end{lstlisting}
+\fi}
 \end{tcolorbox}
-\caption{The \code{apply-cast} auxiliary method.}
-  \label{fig:apply-cast}
+\caption{The \code{apply\_cast} auxiliary method.}
+  \label{fig:apply_cast}
 \end{figure}
 
 The interpreter for \LangCast{} is defined in
 Figure~\ref{fig:interp-Lcast}, with the case for \code{Cast}
-dispatching to \code{apply-cast}. To handle the addition of tuple
+dispatching to \code{apply\_cast}. To handle the addition of tuple
 proxies, we update the tuple primitives in \code{interp-op} using the
 functions in Figure~\ref{fig:guarded-tuple}.
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]  
+{\if\edition\racketEd    
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define interp-Lcast-class
   (class interp-Llambda-class
@@ -19473,13 +19766,19 @@ functions in Figure~\ref{fig:guarded-tuple}.
       (define (recur e) ((interp-exp env) e))
       (match e
         [(Value v) v]
-        [(Cast e src tgt) (apply-cast (recur e) src tgt)]
+        [(Cast e src tgt) (apply_cast (recur e) src tgt)]
         [else ((super interp-exp env) e)]))
     ))
 
 (define (interp-Lcast p)
   (send (new interp-Lcast-class) interp-program p))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+UNDER CONSTRUCTION
+\end{lstlisting}
+\fi}
 \end{tcolorbox}
 
 \caption{The interpreter for \LangCast{}.}
@@ -19489,6 +19788,7 @@ functions in Figure~\ref{fig:guarded-tuple}.
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]  
+{\if\edition\racketEd    
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
     (define (guarded-vector-ref vec i)
       (match vec
@@ -19512,6 +19812,12 @@ functions in Figure~\ref{fig:guarded-tuple}.
          (guarded-vector-length (vector-ref proxy 0))]
         [else (vector-length vec)]))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+UNDER CONSTRUCTION
+\end{lstlisting}
+\fi}
 \end{tcolorbox}
 
 \caption{The \code{guarded-vector} auxiliary functions.}
@@ -19520,9 +19826,9 @@ functions in Figure~\ref{fig:guarded-tuple}.
 
 
 \section{Lower Casts}
-\label{sec:lower-casts}
+\label{sec:lower_casts}
 
-The next step in the journey towards x86 is the \code{lower-casts}
+The next step in the journey towards x86 is the \code{lower\_casts}
 pass that translates the casts in \LangCast{} to the lower-level
 \code{Inject} and \code{Project} operators and a new operator for
 creating tuple proxies, extending the \LangLam{} language to create
@@ -19533,10 +19839,10 @@ the same behavior as casting the expression from the source to the
 target type in the interpreter.
 
 The \code{lower-cast} function can follow a code structure similar to
-the \code{apply-cast} function (Figure~\ref{fig:apply-cast}) used in
+the \code{apply\_cast} function (Figure~\ref{fig:apply_cast}) used in
 the interpreter for \LangCast{} because it must handle the same cases as
-\code{apply-cast} and it needs to mimic the behavior of
-\code{apply-cast}. The most interesting cases are those concerning the
+\code{apply\_cast} and it needs to mimic the behavior of
+\code{apply\_cast}. The most interesting cases are those concerning the
 casts between two tuple types and between two function types.
 
 As mentioned in Section~\ref{sec:interp-casts}, a cast from one tuple
@@ -19552,14 +19858,15 @@ see in the next section, we need to differentiate these tuples from
 the user-created ones, so we recommend using a new primitive operator
 named \code{raw-vector} instead of \code{vector} to create these
 tuples of functions. Figure~\ref{fig:map-bang-lower-cast} shows
-the output of \code{lower-casts} on the example in
+the output of \code{lower\_casts} on the example in
 Figure~\ref{fig:map-bang} that involved casting a tuple of
 integers to a tuple of \CANYTY{}.
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]  
+{\if\edition\racketEd    
 \begin{lstlisting}
-(define (map! [f : (Any -> Any)] [v : (Vector Any Any)]) : Void
+(define (map_inplace [f : (Any -> Any)] [v : (Vector Any Any)]) : Void
    (begin 
       (vector-set! v 0 (f (vector-ref v 0)))
       (vector-set! v 1 (f (vector-ref v 1)))))
@@ -19569,7 +19876,7 @@ integers to a tuple of \CANYTY{}.
 
 (let ([v (vector 0 41)])
    (begin 
-      (map! inc (vector-proxy v
+      (map_inplace inc (vector-proxy v
                         (raw-vector (lambda: ([x9 : Integer]) : Any
                                        (inject x9 Integer))
                                      (lambda: ([x9 : Integer]) : Any
@@ -19580,9 +19887,15 @@ integers to a tuple of \CANYTY{}.
                                        (project x9 Integer)))))
       (vector-ref v 1)))
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+UNDER CONSTRUCTION
+\end{lstlisting}
+\fi}
 \end{tcolorbox}
 
-\caption{Output of \code{lower-casts} on the example in
+\caption{Output of \code{lower\_casts} on the example in
   Figure~\ref{fig:map-bang}.}
 \label{fig:map-bang-lower-cast}
 \end{figure}
@@ -19595,12 +19908,13 @@ backwards! Functions are contravariant\index{subject}{contravariant}
 in the parameters.). Afterwards, call the underlying function and then
 cast the result from the source return type to the target return type.
 Figure~\ref{fig:map-lower-cast} shows the output of the
-\code{lower-casts} pass on the \code{map} example in
+\code{lower\_casts} pass on the \code{map} example in
 Figure~\ref{fig:gradual-map}. Note that the \code{inc} argument in the
 call to \code{map} is wrapped in a \code{lambda}.
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]  
+{\if\edition\racketEd    
 \begin{lstlisting}
 (define (map [f : (Integer -> Integer)]
                    [v : (Vector Integer Integer)])
@@ -19614,9 +19928,15 @@ call to \code{map} is wrapped in a \code{lambda}.
                         (project (inc (inject x9 Integer)) Integer))
                       (vector 0 41)) 1)
 \end{lstlisting}
+\fi}
+{\if\edition\pythonEd
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+UNDER CONSTRUCTION
+\end{lstlisting}
+\fi}
 \end{tcolorbox}
 
-\caption{Output of \code{lower-casts} on the example in
+\caption{Output of \code{lower\_casts} on the example in
   Figure~\ref{fig:gradual-map}.}
 \label{fig:map-lower-cast}
 \end{figure}
