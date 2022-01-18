@@ -13168,10 +13168,20 @@ an array:
 In the following subsections we provide hints regarding how to update
 the passes to handle arrays.
 
+\subsection{Shrink}
+
+Translate calls to \racket{\code{vector-length}}\python{\code{len}}
+into a primitive specific to arrays, \racket{\code{vectorof-length}}\python{\code{array\_len}},
+when the argument's type is \CARRAYTY{T}.
+%
+\python{The type checker for \LangArray{} adds a \code{has\_type}
+  field to the argument of \code{len} for this purpose.}
+
+
 \subsection{Bounds Checking}
 
 We recommend inserting a new pass named \code{check\_bounds} that
-inserts code around each the \racket{\code{vector-ref} and \code{vector-set!}}
+inserts code around each \racket{\code{vector-ref} and \code{vector-set!}}
 \python{subscript} operation to ensure that the index is greater than or equal to zero
 and less than the array's length.
 
@@ -13209,16 +13219,13 @@ and less than the array's length.
 
 \subsection{Expose Allocation}
 
-This pass should translate the \code{make-vector} operator into
-lower-level operations. In particular, the new AST node
-$\LP\key{AllocateArray}~\Exp~\Type\RP$ is analogous to the
-\code{Allocate} AST node for tuples.  It allocates an array of the
-length specified by the $\Exp$, but does not initialize the elements
-of the array. The $\Type$ argument must be $\LP\key{Vectorof}~T\RP$
-where $T$ is the element type for the array. Regarding the
-initialization of the array, we recommend generated a \code{while}
-loop that uses \code{vector-set!} to put the initializing value into
-every element of the array.
+This pass should translate array creation into lower-level
+operations. In particular, the new AST node \ALLOCARRAY{\Exp}{\Type}
+is analogous to the \code{Allocate} AST node for tuples.  The $\Type$
+argument must be \ARRAYTY{T} where $T$ is the element type for the
+array. The \code{AllocateArray} AST node allocates an array of the
+length specified by the $\Exp$ but does not initialize the elements of
+the array. Generate code in this pass to initialize the elements.
 
 \subsection{Remove Complex Operands}
 
@@ -13238,16 +13245,16 @@ Generate instructions for \code{AllocateArray} similar to those for
 that the tag at the front of the array should instead use the
 representation discussed in Section~\ref{sec:array-rep}.
 
-Regarding \code{vectorof-length}, extract the length from the tag
-according to the representation discussed in
+Regarding \racket{\code{vectorof-length}}\python{\code{array\_len}},
+extract the length from the tag according to the representation discussed in
 Section~\ref{sec:array-rep}.
 
-The instructions generated for \code{vectorof-ref} differ from those
-for \code{vector-ref} (Section~\ref{sec:select-instructions-gc}) in
+The instructions generated for accessing an element of an array differ
+from those for a tuple (Section~\ref{sec:select-instructions-gc}) in
 that the index is not a constant so the offset must be computed at
-runtime. The same is true for \code{vectorof-set!}.  Also, the
-\code{vectorof-set!} may appear in an assignment and as a stand-alone
-statement, so make sure to handle both situations in this pass.
+runtime. Also, note that assignment to an array element may appear in
+as a stand-alone statement, so make sure to handle that situation in
+this pass.
 
 %% Finally, the instructions for \code{any-vectorof-length} should be
 %% similar to those for \code{vectorof-length}, except that one must
