@@ -26,7 +26,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{0}
+\def\edition{1}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd{#1}\fi}}
@@ -19519,8 +19519,8 @@ defines a partially-typed version of \code{map} whose parameter
 \racket{\code{(Vector Any Any)}}\python{\code{list[Any]}}
 and that updates \code{v} in place
 instead of returning a new tuple. So we name this function
-\code{map\_inplace}. We apply \code{map\_inplace} to a
-\racket{tuple}\python{list} of integers, so the type checker inserts a
+\code{map\_inplace}. We apply \code{map\_inplace} to an
+\racket{tuple}\python{array} of integers, so the type checker inserts a
 cast from
 \racket{\code{(Vector Integer Integer)}}
 \python{\code{list[int]}}
@@ -19528,15 +19528,15 @@ to
 \racket{\code{(Vector Any Any)}}
 \python{\code{list[Any]}}.
 A naive way for the \LangCast{} interpreter to cast between
-\racket{tuple}\python{list} types would be a build a new
-\racket{tuple}\python{list}
+\racket{tuple}\python{array} types would be a build a new
+\racket{tuple}\python{array}
 whose elements are the result
 of casting each of the original elements to the appropriate target
 type.
 However, this approach is not valid for mutable data structures.
 In the example of Figure~\ref{fig:map-bang},
-if the cast created a new \racket{tuple}\python{list}, then the updates inside of
-\code{map\_inplace} would happen to the new \racket{tuple}\python{list} and not
+if the cast created a new \racket{tuple}\python{array}, then the updates inside of
+\code{map\_inplace} would happen to the new \racket{tuple}\python{array} and not
 the original one.
 
 \begin{figure}[tbp]
@@ -19558,13 +19558,13 @@ the original one.
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
-def map_inplace(f : Callable[[Any], Any], v : list[Any]) -> None:
+def map_inplace(f : Callable[[int], int], v : list[Any]) -> None:
   i = 0
   while i != len(v):
     v[i] = f(v[i])
     i = i + 1
 
-def inc(x):
+def inc(x : int) -> int:
     return x + 1
 
 v = [0, 41]
@@ -19579,11 +19579,11 @@ print( v[1] )
 \end{figure}
 
 Instead the interpreter needs to create a new kind of value, a
-\emph{proxy}, that intercepts every \racket{tuple}\python{list} operation.
-On a read, the proxy reads from the underlying \racket{tuple}\python{list}
+\emph{proxy}, that intercepts every \racket{tuple}\python{array} operation.
+On a read, the proxy reads from the underlying \racket{tuple}\python{array}
 and then applies a
 cast to the resulting value.  On a write, the proxy casts the argument
-value and then performs the write to the underlying tuple.
+value and then performs the write to the underlying \racket{tuple}\python{array}.
 \racket{
 For the first \code{(vector-ref v 0)} in \code{map\_inplace}, the proxy casts
 \code{0} from \INTTY{} to \CANYTY{}.
@@ -19592,8 +19592,8 @@ from \CANYTY{} to \INTTY{}.
 }
 \python{
   For the subscript \code{v[i]} in \code{f([v[i])} of \code{map\_inplace},
-  the proxy casts integer from \INTTY{} to \CANYTY{}.
-  Then for the subscript on the left of the assignment,
+  the proxy casts the integer from \INTTY{} to \CANYTY{}.
+  For the subscript on the left of the assignment,
   the proxy casts the tagged value from from \CANYTY{} to \INTTY{}.
 }
 
@@ -19644,7 +19644,7 @@ print( v[1] )
 \fi}
   \end{tcolorbox}
 
-  \caption{Casting a \racket{tuple}\python{list} to \CANYTY{}.}
+  \caption{Casting an \racket{tuple}\python{array} to \CANYTY{}.}
 \label{fig:map-any}
 \end{figure}
 
@@ -19703,7 +19703,64 @@ of the kinds of casts that we've discussed in this section.
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-UNDER CONSTRUCTION
+  def apply_cast(self, value, src, tgt):
+    match (src, tgt):
+      case (AnyType(), FunctionType(ps2, rt2)):
+        anyfun = FunctionType([AnyType() for p in ps2], AnyType())
+        return self.apply_cast(self.apply_project(value, anyfun), anyfun, tgt)
+      case (AnyType(), TupleType(ts2)):
+        anytup = TupleType([AnyType() for t1 in ts2])
+        return self.apply_cast(self.apply_project(value, anytup), anytup, tgt)
+      case (AnyType(), ListType(t2)):
+        anylist = ListType([AnyType() for t1 in ts2])
+        return self.apply_cast(self.apply_project(value, anylist), anylist, tgt)
+      case (AnyType(), AnyType()):
+        return value
+      case (AnyType(), _):
+        return self.apply_project(value, tgt)
+      case (FunctionType(ps1,rt1), AnyType()):
+        anyfun = FunctionType([AnyType() for p in ps1], AnyType())
+        return self.apply_inject(self.apply_cast(value, src, anyfun), anyfun)
+      case (TupleType(ts1), AnyType()):
+        anytup = TupleType([AnyType() for t1 in ts1])
+        return self.apply_inject(self.apply_cast(value, src, anytup), anytup)
+      case (ListType(t1), AnyType()):
+        anylist = ListType(AnyType())
+        return self.apply_inject(self.apply_cast(value,src,anylist), anylist)
+      case (_, AnyType()):
+        return self.apply_inject(value, src)
+      case (FunctionType(ps1, rt1), FunctionType(ps2, rt2)):
+        params = [generate_name('x') for p in ps2]
+        args = [Cast(Name(x), t2, t1)
+                for (x,(t1,t2)) in zip(params, zip(ps1, ps2))]
+        body = Cast(Call(ValueExp(value), args), rt1, rt2)
+        return Function('cast', params, [Return(body)], {})
+      case (TupleType(ts1), TupleType(ts2)):
+        x = generate_name('x')
+        reads = [Function('cast', [x], [Return(Cast(Name(x), t1, t2))], {})
+                 for (t1,t2) in zip(ts1,ts2)]
+        writes = [Function('cast', [x], [Return(Cast(Name(x), t2, t1))], {})
+                  for (t1,t2) in zip(ts1,ts2)]
+        return ProxiedTuple(value, reads, writes)
+      case (ListType(t1), ListType(t2)):
+        x = generate_name('x')
+        read = Function('cast', [x], [Return(Cast(Name(x), t1, t2))], {})
+        write = Function('cast', [x], [Return(Cast(Name(x), t2, t1))], {})
+        return ProxiedList(value, read, write)
+      case (t1, t2) if t1 == t2:
+        return value
+      case (t1, t2):
+        raise Exception('apply_cast unexpected ' + repr(src) + ' ' + repr(tgt))
+
+  def apply_inject(self, value, src):
+    return Tagged(value, self.type_to_tag(src))
+
+  def apply_project(self, value, tgt):
+        match value:
+          case Tagged(val, tag) if self.type_to_tag(tgt) == tag:
+            return val
+          case _:
+            raise Exception('apply_project, unexpected ' + repr(value))
 \end{lstlisting}
 \fi}
 \end{tcolorbox}
@@ -19713,9 +19770,10 @@ UNDER CONSTRUCTION
 
 The interpreter for \LangCast{} is defined in
 Figure~\ref{fig:interp-Lcast}, with the case for \code{Cast}
-dispatching to \code{apply\_cast}. To handle the addition of tuple
+dispatching to \code{apply\_cast}.
+\racket{To handle the addition of tuple
 proxies, we update the tuple primitives in \code{interp-op} using the
-functions in Figure~\ref{fig:guarded-tuple}.
+functions in Figure~\ref{fig:guarded-tuple}.}
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]  
@@ -19757,7 +19815,18 @@ functions in Figure~\ref{fig:guarded-tuple}.
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-UNDER CONSTRUCTION
+class InterpLcast(InterpLany):
+
+  def interp_exp(self, e, env):
+    match e:
+      case Cast(value, src, tgt):
+        v = self.interp_exp(value, env)
+        return self.apply_cast(v, src, tgt)
+      case ValueExp(value):
+        return value
+      ...
+      case _:
+        return super().interp_exp(e, env)
 \end{lstlisting}
 \fi}
 \end{tcolorbox}
@@ -19767,9 +19836,9 @@ UNDER CONSTRUCTION
 \end{figure}
 
 
+{\if\edition\racketEd    
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]  
-{\if\edition\racketEd    
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
     (define (guarded-vector-ref vec i)
       (match vec
@@ -19793,17 +19862,17 @@ UNDER CONSTRUCTION
          (guarded-vector-length (vector-ref proxy 0))]
         [else (vector-length vec)]))
 \end{lstlisting}
-\fi}
-{\if\edition\pythonEd
-\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-UNDER CONSTRUCTION
-\end{lstlisting}
-\fi}
+%% {\if\edition\pythonEd
+%% \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+%% UNDER CONSTRUCTION
+%% \end{lstlisting}
+%% \fi}
 \end{tcolorbox}
 
 \caption{The \code{guarded-vector} auxiliary functions.}
   \label{fig:guarded-tuple}
 \end{figure}
+\fi}
 
 
 \section{Lower Casts}
@@ -19873,7 +19942,20 @@ integers to a tuple of \CANYTY{}.
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-UNDER CONSTRUCTION
+def map_inplace(f : Callable[[int], int], v : list[Any]) -> void:
+  i = 0
+  while i != array_len(v):
+    array_store(v, i, inject(f(project(array_load(v, i), int)), int))
+    i = (i + 1)
+
+def inc(x : int) -> int:
+  return (x + 1)
+
+def main() -> int:
+  v = [0, 41]
+  map_inplace(inc, array_proxy(v, list[int], list[Any]))
+  print(array_load(v, 1))
+  return 0
 \end{lstlisting}
 \fi}
 \end{tcolorbox}
@@ -19914,7 +19996,16 @@ call to \code{map} is wrapped in a \code{lambda}.
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-UNDER CONSTRUCTION
+def map(f : Callable[[int], int], v : tuple[int,int]) -> tuple[int,int]:
+  return (f(v[0]), f(v[1]),)
+
+def inc(x : any) -> any:
+  return inject((project(x, int) + 1), int)
+
+def main() -> int:
+  t = map(lambda x: project(inc(inject(x, int)), int), (0, 41,))
+  print(t[1])
+  return 0
 \end{lstlisting}
 \fi}
 \end{tcolorbox}
@@ -19929,19 +20020,24 @@ UNDER CONSTRUCTION
 \label{sec:differentiate-proxies}
 
 So far the job of differentiating tuples and tuple proxies has been
-the job of the interpreter. For example, the interpreter for \LangCast{}
+the job of the interpreter.
+\racket{For example, the interpreter for \LangCast{}
 implements \code{vector-ref} using the \code{guarded-vector-ref}
-function in Figure~\ref{fig:guarded-tuple}.  In the
-\code{differentiate-proxies} pass we shift this responsibility to the
-generated code.
+function in Figure~\ref{fig:guarded-tuple}.}
+In the \code{differentiate\_proxies} pass we shift this responsibility
+to the generated code.
 
-We begin by designing the output language \LangPVec.  In
-\LangGrad{} we used the type \code{Vector} for both real tuples and tuple
-proxies. In \LangPVec we return the \code{Vector} type to
-its original meaning, as the type of real tuples, and we introduce a
-new type, \code{PVector}, whose values can be either real tuples or
-tuple proxies. This new type comes with a suite of new primitive
-operations for creating and using values of type \code{PVector}.
+We begin by designing the output language \LangPVec.  In \LangGrad{}
+we used the type \racket{\code{Vector}}\python{\code{tuple}} for both
+real tuples and tuple proxies\python{ and similarly for \code{list} types}.
+In \LangPVec we return the
+\racket{\code{Vector}}\python{\code{tuple}} type to its original
+meaning, as the type of real tuples, and we introduce a new type,
+\racket{\code{PVector}}\python{\code{ProxyOrTupleType}}, whose values
+can be either real tuples or tuple
+proxies. 
+for creating and using values of type \code{PVector}.
+This new type comes with a suite of new primitive operations
 %We don't need to introduce a new type to represent tuple proxies.
 A proxy is represented by a tuple containing three things: 1) the
 underlying tuple, 2) a tuple of functions for casting elements that
@@ -19950,8 +20046,7 @@ values to be written to the tuple. So we define the following
 abbreviation for the type of a tuple proxy:
 \[
 \itm{Proxy} (T\ldots \Rightarrow T'\ldots)
-= (\ttm{Vector}~(\ttm{PVector}~ T\ldots) ~R~ W)
-  \to (\key{PVector}~ T' \ldots)
+= (\ttm{Vector}~\PTUPLETY{T\ldots} ~R~ W) \to \PTUPLETY{T' \ldots})
 \]
 where $R = (\ttm{Vector}~(T\to T') \ldots)$ and
 $W = (\ttm{Vector}~(T'\to T) \ldots)$.
@@ -19994,6 +20089,11 @@ Next we describe each of the new primitive operations.
   Given a tuple proxy, this operation writes a value to the $i$th element
   of the tuple.
 \end{description}
+
+\python{
+  Similarly, we introduce the \code{ProxyOrListType} for arrays.
+  UNDER CONSTRUCTION
+}
 
 Now to discuss the translation that differentiates tuples from
 proxies. First, every type annotation in the program is translated
