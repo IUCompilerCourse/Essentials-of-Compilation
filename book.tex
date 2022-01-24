@@ -12753,8 +12753,8 @@ for tuples become overloaded for use with arrays.}
 \python{
 The subscript operator becomes overloaded for use with arrays and tuples
 and now may appear on the left-hand side of an assignment.
-Note that the index of the subscript may be an arbitrary expression
-and not just a constant integers.
+Note that the index of the subscript, when applied to an array, may be an
+arbitrary expression and not just a constant integer.
 The \code{len} function is also applicable to arrays.
 }
 %
@@ -13170,14 +13170,30 @@ an array:
 In the following subsections we provide hints regarding how to update
 the passes to handle arrays.
 
-\subsection{Shrink}
+\subsection{Type-based Resolution}
 
+As noted above, with the addition of arrays, several operators have
+become \emph{overloaded}, that is, they can be applied to values of
+more than one type. In this case, the element access and \code{len}
+operators can be applied to both tuples and arrays. This kind of
+overloading is quite common in programming languages, so many
+compilers perform \emph{overload resolution}\index{subject}{overload resolution}
+to handle it. The idea is to translate each overloaded
+operator into different operators for the different types.
+
+Implement a new pass named \code{resolve}. 
+Translate the reading of an array element
+into a call to
+\racket{\code{vectorof-ref}}\python{\code{array\_load}}
+and the writing of an array element to
+\racket{\code{vectorof-set!}}\python{\code{array\_store}}
 Translate calls to \racket{\code{vector-length}}\python{\code{len}}
-into a primitive specific to arrays, \racket{\code{vectorof-length}}\python{\code{array\_len}},
-when the argument's type is \CARRAYTY{T}.
+into \racket{\code{vectorof-length}}\python{\code{array\_len}}.
+When these operators are applied to tuples, leave them as-is.
 %
 \python{The type checker for \LangArray{} adds a \code{has\_type}
-  field to the argument of \code{len} for this purpose.}
+  field which can be inspected to determine whether the operator
+  is applied to a tuple or an array.}
 
 
 \subsection{Bounds Checking}
@@ -13254,9 +13270,11 @@ Section~\ref{sec:array-rep}.
 The instructions generated for accessing an element of an array differ
 from those for a tuple (Section~\ref{sec:select-instructions-gc}) in
 that the index is not a constant so the offset must be computed at
-runtime. Also, note that assignment to an array element may appear in
-as a stand-alone statement, so make sure to handle that situation in
-this pass.
+runtime.
+
+%% Also, note that assignment to an array element may appear in
+%% as a stand-alone statement, so make sure to handle that situation in
+%% this pass.
 
 %% Finally, the instructions for \code{any-vectorof-length} should be
 %% similar to those for \code{vectorof-length}, except that one must
