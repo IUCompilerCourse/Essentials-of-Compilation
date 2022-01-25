@@ -13190,7 +13190,8 @@ an array:
 In the following subsections we provide hints regarding how to update
 the passes to handle arrays.
 
-\subsection{Type-based Resolution}
+\subsection{Overload Resolution}
+\label{sec:array-resolution}
 
 As noted above, with the addition of arrays, several operators have
 become \emph{overloaded}, that is, they can be applied to values of
@@ -19648,11 +19649,6 @@ print( v[1] )
 \label{fig:map-any}
 \end{figure}
 
-The \LangCast{} interpreter uses an auxiliary function named
-\code{apply\_cast} to cast a value from a source type to a target type,
-shown in Figure~\ref{fig:apply_cast}. You'll find that it handles all
-of the kinds of casts that we've discussed in this section.
-
 \begin{figure}[tbp]
   \begin{tcolorbox}[colback=white]
 {\if\edition\racketEd    
@@ -19768,12 +19764,19 @@ of the kinds of casts that we've discussed in this section.
   \label{fig:apply_cast}
 \end{figure}
 
+The \LangCast{} interpreter uses an auxiliary function named
+\code{apply\_cast} to cast a value from a source type to a target type,
+shown in Figure~\ref{fig:apply_cast}. You'll find that it handles all
+of the kinds of casts that we've discussed in this section.
+%
 The interpreter for \LangCast{} is defined in
 Figure~\ref{fig:interp-Lcast}, with the case for \code{Cast}
 dispatching to \code{apply\_cast}.
 \racket{To handle the addition of tuple
 proxies, we update the tuple primitives in \code{interp-op} using the
 functions in Figure~\ref{fig:guarded-tuple}.}
+Next we turn to the individual passes needed for compiling \LangGrad{}.
+
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]  
@@ -19874,19 +19877,85 @@ class InterpLcast(InterpLany):
 \end{figure}
 \fi}
 
+{\if\edition\pythonEd
+\section{Overload Resolution}
+\label{sec:gradual-resolution}
+
+Recall that when we added support for arrays in
+Section~\ref{sec:arrays}, the syntax for the array operations were the
+same as for tuple operations (e.g., accessing an element, getting the
+length). So we performed overload resolution, with a pass named
+\code{resolve}, to separate the array and tuple operations.  In
+particular, we introduced the primitives \code{array\_load},
+\code{array\_store}, and \code{array\_len}.
+
+For gradual typing, we further overload these operators to work on
+values of type \CANYTY{}. Thus, the \code{resolve} pass should be
+updated with new cases for the \CANYTY{} type, translating the element
+access and length operations to the primitives \code{any\_load},
+\code{any\_store}, and \code{any\_len}.
+
+
+\section{Cast Insertion}
+\label{sec:gradual-insert-casts}
+
+In our discussion of type checking of \LangGrad{}, we mentioned how
+the runtime aspect of type checking is carried out by the \code{Cast}
+AST node, which is added to the program by a new pass named
+\code{cast\_insert}. The target of this pass is the \LangCast{}
+language.  We now discuss the details of this pass.
+
+The \code{cast\_insert} pass is closely related to the type checker
+for \LangGrad{} (starting in Figure~\ref{fig:type-check-Lgradual-1}).
+In particular, the type checker allows implicit casts between
+consistent types. The job of the \code{cast\_insert} pass is to make
+those into explicit casts. This is accomplished by inserting
+\code{Cast} nodes into the AST.
+%
+For the most part, the implicit casts occur in places where the type
+checker checks two types for consistenty.  Consider the case for
+binary operators in Figure~\ref{fig:type-check-Lgradual-1}. The type
+checker requires that the type of the left operand is consistent with
+\INTTY{}. Thus, the \code{cast\_insert} pass should insert a
+\code{Cast} around the left operand, converting from its type to
+\INTTY{}. The story is similar for the right operand. Note that a cast
+is not always necessary, e.g., if the left operand already has type
+\INTTY{} then there is no need to insert a \code{Cast}.
+
+Some of the implicit casts are not as straightforward, such as the
+conditional expression. In Figure~\ref{fig:type-check-Lgradual-1} we
+see that the type checker requires that the two branches have
+consistent types and that type of the conditional expression is the
+join of the branches' types. In the target language \LangCast{}, the
+branches will need to have the same type as each other, and that type
+will be the type of the conditional expression. Thus, one must insert
+a \code{Cast} around each branch to convert from its type to the join
+type.
+
+The case for function call exhibits another interesting situation. If
+the function expression is of type \CANYTY{}, then it needs to be cast
+to a function type so that it can be used in a function call in
+\LangCast{}. Which function type should it be cast to? The parameter
+and return types are unknown, so we can simply use \CANYTY{} for all
+of them. Futhermore, in \LangCast{} the argument types will need to
+exactly match the parameter types, so we must cast all the arguments
+to type \CANYTY{} (if they are not already of that type).
+
+\fi}
+
 
 \section{Lower Casts}
 \label{sec:lower_casts}
 
 The next step in the journey towards x86 is the \code{lower\_casts}
 pass that translates the casts in \LangCast{} to the lower-level
-\code{Inject} and \code{Project} operators and a new operator for
-creating tuple proxies, extending the \LangLam{} language to create
-\LangProxy{}. We recommend creating an auxiliary function named
-\code{lower-cast} that takes an expression (in \LangCast{}), a source type,
-and a target type, and translates it to expression in \LangProxy{} that has
-the same behavior as casting the expression from the source to the
-target type in the interpreter.
+\code{Inject} and \code{Project} operators and new operators for
+proxies, extending the \LangLam{} language to create \LangProxy{}. We
+recommend creating an auxiliary function named \code{lower\_cast} that
+takes an expression (in \LangCast{}), a source type, and a target
+type, and translates it to expression in \LangProxy{} that has the
+same behavior as casting the expression from the source to the target
+type in the interpreter.
 
 The \code{lower\_cast} function can follow a code structure similar to
 the \code{apply\_cast} function (Figure~\ref{fig:apply_cast}) used in
