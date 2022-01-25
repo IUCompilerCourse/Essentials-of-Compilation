@@ -19735,9 +19735,7 @@ print( v[1] )
         x = generate_name('x')
         reads = [Function('cast', [x], [Return(Cast(Name(x), t1, t2))], {})
                  for (t1,t2) in zip(ts1,ts2)]
-        writes = [Function('cast', [x], [Return(Cast(Name(x), t2, t1))], {})
-                  for (t1,t2) in zip(ts1,ts2)]
-        return ProxiedTuple(value, reads, writes)
+        return ProxiedTuple(value, reads)
       case (ListType(t1), ListType(t2)):
         x = generate_name('x')
         read = Function('cast', [x], [Return(Cast(Name(x), t1, t2))], {})
@@ -19950,38 +19948,50 @@ to type \CANYTY{} (if they are not already of that type).
 The next step in the journey towards x86 is the \code{lower\_casts}
 pass that translates the casts in \LangCast{} to the lower-level
 \code{Inject} and \code{Project} operators and new operators for
-proxies, extending the \LangLam{} language to create \LangProxy{}. We
-recommend creating an auxiliary function named \code{lower\_cast} that
-takes an expression (in \LangCast{}), a source type, and a target
-type, and translates it to expression in \LangProxy{} that has the
-same behavior as casting the expression from the source to the target
-type in the interpreter.
+proxies, extending the \LangLam{} language to create \LangProxy{}.
+The \LangProxy{} language can also be described as an extension of
+\LangAny{}, with the addition of proxies. We recommend creating an
+auxiliary function named \code{lower\_cast} that takes an expression
+(in \LangCast{}), a source type, and a target type, and translates it
+to expression in \LangProxy{}.
 
 The \code{lower\_cast} function can follow a code structure similar to
 the \code{apply\_cast} function (Figure~\ref{fig:apply_cast}) used in
-the interpreter for \LangCast{} because it must handle the same cases as
-\code{apply\_cast} and it needs to mimic the behavior of
-\code{apply\_cast}. The most interesting cases are those concerning the
-casts between two tuple types and between two function types.
+the interpreter for \LangCast{} because it must handle the same cases
+as \code{apply\_cast} and it needs to mimic the behavior of
+\code{apply\_cast}. The most interesting cases are those concerning
+the casts involing tuple, array, and function types.
 
-As mentioned in Section~\ref{sec:interp-casts}, a cast from one tuple
-type to another tuple type is accomplished by creating a proxy that
-intercepts the operations on the underlying tuple. Here we make the
+As mentioned in Section~\ref{sec:interp-casts}, a cast from one array
+type to another array type is accomplished by creating a proxy that
+intercepts the operations on the underlying array. Here we make the
 creation of the proxy explicit with the
-\racket{\code{vector-proxy}}\python{\code{tuple\_proxy}}
-primitive operation. It takes three arguments, the first is an expression for
-the tuple, the second is a tuple of functions for casting an element
-that is being read from the tuple, and the third is a tuple of
-functions for casting an element that is being written to the tuple.
-You can create the functions using \code{Lambda}. Also, as we shall
-see in the next section, we need to differentiate these tuples from
-the user-created ones, so we recommend using a new primitive function
-named \racket{\code{raw-vector}}\python{\code{raw\_tuple}} instead of
-\racket{\code{vector}}\python{\code{Tuple}} to create these
-tuples of functions. Figure~\ref{fig:map-bang-lower-cast} shows
-the output of \code{lower\_casts} on the example in
-Figure~\ref{fig:map-bang} that involved casting a tuple of
-integers to a tuple of \CANYTY{}.
+\racket{\code{vectorof-proxy}}\python{\code{ListProxy}} AST node. It
+takes fives arguments, the first is an expression for the array, the
+second is a function for casting an element that is being read from
+the array, the third is a function for casting an element that is
+being written to the array, the fourth is the type of the underlying
+array, and the fifth is the type of the proxied array.  You can create
+the functions for reading and writing using lambda expressions.
+
+A cast between two tuple types can be handled in a similar manner.
+We create a proxy with the 
+\racket{\code{vector-proxy}}\python{\code{TupleProxy}} AST node.
+\python{Tuples are immutable, so there is no
+  need for a function to cast the value during a write.}
+Because there is a separate element type for each slot in the tuple,
+we need not just one function for casting during a read, but instead a tuple
+of functions.
+%
+Also, as we shall see in the next section, we need to differentiate
+these tuples from the user-created ones, so we recommend using a new
+AST node named \racket{\code{raw-vector}}\python{\code{RawTuple}}
+instead of \racket{\code{vector}}\python{\code{Tuple}} to create the
+tuples of functions.
+%
+Figure~\ref{fig:map-bang-lower-cast} shows the output of
+\code{lower\_casts} on the example in Figure~\ref{fig:map-bang} that
+involved casting an array of integers to an array of \CANYTY{}.
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]  
@@ -20035,8 +20045,8 @@ def main() -> int:
 \end{figure}
 
 A cast from one function type to another function type is accomplished
-by generating a \code{Lambda} whose parameter and return types match
-the target function type. The body of the \code{Lambda} should cast
+by generating a \code{lambda} whose parameter and return types match
+the target function type. The body of the \code{lambda} should cast
 the parameters from the target type to the source type. (Yes,
 backwards! Functions are contravariant\index{subject}{contravariant}
 in the parameters.). Afterwards, call the underlying function and then
