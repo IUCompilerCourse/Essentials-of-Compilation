@@ -18742,7 +18742,7 @@ The concrete syntax of \LangGrad{} is defined in
 Figure~\ref{fig:Lgrad-concrete-syntax} and its abstract syntax is
 defined in Figure~\ref{fig:Lgrad-syntax}. The main syntactic
 difference between \LangLam{} and \LangGrad{} is that type annotations
-optional, which is specified in the grammar using the \Param{} and
+are optional, which is specified in the grammar using the \Param{} and
 \itm{ret} non-terminals. In the abstract syntax, type annotations are
 not optional but we use the \CANYTY{} type when a type annotation is
 absent.
@@ -18917,7 +18917,7 @@ tuple. The \code{inc} function has type
 \racket{\code{(Any -> Any)}}\python{\code{Callable[[Any],Any]}}
 but parameter \code{f} of \code{map} has type
 \racket{\code{(Integer -> Integer)}}\python{\code{Callable[[int],int]}}.
-The type checker for \LangGrad{} allows this because the two types are
+The type checker for \LangGrad{} accepts this call because the two types are
 consistent.
 
 \begin{figure}[btp]
@@ -19531,11 +19531,11 @@ cast from \INTTY{} to \CANYTY{} can be accomplished with the
 tagged value (Figure~\ref{fig:interp-Lany}). Similarly, a cast from
 \CANYTY{} to \INTTY{} is accomplished with the \code{Project}
 operator, that is, by checking the value's tag and either retrieving
-the underlying integer or signaling an error if it the tag is not the
+the underlying integer or signalling an error if the tag is not the
 one for integers (Figure~\ref{fig:interp-Lany-aux}).
 %
-Things get more interesting casts involving function, tuple, or array
-types, that is, casts involving higher-order types.
+Things get more interesting for casts involving function, tuple, or array
+types.
 
 Consider the cast of the function \code{maybe\_inc} from
 \racket{\code{(Any -> Any)}}\python{\code{Callable[[Any], Any]}}
@@ -19546,8 +19546,8 @@ When the \code{maybe\_inc} function flows through
 this cast at runtime, we don't know whether it will return
 an integer, as that depends on the input from the user.
 The \LangCast{} interpreter therefore delays the checking
-of the cast until the function is applied. This is accomplished by
-wrapping \code{maybe\_inc} in a new function that casts its parameter
+of the cast until the function is applied. To do so it
+wraps \code{maybe\_inc} in a new function that casts its parameter
 from \INTTY{} to \CANYTY{}, applies \code{maybe\_inc}, and then
 casts the return value from \CANYTY{} to \INTTY{}.
 
@@ -19641,7 +19641,7 @@ from \CANYTY{} to \INTTY{}.
   For the subscript \code{v[i]} in \code{f([v[i])} of \code{map\_inplace},
   the proxy casts the integer from \INTTY{} to \CANYTY{}.
   For the subscript on the left of the assignment,
-  the proxy casts the tagged value from from \CANYTY{} to \INTTY{}.
+  the proxy casts the tagged value from \CANYTY{} to \INTTY{}.
 }
 
 The final category of cast that we need to consider are casts between
@@ -19953,30 +19953,30 @@ The \code{cast\_insert} pass is closely related to the type checker
 for \LangGrad{} (starting in Figure~\ref{fig:type-check-Lgradual-1}).
 In particular, the type checker allows implicit casts between
 consistent types. The job of the \code{cast\_insert} pass is to make
-those into explicit casts. This is accomplished by inserting
+those casts explicit. It does so by inserting
 \code{Cast} nodes into the AST.
 %
 For the most part, the implicit casts occur in places where the type
-checker checks two types for consistenty.  Consider the case for
+checker checks two types for consistency.  Consider the case for
 binary operators in Figure~\ref{fig:type-check-Lgradual-1}. The type
 checker requires that the type of the left operand is consistent with
 \INTTY{}. Thus, the \code{cast\_insert} pass should insert a
 \code{Cast} around the left operand, converting from its type to
-\INTTY{}. The story is similar for the right operand. Note that a cast
-is not always necessary, e.g., if the left operand already has type
-\INTTY{} then there is no need to insert a \code{Cast}.
+\INTTY{}. The story is similar for the right operand. It is not always
+necessary to insert a cast, e.g., if the left operand already has type
+\INTTY{} then there is no need for a \code{Cast}.
 
-Some of the implicit casts are not as straightforward, such as the
+Some of the implicit casts are not as straightforward. One such case
+arises with the
 conditional expression. In Figure~\ref{fig:type-check-Lgradual-1} we
 see that the type checker requires that the two branches have
 consistent types and that type of the conditional expression is the
-join of the branches' types. In the target language \LangCast{}, the
-branches will need to have the same type as each other, and that type
-will be the type of the conditional expression. Thus, one must insert
-a \code{Cast} around each branch to convert from its type to the join
-type.
+join of the branches' types. In the target language \LangCast{}, both
+branches will need to have the same type, and that type
+will be the type of the conditional expression. Thus, each branch requires
+a \code{Cast} to convert from its type to the join type.
 
-The case for function call exhibits another interesting situation. If
+The case for the function call exhibits another interesting situation. If
 the function expression is of type \CANYTY{}, then it needs to be cast
 to a function type so that it can be used in a function call in
 \LangCast{}. Which function type should it be cast to? The parameter
@@ -19994,7 +19994,7 @@ to type \CANYTY{} (if they are not already of that type).
 The next step in the journey towards x86 is the \code{lower\_casts}
 pass that translates the casts in \LangCast{} to the lower-level
 \code{Inject} and \code{Project} operators and new operators for
-proxies, extending the \LangLam{} language to create \LangProxy{}.
+proxies, extending the \LangLam{} language to \LangProxy{}.
 The \LangProxy{} language can also be described as an extension of
 \LangAny{}, with the addition of proxies. We recommend creating an
 auxiliary function named \code{lower\_cast} that takes an expression
@@ -20006,7 +20006,7 @@ the \code{apply\_cast} function (Figure~\ref{fig:apply_cast}) used in
 the interpreter for \LangCast{} because it must handle the same cases
 as \code{apply\_cast} and it needs to mimic the behavior of
 \code{apply\_cast}. The most interesting cases are those concerning
-the casts involing tuple, array, and function types.
+the casts involving tuple, array, and function types.
 
 As mentioned in Section~\ref{sec:interp-casts}, a cast from one array
 type to another array type is accomplished by creating a proxy that
@@ -20170,7 +20170,7 @@ Likewise, we return the
 meaning, as the type of arrays, and we introduce a new type,
 \PARRAYTYNAME{}, whose values
 can be either arrays or array proxies.
-These new types come with a suite of new primitive operations
+These new types come with a suite of new primitive operations.
 
 {\if\edition\racketEd    
 A tuple proxy is represented by a tuple containing three things: 1) the
@@ -20298,12 +20298,12 @@ and primitive functions.
 
 \fi}
 
-Now to discuss the translation that differentiates tuples and arrays
+Now we discuss the translation that differentiates tuples and arrays
 from proxies. First, every type annotation in the program is
 translated (recursively) to replace \TUPLETYPENAME{} with \PTUPLETYNAME{}.
 Next, we insert uses of \PTUPLETYNAME{} operations in the appropriate
 places. For example, we wrap every tuple creation with an
-\racket{\code{inject-vector}}\python{\code{InjectTupleProxy}}.
+\racket{\code{inject-vector}}\python{\code{InjectTuple}}.
 {\if\edition\racketEd    
 \begin{lstlisting}
 (vector |$e_1 \ldots e_n$|)
@@ -20368,7 +20368,7 @@ operation.
 \fi}
 %
 Note that in the branch for a tuple, we must apply
-\racket{\code{project-vector}} \python{project\_tuple} before reading
+\racket{\code{project-vector}}\python{\code{project\_tuple}} before reading
 from the tuple.
 
 The translation of array operations is similar to the ones for tuples.
@@ -20445,7 +20445,7 @@ Assign([|$\itm{lhs}$|], InjectTuple(|$e_1$|))
 movq |$e'_1$|, |$\itm{lhs'}$|
 \end{lstlisting}
 \fi}
-\python{The translation for \code{InjectList} is just a move instruction.}
+\python{The translation for \code{InjectList} is also a move instruction.}
 \noindent On the other hand,
 \racket{\code{inject-proxy}}\python{\code{InjectTupleProxy}} sets bit
 $63$ to $1$.
@@ -20508,7 +20508,7 @@ movq %rax, |$\itm{lhs'}$|
 %
 The \racket{\code{project-vector} operation is}
 \python{\code{project\_tuple} and \code{project\_array} operations are}
-straightforward to translate, so we leave that up to the reader.
+straightforward to translate, so we leave that to the reader.
 
 Regarding the element access operations for tuples and arrays, the
 runtime provides procedures that implement them (they are recursive
@@ -20602,7 +20602,7 @@ and \code{proxy\_vec\_length} functions.
   extending and adapting your compiler for \LangLam{}. Create 10 new
   partially-typed test programs. In addition to testing with these
   new programs, also test your compiler on all the tests for \LangLam{}
-  and tests for \LangDyn{}.
+  and for \LangDyn{}.
 %
   \racket{Sometimes you may get a type checking error on the
     \LangDyn{} programs but you can adapt them by inserting a cast to
@@ -20712,7 +20712,7 @@ original location of the cast in the source program.
 
 The problem addressed by space-efficient casts also relates to
 higher-order casts. It turns out that in partially typed programs, a
-function or tuple can flow through very-many casts at runtime. With
+function or tuple can flow through very many casts at runtime. With
 the approach described in this chapter, each cast adds another
 \code{lambda} wrapper or a tuple proxy. Not only does this take up
 considerable space, but it also makes the function calls and tuple
@@ -20723,7 +20723,7 @@ algorithm from $O(n^2)$ to $O(n^3)$! \citet{Herman:2006uq} suggested a
 solution to this problem by representing casts using the coercion
 calculus of \citet{Henglein:1994nz}, which prevents the creation of
 long chains of proxies by compressing them into a concise normal
-form. \citet{Siek:2015ab} give and algorithm for compressing coercions
+form. \citet{Siek:2015ab} give an algorithm for compressing coercions
 and \citet{Kuhlenschmidt:2019aa} show how to implement these ideas in
 the Grift compiler.
 \begin{center}
@@ -20733,7 +20733,8 @@ the Grift compiler.
 There are also interesting interactions between gradual typing and
 other language features, such as parametetric polymorphism,
 information-flow types, and type inference, to name a few. We
-recommend the reader to the online gradual typing bibliography:
+recommend the reader to consult the online gradual typing bibliography
+for more material:
 \begin{center}
   \url{http://samth.github.io/gradual-typing-bib/}
 \end{center}
