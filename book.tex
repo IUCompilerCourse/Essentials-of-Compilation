@@ -18982,10 +18982,9 @@ print(t[1])
         case (_, AnyType()):
           return True
         case (FunctionType(ps1, rt1), FunctionType(ps2, rt2)):
-          return all([self.consistent(p1, p2) for (p1,p2) in zip(ps1,ps2)]) \
-              and consistent(rt1, rt2)
+          return all(map(self.consistent, ps1, ps2)) and consistent(rt1, rt2)
         case (TupleType(ts1), TupleType(ts2)):
-          return all([self.consistent(ty1, ty2) for (ty1,ty2) in zip(ts1,ts2)])
+          return all(map(self.consistent, ts1, ts2))
         case (_, _):
           return t1 == t2
 \end{lstlisting}  
@@ -19251,10 +19250,10 @@ class TypeCheckLgrad(TypeCheckLlambda):
         case (_, AnyType()):
           return t1
         case (FunctionType(ps1, rt1), FunctionType(ps2, rt2)):
-          return FunctionType([self.join_types(p1, p2) for (p1,p2) in zip(ps1, ps2)],
-                              self.join_types(rt1,rt2))
+          return FunctionType(list(map(self.join_types, ps1, ps2)),
+                                 self.join_types(rt1,rt2))
         case (TupleType(ts1), TupleType(ts2)):
-          return TupleType([self.join_types(ty1, ty2) for (ty1,ty2) in zip(ts1,ts2)])
+          return TupleType(list(map(self.join_types, ts1, ts2)))
         case (_, _):
           return t1
         
@@ -19774,7 +19773,7 @@ print( v[1] )
       case (FunctionType(ps1, rt1), FunctionType(ps2, rt2)):
         params = [generate_name('x') for p in ps2]
         args = [Cast(Name(x), t2, t1)
-                for (x,(t1,t2)) in zip(params, zip(ps1, ps2))]
+                for (x,t1,t2) in zip(params, ps1, ps2)]
         body = Cast(Call(ValueExp(value), args), rt1, rt2)
         return Function('cast', params, [Return(body)], {})
       case (TupleType(ts1), TupleType(ts2)):
