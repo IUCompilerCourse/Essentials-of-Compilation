@@ -19143,11 +19143,11 @@ print(t[1])
 \begin{tcolorbox}[colback=white]  
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 class TypeCheckLgrad(TypeCheckLlambda):
-  def type_check_exp(self, e, env):
+  def type_check_exp(self, e, env) -> Type:
     match e:
       case Name(id):
         return env[id]
-      case Constant(value) if value is True or value is False:
+      case Constant(value) if isinstance(value, bool):
         return BoolType()
       case Constant(value) if isinstance(value, int):
         return IntType()
@@ -19168,9 +19168,9 @@ class TypeCheckLgrad(TypeCheckLlambda):
         return self.join_types(body_t, orelse_t)
       case Call(func, args):
         func_t = self.type_check_exp(func, env)
-        args_t = unzip([self.type_check_exp(arg, env) for arg in args])
+        args_t = [self.type_check_exp(arg, env) for arg in args]
         match func_t:
-          case FunctionType(params_t, return_t):
+          case FunctionType(params_t, return_t) if len(params_t) == len(args_t):
             for (arg_t, param_t) in zip(args_t, params_t):
                 self.check_consistent(param_t, arg_t, e)
             return return_t
@@ -19196,15 +19196,14 @@ class TypeCheckLgrad(TypeCheckLlambda):
       case Lambda(params, body):
         match expected_ty:
           case FunctionType(params_t, return_t):
-            new_env = {x:t for (x,t) in env.items()}
-            for (p,t) in zip(new_params, params_t):
-                new_env[p] = t
+            new_env = env.copy().update(zip(params, params_t))
             e.has_type = expected_ty
+            body_ty = self.type_check_exp(body, new_env)
+            self.check_consistent(body_ty, return_t)
           case AnyType():
-            new_env = {x:t for (x,t) in env.items()}
-            for p in new_params:
-                new_env[p] = AnyType()
-            e.has_type = FunctionType([AnyType() for _ in new_params], AnyType())
+            new_env = env.copy().update((p, AnyType()) for p in params)
+            e.has_type = FunctionType([AnyType() for _ in params], AnyType())
+            body_ty = self.type_check_exp(body, new_env)
           case _:
             raise Exception('lambda does not have type ' + str(expected_ty))
       case _:
@@ -19226,7 +19225,7 @@ class TypeCheckLgrad(TypeCheckLlambda):
         if id in env:
           self.check_consistent(env[id], value_ty, value)
         else:
-          env[id] = t
+          env[id] = value_ty
       ...
       case _:
         raise Exception('type_check_stmts: unexpected ' + repr(ss))
