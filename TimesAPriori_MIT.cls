@@ -1823,6 +1823,7 @@ Chapter \arabic{chapter}}%
 \thickmuskip=3mu%
 }%
 
+\RequirePackage{multind} % has to be loaded before hyperref for links in index. -Jeremy
 \RequirePackage[bookmarks=true,bookmarksnumbered=true,bookmarksopenlevel=1,colorlinks=false,breaklinks,linkcolor=black,citecolor=black,urlcolor=black,hidelinks]{hyperref}%
 \ifxetex\relax\else\usepackage{breakurl}\fi%
 %\ifluatex\relax\else\usepackage{breakurl}\fi%
