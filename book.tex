@@ -12047,33 +12047,6 @@ pass, which is \LangAlloc{} in monadic normal form.
      \LangAllocANFM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
   \end{array}
 \end{array}
-%% \begin{array}{lcl}
-%% \itm{binaryop} &::=& \code{Add()} \MID \code{Sub()} \\
-%% \itm{boolop} &::=& \code{And()} \MID \code{Or()} \\
-%% \itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \MID \code{Is()} \\
-%% \itm{unaryop} &::=& \code{USub()} \MID \code{Not()} \\
-%% \itm{bool} &::=& \code{True} \MID \code{False} \\
-%% \Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} \\
-%% \Exp &::=& \Atm \MID \READ{} \MID \\
-%%      &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm}
-%%      \MID \UNIOP{\itm{unaryop}}{\Atm}\\
-%%      &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \\
-%% %     \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp} \\ % removed by RCO
-%%      &\MID& \IF{\Exp}{\Exp}{\Exp} \\
-%%      &\MID& \GET{\Atm}{\Atm} \\
-%%      &\MID& \LEN{\Exp}\\
-%%    &\MID& \ALLOCATE{\Int}{\Type}
-%%      \MID \GLOBALVALUE{\Var}\RP\\
-%%    &\MID& \BEGIN{\Stmt^{*}}{\Atm} \\ % can use this in place of \LET;
-%%                                 % why have \LET?
-%% \Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
-%%   &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \\
-%%   &\MID& \ASSIGN{\PUT{\Atm}{\Atm}}{\Exp} \\
-%%   &\MID& \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
-%%   &\MID& \WHILESTMT{\Exp}{\Stmt^{+}}
-%%    \MID \COLLECT{\Int}  \\
-%% \LangAllocANFM{} &::=& \PROGRAM{\code{'()}}{\Stmt^{*}}
-%% \end{array}
 \]
 \fi}
 \end{tcolorbox}
@@ -14328,12 +14301,13 @@ Recall that we wish to limit the number of function parameters to six
 so that we do not need to use the stack for argument passing, which
 makes it easier to implement efficient tail calls.  However, because
 the input language \LangFun{} supports arbitrary numbers of function
-arguments, we have some work to do!
-
-This pass transforms functions and function calls that involve more
-than six arguments to pass the first five arguments as usual, but it
-packs the rest of the arguments into a tuple and passes it as the
-sixth argument.
+arguments, we have some work to do! The \code{limit\_functions} pass
+transforms functions and function calls that involve more than six
+arguments to pass the first five arguments as usual, but it packs the
+rest of the arguments into a tuple and passes it as the sixth
+argument.\footnote{The implementation this pass can be postponed to
+  last because you can test the rest of the passes on functions with
+  six or fewer parameters.}
 
 Each function definition with seven or more parameters is transformed as
 follows.
@@ -14422,13 +14396,72 @@ classified as a complex expression so that we generate an assignment
 statement with a left-hand side that can serve as the target of the
 \code{leaq}.
 
-The output of this pass, \LangFunANF{}, extends \LangAllocANF{}
-(Figure~\ref{fig:Lvec-anf-syntax}) with \code{FunRef}
-and \racket{\code{Apply}}\python{\code{Call}} in the grammar for expressions.
+The output of this pass, \LangFunANF{} (Figure~\ref{fig:Lfun-anf-syntax}),
+extends \LangAllocANF{} (Figure~\ref{fig:Lvec-anf-syntax}) with \code{FunRef}
+and \racket{\code{Apply}}\python{\code{Call}} in the grammar for expressions
+and augments programs to include a list of function definitions.
 %
 \python{Also, \LangFunANF{} adds \code{Return} to the grammar for statements.}
 
-% TODO: Return?
+
+\newcommand{\LfunMonadASTRacket}{
+  \begin{array}{lcl}
+  \Type &::=& (\Type \ldots \; \key{->}\; \Type) \\
+  \Exp &::=& \FUNREF{\itm{label}}{\Int} \MID \APPLY{\Atm}{\Atm\ldots}\\
+  \Def &::=& \FUNDEF{\Var}{\LP[\Var \code{:} \Type]\ldots\RP}{\Type}{\code{'()}}{\Exp}
+  \end{array}
+}
+
+\newcommand{\LfunMonadASTPython}{
+  \begin{array}{lcl}
+    \Type &::=& \key{IntType()} \MID \key{BoolType()} \key{VoidType()}
+        \MID \key{TupleType}\LS\Type^+\RS\\
+        &\MID& \key{FunctionType}\LP \Type^{*} \key{, } \Type \RP \\
+    \Exp &::=& \FUNREF{\itm{label}}{\Int} \MID \CALL{\Atm}{\Atm^{*}}\\
+    \Stmt &::=& \RETURN{\Exp} \\
+   \Params &::=&  \LP\Var\key{,}\Type\RP^* \\
+   \Def &::=& \FUNDEF{\Var}{\Params}{\Type}{}{\Stmt^{+}} 
+  \end{array}
+}
+
+\begin{figure}[tp]
+\centering
+\begin{tcolorbox}[colback=white]
+\small
+{\if\edition\racketEd    
+\[
+\begin{array}{l}
+  \gray{\LvarMonadASTRacket} \\ \hline
+  \gray{\LifMonadASTRacket} \\ \hline
+  \gray{\LwhileMonadASTRacket} \\ \hline
+  \gray{\LtupMonadASTRacket} \\ \hline
+  \LfunMonadASTRacket \\
+\begin{array}{rcl}
+\LangFunANFM{}  &::=& \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP)}{\Exp}
+\end{array}
+\end{array}
+\]
+\fi}
+{\if\edition\pythonEd
+\[
+\begin{array}{l}
+  \gray{\LvarMonadASTPython} \\ \hline
+  \gray{\LifMonadASTPython} \\ \hline
+  \gray{\LwhileMonadASTPython} \\ \hline
+  \gray{\LtupMonadASTPython} \\ \hline
+  \LfunMonadASTPython \\
+  \begin{array}{rcl}
+     \LangFunANFM{} &::=& \PROGRAM{}{\LS \Def \ldots \Stmt \ldots \RS}
+  \end{array}
+\end{array}
+\]
+\fi}
+\end{tcolorbox}
+
+\caption{\LangFunANF{} is \LangFunRef{} in monadic normal form.}
+\label{fig:Lfun-anf-syntax}
+\end{figure}
+
 
 
 %% Figure~\ref{fig:Lfun-anf-syntax} defines the output language
