@@ -26,7 +26,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{0}
+\def\edition{1}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd{#1}\fi}}
@@ -13561,7 +13561,7 @@ nested inside each other.
 \newcommand{\LfunGrammarPython}{
   \begin{array}{lcl}
     \Type &::=& \key{int}
-                \MID \key{bool}
+                \MID \key{bool} \MID \key{void}
                 \MID \key{tuple}\LS \Type^+ \RS
                 \MID \key{Callable}\LS \LS \Type \key{,} \ldots \RS \key{, } \Type \RS \\
    \Exp &::=& \CAPPLY{\Exp}{\Exp\code{,} \ldots} \\
@@ -13571,7 +13571,7 @@ nested inside each other.
 }
 \newcommand{\LfunASTPython}{
   \begin{array}{lcl}
-    \Type &::=& \key{IntType()} \MID \key{BoolType()} \key{VoidType()}
+    \Type &::=& \key{IntType()} \MID \key{BoolType()} \MID \key{VoidType()}
         \MID \key{TupleType}\LS\Type^+\RS\\
         &\MID& \key{FunctionType}\LP \Type^{*} \key{, } \Type \RP \\
     \Exp &::=& \CALL{\Exp}{\Exp^{*}}\\
@@ -20913,44 +20913,54 @@ for more material:
 %   coercions?
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{Parametric Polymorphism}
+\chapter{Generics}
 \label{ch:Lpoly}
 \index{subject}{parametric polymorphism}
 \index{subject}{generics}
 
-\if\edition\pythonEd
-
-UNDER CONSTRUCTION
-
-\fi
-
+This chapter studies the compilation of
+generics\index{subject}{generics} (aka. parametric
+polymorphism\index{subject}{parametric polymorphism}), compiling the
+\LangPoly{} subset of \racket{Typed Racket}\python{Python}.  Generics
+enable programmers to make code more reusable by parameterizing
+functions and data structures with respect to the types that they
+operate on. For example, Figure~\ref{fig:map-poly} revisits the
+\code{map} example but this time gives it a more fitting type.  This
+\code{map} function is parameterized with respect to the element type
+of the tuple. The type of \code{map} is the following generic type
+specified by the \code{All} type with parameter \code{T}.
 \if\edition\racketEd
-
-This chapter studies the compilation of parametric
-polymorphism\index{subject}{parametric polymorphism}
-(aka. generics\index{subject}{generics}), compiling the \LangPoly{}
-subset of Typed Racket. Parametric polymorphism enables programmers to
-make code more reusable by parameterizing functions and data
-structures with respect to the types that they operate on. For
-example, Figure~\ref{fig:map-poly} revisits the \code{map} example but
-this time gives it a more fitting type.  This \code{map} function is
-parameterized with respect to the element type of the tuple. The type
-of \code{map} is the following polymorphic type as specified by the
-\code{All} and the type parameter \code{a}.
 \begin{lstlisting}
-  (All (a) ((a -> a) (Vector a a) -> (Vector a a)))
+  (All (T) ((T -> T) (Vector T T) -> (Vector T T)))
 \end{lstlisting}
+\fi
+\if\edition\pythonEd
+\begin{lstlisting}
+  All[[T], Callable[[Callable[[T],T], tuple[T,T]], tuple[T,T]]]
+\end{lstlisting}
+\fi
 The idea is that \code{map} can be used at \emph{all} choices of a
-type for parameter \code{a}. In Figure~\ref{fig:map-poly} we apply
-\code{map} to a tuple of integers, a choice of \code{Integer} for
-\code{a}, but we could have just as well applied \code{map} to a tuple
-of Booleans.
+type for parameter \code{T}. In Figure~\ref{fig:map-poly} we apply
+\code{map} to a tuple of integers, choosing
+\racket{\code{Integer}}\python{\code{int}} for \code{T}, but we could
+have just as well applied \code{map} to a tuple of Booleans.
+%
+\if\edition\pythonEd
+%
+In Python, when writing a generic function such as \code{map}, one
+does not explicitly write down its generic type (using \code{All}).
+Instead, the fact that it is generic is implied by the use of type
+variables (such as \code{T}) in the type annotations of its
+parameters.
+%
+\fi
 
 \begin{figure}[tbp]
   % poly_test_2.rkt
 \begin{tcolorbox}[colback=white]  
+\if\edition\racketEd
 \begin{lstlisting}
-(: map (All (a) ((a -> a) (Vector a a) -> (Vector a a))))
+(: map (All (T) ((T -> T) (Vector T T) -> (Vector T T))))
 (define (map f v)
   (vector (f (vector-ref v 0)) (f (vector-ref v 1))))
 
@@ -20958,6 +20968,19 @@ of Booleans.
 
 (vector-ref (map inc (vector 0 41)) 1)
 \end{lstlisting}
+\fi
+\if\edition\pythonEd
+\begin{lstlisting}
+def map(f : Callable[[T],T], tup : tuple[T,T]) -> tuple[T,T]:
+    return (f(tup[0]), f(tup[1]))
+
+def add1(x : int) -> int:
+    return x + 1
+
+t = map(add1, (0, 41))
+print(t[1])
+\end{lstlisting}
+\fi
 \end{tcolorbox}
 
 \caption{The \code{map} example using parametric polymorphism.}
@@ -20966,15 +20989,21 @@ of Booleans.
 
 Figure~\ref{fig:Lpoly-concrete-syntax} defines the concrete syntax of
 \LangPoly{} and Figure~\ref{fig:Lpoly-syntax} defines the abstract
-syntax. We add a second form for function definitions in which a type
+syntax.
+%
+\if\edition\racketEd
+We add a second form for function definitions in which a type
 declaration comes before the \code{define}. In the abstract syntax,
 the return type in the \code{Def} is \CANYTY{}, but that should be
 ignored in favor of the return type in the type declaration.  (The
 \CANYTY{} comes from using the same parser as in
 Chapter~\ref{ch:Ldyn}.)  The presence of a type declaration
 enables the use of an \code{All} type for a function, thereby making
-it polymorphic. The grammar for types is extended to include
-polymorphic types and type variables.
+it polymorphic.
+\fi
+%
+The grammar for types is extended to include generic types and type
+variables.
 
 \newcommand{\LpolyGrammarRacket}{
 \begin{array}{lcl}
@@ -20992,10 +21021,24 @@ polymorphic types and type variables.
 \end{array}
 }  
 
+\newcommand{\LpolyGrammarPython}{
+\begin{array}{lcl}
+  \Type &::=& \key{All}\LS \LS\Var\ldots\RS,\Type\RS \MID \Var 
+\end{array}
+}
+
+\newcommand{\LpolyASTPython}{
+\begin{array}{lcl}
+  \Type &::=& \key{GenericType}\LP\LS\Var\ldots\RS, \Type\RP \MID \Var 
+\end{array}
+}  
+
+
 \begin{figure}[tp]
 \centering
 \begin{tcolorbox}[colback=white]
 \footnotesize
+\if\edition\racketEd
 \[
 \begin{array}{l}
   \gray{\LintGrammarRacket{}} \\ \hline
@@ -21011,6 +21054,24 @@ polymorphic types and type variables.
 \end{array}
 \end{array}
 \]
+\fi
+\if\edition\pythonEd
+\[
+\begin{array}{l}
+  \gray{\LintGrammarPython{}} \\ \hline
+  \gray{\LvarGrammarPython{}} \\ \hline
+  \gray{\LifGrammarPython{}} \\ \hline
+  \gray{\LwhileGrammarPython} \\ \hline
+  \gray{\LtupGrammarPython} \\   \hline
+  \gray{\LfunGrammarPython} \\   \hline
+  \gray{\LlambdaGrammarPython} \\\hline
+  \LpolyGrammarPython \\
+  \begin{array}{lcl}
+    \LangPoly{} &::=& \Def\ldots \Stmt\ldots
+  \end{array}
+\end{array}
+\]
+\fi
 \end{tcolorbox}
 
 \caption{The concrete syntax of \LangPoly{}, extending \LangLam{}
@@ -21022,6 +21083,7 @@ polymorphic types and type variables.
 \centering
 \begin{tcolorbox}[colback=white]
 \footnotesize
+\if\edition\racketEd
 \[
 \begin{array}{l}
   \gray{\LintOpAST} \\ \hline
@@ -21037,6 +21099,24 @@ polymorphic types and type variables.
 \end{array}
 \end{array}
 \]
+\fi
+\if\edition\pythonEd
+\[
+\begin{array}{l}
+  \gray{\LintASTPython} \\ \hline
+  \gray{\LvarASTPython{}} \\ \hline
+  \gray{\LifASTPython{}} \\ \hline
+  \gray{\LwhileASTPython{}} \\ \hline
+  \gray{\LtupASTPython{}} \\ \hline
+  \gray{\LfunASTPython} \\ \hline
+  \gray{\LlambdaASTPython} \\ \hline
+  \LpolyASTPython \\
+  \begin{array}{lcl}
+  \LangPoly{} &::=& \PROGRAM{}{\LS \Def \ldots \Stmt \ldots \RS}
+  \end{array}
+\end{array}
+\]
+\fi
 \end{tcolorbox}
 
 \caption{The abstract syntax of \LangPoly{}, extending \LangLam{}
@@ -21044,37 +21124,59 @@ polymorphic types and type variables.
 \label{fig:Lpoly-syntax}
 \end{figure}
 
-By including polymorphic types in the $\Type$ non-terminal we choose
-to make them first-class which has interesting repercussions on the
-compiler. Many languages with polymorphism, such as
+By including the \code{All} type in the $\Type$ non-terminal of the
+grammar we choose to make generics first-class, which has interesting
+repercussions on the compiler.\footnote{The Python typing library does
+  not include the \code{All} type, we are taking the liberty to add
+  the \code{All} type.}  Many languages with generics, such as
 C++~\citep{stroustrup88:_param_types} and Standard
-ML~\citep{Milner:1990fk}, only support second-class polymorphism, so
-it may be helpful to see an example of first-class polymorphism in
-action. In Figure~\ref{fig:apply-twice} we define a function
-\code{apply-twice} whose parameter is a polymorphic function. The
-occurrence of a polymorphic type underneath a function type is enabled
-by the normal recursive structure of the grammar for $\Type$ and the
-categorization of the \code{All} type as a $\Type$.  The body of
-\code{apply-twice} applies the polymorphic function to a Boolean and
-to an integer.
+ML~\citep{Milner:1990fk}, only support second-class generics, so it
+may be helpful to see an example of first-class generics in action. In
+Figure~\ref{fig:apply-twice} we define a function \code{apply\_twice}
+whose parameter is a generic function. Indeed, because the grammar for
+$\Type$ includes the \code{All} type, a generic function may also be
+returned from a function or stored inside a tuple. The body of
+\code{apply\_twice} applies the generic function \code{f} to a Boolean
+and also to an integer, which would not be possible if \code{f} were
+not generic.
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]  
+\if\edition\racketEd
 \begin{lstlisting}
-(: apply-twice ((All (b) (b -> b)) -> Integer))
-(define (apply-twice f)
+(: apply_twice ((All (U) (U -> U)) -> Integer))
+(define (apply_twice f)
   (if (f #t) (f 42) (f 777)))
 
-(: id (All (a) (a -> a)))
+(: id (All (T) (T -> T)))
 (define (id x) x)
 
-(apply-twice id)
+(apply_twice id)
 \end{lstlisting}
+\fi
+\if\edition\pythonEd
+\begin{lstlisting}
+def apply_twice(f : All[[U], Callable[[U],U]]) -> int:
+    if f(True):
+        return f(42)
+    else:
+        return f(777)
+
+def id(x: T) -> T:
+    return x
+
+print(apply_twice(id))
+\end{lstlisting}
+\fi
 \end{tcolorbox}
 
 \caption{An example illustrating first-class polymorphism.}
 \label{fig:apply-twice}
 \end{figure}
+
+\if\edition\pythonEd
+UNDER CONSTRUCTION
+\fi
 
 The type checker for \LangPoly{} in Figure~\ref{fig:type-check-Lvar0} has
 three new responsibilities (compared to \LangLam{}). The type checking of
@@ -21128,6 +21230,7 @@ process in next pass of the compiler.
 \centering
 \begin{tcolorbox}[colback=white]
 \small
+\if\edition\racketEd
 \[
 \begin{array}{lcl}
   \Type &::=& \ldots \MID \LP\key{All}~\LP\Var\ldots\RP~ \Type\RP \MID \Var \\
@@ -21137,6 +21240,10 @@ process in next pass of the compiler.
   \LangInst{} &::=& \PROGRAMDEFSEXP{\code{'()}}{\LP\Def\ldots\RP}{\Exp}
 \end{array}
 \]
+\fi
+\if\edition\pythonEd
+UNDER CONSTURCTION
+\fi
 \end{tcolorbox}
 
 \caption{The abstract syntax of \LangInst{}, extending \LangLam{}
@@ -21599,8 +21706,6 @@ needed to compile \LangPoly{}.
 % TODO: challenge problem: specialization of instantiations
 
 % Further Reading
-
-\fi
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \clearpage
