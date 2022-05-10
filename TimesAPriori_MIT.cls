@@ -21,13 +21,14 @@
 \setlength{\paperheight}{9truein}%
 \setlength{\paperwidth}{6truein}%
 
-\DeclareOption{draft}{\PassOptionsToPackage{draft}{graphicx}}
-\DeclareOption{a4paper}{\PassOptionsToPackage{a4}{crop}}
-\DeclareOption{centre}{\PassOptionsToPackage{center}{crop}}
-\DeclareOption{crop}{\PassOptionsToPackage{cam}{crop}\global\@cropmarksontrue}
-\DeclareOption{nocrop}{\PassOptionsToPackage{off}{crop}\global\@cropmarksonfalse}
-\DeclareOption{info}{\PassOptionsToPackage{info}{crop}}
-\DeclareOption{noinfo}{\PassOptionsToPackage{noinfo}{crop}}
+%% The crop package seems to screw up the page geometry. -Jeremy
+%%\DeclareOption{draft}{\PassOptionsToPackage{draft}{graphicx}}
+%% \DeclareOption{a4paper}{\PassOptionsToPackage{a4}{crop}}
+%% \DeclareOption{centre}{\PassOptionsToPackage{center}{crop}}
+%% \DeclareOption{crop}{\PassOptionsToPackage{cam}{crop}\global\@cropmarksontrue}
+%% \DeclareOption{nocrop}{\PassOptionsToPackage{off}{crop}\global\@cropmarksonfalse}
+%% \DeclareOption{info}{\PassOptionsToPackage{info}{crop}}
+%% \DeclareOption{noinfo}{\PassOptionsToPackage{noinfo}{crop}}
 %%Trim Sizes%%
 \DeclareOption{6x9}{\global\sixbyninetrue}
 \DeclareOption{7x10}{\global\sevenbytentrue}
@@ -40,7 +41,7 @@
 %%Numbers like Theorem 1.1, Lemma 1.2, etc.
 \DeclareOption{thmnumcont}{\global\thmcountconttrue}%
 
-\ExecuteOptions{a4paper,crop,centre,info}
+%\ExecuteOptions{a4paper,crop,centre,info}
 
 \ProcessOptions
 
