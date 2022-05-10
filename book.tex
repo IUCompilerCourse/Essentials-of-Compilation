@@ -61,7 +61,7 @@ language=Python,
 basicstyle=\ttfamily\small,
 morekeywords={match,case,bool,int,let},
 deletekeywords={},
-escapechar=|,
+%escapechar=|,
 columns=flexible,
 moredelim=[is][\color{red}]{~}{~},
 showstringspaces=false
@@ -20790,12 +20790,12 @@ and \code{proxy\_vec\_length} functions.
 \begin{tcolorbox}[colback=white]  
 \begin{tikzpicture}[baseline=(current  bounding  box.center),scale=0.85]
 \node (Lgradual) at (12,4)  {\large \LangGrad{}};
-\node (Lgradualr) at (9,4)  {\large \LangGrad{}};
-\node (Lgradualp) at (6,4)  {\large \LangCast{}};
-\node (Llambdapp) at (3,4)  {\large \LangProxy{}};
-\node (Llambdaproxy) at (0,4)  {\large \LangPVec{}};
-\node (Llambdaproxy-2) at (0,2)  {\large \LangPVec{}};
-\node (Llambdaproxy-3) at (3,2)  {\large \LangPVec{}};
+\node (Lgradual2) at (9,4)  {\large \LangGrad{}};
+\node (Lgradual3) at (6,4)  {\large \LangCast{}};
+\node (Lgradual4) at (3,4)  {\large \LangProxy{}};
+\node (Lgradualr) at (0,4)  {\large \LangPVec{}};
+\node (Lgradualp) at (0,2)  {\large \LangPVec{}};
+\node (Llambdapp) at (3,2)  {\large \LangPVec{}};
 \node (Llambdaproxy-4) at (6,2)  {\large \LangPVecFunRef{}};
 \node (Llambdaproxy-5) at (9,2)  {\large \LangPVecFunRef{}};
 \node (F1-1) at (12,2)  {\large \LangPVecFunRef{}};
@@ -20815,19 +20815,19 @@ and \code{proxy\_vec\_length} functions.
 
 
 \path[->,bend right=15] (Lgradual) edge [above] node
+     {\ttfamily\footnotesize shrink} (Lgradual2);
+\path[->,bend right=15] (Lgradual2) edge [above] node
+     {\ttfamily\footnotesize uniquify} (Lgradual3);
+\path[->,bend right=15] (Lgradual3) edge [above] node
+     {\ttfamily\footnotesize reveal\_functions} (Lgradual4);
+\path[->,bend right=15] (Lgradual4) edge [above] node
      {\ttfamily\footnotesize resolve} (Lgradualr);
-\path[->,bend right=15] (Lgradualr) edge [above] node
+\path[->,bend right=15] (Lgradualr) edge [right] node
      {\ttfamily\footnotesize cast\_insert} (Lgradualp);
-\path[->,bend right=15] (Lgradualp) edge [above] node
+\path[->,bend right=15] (Lgradualp) edge [below] node
      {\ttfamily\footnotesize lower\_casts} (Llambdapp);
-\path[->,bend right=15] (Llambdapp) edge [above] node
-     {\ttfamily\footnotesize differentiate.} (Llambdaproxy);
-\path[->,bend left=15] (Llambdaproxy) edge [left] node
-     {\ttfamily\footnotesize shrink} (Llambdaproxy-2);
-\path[->,bend left=15] (Llambdaproxy-2) edge [above] node
-     {\ttfamily\footnotesize uniquify} (Llambdaproxy-3);
-\path[->,bend left=15] (Llambdaproxy-3) edge [above] node
-     {\ttfamily\footnotesize reveal\_functions} (Llambdaproxy-4);
+\path[->,bend left=15] (Llambdapp) edge [above] node
+     {\ttfamily\footnotesize differentiate.} (Llambdaproxy-4);
 \path[->,bend left=15] (Llambdaproxy-4) edge [above] node
      {\ttfamily\footnotesize reveal\_casts} (Llambdaproxy-5);
 \path[->,bend left=15] (Llambdaproxy-5) edge [above] node
@@ -21226,11 +21226,13 @@ the choice of the names of the type parameters. The definition of type
 equality in Figure~\ref{fig:type-check-Lvar0-aux} renames the type
 parameters in one type to match the type parameters of the other type.
 
+\if\edition\racketEd
 The third responsibility of the type checker is to make sure that only
 defined type variables appear in type annotations. The
 \code{check\_well\_formed} function defined in
 Figure~\ref{fig:well-formed-types} recursively inspects a type, making
 sure that each type variable has been defined.
+\fi
 
 
 \begin{figure}[tbp]
@@ -21304,7 +21306,55 @@ sure that each type variable has been defined.
 \end{lstlisting}
 \fi
 \if\edition\pythonEd
-UNDER CONSTRUCTION
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+def type_check_exp(self, e, env):
+  match e:
+    case Call(Name(f), args) if f in builtin_functions:
+      return super().type_check_exp(e, env)      
+    case Call(func, args):
+      func_t = self.type_check_exp(func, env)
+      func.has_type = func_t
+      match func_t:
+        case AllType(ps, FunctionType(p_tys, rt)):
+          for arg in args:
+              arg.has_type = self.type_check_exp(arg, env)
+          arg_tys = [arg.has_type for arg in args]
+          deduced = {}
+          for (p, a) in zip(p_tys, arg_tys):
+              self.match_types(p, a, deduced, e)
+          return self.substitute_type(rt, deduced)
+        case _:
+          return super().type_check_exp(e, env)
+    case Inst(gen, type_args):
+      gen_t = self.type_check_exp(gen, env)
+      gen.has_type = gen_t
+      match gen_t:
+        case AllType(ps, ty):
+          return self.substitute_type(ty, type_args)
+        case _:
+          raise Exception('type_check_exp: expected generic, not ' + str(gen_t))
+    case _:
+      return super().type_check_exp(e, env)
+
+def type_check(self, p):
+  match p:
+    case Module(body):
+      env = {}
+      for s in body:
+          match s:
+            case FunctionDef(name, params, bod, dl, returns, comment):
+              params_t = [t for (x,t) in params]
+              ty_params = set()
+              for t in params_t:
+                ty_params |= self.generic_variables(t)
+              ty = FunctionType(params_t, returns)
+              if len(ty_params) > 0:
+                  ty = AllType(list(ty_params), ty)
+              env[name] = ty
+      self.check_stmts(body, IntType(), env)
+    case _:
+      raise Exception('type_check: unexpected ' + repr(p))
+\end{lstlisting}
 \fi
 \end{tcolorbox}
 
@@ -21387,9 +21437,9 @@ UNDER CONSTRUCTION
 \end{figure}
 
 
+\if\edition\racketEd    
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]  
-\if\edition\racketEd    
 \begin{lstlisting}%[basicstyle=\ttfamily\scriptsize]
 (define/public ((check_well_formed env) ty)
   (match ty
@@ -21410,15 +21460,12 @@ UNDER CONSTRUCTION
      ((check_well_formed env^) t)]
     [else (error 'type-check "unrecognized type ~a" ty)]))
 \end{lstlisting}
-\fi
-\if\edition\pythonEd
-UNDER CONSTRUCTION
-\fi
 \end{tcolorbox}
 
 \caption{Well-formed types.}
 \label{fig:well-formed-types}
 \end{figure}
+\fi
 
 % TODO: interpreter for R'_10
 \clearpage
@@ -21643,7 +21690,7 @@ type parameter \code{a} are replaced by \CANYTY{} and the polymorphic
 \end{lstlisting}
 \fi
 \if\edition\pythonEd
-UNDER CONSTRUCTION
+
 \fi
 \end{tcolorbox}
 
