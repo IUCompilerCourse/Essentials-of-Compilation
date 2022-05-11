@@ -51,7 +51,7 @@ morekeywords={seq,assign,program,block,define,lambda,match,goto,if,else,then,str
 deletekeywords={read,mapping,vector},
 escapechar=|,
 columns=flexible,
-moredelim=[is][\color{red}]{~}{~},
+%moredelim=[is][\color{red}]{~}{~},
 showstringspaces=false
 }
 \fi
@@ -61,9 +61,9 @@ language=Python,
 basicstyle=\ttfamily\small,
 morekeywords={match,case,bool,int,let},
 deletekeywords={},
-%escapechar=|,
+escapechar=|,
 columns=flexible,
-moredelim=[is][\color{red}]{~}{~},
+%moredelim=[is][\color{red}]{~}{~},
 showstringspaces=false
 }
 \fi
@@ -8752,9 +8752,7 @@ We recommend translating an assignment with an equality on the
 right-hand side into a sequence of three instructions. \\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
-\begin{lstlisting}
-|$\CASSIGN{\Var}{ \LP\CEQ{\Atm_1}{\Atm_2} \RP }$|
-\end{lstlisting}
+$\CASSIGN{\Var}{ \LP\CEQ{\Atm_1}{\Atm_2} \RP }$ 
 \end{minipage}
 &
 $\Rightarrow$
@@ -20395,7 +20393,7 @@ Next we describe each of the new primitive operations.
 \fi}
 
 {\if\edition\pythonEd
-
+%
 A tuple proxy is represented by a tuple containing 1) the underlying
 tuple and 2) a tuple of functions for casting elements that are read
 from the tuple. The \LangPVec{} language includes the following AST
@@ -21009,8 +21007,9 @@ enables the use of an \code{All} type for a function, thereby making
 it generic.
 \fi
 %
-The grammar for types is extended to include generic types and type
-variables.
+The grammar for types is extended to include the type of a generic
+(\code{All}) and type variables\python{ (\code{GenericVar} in the
+  abstract syntax)}.
 
 \newcommand{\LpolyGrammarRacket}{
 \begin{array}{lcl}
@@ -21036,7 +21035,8 @@ variables.
 
 \newcommand{\LpolyASTPython}{
 \begin{array}{lcl}
-  \Type &::=& \key{AllType}\LP\LS\Var\ldots\RS, \Type\RP \MID \Var 
+  \Type &::=& \key{AllType}\LP\LS\Var\ldots\RS, \Type\RP
+    \MID \key{GenericVar}\LP\Var\RP
 \end{array}
 }  
 
@@ -21181,40 +21181,54 @@ print(apply_twice(id))
 \label{fig:apply-twice}
 \end{figure}
 
-{\color{red}[TODO: discuss generic function definitions]}
 
-The type checker for \LangPoly{} in Figure~\ref{fig:type-check-Lvar0}
-has several new responsibilities (compared to \LangLam{}). The type
-checking of function application is extended to handle the case where
-the operator expression is a generic function. In that case the type
-arguments are deduced by matching the type of the parameters with the
-types of the arguments.
+
+The type checker for \LangPoly{} in Figure~\ref{fig:type-check-Lpoly}
+has several new responsibilities (compared to \LangLam{}) which we
+discuss in the following paragraphs.
+
+\if\edition\racketEd
 %
-The \code{match\_types} auxiliary function carries out this deduction
-by recursively descending through a parameter type \code{pt} and the
-corresponding argument type \code{at}, making sure that they are equal
-except when there is a type parameter on the left (in the parameter
-type). If it is the first time that the type parameter has been
-encountered, then the algorithm deduces an association of the type
-parameter to the corresponding type on the right (in the argument
-type). If it is not the first time that the type parameter has been
-encountered, the algorithm looks up its deduced type and makes sure
-that it is equal to the type on the right.
-%%
-%% Once the type arguments are deduced, the operator expression is
-%% wrapped in an \code{Inst} AST node (for instantiate) that records the
-%% type of the operator, but more importantly, records the deduced type
-%% arguments.
-%%
-The return type of the application is the return type of
-the generic function, but with the type parameters replaced by the
-deduced type arguments, using the \code{substitute\_type} function.
+TODO: function definitions
+%
+\fi
+\if\edition\pythonEd
+%
+Regarding function definitions, if the type annotations on its
+parameters contain generic variables, then the function is generic and
+therefore its type is an \code{All} type wrapped around a function
+type. Otherwise the function is monomorphic and its type is simply
+a function type.
+%
+\fi
 
-The second responsibility of the type checker to extend type equality
-to handle the \code{All} type.  This is not quite as simple as for
-other types, such as function and tuple types, because two \code{All}
-types can be syntactically different even though they are equivalent.
-For example,
+The type checking of function application is extended to handle the
+case where the operator expression is a generic function. In that case
+the type arguments are deduced by matching the type of the parameters
+with the types of the arguments.
+%
+The \code{match\_types} auxiliary function
+(Figure~\ref{fig:type-check-Lpoly-aux}) carries out this deduction by
+recursively descending through a parameter type \code{param\_ty} and
+the corresponding argument type \code{arg\_ty}, making sure that they
+are equal except when there is a type parameter in the parameter
+type. Upon encouterning a type parameter for the first time, the
+algorithm deduces an association of the type parameter to the
+corresponding part of the argument type. If it is not the first time
+that the type parameter has been encountered, the algorithm looks up
+its deduced type and makes sure that it is equal to the corresponding
+part of the argument type.  The return type of the application is the
+return type of the generic function, but with the type parameters
+replaced by the deduced type arguments, using the
+\code{substitute\_type} auxiliary function, which is also listed in
+Figure~\ref{fig:type-check-Lpoly-aux}.
+
+
+The type checker extends type equality to handle the \code{All} type.
+This is not quite as simple as for other types, such as function and
+tuple types, because two \code{All} types can be syntactically
+different even though they are equivalent. For example,
+%
 \racket{\code{(All (T) (T -> T))}}
 \python{\code{All[[T], Callable[[T], T]]}}
 is equivalent to
@@ -21223,15 +21237,16 @@ is equivalent to
 %
 Two generic types should be considered equal if they differ only in
 the choice of the names of the type parameters. The definition of type
-equality in Figure~\ref{fig:type-check-Lvar0-aux} renames the type
+equality in Figure~\ref{fig:type-check-Lpoly-aux} renames the type
 parameters in one type to match the type parameters of the other type.
 
 \if\edition\racketEd
-The third responsibility of the type checker is to make sure that only
-defined type variables appear in type annotations. The
-\code{check\_well\_formed} function defined in
-Figure~\ref{fig:well-formed-types} recursively inspects a type, making
-sure that each type variable has been defined.
+%
+The type checker also ensures that only defined type variables appear
+in type annotations. The \code{check\_well\_formed} function defined
+in Figure~\ref{fig:well-formed-types} recursively inspects a type,
+making sure that each type variable has been defined.
+%
 \fi
 
 
@@ -21306,7 +21321,7 @@ sure that each type variable has been defined.
 \end{lstlisting}
 \fi
 \if\edition\pythonEd
-\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+\begin{lstlisting}[basicstyle=\ttfamily\small]
 def type_check_exp(self, e, env):
   match e:
     case Call(Name(f), args) if f in builtin_functions:
@@ -21325,14 +21340,6 @@ def type_check_exp(self, e, env):
           return self.substitute_type(rt, deduced)
         case _:
           return super().type_check_exp(e, env)
-    case Inst(gen, type_args):
-      gen_t = self.type_check_exp(gen, env)
-      gen.has_type = gen_t
-      match gen_t:
-        case AllType(ps, ty):
-          return self.substitute_type(ty, type_args)
-        case _:
-          raise Exception('type_check_exp: expected generic, not ' + str(gen_t))
     case _:
       return super().type_check_exp(e, env)
 
@@ -21346,7 +21353,7 @@ def type_check(self, p):
               params_t = [t for (x,t) in params]
               ty_params = set()
               for t in params_t:
-                ty_params |= self.generic_variables(t)
+                ty_params |$\mid$|= self.generic_variables(t)
               ty = FunctionType(params_t, returns)
               if len(ty_params) > 0:
                   ty = AllType(list(ty_params), ty)
@@ -21359,7 +21366,7 @@ def type_check(self, p):
 \end{tcolorbox}
 
 \caption{Type checker for the \LangPoly{} language.}
-\label{fig:type-check-Lvar0}
+\label{fig:type-check-Lpoly}
 \end{figure}
 
 \begin{figure}[tbp]
@@ -21428,12 +21435,70 @@ def type_check(self, p):
 \end{lstlisting}
 \fi
 \if\edition\pythonEd
-UNDER CONSTRUCTION
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+def match_types(self, param_ty, arg_ty, deduced, e):
+  match (param_ty, arg_ty):
+    case (GenericVar(id), _):
+      if id in deduced:
+          self.check_type_equal(arg_ty, deduced[id], e)
+      else:
+          deduced[id] = arg_ty
+    case (AllType(ps, ty), AllType(arg_ps, arg_ty)):
+      rename = {ap:p for (ap,p) in zip(arg_ps, ps)}
+      new_arg_ty = self.substitute_type(arg_ty, rename)
+      self.match_types(ty, new_arg_ty, deduced, e)
+    case (TupleType(ps), TupleType(ts)):
+      for (p, a) in zip(ps, ts):
+        self.match_types(p, a, deduced, e)
+    case (ListType(p), ListType(a)):
+      self.match_types(p, a, deduced, e)
+    case (FunctionType(pps, prt), FunctionType(aps, art)):
+      for (pp, ap) in zip(pps, aps):
+          self.match_types(pp, ap, deduced, e)
+      self.match_types(prt, art, deduced, e)
+    case (IntType(), IntType()):
+      pass
+    case (BoolType(), BoolType()):
+      pass
+    case _:
+      raise Exception('mismatch: ' + str(param_ty) + '\n!= ' + str(arg_ty))
+
+def substitute_type(self, ty, var_map):
+  match ty:
+    case GenericVar(id):
+      return var_map[id]
+    case AllType(ps, ty):
+      new_map = copy.deepcopy(var_map)
+      for p in ps:
+        new_map[p] = GenericVar(p)
+      return AllType(ps, self.substitute_type(ty, new_map))
+    case TupleType(ts):
+      return TupleType([self.substitute_type(t, var_map) for t in ts])
+    case ListType(ty):
+      return ListType(self.substitute_type(ty, var_map))
+    case FunctionType(pts, rt):
+      return FunctionType([self.substitute_type(p, var_map) for p in pts],
+                          self.substitute_type(rt, var_map))
+    case IntType():
+      return IntType()
+    case BoolType():
+      return BoolType()
+    case _:
+      raise Exception('substitute_type: unexpected ' + repr(ty))
+
+def check_type_equal(self, t1, t2, e):
+    match (t1, t2):
+      case (AllType(ps1, ty1), AllType(ps2, ty2)):
+        rename = {p2: GenericVar(p1) for (p1,p2) in zip(ps1,ps2)}
+        return self.check_type_equal(ty1, self.substitute_type(ty2, rename), e)
+      case (_, _):
+        return super().check_type_equal(t1, t2, e)
+\end{lstlisting}
 \fi
 \end{tcolorbox}
 
 \caption{Auxiliary functions for type checking \LangPoly{}.}
-\label{fig:type-check-Lvar0-aux}
+\label{fig:type-check-Lpoly-aux}
 \end{figure}
 
 
@@ -21544,11 +21609,11 @@ compilation is handled by the compiler of Chapter~\ref{ch:Lgrad}.
 \label{sec:generic-resolve}
 
 Recall that the type checker for \LangPoly{} deduces the type
-arguments in a call to a generic function. The purpose of the
+arguments at call sites to a generic function. The purpose of the
 \code{resolve} pass is to turn this implicit instantiation into an
-explicit one, by adding \code{Inst} nodes to the syntax of the
-intermediate language.  An \code{Inst} node records the mapping of
-type parameters to type arguments. The semantics of the \code{Inst}
+explicit one, by adding \code{inst} nodes to the syntax of the
+intermediate language.  An \code{inst} node records the mapping of
+type parameters to type arguments. The semantics of the \code{inst}
 node is to instantiate the result of its first argument, a generic
 function, to produce a monomorphic function. However, because the
 interpreter never analyzes type annotations, instantiation can be a
@@ -21690,7 +21755,23 @@ type parameter \code{a} are replaced by \CANYTY{} and the polymorphic
 \end{lstlisting}
 \fi
 \if\edition\pythonEd
+\begin{lstlisting}
+def map(f : Callable[[Any],Any], tup : tuple[Any,Any])-> tuple[Any,Any]:
+  return (f(tup[0]), f(tup[1]))
 
+def add1(x : int) -> int:
+  return (x + 1)
+
+def main() -> int:
+  t = cast(map, |$T_1$|, |$T_2$|)(add1, (0, 41))
+  print(t[1])
+  return 0
+\end{lstlisting}
+{\small
+where\\
+$T_1 = $ \code{Callable[[Callable[[Any], Any],tuple[Any,Any]], tuple[Any,Any]]}\\
+$T_2 = $ \code{Callable[[Callable[[int], int],tuple[int,int]], tuple[int,int]]}
+}
 \fi
 \end{tcolorbox}
 
@@ -21754,44 +21835,92 @@ that the \CANYTY{} type is consistent with any type.)
 
 To implement the \code{erase\_types} pass, we first recommend defining
 a recursive function that translates types, named
-\code{erase\_type}. It replaces type variables with \CANYTY{}
+\code{erase\_type}. It replaces type variables with \CANYTY{} as
+follows.
+%
+\if\edition\racketEd
 \begin{lstlisting}
-|$x$|
+|$T$|
 |$\Rightarrow$|
 Any
 \end{lstlisting}
-and it removes the polymorphic \code{All} types.
+\fi
+\if\edition\pythonEd
+\begin{lstlisting}
+GenericVar(|$T$|)
+|$\Rightarrow$|
+Any
+\end{lstlisting}
+\fi
+%
+\noindent The \code{erase\_type} function also removes the generic
+\code{All} types.
+%
+\if\edition\racketEd
 \begin{lstlisting}
 (All |$xs$| |$T_1$|)
 |$\Rightarrow$|
 |$T'_1$|
 \end{lstlisting}
-Apply the \code{erase\_type} function to all of the type annotations
-in the program.
+\fi
+\if\edition\pythonEd
+\begin{lstlisting}
+AllType(|$xs$|, |$T_1$|)
+|$\Rightarrow$|
+|$T'_1$|
+\end{lstlisting}
+\fi
+where $T'_1$ is the result of applying \code{erase\_type} to $T_1$.
+%
+In this compiler pass, apply the \code{erase\_type} function to all of
+the type annotations in the program.
 
 Regarding the translation of expressions, the case for \code{Inst} is
 the interesting one. We translate it into a \code{Cast}, as shown
-below. The type of the subexpression $e$ is the polymorphic type
-$\LP\key{All}~\itm{xs}~T\RP$. The source type of the cast is the erasure of
-$T$, the type $T'$. The target type $T''$ is the result of
-substituting the argument types $ts$ for the type parameters $xs$ in
-$T$ followed by doing type erasure.
+below.
+The type of hte subexpression $e$ is a generic type of the form
+\racket{$\LP\key{All}~\itm{xs}~T\RP$}
+\python{$\key{AllType}\LP\itm{xs}, T\RP$}.  The source type of the
+cast is the erasure of $T$, the type $T_s$.
+%
+\if\edition\racketEd
+%
+The target type $T_t$ is the result of substituting the argument types
+$ts$ for the type parameters $xs$ in $T$ followed by doing type
+erasure.
+%
 \begin{lstlisting}
 (Inst |$e$| (All |$xs$| |$T$|) |$ts$|)
 |$\Rightarrow$|
-(Cast |$e'$| |$T'$| |$T''$|)
+(Cast |$e'$| |$T_s$| |$T_t$|)
 \end{lstlisting}
-where $T'' = \LP\code{erase-type}~\LP\code{substitute\_type}~s~T\RP\RP$
+%
+where $T_t = \LP\code{erase\_type}~\LP\code{substitute\_type}~s~T\RP\RP$
 and $s = \LP\code{map}~\code{cons}~xs~ts\RP$.
+\fi
+\if\edition\pythonEd
+%
+The target type $T_t$ is the result of substituting the deduced
+argument types $d$ in $T$ followed by doing type erasure.
+%
+\begin{lstlisting}
+Inst(|$e$|, |$d$|)
+|$\Rightarrow$|
+Cast(|$e'$|, |$T_s$|, |$T_t$|)
+\end{lstlisting}
+%
+where
+$T_t = \code{erase\_type}\LP\code{substitute\_type}\LP d, T\RP\RP$.
+\fi
 
-Finally, each polymorphic function is translated to a regular
+Finally, each generic function is translated to a regular
 function in which type erasure has been applied to all the type
 annotations and the body.
-\begin{lstlisting}
-(Poly |$ts$| (Def |$f$| ([|$x_1$| : |$T_1$|] |$\ldots$|) |$T_r$| |$\itm{info}$| |$e$|))
-|$\Rightarrow$|          
-(Def |$f$| ([|$x_1$| : |$T'_1$|] |$\ldots$|) |$T'_r$| |$\itm{info}$| |$e'$|)
-\end{lstlisting}
+%% \begin{lstlisting}
+%% (Poly |$ts$| (Def |$f$| ([|$x_1$| : |$T_1$|] |$\ldots$|) |$T_r$| |$\itm{info}$| |$e$|))
+%% |$\Rightarrow$|          
+%% (Def |$f$| ([|$x_1$| : |$T'_1$|] |$\ldots$|) |$T'_r$| |$\itm{info}$| |$e'$|)
+%% \end{lstlisting}
 
 \begin{exercise}\normalfont\normalsize
   Implement a compiler for the polymorphic language \LangPoly{} by
@@ -21873,7 +22002,71 @@ annotations and the body.
 \end{tikzpicture}
 \fi
 \if\edition\pythonEd
-UNDER CONSTRUCTION
+\begin{tikzpicture}[baseline=(current  bounding  box.center),scale=0.85]
+\node (Lgradual) at (12,4)  {\large \LangPoly{}};
+\node (Lgradual2) at (9,4)  {\large \LangPoly{}};
+\node (Lgradual3) at (6,4)  {\large \LangPoly{}};
+\node (Lgradual4) at (3,4)  {\large \LangPoly{}};
+\node (Lgradualr) at (0,4)  {\large \LangInst{}};
+\node (Llambdapp) at (0,2)  {\large \LangCast{}};
+\node (Llambdaproxy-4) at (3,2)  {\large \LangPVec{}};
+\node (Llambdaproxy-5) at (6,2)  {\large \LangPVec{}};
+\node (F1-1) at (9,2)  {\large \LangPVec{}};
+\node (F1-2) at (12,0)  {\large \LangPVec{}};
+\node (F1-3) at (9,0)  {\large \LangPVec{}};
+\node (F1-4) at (6,0)  {\large \LangPVecAlloc{}};
+\node (F1-5) at (3,0)  {\large \LangPVecAlloc{}};
+\node (F1-6) at (0,0)  {\large \LangPVecAlloc{}};
+\node (C3-2) at (3,-2)  {\large \LangCLoopPVec{}};
+
+\node (x86-2) at (3,-4)  {\large \LangXIndCallVar{}};
+\node (x86-2-1) at (3,-6)  {\large \LangXIndCallVar{}};
+\node (x86-2-2) at (6,-6)  {\large \LangXIndCallVar{}};
+\node (x86-3) at (6,-4)  {\large \LangXIndCallVar{}};
+\node (x86-4) at (9,-4) {\large \LangXIndCall{}};
+\node (x86-5) at (9,-6) {\large \LangXIndCall{}};
+
+
+\path[->,bend right=15] (Lgradual) edge [above] node
+     {\ttfamily\footnotesize shrink} (Lgradual2);
+\path[->,bend right=15] (Lgradual2) edge [above] node
+     {\ttfamily\footnotesize uniquify} (Lgradual3);
+\path[->,bend right=15] (Lgradual3) edge [above] node
+     {\ttfamily\footnotesize reveal\_functions} (Lgradual4);
+\path[->,bend right=15] (Lgradual4) edge [above] node
+     {\ttfamily\footnotesize resolve} (Lgradualr);
+\path[->,bend right=15] (Lgradualr) edge [right] node
+     {\ttfamily\footnotesize erase\_types} (Llambdapp);
+\path[->,bend right=15] (Llambdapp) edge [below] node
+     {\ttfamily\footnotesize differentiate.} (Llambdaproxy-4);
+\path[->,bend left=15] (Llambdaproxy-4) edge [above] node
+     {\ttfamily\footnotesize reveal\_casts} (Llambdaproxy-5);
+\path[->,bend left=15] (Llambdaproxy-5) edge [above] node
+     {\ttfamily\footnotesize convert\_assignments} (F1-1);
+\path[->,bend left=15] (F1-1) edge [left] node
+     {\ttfamily\footnotesize convert\_to\_clos.} (F1-2);
+\path[->,bend left=15] (F1-2) edge [below] node
+     {\ttfamily\footnotesize limit\_fun.} (F1-3);
+\path[->,bend right=15] (F1-3) edge [above] node
+     {\ttfamily\footnotesize expose\_alloc.} (F1-4);
+\path[->,bend right=15] (F1-4) edge [above] node
+     {\ttfamily\footnotesize uncover\_get!} (F1-5);
+\path[->,bend right=15] (F1-5) edge [above] node
+     {\ttfamily\footnotesize remove\_complex.} (F1-6);
+\path[->,bend right=15] (F1-6) edge [right] node
+     {\ttfamily\footnotesize explicate\_control} (C3-2);
+\path[->,bend left=15] (C3-2) edge [left] node
+     {\ttfamily\footnotesize select\_instr.} (x86-2);
+\path[->,bend right=15] (x86-2) edge [left] node
+     {\ttfamily\footnotesize uncover\_live} (x86-2-1);
+\path[->,bend right=15] (x86-2-1) edge [below] node 
+     {\ttfamily\footnotesize build\_inter.} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [left] node
+     {\ttfamily\footnotesize allocate\_reg.} (x86-3);
+\path[->,bend left=15] (x86-3) edge [above] node
+     {\ttfamily\footnotesize patch\_instr.} (x86-4);
+\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize prelude\_and\_conc.} (x86-5);
+\end{tikzpicture}
 \fi
 \end{tcolorbox}
 
