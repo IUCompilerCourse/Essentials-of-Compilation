@@ -6588,15 +6588,15 @@ be more appropriate.
 \index{subject}{conditional expression}
 \setcounter{footnote}{0}
 
-The \LangVar{} language only has a single kind of value, the
+The \LangVar{} language has only a single kind of value, the
 integers. In this chapter we add a second kind of value, the Booleans,
-to create the \LangIf{} language. The Boolean values \emph{true} and
-\emph{false} are written \TRUE{} and \FALSE{} respectively in
-\racket{Racket}\python{Python}.  The \LangIf{} language includes
-several operations that involve Booleans (\key{and}, \key{not},
+to create the \LangIf{} language. In \racket{Racket}\python{Python},
+the Boolean values \emph{true} and \emph{false} are written \TRUE{}
+and \FALSE{}, respectively.  The \LangIf{} language includes several
+operations that involve Booleans (\key{and}, \key{not},
 \racket{\key{eq?}}\python{==}, \key{<}, etc.) and the \key{if}
 expression \python{and statement}.  With the addition of \key{if},
-programs can have non-trivial control flow which
+programs can have nontrivial control flow which
 %
 \racket{impacts \code{explicate\_control} and liveness analysis}
 %
@@ -6614,35 +6614,34 @@ interpretation of the operation. \racket{The Racket
 depending on the operation and the kind of value. For example, the
 result of \racket{\code{(not 1)}}\python{\code{not 1}} is
 \racket{\code{\#f}}\python{False} because \racket{Racket}\python{Python}
-treats non-zero integers as if they were \racket{\code{\#t}}\python{\code{True}}.
+treats nonzero integers as if they were \racket{\code{\#t}}\python{\code{True}}.
 %
-\racket{On the other hand, \code{(car 1)} results in a run-time error
+\racket{On the other hand, \code{(car 1)} results in a runtime error
   in Racket because \code{car} expects a pair.}
 %
-\python{On the other hand, \code{1[0]} results in a run-time error
+\python{On the other hand, \code{1[0]} results in a runtime error
   in Python because an ``\code{int} object is not subscriptable''.}
 
 \racket{Typed Racket}\python{The MyPy type checker} makes similar
-design choices as \racket{Racket}\python{Python}, except much of the
-error detection happens at compile time instead of run
-time\python{~\citep{Lehtosalo2021:MyPy}}. \racket{Typed Racket}\python{MyPy}
+design choices as \racket{Racket}\python{Python}, except that much of the
+error detection happens at compile time instead of runtime\python{~\citep{Lehtosalo2021:MyPy}}. \racket{Typed Racket}\python{MyPy}
 accepts \racket{\code{(not 1)}}\python{\code{not 1}}. But in the case
-of \racket{\code{(car 1)}}\python{\code{1[0]}}, \racket{Typed
-  Racket}\python{MyPy} reports a compile-time error
+of \racket{\code{(car 1)}}\python{\code{1[0]}}, \racket{Typed Racket}
+\python{MyPy} reports a compile-time error
 %
 \racket{because Racket expects the type of the argument to be of the form
   \code{(Listof T)} or \code{(Pairof T1 T2)}.}
 %
 \python{stating that a ``value of type \code{int} is not indexable''.}
 
-The \LangIf{} language performs type checking during compilation like
+The \LangIf{} language performs type checking during compilation just as
 \racket{Typed Racket}\python{MyPy}. In chapter~\ref{ch:Ldyn} we study
 the alternative choice, that is, a dynamically typed language like
 \racket{Racket}\python{Python}.  The \LangIf{} language is a subset of
 \racket{Typed Racket}\python{MyPy}; for some operations we are more
 restrictive, for example, rejecting \racket{\code{(not
     1)}}\python{\code{not 1}}. We keep the type checker for \LangIf{}
-fairly simple because the focus of this book is on compilation, not
+fairly simple because the focus of this book is on compilation and not
 type systems, about which there are already several excellent
 books~\citep{Pierce:2002hj,Pierce:2004fk,Harper2016,Pierce:SF2}.
 
@@ -6659,27 +6658,28 @@ checking and define a type checker for \LangIf{}
 The remaining sections of this chapter discuss how Booleans and
 conditional control flow require changes to the existing compiler
 passes and the addition of new ones. We introduce the \code{shrink}
-pass to translates some operators into others, thereby reducing the
+pass to translate some operators into others, thereby reducing the
 number of operators that need to be handled in later passes.
 %
 The main event of this chapter is the \code{explicate\_control} pass
-that is responsible for translating \code{if}'s into conditional
-\code{goto}'s (section~\ref{sec:explicate-control-Lif}).
+that is responsible for translating \code{if}s into conditional
+\code{goto}s (section~\ref{sec:explicate-control-Lif}).
 %
 Regarding register allocation, there is the interesting question of
-how to handle conditional \code{goto}'s during liveness analysis.
+how to handle conditional \code{goto}s during liveness analysis.
 
 
 \section{The \LangIf{} Language}
 \label{sec:lang-if}
 
-The concrete and abstract syntax of the \LangIf{} language are defined in
-Figures~\ref{fig:Lif-concrete-syntax} and~\ref{fig:Lif-syntax},
-respectively. The \LangIf{} language includes all of 
-\LangVar{} {(shown in gray)}, the Boolean literals \TRUE{} and
-\FALSE{}, \racket{and} the \code{if} expression%
-\python{, and the \code{if}  statement}.
-We expand the set of operators to include
+Definitions of the concrete syntax and abstract syntax of the
+\LangIf{} language are shown in Figures~\ref{fig:Lif-concrete-syntax}
+and~\ref{fig:Lif-syntax}, respectively. The \LangIf{} language
+includes all of \LangVar{} {(shown in gray)}, the Boolean literals
+\TRUE{} and \FALSE{}, \racket{and} the \code{if} expression
+%
+\python{, and the \code{if} statement}.  We expand the set of
+operators to include
 \begin{enumerate}
 \item the logical operators \key{and}, \key{or}, and \key{not},
 \item the \racket{\key{eq?} operation}\python{\key{==} and \key{!=} operations}
@@ -6689,7 +6689,7 @@ We expand the set of operators to include
 \end{enumerate}
 
 \racket{We reorganize the abstract syntax for the primitive
-  operations in figure~\ref{fig:Lif-syntax}, using only one grammar
+  operations given in figure~\ref{fig:Lif-syntax}, using only one grammar
   rule for all of them. This means that the grammar no longer checks
   whether the arity of an operators matches the number of
   arguments. That responsibility is moved to the type checker for
@@ -6837,16 +6837,16 @@ We expand the set of operators to include
 \label{fig:Lif-syntax}
 \end{figure}
 
-Figure~\ref{fig:interp-Lif} defines the interpreter for \LangIf{},
-which inherits from the interpreter for \LangVar{}
+Figure~\ref{fig:interp-Lif} shows the definition of the interpreter
+for \LangIf{}, which inherits from the interpreter for \LangVar{}
 (figure~\ref{fig:interp-Lvar}). The literals \TRUE{} and \FALSE{}
 evaluate to the corresponding Boolean values. The conditional
-expression $\CIF{e_1}{e_2}{\itm{e_3}}$ evaluates expression $e_1$
-and then either evaluates $e_2$ or $e_3$ depending on whether
-$e_1$ produced \TRUE{} or \FALSE{}. The logical operations
-\code{and}, \code{or}, and \code{not} behave according to
-propositional logic. In addition, the \code{and} and \code{or}
-operations perform \emph{short-circuit evaluation}.
+expression $\CIF{e_1}{e_2}{\itm{e_3}}$ evaluates expression $e_1$ and
+then either evaluates $e_2$ or $e_3$, depending on whether $e_1$
+produced \TRUE{} or \FALSE{}. The logical operations \code{and},
+\code{or}, and \code{not} behave according to propositional logic. In
+addition, the \code{and} and \code{or} operations perform
+\emph{short-circuit evaluation}.
 %
 That is, given the expression $\CAND{e_1}{e_2}$, the expression $e_2$
 is not evaluated if $e_1$ evaluates to \FALSE{}.
@@ -7021,7 +7021,7 @@ class InterpLif(InterpLvar):
 It is helpful to think about type checking in two complementary
 ways. A type checker predicts the type of value that will be produced
 by each expression in the program.  For \LangIf{}, we have just two types,
-\INTTY{} and \BOOLTY{}. So a type checker should predict that
+\INTTY{} and \BOOLTY{}. So, a type checker should predict that
 {\if\edition\racketEd
 \begin{lstlisting}
    (+ 10 (- (+ 12 20)))
@@ -7032,7 +7032,7 @@ by each expression in the program.  For \LangIf{}, we have just two types,
    10 + -(12 + 20)
 \end{lstlisting}
 \fi}
-\noindent produces a value of type \INTTY{} while
+\noindent produces a value of type \INTTY{}, whereas
 {\if\edition\racketEd
 \begin{lstlisting}
    (and (not #f) #t)
@@ -7048,7 +7048,9 @@ by each expression in the program.  For \LangIf{}, we have just two types,
 A second way to think about type checking is that it enforces a set of
 rules about which operators can be applied to which kinds of
 values. For example, our type checker for \LangIf{} signals an error
-for the below expression {\if\edition\racketEd
+for the following expression:
+%
+{\if\edition\racketEd
 \begin{lstlisting}
    (not (+ 10 (- (+ 12 20))))
 \end{lstlisting}
@@ -7061,17 +7063,17 @@ for the below expression {\if\edition\racketEd
 \noindent The subexpression
 \racket{\code{(+ 10 (- (+ 12 20)))}}
 \python{\code{(10 + -(12 + 20))}}
-has type \INTTY{} but the type checker enforces the rule that the
+has type \INTTY{}, but the type checker enforces the rule that the
 argument of \code{not} must be an expression of type \BOOLTY{}.
 
 We implement type checking using classes and methods because they
 provide the open recursion needed to reuse code as we extend the type
-checker in later chapters, analogous to the use of classes and methods
+checker in subsequent chapters, analogous to the use of classes and methods
 for the interpreters (section~\ref{sec:extensible-interp}).
 
 We separate the type checker for the \LangVar{} subset into its own
 class, shown in figure~\ref{fig:type-check-Lvar}. The type checker for
-\LangIf{} is shown in figure~\ref{fig:type-check-Lif} and it inherits
+\LangIf{} is shown in figure~\ref{fig:type-check-Lif}, and it inherits
 from the type checker for \LangVar{}. These type checkers are in the
 files
 \racket{\code{type-check-Lvar.rkt}}\python{\code{type\_check\_Lvar.py}}
@@ -7086,10 +7088,10 @@ error or returns \racket{an expression and} its type.
 \racket{It returns an expression because there are situations in which
   we want to change or update the expression.}
 
-Next we discuss the \code{type\_check\_exp} function of \LangVar{} in
-figure~\ref{fig:type-check-Lvar}.  The type of an integer constant is
-\INTTY{}.  To handle variables, the type checker uses the environment
-\code{env} to map variables to types.
+Next we discuss the \code{type\_check\_exp} function of \LangVar{}
+shown in figure~\ref{fig:type-check-Lvar}.  The type of an integer
+constant is \INTTY{}.  To handle variables, the type checker uses the
+environment \code{env} to map variables to types.
 %
 \racket{Consider the case for \key{let}.  We type check the
   initializing expression to obtain its type \key{T} and then
@@ -7339,7 +7341,7 @@ class TypeCheckLif(TypeCheckLvar):
 \label{fig:type-check-Lif}
 \end{figure}
 
-The type checker for \LangIf{} is defined in
+The definition of the type checker for \LangIf{} is shown in
 figure~\ref{fig:type-check-Lif}.
 %
 The type of a Boolean constant is \BOOLTY{}.
@@ -7350,20 +7352,20 @@ The type of a Boolean constant is \BOOLTY{}.
 \python{Logical not requires its argument to be a \BOOLTY{} and
   produces a \BOOLTY{}. Similarly for logical and and logical or. }
 %
-The equality operator requires the two arguments to have the same type
+The equality operator requires the two arguments to have the same type,
 and therefore we handle it separately from the other operators.
 %
 \python{The other comparisons (less-than, etc.) require their
 arguments to be of type \INTTY{} and they produce a \BOOLTY{}.}
 %
 The condition of an \code{if} must
-be of \BOOLTY{} type and the two branches must have the same type.
+be of \BOOLTY{} type, and the two branches must have the same type.
 
 
 \begin{exercise}\normalfont\normalsize
-Create 10 new test programs in \LangIf{}. Half of the programs should
+Create ten new test programs in \LangIf{}. Half the programs should
 have a type error. For those programs, create an empty file with the
-same base name but with file extension \code{.tyerr}. For example, if
+same base name and with file extension \code{.tyerr}. For example, if
 the test
 \racket{\code{cond\_test\_14.rkt}}\python{\code{cond\_test\_14.py}}
 is expected to error, then create
@@ -7379,7 +7381,7 @@ The other half of the test programs should not have type errors.
   \code{type-check-Lif}, which causes the type checker to run prior to
   the compiler passes. Temporarily change the \code{passes} to an
   empty list and run the script, thereby checking that the new test
-  programs either type check or not as intended.}
+  programs either type check or do not, as intended.}
 %
 Run the test script to check that these test programs type check as
 expected.
@@ -7405,7 +7407,7 @@ expressions. A \code{goto} statement transfers control to the $\Tail$
 expression corresponding to its label.
 %
 Figure~\ref{fig:c1-concrete-syntax} defines the concrete syntax of the
-\LangCIf{} intermediate language and figure~\ref{fig:c1-syntax}
+\LangCIf{} intermediate language, and figure~\ref{fig:c1-syntax}
 defines its abstract syntax.
 %
 \fi}
@@ -7561,10 +7563,10 @@ in figure~\ref{fig:c1-syntax}.
 \index{subject}{x86} To implement the new logical operations, the
 comparison operations, and the \key{if} expression\python{ and
   statement}, we delve further into the x86
-language. Figures~\ref{fig:x86-1-concrete} and \ref{fig:x86-1} define
-the concrete and abstract syntax for the \LangXIf{} subset of x86,
-which includes instructions for logical operations, comparisons, and
-\racket{conditional} jumps.
+language. Figures~\ref{fig:x86-1-concrete} and \ref{fig:x86-1} present
+the definitions of the concrete and abstract syntax for the \LangXIf{}
+subset of x86, which includes instructions for logical operations,
+comparisons, and \racket{conditional} jumps.
 %
 \python{The abstract syntax for an \LangXIf{} program contains a
   dictionary mapping labels to sequences of instructions, each of
@@ -7577,7 +7579,7 @@ directly implements logical negation (\code{not} in \LangIf{} and
 encode \code{not}.  The \key{xorq} instruction takes two arguments,
 performs a pairwise exclusive-or ($\mathrm{XOR}$) operation on each
 bit of its arguments, and writes the results into its second argument.
-Recall the truth table for exclusive-or:
+Recall the following truth table for exclusive-or:
 \begin{center}
 \begin{tabular}{l|cc}
    & 0 & 1 \\ \hline
@@ -7589,8 +7591,8 @@ For example, applying $\mathrm{XOR}$ to each bit of the binary numbers
 $0011$ and $0101$ yields $0110$. Notice that in the row of the table
 for the bit $1$, the result is the opposite of the second bit.  Thus,
 the \code{not} operation can be implemented by \code{xorq} with $1$ as
-the first argument as follows, where $\Arg$ is the translation of
-$\Atm$ to x86.
+the first argument, as follows, where $\Arg$ is the translation of
+$\Atm$ to x86:
 \[
 \CASSIGN{\Var}{\CUNIOP{\key{not}}{\Atm}}
 \qquad\Rightarrow\qquad
@@ -7693,13 +7695,13 @@ $\Atm$ to x86.
 
 Next we consider the x86 instructions that are relevant for compiling
 the comparison operations. The \key{cmpq} instruction compares its two
-arguments to determine whether one argument is less than, equal, or
+arguments to determine whether one argument is less than, equal to, or
 greater than the other argument. The \key{cmpq} instruction is unusual
 regarding the order of its arguments and where the result is
-placed. The argument order is backwards: if you want to test whether
+placed. The argument order is backward: if you want to test whether
 $x < y$, then write \code{cmpq} $y$\code{,} $x$. The result of
 \key{cmpq} is placed in the special EFLAGS register. This register
-cannot be accessed directly but it can be queried by a number of
+cannot be accessed directly, but it can be queried by a number of
 instructions, including the \key{set} instruction. The instruction
 $\key{set}cc~d$ puts a \key{1} or \key{0} into the destination $d$
 depending on whether the contents of the EFLAGS register matches the
