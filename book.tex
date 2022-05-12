@@ -630,6 +630,8 @@ defined in the file \code{utilities.rkt} in the support code.}
 (struct Int (value))
 \end{lstlisting}
 An integer node contains just one thing: the integer value.
+We establish the convention that \code{struct} names, such
+as \code{Int}, are capitalized.
 To create an AST node for the integer $8$, we write \INT{8}.
 \begin{lstlisting}
 (define eight (Int 8))
@@ -1718,25 +1720,24 @@ appendix~\ref{appendix:utilities}.\\
 \chapter{Integers and Variables}
 \label{ch:Lvar}
 
-This chapter is about compiling a subset of
+This chapter covers compiling a subset of
 \racket{Racket}\python{Python} to x86-64 assembly
 code~\citep{Intel:2015aa}. The subset, named \LangVar{}, includes
 integer arithmetic and local variables.  We often refer to x86-64
-simply as x86.  The chapter begins with a description of the
-\LangVar{} language (Section~\ref{sec:s0}) followed by an introduction
-to x86 assembly (Section~\ref{sec:x86}). The x86 assembly language is
-large so we discuss only the instructions needed for compiling
-\LangVar{}. We introduce more x86 instructions in later chapters.
-After introducing \LangVar{} and x86, we reflect on their differences
-and come up with a plan to break down the translation from \LangVar{}
-to x86 into a handful of steps (Section~\ref{sec:plan-s0-x86}).  The
-rest of the sections in this chapter give detailed hints regarding
-each step.  We hope to give enough hints that the well-prepared
-reader, together with a few friends, can implement a compiler from
-\LangVar{} to x86 in a short time.  To give the reader a feeling for
-the scale of this first compiler, the instructor solution for the
-\LangVar{} compiler is approximately \racket{500}\python{300} lines of
-code.
+simply as x86.  The chapter first describes the \LangVar{} language
+(section~\ref{sec:s0}) and then introduces x86 assembly
+(section~\ref{sec:x86}). Because x86 assembly language is large, we
+discuss only the instructions needed for compiling \LangVar{}. We
+introduce more x86 instructions in subsequent chapters.  After
+introducing \LangVar{} and x86, we reflect on their differences and
+create a plan to break down the translation from \LangVar{} to x86
+into a handful of steps (section~\ref{sec:plan-s0-x86}).  The rest of
+the chapter gives detailed hints regarding each step.  We aim to give
+enough hints that the well-prepared reader, together with a few
+friends, can implement a compiler from \LangVar{} to x86 in a short
+time.  To suggest the scale of this first compiler, we note that the
+instructor solution for the \LangVar{} compiler is approximately
+\racket{500}\python{300} lines of code.
 
 \section{The \LangVar{} Language}
 \label{sec:s0}
@@ -1744,14 +1745,14 @@ code.
 
 The \LangVar{} language extends the \LangInt{} language with
 variables.  The concrete syntax of the \LangVar{} language is defined
-by the grammar in Figure~\ref{fig:Lvar-concrete-syntax} and the
-abstract syntax is defined in Figure~\ref{fig:Lvar-syntax}.  The
-nonterminal \Var{} may be any \racket{Racket}\python{Python} identifier.
-As in \LangInt{}, \READOP{} is a nullary operator, \key{-} is a unary operator, and
-\key{+} is a binary operator.  Similar to \LangInt{}, the abstract
-syntax of \LangVar{} includes the \racket{\key{Program}
-  struct}\python{\key{Module} instance} to mark the top of the
-program.
+by the grammar presented in figure~\ref{fig:Lvar-concrete-syntax} and
+the abstract syntax is presented in figure~\ref{fig:Lvar-syntax}.  The
+nonterminal \Var{} may be any \racket{Racket}\python{Python}
+identifier.  As in \LangInt{}, \READOP{} is a nullary operator,
+\key{-} is a unary operator, and \key{+} is a binary operator.
+Similarly to \LangInt{}, the abstract syntax of \LangVar{} includes the
+\racket{\key{Program} struct}\python{\key{Module} instance} to mark
+the top of the program.
 %% The $\itm{info}$
 %% field of the \key{Program} structure contains an \emph{association
 %%   list} (a list of key-value pairs) that is used to communicate
@@ -1846,8 +1847,8 @@ exhibit several compilation techniques.
 Let us dive further into the syntax and semantics of the \LangVar{}
 language.  The \key{let} feature defines a variable for use within its
 body and initializes the variable with the value of an expression.
-The abstract syntax for \key{let} is defined in
-Figure~\ref{fig:Lvar-syntax}.  The concrete syntax for \key{let} is
+The abstract syntax for \key{let} is shown in
+figure~\ref{fig:Lvar-syntax}.  The concrete syntax for \key{let} is
 \begin{lstlisting}
 (let ([|$\itm{var}$| |$\itm{exp}$|]) |$\itm{exp}$|)
 \end{lstlisting}
@@ -1878,9 +1879,9 @@ print(10 + x)
 
 {\if\edition\racketEd
 %  
-When there are multiple \key{let}'s for the same variable, the closest
+When there are multiple \key{let}s for the same variable, the closest
 enclosing \key{let} is used. That is, variable definitions overshadow
-prior definitions. Consider the following program with two \key{let}'s
+prior definitions. Consider the following program with two \key{let}s
 that define two variables named \code{x}. Can you figure out the
 result?
 \begin{lstlisting}
@@ -1889,8 +1890,8 @@ result?
 For the purposes of depicting which variable occurrences correspond to
 which definitions, the following shows the \code{x}'s annotated with
 subscripts to distinguish them. Double check that your answer for the
-above is the same as your answer for this annotated version of the
-program.
+previous program is the same as your answer for this annotated version
+of the program.
 \begin{lstlisting}
 (let ([x|$_1$| 32]) (+ (let ([x|$_2$| 10]) x|$_2$|) x|$_1$|))
 \end{lstlisting}
@@ -1908,17 +1909,15 @@ $52$ then $10$, the following produces $42$ (not $-42$).
 
 To prepare for discussing the interpreter of \LangVar{}, we explain
 why we implement it in an object-oriented style. Throughout this book
-we define many interpreters, one for each of language that we
+we define many interpreters, one for each language that we
 study. Because each language builds on the prior one, there is a lot
 of commonality between these interpreters. We want to write down the
-common parts just once instead of many times. A naive 
-interpreter for \LangVar{} would handle the
-\racket{cases for variables and \code{let}}
-\python{case for variables}
-but dispatch to an interpreter for \LangInt{}
-in the rest of the cases. The following code sketches this idea. (We
-explain the \code{env} parameter soon, in
-Section~\ref{sec:interp-Lvar}.)
+common parts just once instead of many times. A naive interpreter for
+\LangVar{} would handle the \racket{cases for variables and
+  \code{let}} \python{case for variables} but dispatch to an
+interpreter for \LangInt{} in the rest of the cases. The following
+code sketches this idea. (We explain the \code{env} parameter in
+section~\ref{sec:interp-Lvar}.)
 
 \begin{center}
 {\if\edition\racketEd  
@@ -1970,8 +1969,8 @@ def interp_Lvar(e, env):
 \end{center}
 The problem with this naive approach is that it does not handle
 situations in which an \LangVar{} feature, such as a variable, is
-nested inside an \LangInt{} feature, like the \code{-} operator, as in
-the following program.
+nested inside an \LangInt{} feature, such as the \code{-} operator, as
+in the following program.
 %
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -1988,16 +1987,15 @@ print(-y)
 \noindent If we invoke \code{interp\_Lvar} on this program, it
 dispatches to \code{interp\_Lint} to handle the \code{-} operator, but
 then it recursively calls \code{interp\_Lint} again on its argument.
-But there is no case for \code{Var} in \code{interp\_Lint} so we get
+Because there is no case for \code{Var} in \code{interp\_Lint}, we get
 an error!
 
 To make our interpreters extensible we need something called
-\emph{open recursion}\index{subject}{open recursion}, where the tying of the
-recursive knot is delayed to when the functions are
-composed. Object-oriented languages provide open recursion via
-method overriding\index{subject}{method overriding}. The
-following code uses method overriding to interpret \LangInt{} and
-\LangVar{} using
+\emph{open recursion}\index{subject}{open recursion}, in which the
+tying of the recursive knot is delayed until the functions are
+composed. Object-oriented languages provide open recursion via method
+overriding\index{subject}{method overriding}. The following code uses
+method overriding to interpret \LangInt{} and \LangVar{} using
 %
 \racket{the
   \href{https://docs.racket-lang.org/guide/classes.html}{\code{class}}
@@ -2007,7 +2005,7 @@ following code uses method overriding to interpret \LangInt{} and
 %
 We define one class for each language and define a method for
 interpreting expressions inside each class. The class for \LangVar{}
-inherits from the class for \LangInt{} and the method
+inherits from the class for \LangInt{}, and the method
 \code{interp\_exp} in \LangVar{} overrides the \code{interp\_exp} in
 \LangInt{}. Note that the default case of \code{interp\_exp} in
 \LangVar{} uses \code{super} to invoke \code{interp\_exp}, and because
@@ -2073,7 +2071,7 @@ def InterpLvar(InterpLint):
 \end{minipage}
 \fi}
 \end{center}
-Getting back to the troublesome example, repeated here:
+Getting back to the troublesome example, repeated here
 {\if\edition\racketEd  
 \begin{lstlisting}
 (Let 'y (Int 10) (Prim '- (Var 'y)))
@@ -2089,8 +2087,8 @@ print(-y)
 \racket{on this expression,}
 \python{on the \code{-y} expression,}
 %
-call it \code{e0}, by creating an object of the \LangVar{} class
-and calling the \code{interp\_exp} method.
+which we call \code{e0}, by creating an object of the \LangVar{} class
+and calling the \code{interp\_exp} method
 {\if\edition\racketEd
 \begin{lstlisting}
 ((send (new interp-Lvar-class) interp_exp '()) e0)
@@ -2104,7 +2102,7 @@ InterpLvar().interp_exp(e0)
 \noindent To process the \code{-} operator, the default case of
 \code{interp\_exp} in \LangVar{} dispatches to the \code{interp\_exp}
 method in \LangInt{}. But then for the recursive method call, it
-dispatches back to \code{interp\_exp} in \LangVar{}, where the
+dispatches to \code{interp\_exp} in \LangVar{}, where the
 \code{Var} node is handled correctly. Thus, method overriding gives us
 the open recursion that we need to implement our interpreters in an
 extensible way.
@@ -2113,55 +2111,16 @@ extensible way.
 \subsection{Definitional Interpreter for \LangVar{}}
 \label{sec:interp-Lvar}
 
-{\if\edition\racketEd
-\begin{figure}[tp]
-%\begin{wrapfigure}[26]{r}[0.75in]{0.55\textwidth}
-  \small
-  \begin{tcolorbox}[title=Association Lists as Dictionaries]
-  An \emph{association list} (alist) is a list of key-value pairs.
-  For example, we can map people to their ages with an alist.
-  \index{subject}{alist}\index{subject}{association list}
-  \begin{lstlisting}[basicstyle=\ttfamily]
-  (define ages '((jane . 25) (sam . 24) (kate . 45)))
-  \end{lstlisting}
-  The \emph{dictionary} interface is for mapping keys to values.
-  Every alist implements this interface.  \index{subject}{dictionary} The package
-  \href{https://docs.racket-lang.org/reference/dicts.html}{\code{racket/dict}}
-  provides many functions for working with dictionaries. Here
-  are a few of them:
-  \begin{description}
-  \item[$\LP\key{dict-ref}\,\itm{dict}\,\itm{key}\RP$]
-    returns the value associated with the given $\itm{key}$.
-  \item[$\LP\key{dict-set}\,\itm{dict}\,\itm{key}\,\itm{val}\RP$]
-    returns a new dictionary that maps $\itm{key}$ to $\itm{val}$
-    but otherwise is the same as $\itm{dict}$.
-  \item[$\LP\code{in-dict}\,\itm{dict}\RP$] returns the
-    \href{https://docs.racket-lang.org/reference/sequences.html}{sequence}
-    of keys and values in $\itm{dict}$. For example, the following
-    creates a new alist in which the ages are incremented.
-  \end{description}
-  \vspace{-10pt}
-  \begin{lstlisting}[basicstyle=\ttfamily]
-  (for/list ([(k v) (in-dict ages)])
-    (cons k (add1 v)))
-  \end{lstlisting}
-\end{tcolorbox}
-  %\end{wrapfigure}
-  \caption{Association lists implement the dictionary interface.}
-  \label{fig:alist}
-\end{figure}
-\fi}
-
 Having justified the use of classes and methods to implement
 interpreters, we revisit the definitional interpreter for \LangInt{}
-in Figure~\ref{fig:interp-Lint-class} and then extend it to create an
-interpreter for \LangVar{} in Figure~\ref{fig:interp-Lvar}.  The
-interpreter for \LangVar{} adds two new \key{match} cases for
+shown in figure~\ref{fig:interp-Lint-class} and then extend it to
+create an interpreter for \LangVar{}, shown in figure~\ref{fig:interp-Lvar}.
+The interpreter for \LangVar{} adds two new \key{match} cases for
 variables and \racket{\key{let}}\python{assignment}. For
-\racket{\key{let}}\python{assignment} we need a way to communicate the
+\racket{\key{let}}\python{assignment}, we need a way to communicate the
 value bound to a variable to all the uses of the variable. To
-accomplish this, we maintain a mapping from variables to values
-called an \emph{environment}\index{subject}{environment}.
+accomplish this, we maintain a mapping from variables to values called
+an \emph{environment}\index{subject}{environment}.
 %
 We use
 %
@@ -2305,12 +2264,51 @@ def interp_Lvar(p):
 \label{fig:interp-Lvar}
 \end{figure}
 
+{\if\edition\racketEd
+\begin{figure}[tp]
+%\begin{wrapfigure}[26]{r}[0.75in]{0.55\textwidth}
+  \small
+  \begin{tcolorbox}[title=Association Lists as Dictionaries]
+  An \emph{association list} (called an alist) is a list of key-value pairs.
+  For example, we can map people to their ages with an alist
+  \index{subject}{alist}\index{subject}{association list}
+  \begin{lstlisting}[basicstyle=\ttfamily]
+  (define ages '((jane . 25) (sam . 24) (kate . 45)))
+  \end{lstlisting}
+  The \emph{dictionary} interface is for mapping keys to values.
+  Every alist implements this interface.  \index{subject}{dictionary}
+  The package
+  \href{https://docs.racket-lang.org/reference/dicts.html}{\code{racket/dict}}
+  provides many functions for working with dictionaries, such as
+  \begin{description}
+  \item[$\LP\key{dict-ref}\,\itm{dict}\,\itm{key}\RP$]
+    returns the value associated with the given $\itm{key}$.
+  \item[$\LP\key{dict-set}\,\itm{dict}\,\itm{key}\,\itm{val}\RP$]
+    returns a new dictionary that maps $\itm{key}$ to $\itm{val}$
+    and otherwise is the same as $\itm{dict}$.
+  \item[$\LP\code{in-dict}\,\itm{dict}\RP$] returns the
+    \href{https://docs.racket-lang.org/reference/sequences.html}{sequence}
+    of keys and values in $\itm{dict}$. For example, the following
+    creates a new alist in which the ages are incremented:
+  \end{description}
+  \vspace{-10pt}
+  \begin{lstlisting}[basicstyle=\ttfamily]
+  (for/list ([(k v) (in-dict ages)])
+    (cons k (add1 v)))
+  \end{lstlisting}
+\end{tcolorbox}
+  %\end{wrapfigure}
+  \caption{Association lists implement the dictionary interface.}
+  \label{fig:alist}
+\end{figure}
+\fi}
+
 The goal for this chapter is to implement a compiler that translates
 any program $P_1$ written in the \LangVar{} language into an x86 assembly
 program $P_2$ such that $P_2$ exhibits the same behavior when run on a
 computer as the $P_1$ program interpreted by \code{interp\_Lvar}.
 That is, they output the same integer $n$. We depict this correctness
-criteria in the following diagram.
+criteria in the following diagram:
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
  \node (p1) at (0,  0)   {$P_1$};
@@ -2334,9 +2332,8 @@ Figure~\ref{fig:x86-int-concrete} defines the concrete syntax for
 assembler.
 %
 A program begins with a \code{main} label followed by a sequence of
-instructions. The \key{globl} directive says that the \key{main}
-procedure is externally visible, which is necessary so that the
-operating system can call it.
+instructions. The \key{globl} directive makes the \key{main} procedure
+externally visible so that the operating system can call it.
 %
 An x86 program is stored in the computer's memory.  For our purposes,
 the computer's memory is a mapping of 64-bit addresses to 64-bit
