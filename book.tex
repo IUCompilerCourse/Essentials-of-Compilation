@@ -75,6 +75,7 @@ showstringspaces=false
 \newtheorem{exercise}[theorem]{Exercise}
 \numberwithin{theorem}{chapter}
 \numberwithin{definition}{chapter}
+\numberwithin{equation}{chapter}
 
 % Adjusted settings
 \setlength{\columnsep}{4pt}
@@ -4071,26 +4072,27 @@ all, fast code is useless if it produces incorrect results!
 
 \index{subject}{register allocation}
 
-In chapter~\ref{ch:Lvar} we compiled \LangVar{} to x86, storing
-variables on the procedure call stack.  It can take 10s to 100s of
-cycles for the CPU to access locations on the stack whereas accessing
-a register takes only a single cycle. In this chapter we improve the
-efficiency of our generated code by storing some variables in
-registers. The goal of register allocation is to fit as many variables
-into registers as possible. Some programs have more variables than
-registers so we cannot always map each variable to a different
-register. Fortunately, it is common for different variables to be
-in-use during different periods of time during program execution, and
-in those cases we can map multiple variables to the same register.
+In chapter~\ref{ch:Lvar} we learned how to compile \LangVar{} to x86,
+storing variables on the procedure call stack.  The CPU may require tens
+to hundreds of cycles to access a location on the stack, whereas
+accessing a register takes only a single cycle. In this chapter we
+improve the efficiency of our generated code by storing some variables
+in registers. The goal of register allocation is to fit as many
+variables into registers as possible. Some programs have more
+variables than registers, so we cannot always map each variable to a
+different register. Fortunately, it is common for different variables
+to be in use during different periods of time during program
+execution, and in those cases we can map multiple variables to the
+same register.
 
-The program in figure~\ref{fig:reg-eg} serves as a running
+The program shown in figure~\ref{fig:reg-eg} serves as a running
 example. The source program is on the left and the output of
-instruction selection is on the right. The program is almost in the
-x86 assembly language but it still uses variables.  Consider variables
-\code{x} and \code{z}.  After the variable \code{x} is moved to
-\code{z} it is no longer in-use.  Variable \code{z}, on the other
-hand, is used only after this point, so \code{x} and \code{z} could
-share the same register.
+instruction selection is on the right. The program is almost
+completely in the x86 assembly language, but it still uses variables.
+Consider variables \code{x} and \code{z}.  After the variable \code{x}
+has been moved to \code{z}, it is no longer in use.  Variable \code{z}, on
+the other hand, is used only after this point, so \code{x} and
+\code{z} could share the same register.
 
 \begin{figure}
 \begin{tcolorbox}[colback=white]
@@ -4160,14 +4162,13 @@ callq print_int
 \fi}
 \end{minipage}
 \end{tcolorbox}
-
 \caption{A running example for register allocation.}
 \label{fig:reg-eg}
 \end{figure}
 
 The topic of section~\ref{sec:liveness-analysis-Lvar} is how to
-compute where a variable is in-use.  Once we have that information, we
-compute which variables are in-use at the same time, i.e., which ones
+compute where a variable is in use.  Once we have that information, we
+compute which variables are in use at the same time, i.e., which ones
 \emph{interfere}\index{subject}{interfere} with each other, and
 represent this relation as an undirected graph whose vertices are
 variables and edges indicate when two variables interfere
@@ -4176,8 +4177,8 @@ allocation as a graph coloring problem
 (section~\ref{sec:graph-coloring}).
 
 If we run out of registers despite these efforts, we place the
-remaining variables on the stack, similar to what we did in
-chapter~\ref{ch:Lvar}. It is common to use the verb
+remaining variables on the stack, similarly to how we handled
+variables in chapter~\ref{ch:Lvar}. It is common to use the verb
 \emph{spill}\index{subject}{spill} for assigning a variable to a stack
 location. The decision to spill a variable is handled as part of the
 graph coloring process.
@@ -4186,11 +4187,11 @@ We make the simplifying assumption that each variable is assigned to
 one location (a register or stack address). A more sophisticated
 approach is to assign a variable to one or more locations in different
 regions of the program.  For example, if a variable is used many times
-in short sequence and then only used again after many other
+in short sequence and then used again only after many other
 instructions, it could be more efficient to assign the variable to a
 register during the initial sequence and then move it to the stack for
 the rest of its lifetime. We refer the interested reader to
-\citet{Cooper:2011aa} (Chapter 13) for more information about that
+\citet{Cooper:2011aa} (chapter 13) for more information about that
 approach.
 
 % discuss prioritizing variables based on how much they are used.
@@ -4216,7 +4217,7 @@ MacOS~\citep{Bryant:2005aa,Matz:2013aa}.
 %
 The calling conventions include rules about how functions share the
 use of registers. In particular, the caller is responsible for freeing
-up some registers prior to the function call for use by the callee.
+some registers prior to the function call for use by the callee.
 These are called the \emph{caller-saved registers}
 \index{subject}{caller-saved registers}
 and they are
@@ -4231,7 +4232,7 @@ rsp rbp rbx r12 r13 r14 r15
 \end{lstlisting}
 
 We can think about this caller/callee convention from two points of
-view, the caller view and the callee view:
+view, the caller view and the callee view, as follows:
 \begin{itemize}
 \item The caller should assume that all the caller-saved registers get
   overwritten with arbitrary values by the callee.  On the other hand,
@@ -4253,13 +4254,13 @@ function are passed in the following six registers, in this order.
 \begin{lstlisting}
 rdi rsi rdx rcx r8 r9
 \end{lstlisting}
-If there are more than six arguments, then the convention is to use
+If there are more than six arguments, the convention is to use
 space on the frame of the caller for the rest of the
 arguments. However, in chapter~\ref{ch:Lfun} we arrange never to
 need more than six arguments.
 %
-\racket{For now, the only function we care about is \code{read\_int}
-  and it takes zero arguments.}
+\racket{For now, the only function we care about is \code{read\_int},
+  which takes zero arguments.}
 %
 \python{For now, the only functions we care about are \code{read\_int}
   and \code{print\_int}, which take zero and one argument, respectively.}
@@ -4267,19 +4268,18 @@ need more than six arguments.
 The register \code{rax} is used for the return value of a function.
 
 The next question is how these calling conventions impact register
-allocation. Consider the \LangVar{} program in
+allocation. Consider the \LangVar{} program presented in
 figure~\ref{fig:example-calling-conventions}.  We first analyze this
 example from the caller point of view and then from the callee point
-of view. We refer to a variable that is in-use during a function call
-as being a \emph{call-live variable}\index{subject}{call-live
-  variable}.
+of view. We refer to a variable that is in use during a function call
+as a \emph{call-live variable}\index{subject}{call-live variable}.
 
 The program makes two calls to \READOP{}.  The variable \code{x} is
-call-live because it is in-use during the second call to \READOP{}; we
+call-live because it is in use during the second call to \READOP{}; we
 must ensure that the value in \code{x} does not get overwritten during
 the call to \READOP{}.  One obvious approach is to save all the values
 that reside in caller-saved registers to the stack prior to each
-function call, and restore them after each call. That way, if the
+function call and to restore them after each call. That way, if the
 register allocator chooses to assign \code{x} to a caller-saved
 register, its value will be preserved across the call to \READOP{}.
 However, saving and restoring to the stack is relatively slow. If
@@ -4288,17 +4288,17 @@ to a stack location in the first place. Or better yet, if we can
 arrange for \code{x} to be placed in a callee-saved register, then it
 won't need to be saved and restored during function calls.
 
-The approach that we recommend for call-live variables is to either
+The approach that we recommend for call-live variables is either to
 assign them to callee-saved registers or to spill them to the
 stack. On the other hand, for variables that are not call-live, we try
-the following alternatives in order 1) look for an available
+the following alternatives in order: (1) look for an available
 caller-saved register (to leave room for other variables in the
-callee-saved register), 2) look for a callee-saved register, and 3)
+callee-saved register), (2) look for a callee-saved register, and (3)
 spill the variable to the stack.
 
 It is straightforward to implement this approach in a graph coloring
 register allocator. First, we know which variables are call-live
-because we already need to compute which variables are in-use at every
+because we already need to compute which variables are in use at every
 instruction (section~\ref{sec:liveness-analysis-Lvar}). Second, when
 we build the interference graph
 (section~\ref{sec:build-interference}), we can place an edge between
@@ -4316,12 +4316,12 @@ is already in a safe place during the second call to
 call-live variable.
 
 Next we analyze the example from the callee point of view, focusing on
-the prelude and conclusion of the \code{main} function. As usual the
+the prelude and conclusion of the \code{main} function. As usual, the
 prelude begins with saving the \code{rbp} register to the stack and
 setting the \code{rbp} to the current stack pointer. We now know why
 it is necessary to save the \code{rbp}: it is a callee-saved register.
-The prelude then pushes \code{rbx} to the stack because 1) \code{rbx}
-is a callee-saved register and 2) \code{rbx} is assigned to a variable
+The prelude then pushes \code{rbx} to the stack because (1) \code{rbx}
+is a callee-saved register and (2) \code{rbx} is assigned to a variable
 (\code{x}). The other callee-saved registers are not saved in the
 prelude because they are not used. The prelude subtracts 8 bytes from
 the \code{rsp} to make it 16-byte aligned. Shifting attention to the
@@ -4416,8 +4416,8 @@ main:
 \index{subject}{liveness analysis}
 
 The \code{uncover\_live} \racket{pass}\python{function} performs
-\emph{liveness analysis}, that is, it discovers which variables are
-in-use in different regions of a program.
+\emph{liveness analysis}; that is, it discovers which variables are
+in use in different regions of a program.
 %
 A variable or register is \emph{live} at a program point if its
 current value is used at some later point in the program.  We refer to
@@ -4438,16 +4438,16 @@ addq b, c
 \end{lstlisting}
 \end{minipage}
 \end{center}
-The answer is no because \code{a} is live from line 1 to 3 and
+The answer is no, because \code{a} is live from line 1 to 3 and
 \code{b} is live from line 4 to 5.  The integer written to \code{b} on
 line 2 is never used because it is overwritten (line 4) before the
 next read (line 5).
 
 The live locations for each instruction can be computed by traversing
-the instruction sequence back to front (i.e., backwards in execution
+the instruction sequence back to front (i.e., backward in execution
 order).  Let $I_1,\ldots, I_n$ be the instruction sequence. We write
 $L_{\mathsf{after}}(k)$ for the set of live locations after
-instruction $I_k$ and $L_{\mathsf{before}}(k)$ for the set of live
+instruction $I_k$ and write $L_{\mathsf{before}}(k)$ for the set of live
 locations before instruction $I_k$.  \racket{We recommend representing
   these sets with the Racket \code{set} data structure described in
   figure~\ref{fig:set}.}  \python{We recommend representing these sets
@@ -4495,16 +4495,16 @@ instruction sequence back to front.
 \begin{equation}\label{eq:live-before-after-minus-writes-plus-reads}
   L_{\mathtt{before}}(k) = (L_{\mathtt{after}}(k) - W(k)) \cup R(k),
 \end{equation}
-where $W(k)$ are the locations written to by instruction $I_k$ and
+where $W(k)$ are the locations written to by instruction $I_k$, and
 $R(k)$ are the locations read by instruction $I_k$.
 
 {\if\edition\racketEd
 %
 There is a special case for \code{jmp} instructions.  The locations
 that are live before a \code{jmp} should be the locations in
-$L_{\mathtt{before}}$ at the target of the jump. So we recommend
+$L_{\mathsf{before}}$ at the target of the jump. So, we recommend
 maintaining an alist named \code{label->live} that maps each label to
-the $L_{\mathtt{before}}$ for the first instruction in its block. For
+the $L_{\mathsf{before}}$ for the first instruction in its block. For
 now the only \code{jmp} in a \LangXVar{} program is the jump to the
 conclusion. (For example, see figure~\ref{fig:reg-eg}.)  The
 conclusion reads from \ttm{rax} and \ttm{rsp}, so the alist should map
@@ -4512,32 +4512,33 @@ conclusion reads from \ttm{rax} and \ttm{rsp}, so the alist should map
 %
 \fi}
 
-Let us walk through the above example, applying these formulas
-starting with the instruction on line 5. We collect the answers in
-figure~\ref{fig:liveness-example-0}.  The $L_{\mathsf{after}}$ for the
-\code{addq b, c} instruction is $\emptyset$ because it is the last
-instruction (formula~\ref{eq:live-last-empty}).  The
-$L_{\mathsf{before}}$ for this instruction is $\{\ttm{b},\ttm{c}\}$
-because it reads from variables \code{b} and \code{c}
-(formula~\ref{eq:live-before-after-minus-writes-plus-reads}), that is
+Let us walk through the previous example, applying these formulas
+starting with the instruction on line 5 of the code fragment. We
+collect the answers in figure~\ref{fig:liveness-example-0}.  The
+$L_{\mathsf{after}}$ for the \code{addq b, c} instruction is
+$\emptyset$ because it is the last instruction
+(formula~\eqref{eq:live-last-empty}).  The $L_{\mathsf{before}}$ for
+this instruction is $\{\ttm{b},\ttm{c}\}$ because it reads from
+variables \code{b} and \code{c}
+(formula~\eqref{eq:live-before-after-minus-writes-plus-reads})
 \[
    L_{\mathsf{before}}(5) = (\emptyset - \{\ttm{c}\}) \cup \{ \ttm{b}, \ttm{c} \} = \{ \ttm{b}, \ttm{c} \}
 \]
 Moving on the the instruction \code{movq \$10, b} at line 4, we copy
 the live-before set from line 5 to be the live-after set for this
-instruction (formula~\ref{eq:live-after-before-next}).
+instruction (formula~\eqref{eq:live-after-before-next}).
 \[
   L_{\mathsf{after}}(4) = \{ \ttm{b}, \ttm{c} \}
 \]
 This move instruction writes to \code{b} and does not read from any
 variables, so we have the following live-before set
-(formula~\ref{eq:live-before-after-minus-writes-plus-reads}).
+(formula~\eqref{eq:live-before-after-minus-writes-plus-reads}).
 \[
   L_{\mathsf{before}}(4) = (\{\ttm{b},\ttm{c}\} - \{\ttm{b}\}) \cup \emptyset = \{ \ttm{c} \}
 \]
 The live-before for instruction \code{movq a, c}
 is $\{\ttm{a}\}$ because it writes to $\{\ttm{c}\}$ and reads from $\{\ttm{a}\}$
-(formula~\ref{eq:live-before-after-minus-writes-plus-reads}).  The
+(formula~\eqref{eq:live-before-after-minus-writes-plus-reads}).  The
 live-before for \code{movq \$30, b} is $\{\ttm{a}\}$ because it writes to a
 variable that is not live and does not read from a variable.
 Finally, the live-before for \code{movq \$5, a} is $\emptyset$
@@ -4664,15 +4665,15 @@ L_{\mathsf{after}}(5)=  \emptyset
   of instructions and an initial live-after set (typically empty) and
   returns the list of live-after sets.}
 %
-We recommend creating auxiliary functions to 1) compute the set
-of locations that appear in an \Arg{}, 2) compute the locations read
-by an instruction (the $R$ function), and 3) the locations written by
+We recommend creating auxiliary functions to (1) compute the set
+of locations that appear in an \Arg{}, (2) compute the locations read
+by an instruction (the $R$ function), and (3) the locations written by
 an instruction (the $W$ function). The \code{callq} instruction should
-include all of the caller-saved registers in its write-set $W$ because
+include all the caller-saved registers in its write set $W$ because
 the calling convention says that those registers may be written to
 during the function call. Likewise, the \code{callq} instruction
 should include the appropriate argument-passing registers in its
-read-set $R$, depending on the arity of the function being
+read set $R$, depending on the arity of the function being
 called. (This is why the abstract syntax for \code{callq} includes the
 arity.)
 \end{exercise}
@@ -4717,15 +4718,15 @@ arity.)
 \end{figure}
 \fi}
 
-Based on the liveness analysis, we know where each location is live.
-However, during register allocation, we need to answer questions of
-the specific form: are locations $u$ and $v$ live at the same time?
-(And therefore cannot be assigned to the same register.)  To make this
-question more efficient to answer, we create an explicit data
-structure, an \emph{interference graph}\index{subject}{interference
-  graph}.  An interference graph is an undirected graph that has an
-edge between two locations if they are live at the same time, that is,
-if they interfere with each other.
+On the basis of the liveness analysis, we know where each location is
+live.  However, during register allocation, we need to answer
+questions of the specific form: are locations $u$ and $v$ live at the
+same time?  (If so, they cannot be assigned to the same register.)  To
+make this question more efficient to answer, we create an explicit
+data structure, an \emph{interference
+  graph}\index{subject}{interference graph}.  An interference graph is
+an undirected graph that has an edge between two locations if they are
+live at the same time, that is, if they interfere with each other.
 %
 \racket{We recommend using the Racket \code{graph} package
   (figure~\ref{fig:graph}) to represent the interference graph.}
@@ -4738,7 +4739,7 @@ the set of live locations between each instruction and add an edge to
 the graph for every pair of variables in the same set.  This approach
 is less than ideal for two reasons. First, it can be expensive because
 it takes $O(n^2)$ time to consider every pair in a set of $n$ live
-locations. Second, in the special case where two locations hold the
+locations. Second, in the special case in which two locations hold the
 same value (because one was assigned to the other), they can be live
 at the same time without interfering with each other.
 
@@ -4746,16 +4747,16 @@ A better way to compute the interference graph is to focus on
 writes~\citep{Appel:2003fk}. The writes performed by an instruction
 must not overwrite something in a live location. So for each
 instruction, we create an edge between the locations being written to
-and the live locations. (Except that a location never interferes with
-itself.) For the \key{callq} instruction, we consider all of the
-caller-saved registers as being written to, so an edge is added
+and the live locations. (However, a location never interferes with
+itself.) For the \key{callq} instruction, we consider all the
+caller-saved registers to have been written to, so an edge is added
 between every live variable and every caller-saved register. Also, for
 \key{movq} there is the special case of two variables holding the same
 value. If a live variable $v$ is the same as the source of the
 \key{movq}, then there is no need to add an edge between $v$ and the
 destination, because they both hold the same value.
 %
-So we have the following two rules.
+Hence we have the following two rules:
 
 \begin{enumerate}
 \item If instruction $I_k$ is a move instruction of the form
@@ -4769,37 +4770,37 @@ So we have the following two rules.
 \end{enumerate}
 
 Working from the top to bottom of figure~\ref{fig:live-eg}, we apply
-the above rules to each instruction. We highlight a few of the
-instructions.  \racket{The first instruction is \lstinline{movq $1, v}
+these rules to each instruction. We highlight a few of the
+instructions.  \racket{The first instruction is \lstinline{movq $1, v},
   and the live-after set is $\{\ttm{v},\ttm{rsp}\}$. Rule 1 applies,
   so \code{v} interferes with \code{rsp}.}
 %
-\python{The first instruction is \lstinline{movq $1, v} and the
+\python{The first instruction is \lstinline{movq $1, v}, and the
   live-after set is $\{\ttm{v}\}$. Rule 1 applies but there is
   no interference because $\ttm{v}$ is the destination of the move.}
 %
-\racket{The fourth instruction is \lstinline{addq $7, x} and the
+\racket{The fourth instruction is \lstinline{addq $7, x}, and the
   live-after set is $\{\ttm{w},\ttm{x},\ttm{rsp}\}$. Rule 2 applies so
   $\ttm{x}$ interferes with \ttm{w} and \ttm{rsp}.}
 %
-\python{The fourth instruction is \lstinline{addq $7, x} and the
+\python{The fourth instruction is \lstinline{addq $7, x}, and the
   live-after set is $\{\ttm{w},\ttm{x}\}$. Rule 2 applies so
   $\ttm{x}$ interferes with \ttm{w}.}
 %
-\racket{The next instruction is \lstinline{movq x, y} and the
+\racket{The next instruction is \lstinline{movq x, y}, and the
   live-after set is $\{\ttm{w},\ttm{x},\ttm{y},\ttm{rsp}\}$. Rule 1
   applies, so \ttm{y} interferes with \ttm{w} and \ttm{rsp} but not
   \ttm{x} because \ttm{x} is the source of the move and therefore
   \ttm{x} and \ttm{y} hold the same value.}
 %
-\python{The next instruction is \lstinline{movq x, y} and the
+\python{The next instruction is \lstinline{movq x, y}, and the
   live-after set is $\{\ttm{w},\ttm{x},\ttm{y}\}$. Rule 1
   applies, so \ttm{y} interferes with \ttm{w} but not
-  \ttm{x} because \ttm{x} is the source of the move and therefore
+  \ttm{x}, because \ttm{x} is the source of the move and therefore
   \ttm{x} and \ttm{y} hold the same value.}
 %
 Figure~\ref{fig:interference-results} lists the interference results
-for all of the instructions and the resulting interference graph is
+for all the instructions, and the resulting interference graph is
 shown in figure~\ref{fig:interfere}.
 
 
@@ -4934,7 +4935,7 @@ shown in figure~\ref{fig:interfere}.
 
 \begin{exercise}\normalfont\normalsize
 \racket{Implement the compiler pass named \code{build\_interference} according
-to the algorithm suggested above. We recommend using the Racket
+to the algorithm suggested here. We recommend using the Racket
   \code{graph} package to create and inspect the interference graph.
 The output graph of this pass should be stored in the $\itm{info}$ field of
 the program, under the key \code{conflicts}.}
@@ -4948,11 +4949,11 @@ the program, under the key \code{conflicts}.}
 \section{Graph Coloring via Sudoku}
 \label{sec:graph-coloring}
 \index{subject}{graph coloring}
-\index{subject}{Sudoku}
+\index{subject}{sudoku}
 \index{subject}{color}
 
-We come to the main event of this chapter, mapping variables to
-registers and stack locations. Variables that interfere with each
+We come to the main event discussed in this chapter, mapping variables
+to registers and stack locations. Variables that interfere with each
 other must be mapped to different locations.  In terms of the
 interference graph, this means that adjacent vertices must be mapped
 to different locations.  If we think of locations as colors, the
@@ -4960,49 +4961,49 @@ register allocation problem becomes the graph coloring
 problem~\citep{Balakrishnan:1996ve,Rosen:2002bh}.
 
 The reader may be more familiar with the graph coloring problem than he
-or she realizes; the popular game of Sudoku is an instance of the
+or she realizes; the popular game of sudoku is an instance of the
 graph coloring problem. The following describes how to build a graph
-out of an initial Sudoku board.
+out of an initial sudoku board.
 \begin{itemize}
-\item There is one vertex in the graph for each Sudoku square.
+\item There is one vertex in the graph for each sudoku square.
 \item There is an edge between two vertices if the corresponding squares
-  are in the same row, in the same column, or if the squares are in
-  the same $3\times 3$ region.
+  are in the same row, in the same column, or in the same $3\times 3$ region.
 \item Choose nine colors to correspond to the numbers $1$ to $9$.
-\item Based on the initial assignment of numbers to squares in the
-  Sudoku board, assign the corresponding colors to the corresponding
+\item On the basis of the initial assignment of numbers to squares on the
+  sudoku board, assign the corresponding colors to the corresponding
   vertices in the graph.
 \end{itemize}
 If you can color the remaining vertices in the graph with the nine
-colors, then you have also solved the corresponding game of Sudoku.
-Figure~\ref{fig:sudoku-graph} shows an initial Sudoku game board and
-the corresponding graph with colored vertices.  We map the Sudoku
-number 1 to black, 2 to white, and 3 to gray.  We only show edges for a
-sampling of the vertices (the colored ones) because showing edges for
-all of the vertices would make the graph unreadable.
+colors, then you have also solved the corresponding game of sudoku.
+Figure~\ref{fig:sudoku-graph} shows an initial sudoku game board and
+the corresponding graph with colored vertices.  Here we use a
+monochrome representation of colors, mapping the sudoku number 1 to
+black, 2 to white, and 3 to gray.  We show edges for only a sampling
+of the vertices (the colored ones) because showing edges for all the
+vertices would make the graph unreadable.
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]
 \includegraphics[width=0.5\textwidth]{figs/sudoku}
 \includegraphics[width=0.5\textwidth]{figs/sudoku-graph-bw}
 \end{tcolorbox}
-\caption{A Sudoku game board and the corresponding colored graph.}
+\caption{A sudoku game board and the corresponding colored graph.}
 \label{fig:sudoku-graph}
 \end{figure}
 
-Some techniques for playing Sudoku correspond to heuristics used in
+Some techniques for playing sudoku correspond to heuristics used in
 graph coloring algorithms.  For example, one of the basic techniques
-for Sudoku is called Pencil Marks. The idea is to use a process of
+for sudoku is called Pencil Marks. The idea is to use a process of
 elimination to determine what numbers are no longer available for a
-square and write down those numbers in the square (writing very
+square and to write those numbers in the square (writing very
 small). For example, if the number $1$ is assigned to a square, then
 write the pencil mark $1$ in all the squares in the same row, column,
 and region to indicate that $1$ is no longer an option for those other
 squares.
 %
 The Pencil Marks technique corresponds to the notion of
-\emph{saturation}\index{subject}{saturation} due to \cite{Brelaz:1979eu}.  The
-saturation of a vertex, in Sudoku terms, is the set of numbers that
+\emph{saturation}\index{subject}{saturation} due to \citet{Brelaz:1979eu}.  The
+saturation of a vertex, in sudoku terms, is the set of numbers that
 are no longer available. In graph terminology, we have the following
 definition:
 \begin{equation*}
@@ -5016,30 +5017,30 @@ The Pencil Marks technique leads to a simple strategy for filling in
 numbers: if there is a square with only one possible number left, then
 choose that number! But what if there are no squares with only one
 possibility left? One brute-force approach is to try them all: choose
-the first one and if that ultimately leads to a solution, great.  If
+the first one, and if that ultimately leads to a solution, great.  If
 not, backtrack and choose the next possibility.  One good thing about
 Pencil Marks is that it reduces the degree of branching in the search
 tree. Nevertheless, backtracking can be terribly time consuming. One
 way to reduce the amount of backtracking is to use the
-most-constrained-first heuristic (aka. minimum remaining
-values)~\citep{Russell2003}.  That is, when choosing a square, always
+most-constrained-first heuristic (aka minimum remaining
+values)~\citep{Russell2003}.  That is, in choosing a square, always
 choose one with the fewest possibilities left (the vertex with the
 highest saturation).  The idea is that choosing highly constrained
-squares earlier rather than later is better because later on there may
+squares earlier rather than later is better, because later on there may
 not be any possibilities left in the highly saturated squares.
 
-However, register allocation is easier than Sudoku because the
+However, register allocation is easier than sudoku, because the
 register allocator can fall back to assigning variables to stack
 locations when the registers run out. Thus, it makes sense to replace
 backtracking with greedy search: make the best choice at the time and
 keep going. We still wish to minimize the number of colors needed, so
 we use the most-constrained-first heuristic in the greedy search.
-Figure~\ref{fig:satur-algo} gives the pseudo-code for a simple greedy
+Figure~\ref{fig:satur-algo} gives the pseudocode for a simple greedy
 algorithm for register allocation based on saturation and the
 most-constrained-first heuristic. It is roughly equivalent to the
 DSATUR graph coloring algorithm~\citep{Brelaz:1979eu}.
 %,Gebremedhin:1999fk,Omari:2006uq
-Just as in Sudoku, the algorithm represents colors with integers. The
+Just as in sudoku, the algorithm represents colors with integers. The
 integers $0$ through $k-1$ correspond to the $k$ registers that we use
 for register allocation. The integers $k$ and larger correspond to
 stack locations. The registers that are not used for register
@@ -5065,8 +5066,8 @@ particular, we assign $-1$ to \code{rax} and $-2$ to \code{rsp}.
   \centering
 \begin{lstlisting}[basicstyle=\rmfamily,deletekeywords={for,from,with,is,not,in,find},morekeywords={while},columns=fullflexible]
 Algorithm: DSATUR
-Input: a graph |$G$|
-Output: an assignment |$\mathrm{color}[v]$| for each vertex |$v \in G$|
+Input: A graph |$G$|
+Output: An assignment |$\mathrm{color}[v]$| for each vertex |$v \in G$|
 
 |$W \gets \mathrm{vertices}(G)$|
 while |$W \neq \emptyset$| do
@@ -5083,10 +5084,10 @@ while |$W \neq \emptyset$| do
 
 {\if\edition\racketEd      
 With the DSATUR algorithm in hand, let us return to the running
-example and consider how to color the interference graph in
+example and consider how to color the interference graph shown in
 figure~\ref{fig:interfere}.
 %
-We start by assigning the register nodes to their own color. For
+We start by assigning each register node to its own color. For
 example, \code{rax} is assigned the color $-1$ and \code{rsp} is
 assigned $-2$.  The variables are not yet colored, so they are
 annotated with a dash. We then update the saturation for vertices that
@@ -5121,7 +5122,7 @@ it interferes with both \code{rax} and \code{rsp}.
 \draw (rax) to (rsp);
 \end{tikzpicture}
 \]
-The algorithm says to select a maximally saturated vertex. So we pick
+The algorithm says to select a maximally saturated vertex. So, we pick
 $\ttm{t}$ and color it with the first available integer, which is
 $0$. We mark $0$ as no longer available for $\ttm{z}$, $\ttm{rax}$,
 and \ttm{rsp} because they interfere with $\ttm{t}$.
@@ -5154,7 +5155,7 @@ and \ttm{rsp} because they interfere with $\ttm{t}$.
 \end{tikzpicture}
 \]
 We repeat the process, selecting a maximally saturated vertex,
-choosing is \code{z}, and color it with the first available number, which
+choosing \code{z}, and coloring it with the first available number, which
 is $1$. We add $1$ to the saturation for the neighboring vertices
 \code{t}, \code{y}, \code{w}, and \code{rsp}.
 \[
@@ -5305,7 +5306,7 @@ In the last step of the algorithm, we color \code{x} with $1$.
 \draw (rax) to (rsp);
 \end{tikzpicture}
 \]
-So we obtain the following coloring:
+So, we obtain the following coloring:
 \[
 \{
 \ttm{rax} \mapsto -1,
@@ -5480,7 +5481,7 @@ We color the remaining two variables, \code{tmp\_1} and \code{x}, with $1$.
 \draw (v) to (w);
 \end{tikzpicture}
 \]
-So we obtain the following coloring:
+So, we obtain the following coloring:
 \[
 \{ \ttm{tmp\_0} \mapsto  0, 
    \ttm{tmp\_1} \mapsto  1, 
@@ -5503,7 +5504,7 @@ To prioritize the processing of highly saturated nodes inside the
 \code{color\_graph} function, we recommend using the priority queue
 data structure \racket{described in figure~\ref{fig:priority-queue}}\python{in the file \code{priority\_queue.py} of the support code}. \racket{In
 addition, you will need to maintain a mapping from variables to their
-``handles'' in the priority queue so that you can notify the priority
+handles in the priority queue so that you can notify the priority
 queue when their saturation changes.}
 
 {\if\edition\racketEd      
@@ -5512,7 +5513,7 @@ queue when their saturation changes.}
   \small
   \begin{tcolorbox}[title=Priority Queue]
     A \emph{priority queue} is a collection of items in which the
-    removal of items is governed by priority. In a ``min'' queue,
+    removal of items is governed by priority. In a min queue,
     lower priority items are removed first. An implementation is in
     \code{priority\_queue.rkt} of the support code.  \index{subject}{priority
       queue} \index{subject}{minimum priority queue}
@@ -5574,8 +5575,8 @@ assignment of variables to locations.
 
 Adapt the code from the \code{assign\_homes} pass
 (section~\ref{sec:assign-Lvar}) to replace the variables with their
-assigned location. Applying the above assignment to our running
-example, on the left, yields the program on the right.
+assigned location. Applying this assignment to our running
+example shown next, on the left, yields the program on the right.
 % why frame size of 32? -JGS
 \begin{center}
 {\if\edition\racketEd      
@@ -5798,8 +5799,8 @@ saved and restored.
 %
 When calculating the amount to adjust the \code{rsp} in the prelude,
 make sure to take into account the space used for saving the
-callee-saved registers. Also, don't forget that the frame needs to be
-a multiple of 16 bytes! We recommend using the following equation for
+callee-saved registers. Also, remember that the frame needs to be a
+multiple of 16 bytes! We recommend using the following equation for
 the amount $A$ to subtract from the \code{rsp}. Let $S$ be the number
 of spilled variables and $C$ be the number of callee-saved registers
 that were allocated to variables. The $\itm{align}$ function rounds a
@@ -5807,7 +5808,7 @@ number up to the nearest 16 bytes.
 \[
    \itm{A} = \itm{align}(8\itm{S} + 8\itm{C}) - 8\itm{C}
 \]
-The reason we subtract $8\itm{C}$ in the above equation is because the
+The reason we subtract $8\itm{C}$ in this equation is that the
 prelude uses \code{pushq} to save each of the callee-saved registers,
 and \code{pushq} subtracts $8$ from the \code{rsp}.
 
@@ -5820,26 +5821,26 @@ and \code{pushq} subtracts $8$ from the \code{rsp}.
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (Lvar) at (0,2)  {\large \LangVar{}};
 \node (Lvar-2) at (3,2)  {\large \LangVar{}};
-\node (Lvar-3) at (6,2)  {\large \LangVarANF{}};
-\node (Cvar-1) at (3,0)  {\large \LangCVar{}};
+\node (Lvar-3) at (7,2)  {\large \LangVarANF{}};
+\node (Cvar-1) at (0,0)  {\large \LangCVar{}};
 
-\node (x86-2) at (3,-2)  {\large \LangXVar{}};
-\node (x86-3) at (6,-2)  {\large \LangXVar{}};
-\node (x86-4) at (9,-2) {\large \LangXInt{}};
-\node (x86-5) at (9,-4) {\large \LangXInt{}};
+\node (x86-2) at (0,-2)  {\large \LangXVar{}};
+\node (x86-3) at (3,-2)  {\large \LangXVar{}};
+\node (x86-4) at (7,-2) {\large \LangXInt{}};
+\node (x86-5) at (7,-4) {\large \LangXInt{}};
 
-\node (x86-2-1) at (3,-4)  {\large \LangXVar{}};
-\node (x86-2-2) at (6,-4)  {\large \LangXVar{}};
+\node (x86-2-1) at (0,-4)  {\large \LangXVar{}};
+\node (x86-2-2) at (3,-4)  {\large \LangXVar{}};
 
 \path[->,bend left=15] (Lvar) edge [above] node {\ttfamily\footnotesize uniquify} (Lvar-2);
-\path[->,bend left=15] (Lvar-2) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Lvar-3);
+\path[->,bend left=15] (Lvar-2) edge [above] node {\ttfamily\footnotesize remove\_complex\_operands} (Lvar-3);
 \path[->,bend left=15] (Lvar-3) edge [right] node {\ttfamily\footnotesize explicate\_control} (Cvar-1);
-\path[->,bend right=15] (Cvar-1) edge [left] node {\ttfamily\footnotesize select\_instr.} (x86-2);
-\path[->,bend left=15] (x86-2) edge [left] node {\ttfamily\footnotesize uncover\_live} (x86-2-1);
-\path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build\_inter.} (x86-2-2);
-\path[->,bend right=15] (x86-2-2) edge [left] node {\ttfamily\footnotesize allocate\_reg.} (x86-3);
-\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch\_instr.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [left] node {\ttfamily\footnotesize prelude\_and\_concl.} (x86-5);
+\path[->,bend right=15] (Cvar-1) edge [right] node {\ttfamily\footnotesize select\_instructions} (x86-2);
+\path[->,bend left=15] (x86-2) edge [right] node {\ttfamily\footnotesize uncover\_live} (x86-2-1);
+\path[->,bend right=15] (x86-2-1) edge [below] node {\ttfamily\footnotesize build\_interference} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [right] node {\ttfamily\footnotesize allocate\_registers} (x86-3);
+\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch\_instructions} (x86-4);
+\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize prelude\_and\_conclusion} (x86-5);
 \end{tikzpicture}
 \end{tcolorbox}
 
@@ -5863,7 +5864,7 @@ Moving on to the program proper, we see how the registers were
 allocated.
 %
 \racket{Variables \code{v}, \code{x}, and \code{y} were assigned to
-  \code{rbx} and variable \code{z} was assigned to \code{rcx}.}
+  \code{rbx}, and variable \code{z} was assigned to \code{rcx}.}
 %
 \python{Variables \code{v}, \code{x}, \code{y}, and \code{tmp\_0}
   were assigned to \code{rcx} and variables \code{w} and \code{tmp\_1}
@@ -5878,7 +5879,7 @@ registers, so in this case \racket{\code{w}}\python{z} is placed at
 
 In the conclusion\index{subject}{conclusion}, we undo the work that was
 done in the prelude. We move the stack pointer up by \code{8} bytes
-(the room for spilled variables), then we pop the old values of
+(the room for spilled variables), then pop the old values of
 \code{rbx} and \code{rbp} (callee-saved registers), and finish with
 \code{retq} to return control to the operating system.
 
@@ -5976,8 +5977,8 @@ called move biasing, for students who are looking for an extra
 challenge.
 
 {\if\edition\racketEd      
-To motivate the need for move biasing we return to the running example
-but this time we use all of the general purpose registers.  So we have
+To motivate the need for move biasing we return to the running example,
+but this time we use all of the general purpose registers. So, we have
 the following mapping of color numbers to registers.
 \[
   \{ 0 \mapsto \key{\%rcx}, \; 1 \mapsto \key{\%rdx}, \; 2 \mapsto \key{\%rsi}, \ldots \}
@@ -6020,7 +6021,7 @@ jmp conclusion
 \end{lstlisting}
 \end{minipage}
 \end{center}
-In the above output code there are two \key{movq} instructions that
+In this output code there are two \key{movq} instructions that
 can be removed because their source and target are the same.  However,
 if we had put \key{t}, \key{v}, \key{x}, and \key{y} into the same
 register, we could instead remove three \key{movq} instructions.  We
@@ -6039,18 +6040,18 @@ to allocate \code{y} and \code{tmp\_0} to the same register.  \fi}
 We say that two variables $p$ and $q$ are \emph{move
 related}\index{subject}{move related} if they participate together in
 a \key{movq} instruction, that is, \key{movq} $p$\key{,} $q$ or
-\key{movq} $q$\key{,} $p$. When deciding which variable to color next,
-when there are multiple variables with the same saturation, prefer
+\key{movq} $q$\key{,} $p$. In deciding which variable to color next,
+if there are multiple variables with the same saturation, prefer
 variables that can be assigned to a color that is the same as the
-color of a move related variable.  Furthermore, when the register
+color of a move-related variable.  Furthermore, when the register
 allocator chooses a color for a variable, it should prefer a color
 that has already been used for a move-related variable (assuming that
 they do not interfere). Of course, this preference should not override
-the preference for registers over stack locations. So this preference
-should be used as a tie breaker when choosing between registers or
-when choosing between stack locations.
+the preference for registers over stack locations. So, this preference
+should be used as a tie breaker in choosing between registers and
+in choosing between stack locations.
 
-We recommend representing the move relationships in a graph, similar
+We recommend representing the move relationships in a graph, similarly
 to how we represented interference.  The following is the \emph{move
   graph} for our running example.
 {\if\edition\racketEd      
@@ -6126,10 +6127,10 @@ were \code{w} and \code{y}.
 \end{tikzpicture}
 \]
 %
-Last time we chose to color \code{w} with $0$. But this time we see
-that \code{w} is not move related to any vertex, but \code{y} is move
-related to \code{t}.  So we choose to color \code{y} with $0$, the
-same color as \code{t}.
+The last time, we chose to color \code{w} with $0$. This time, we see
+that \code{w} is not move-related to any vertex, but \code{y} is
+move-related to \code{t}.  So we choose to color \code{y} with $0$,
+the same color as \code{t}.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (rax) at (0,0) {$\ttm{rax}:-1,\{0,-2\}$};
@@ -6310,7 +6311,7 @@ To finish the coloring, \code{x} and \code{v} get $0$ and
 \]
 \fi}
 
-So we have the following assignment of variables to registers.
+So, we have the following assignment of variables to registers.
 {\if\edition\racketEd
 \begin{gather*}
   \{ \ttm{v} \mapsto \key{\%rcx}, \,
@@ -6332,9 +6333,11 @@ So we have the following assignment of variables to registers.
      \ttm{tmp\_1} \mapsto \key{-8(\%rbp)} \}
 \end{gather*}
 \fi}
-We apply this register assignment to the running example, on the left,
-to obtain the code in the middle.  The \code{patch\_instructions} then
-deletes the trivial moves to obtain the code on the right.
+%
+We apply this register assignment to the running example shown next,
+on the left, to obtain the code in the middle.  The
+\code{patch\_instructions} then deletes the trivial moves to obtain
+the code on the right.
 
 {\if\edition\racketEd
 \begin{minipage}{0.25\textwidth}
@@ -6442,9 +6445,9 @@ callq print_int
 \begin{exercise}\normalfont\normalsize
 Change your implementation of \code{allocate\_registers} to take move
 biasing into account. Create two new tests that include at least one
-opportunity for move biasing and visually inspect the output x86
+opportunity for move biasing, and visually inspect the output x86
 programs to make sure that your move biasing is working properly. Make
-sure that your compiler still passes all of the tests.
+sure that your compiler still passes all the tests.
 \end{exercise}
 
 %To do: another neat challenge would be to do
@@ -6474,8 +6477,8 @@ algorithm is based on the following observation of
 \citet{Kempe:1879aa}. If a graph $G$ has a vertex $v$ with degree
 lower than $k$, then $G$ is $k$ colorable if the subgraph of $G$ with
 $v$ removed is also $k$ colorable. To see why, suppose that the
-subgraph is $k$ colorable.  At worst the neighbors of $v$ are assigned
-different colors, but since there are less than $k$ neighbors, there
+subgraph is $k$ colorable.  At worst, the neighbors of $v$ are assigned
+different colors, but because there are fewer than $k$ neighbors, there
 will be one or more colors left over to use for coloring $v$ in $G$.
 
 The algorithm of \citet{Chaitin:1981vl} removes a vertex $v$ of degree
@@ -6487,19 +6490,19 @@ of degree lower than $k$ then pick a vertex at random, spill it,
 remove it from the graph, and proceed recursively to color the rest of
 the graph.
 
-Prior to coloring, \citet{Chaitin:1981vl} merge variables that are
-move-related and that don't interfere with each other, a process
-called \emph{coalescing}. While coalescing decreases the number of
+Prior to coloring, \citet{Chaitin:1981vl} merged variables that are
+move-related and that don't interfere with each other, in a process
+called \emph{coalescing}. Although coalescing decreases the number of
 moves, it can make the graph more difficult to
-color. \citet{Briggs:1994kx} propose \emph{conservative coalescing} in
+color. \citet{Briggs:1994kx} proposed \emph{conservative coalescing} in
 which two variables are merged only if they have fewer than $k$
-neighbors of high degree. \citet{George:1996aa} observe that
-conservative coalescing is sometimes too conservative and make it more
+neighbors of high degree. \citet{George:1996aa} observed that
+conservative coalescing is sometimes too conservative and made it more
 aggressive by iterating the coalescing with the removal of low-degree
 vertices.
 %
 Attacking the problem from a different angle, \citet{Briggs:1994kx}
-also propose \emph{biased coloring} in which a variable is assigned to
+also proposed \emph{biased coloring}, in which a variable is assigned to
 the same color as another move-related variable if possible, as
 discussed in section~\ref{sec:move-biasing}.
 %
@@ -6507,10 +6510,10 @@ The algorithm of \citet{Chaitin:1981vl} and its successors iteratively
 performs coalescing, graph coloring, and spill code insertion until
 all variables have been assigned a location.
 
-\citet{Briggs:1994kx} observes that \citet{Chaitin:1982vn} sometimes
-spills variables that don't have to be: a high-degree variable can be
+\citet{Briggs:1994kx} observed that \citet{Chaitin:1982vn} sometimes
+spilled variables that don't have to be: a high-degree variable can be
 colorable if many of its neighbors are assigned the same color.
-\citet{Briggs:1994kx} propose \emph{optimistic coloring}, in which a
+\citet{Briggs:1994kx} proposed \emph{optimistic coloring}, in which a
 high-degree vertex is not immediately spilled. Instead the decision is
 deferred until after the recursive call, at which point it is apparent
 whether there is actually an available color or not. We observe that
@@ -6526,10 +6529,10 @@ The smallest-last ordering algorithm is one of many \emph{greedy}
 coloring algorithms. A greedy coloring algorithm visits all the
 vertices in a particular order and assigns each one the first
 available color. An \emph{offline} greedy algorithm chooses the
-ordering up-front, prior to assigning colors. The algorithm of
+ordering up front, prior to assigning colors. The algorithm of
 \citet{Chaitin:1981vl} should be considered offline because the vertex
 ordering does not depend on the colors assigned.  Other orderings are
-possible. For example, \citet{Chow:1984ys} order variables according
+possible. For example, \citet{Chow:1984ys} ordered variables according
 to an estimate of runtime cost.
 
 An \emph{online} greedy coloring algorithm uses information about the
@@ -6537,11 +6540,11 @@ current assignment of colors to influence the order in which the
 remaining vertices are colored. The saturation-based algorithm
 described in this chapter is one such algorithm. We choose to use
 saturation-based coloring because it is fun to introduce graph
-coloring via Sudoku!
+coloring via sudoku!
 
 A register allocator may choose to map each variable to just one
 location, as in \citet{Chaitin:1981vl}, or it may choose to map a
-variable to one or more locations. The later can be achieved by
+variable to one or more locations. The latter can be achieved by
 \emph{live range splitting}, where a variable is replaced by several
 variables that each handle part of its live
 range~\citep{Chow:1984ys,Briggs:1994kx,Cooper:1998ly}.
@@ -6564,17 +6567,17 @@ range~\citep{Chow:1984ys,Briggs:1994kx,Cooper:1998ly}.
 
 %Register Allocation via Usage Counts, Freiburghouse CACM
 
-\citet{Palsberg:2007si} observe that many of the interference graphs
-that arise from Java programs in the JoeQ compiler are \emph{chordal},
-that is, every cycle with four or more edges has an edge which is not
-part of the cycle but which connects two vertices on the cycle. Such
+\citet{Palsberg:2007si} observed that many of the interference graphs
+that arise from Java programs in the JoeQ compiler are \emph{chordal};
+that is, every cycle with four or more edges has an edge that is not
+part of the cycle but that connects two vertices on the cycle. Such
 graphs can be optimally colored by the greedy algorithm with a vertex
 ordering determined by maximum cardinality search.
 
-In situations where compile time is of utmost importance, such as in
-just-in-time compilers, graph coloring algorithms can be too expensive
-and the linear scan algorithm of \citet{Poletto:1999uq} may be more
-appropriate.
+In situations in which compile time is of utmost importance, such as
+in just-in-time compilers, graph coloring algorithms can be too
+expensive, and the linear scan algorithm of \citet{Poletto:1999uq} may
+be more appropriate.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -8906,9 +8909,9 @@ instruction and associate that with the block's label in the
 %
 The next question is how to analyze jump instructions.  The locations
 that are live before a \code{jmp} should be the locations in
-$L_{\mathtt{before}}$ at the target of the jump. So we recommend
+$L_{\mathsf{before}}$ at the target of the jump. So we recommend
 maintaining a dictionary named \code{live\_before\_block} that maps each
-label to the $L_{\mathtt{before}}$ for the first instruction in its
+label to the $L_{\mathsf{before}}$ for the first instruction in its
 block. After performing liveness analysis on each block, we take the
 live-before set of its first instruction and associate that with the
 block's label in the \code{live\_before\_block} dictionary.
@@ -22430,7 +22433,7 @@ registers.
 % LocalWords:  pushq subq popq negq addq arity uniquify Cvar instr cg
 % LocalWords:  Seq CProgram gensym lib Fprivate Flist tmp ANF Danvy
 % LocalWords:  rco Flists py rhs unhandled cont immediates lstlisting
-% LocalWords:  numberstyle Cormen Sudoku Balakrishnan ve aka DSATUR
+% LocalWords:  numberstyle Cormen sudoku Balakrishnan ve aka DSATUR
 % LocalWords:  Brelaz eu Gebremedhin Omari deletekeywords min JGS wb
 % LocalWords:  morekeywords fullflexible goto allocator tuples Wailes
 % LocalWords:  Kernighan runtime Freiburg Thiemann Bloomington unary
