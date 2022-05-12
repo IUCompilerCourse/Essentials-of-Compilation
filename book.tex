@@ -74,6 +74,7 @@ showstringspaces=false
 
 \newtheorem{exercise}[theorem]{Exercise}
 \numberwithin{theorem}{chapter}
+\numberwithin{definition}{chapter}
 
 % Adjusted settings
 \setlength{\columnsep}{4pt}
@@ -476,6 +477,7 @@ Bloomington, Indiana
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Preliminaries}
 \label{ch:trees-recur}
+\setcounter{footnote}{0}
 
 In this chapter we review the basic tools needed to implement a
 compiler. Programs are typically input by a programmer as text, that
@@ -1719,6 +1721,7 @@ appendix~\ref{appendix:utilities}.\\
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Integers and Variables}
 \label{ch:Lvar}
+\setcounter{footnote}{0}
 
 This chapter covers compiling a subset of
 \racket{Racket}\python{Python} to x86-64 assembly
@@ -2337,14 +2340,15 @@ externally visible so that the operating system can call it.
 %
 An x86 program is stored in the computer's memory.  For our purposes,
 the computer's memory is a mapping of 64-bit addresses to 64-bit
-values.  The computer has a \emph{program counter} (PC)\index{subject}{program
-  counter}\index{subject}{PC} stored in the \code{rip} register that points to
-the address of the next instruction to be executed.  For most
-instructions, the program counter is incremented after the instruction
-is executed, so it points to the next instruction in memory.  Most x86
-instructions take two operands, where each operand is either an
-integer constant (called an \emph{immediate value}\index{subject}{immediate
-  value}), a \emph{register}\index{subject}{register}, or a memory location.
+values.  The computer has a \emph{program counter}
+(PC)\index{subject}{program counter}\index{subject}{PC} stored in the
+\code{rip} register that points to the address of the next instruction
+to be executed.  For most instructions, the program counter is
+incremented after the instruction is executed so that it points to the
+next instruction in memory. Most x86 instructions take two operands,
+each of which is an integer constant (called an \emph{immediate
+  value}\index{subject}{immediate value}), a
+\emph{register}\index{subject}{register}, or a memory location.
 
 \newcommand{\allregisters}{\key{rsp} \MID \key{rbp} \MID \key{rax} \MID \key{rbx} \MID \key{rcx}
               \MID \key{rdx} \MID \key{rsi} \MID \key{rdi} \MID \\
@@ -2401,10 +2405,10 @@ integer constant (called an \emph{immediate value}\index{subject}{immediate
 \end{figure}
 
 A register is a special kind of variable that holds a 64-bit
-value. There are 16 general-purpose registers in the computer and
-their names are given in Figure~\ref{fig:x86-int-concrete}.  A register
-is written with a \key{\%} followed by the register name, such as
-\key{\%rax}.
+value. There are 16 general-purpose registers in the computer; their
+names are given in figure~\ref{fig:x86-int-concrete}.  A register is
+written with a percent sign, \key{\%}, followed by the register name,
+for example \key{\%rax}.
 
 An immediate value is written using the notation \key{\$}$n$ where $n$
 is an integer.
@@ -2412,49 +2416,49 @@ is an integer.
 %
 An access to memory is specified using the syntax $n(\key{\%}r)$,
 which obtains the address stored in register $r$ and then adds $n$
-bytes to the address. The resulting address is used to load or store
+bytes to the address. The resulting address is used to load or to store
 to memory depending on whether it occurs as a source or destination
 argument of an instruction.
 
-An arithmetic instruction such as $\key{addq}\,s\key{,}\,d$ reads from the
-source $s$ and destination $d$, applies the arithmetic operation, then
-writes the result back to the destination $d$. \index{subject}{instruction}
+An arithmetic instruction such as $\key{addq}\,s\key{,}\,d$ reads from
+the source $s$ and destination $d$, applies the arithmetic operation,
+and then writes the result to the destination $d$. \index{subject}{instruction}
 %
 The move instruction $\key{movq}\,s\key{,}\,d$ reads from $s$ and
 stores the result in $d$.
 %
 The $\key{callq}\,\itm{label}$ instruction jumps to the procedure
-specified by the label and $\key{retq}$ returns from a procedure to
+specified by the label, and $\key{retq}$ returns from a procedure to
 its caller. 
 %
-We discuss procedure calls in more detail later in this chapter and in
-Chapter~\ref{ch:Lfun}.
+We discuss procedure calls in more detail further in this chapter and
+in chapter~\ref{ch:Lfun}.
 %
 The last letter \key{q} indicates that these instructions operate on
-quadwords, i.e., 64-bit values.
+quadwords which are 64-bit values.
 %
 \racket{The instruction $\key{jmp}\,\itm{label}$ updates the program
-  counter to the address of the instruction after the specified
-  label.}
+  counter to the address of the instruction immediately after the
+  specified label.}
 
-Appendix~\ref{sec:x86-quick-reference} contains a quick-reference for
-all of the x86 instructions used in this book.
+Appendix~\ref{sec:x86-quick-reference} contains a quick reference for
+all the x86 instructions used in this book.
 
 Figure~\ref{fig:p0-x86} depicts an x86 program that computes
 \racket{\code{(+ 10 32)}}\python{10 + 32}. The instruction
 \lstinline{movq $10, %rax}
-puts $10$ into register \key{rax} and then \lstinline{addq $32, %rax}
+puts $10$ into register \key{rax}, and then \lstinline{addq $32, %rax}
 adds $32$ to the $10$ in \key{rax} and
-puts the result, $42$, back into \key{rax}.
+puts the result, $42$, into \key{rax}.
 %
 The last instruction \key{retq} finishes the \key{main} function by
 returning the integer in \key{rax} to the operating system. The
 operating system interprets this integer as the program's exit
-code. By convention, an exit code of 0 indicates that a program
+code. By convention, an exit code of 0 indicates that a program has
 completed successfully, and all other exit codes indicate various
 errors.
 %
-\racket{Nevertheless, in this book we return the result of the program
+\racket{However, in this book we return the result of the program
   as the exit code.}
 
 \begin{figure}[tbp]
@@ -2478,28 +2482,30 @@ main:
 We exhibit the use of memory for storing intermediate results in the
 next example.  Figure~\ref{fig:p1-x86} lists an x86 program that
 computes \racket{\code{(+ 52 (- 10))}}\python{52 + -10}. This program
-uses a region of memory called the \emph{procedure call stack} (or
-\emph{stack} for
+uses a region of memory called the \emph{procedure call stack}
+(\emph{stack} for
 short). \index{subject}{stack}\index{subject}{procedure call stack}
 The stack consists of a separate \emph{frame}\index{subject}{frame}
 for each procedure call. The memory layout for an individual frame is
-shown in Figure~\ref{fig:frame}.  The register \key{rsp} is called the
-\emph{stack pointer}\index{subject}{stack pointer} and it contains the
+shown in figure~\ref{fig:frame}.  The register \key{rsp} is called the
+\emph{stack pointer}\index{subject}{stack pointer} and contains the
 address of the item at the top of the stack.  In general, we use the
 term \emph{pointer}\index{subject}{pointer} for something that
 contains an address. The stack grows downward in memory, so we
 increase the size of the stack by subtracting from the stack pointer.
 In the context of a procedure call, the \emph{return
-  address}\index{subject}{return address} is the instruction after the
-call instruction on the caller side. The function call instruction,
-\code{callq}, pushes the return address onto the stack prior to
-jumping to the procedure.  The register \key{rbp} is the \emph{base
-  pointer}\index{subject}{base pointer} and is used to access
-variables that are stored in the frame of the current procedure call.
-The base pointer of the caller is stored after the return address. In
-Figure~\ref{fig:frame} we number the variables from $1$ to
-$n$. Variable $1$ is stored at address $-8\key{(\%rbp)}$, variable $2$
-at $-16\key{(\%rbp)}$, etc.
+  address}\index{subject}{return address} is the location of the
+instruction that immediately follows the call instruction on the
+caller side.  The function call instruction, \code{callq}, pushes the
+return address onto the stack prior to jumping to the procedure.  The
+register \key{rbp} is the \emph{base pointer}\index{subject}{base
+  pointer} and is used to access variables that are stored in the
+frame of the current procedure call.  The base pointer of the caller
+is stored immediately after the return address.
+Figure~\ref{fig:frame} shows the memory layout of a frame with storage
+for $n$ variables, which are numbered from $1$ to $n$. Variable $1$ is
+stored at address $-8\key{(\%rbp)}$, variable $2$ at
+$-16\key{(\%rbp)}$, and so on.
 
 \begin{figure}[tbp]
   \begin{minipage}{0.66\textwidth}
@@ -2550,40 +2556,43 @@ main:
 
 
 \begin{figure}[tbp]
+\begin{minipage}{0.66\textwidth}
+\begin{tcolorbox}[colback=white]
 \centering
 \begin{tabular}{|r|l|} \hline
 Position & Contents \\ \hline
-8(\key{\%rbp}) & return address \\
-0(\key{\%rbp}) & old \key{rbp} \\
--8(\key{\%rbp}) & variable $1$ \\
--16(\key{\%rbp}) & variable $2$ \\
+$8$(\key{\%rbp}) & return address \\
+$0$(\key{\%rbp}) & old \key{rbp} \\
+$-8$(\key{\%rbp}) & variable $1$ \\
+$-16$(\key{\%rbp}) & variable $2$ \\
  \ldots  & \ldots \\
-0(\key{\%rsp}) & variable $n$\\ \hline
+$0$(\key{\%rsp}) & variable $n$\\ \hline
 \end{tabular}
-
+\end{tcolorbox}
+\end{minipage}
 \caption{Memory layout of a frame.}
 \label{fig:frame}
 \end{figure}
 
-Getting back to the program in Figure~\ref{fig:p1-x86}, consider how
-control is transferred from the operating system to the \code{main}
-function.  The operating system issues a \code{callq main} instruction
-which pushes its return address on the stack and then jumps to
+In the program shown in figure~\ref{fig:p1-x86}, consider how control
+is transferred from the operating system to the \code{main} function.
+The operating system issues a \code{callq main} instruction that
+pushes its return address on the stack and then jumps to
 \code{main}. In x86-64, the stack pointer \code{rsp} must be divisible
 by 16 bytes prior to the execution of any \code{callq} instruction, so
-when control arrives at \code{main}, the \code{rsp} is 8 bytes out of
-alignment (because the \code{callq} pushed the return address).  The
-first three instructions are the typical
+that when control arrives at \code{main}, the \code{rsp} is 8 bytes
+out of alignment (because the \code{callq} pushed the return address).
+The first three instructions are the typical
 \emph{prelude}\index{subject}{prelude} for a procedure.  The
 instruction \code{pushq \%rbp} first subtracts $8$ from the stack
 pointer \code{rsp} and then saves the base pointer of the caller at
 address \code{rsp} on the stack. The next instruction \code{movq
   \%rsp, \%rbp} sets the base pointer to the current stack pointer,
-which is pointing at the location of the old base pointer. The
+which is pointing to the location of the old base pointer. The
 instruction \code{subq \$16, \%rsp} moves the stack pointer down to
 make enough room for storing variables.  This program needs one
-variable ($8$ bytes) but we round up to 16 bytes so that \code{rsp} is
-16-byte aligned and we're ready to make calls to other functions.
+variable ($8$ bytes), but we round up to 16 bytes so that \code{rsp} is
+16-byte-aligned, and then we are ready to make calls to other functions.
 \racket{The last instruction of the prelude is \code{jmp start}, which
   transfers control to the instructions that were generated from the
   expression \racket{\code{(+ 52 (- 10))}}\python{52 + -10}.}
@@ -2607,42 +2616,42 @@ the value in \code{rax}, updating its contents to $42$.
 \python{The \emph{conclusion}\index{subject}{conclusion} of the
   \code{main} function consists of the last three instructions.}
 %
-The first two restore the \code{rsp} and \code{rbp} registers to the
-state they were in at the beginning of the procedure. In particular,
-\key{addq \$16, \%rsp} moves the stack pointer back to point at the
+The first two restore the \code{rsp} and \code{rbp} registers to their
+states at the beginning of the procedure. In particular,
+\key{addq \$16, \%rsp} moves the stack pointer to point to the
 old base pointer. Then \key{popq \%rbp} restores the old base pointer
 to \key{rbp} and adds $8$ to the stack pointer.  The last instruction,
 \key{retq}, jumps back to the procedure that called this one and adds
 $8$ to the stack pointer.
 
 Our compiler needs a convenient representation for manipulating x86
-programs, so we define an abstract syntax for x86 in
-Figure~\ref{fig:x86-int-ast}. We refer to this language as
+programs, so we define an abstract syntax for x86, shown in
+figure~\ref{fig:x86-int-ast}. We refer to this language as
 \LangXInt{}.
 %
 {\if\edition\pythonEd%
-  The main difference compared to the concrete syntax of \LangXInt{}
-  (Figure~\ref{fig:x86-int-concrete}) is that labels, instruction
+  The main difference between this and the concrete syntax of \LangXInt{}
+  (figure~\ref{fig:x86-int-concrete}) is that labels, instruction
   names, and register names are explicitly represented by strings. 
 \fi} %
 {\if\edition\racketEd  
-The main difference compared to the concrete syntax of \LangXInt{}
-(Figure~\ref{fig:x86-int-concrete}) is that labels are not allowed in
+The main difference between this and the concrete syntax of \LangXInt{}
+(figure~\ref{fig:x86-int-concrete}) is that labels are not allowed in
 front of every instruction. Instead instructions are grouped into
 \emph{basic blocks}\index{subject}{basic block} with a
-label associated with every basic block, which is why the \key{X86Program}
+label associated with every basic block; this is why the \key{X86Program}
 struct includes an alist mapping labels to basic blocks. The reason for this
-organization becomes apparent in Chapter~\ref{ch:Lif} when we
+organization becomes apparent in chapter~\ref{ch:Lif} when we
 introduce conditional branching. The \code{Block} structure includes
-an $\itm{info}$ field that is not needed for this chapter but becomes
-useful in Chapter~\ref{ch:register-allocation-Lvar}.  For now, the
+an $\itm{info}$ field that is not needed in this chapter but becomes
+useful in chapter~\ref{ch:register-allocation-Lvar}.  For now, the
 $\itm{info}$ field should contain an empty list.
 \fi}
 %
 Regarding the abstract syntax for \code{callq}, the \code{Callq} AST
 node includes an integer for representing the arity of the function,
-i.e., the number of arguments, which is helpful to know during
-register allocation (Chapter~\ref{ch:register-allocation-Lvar}).
+that is, the number of arguments, which is helpful to know during
+register allocation (chapter~\ref{ch:register-allocation-Lvar}).
 
 \newcommand{\allastregisters}{\skey{rsp} \MID \skey{rbp} \MID \skey{rax} \MID \skey{rbx} \MID \skey{rcx}
               \MID \skey{rdx} \MID \skey{rsi} \MID \skey{rdi} \MID \\
@@ -2706,7 +2715,7 @@ register allocation (Chapter~\ref{ch:register-allocation-Lvar}).
 \section{Planning the Trip to x86}
 \label{sec:plan-s0-x86}
 
-To compile one language to another it helps to focus on the
+To compile one language to another, it helps to focus on the
 differences between the two languages because the compiler will need
 to bridge those differences. What are the differences between \LangVar{}
 and x86 assembly? Here are some of the most important ones:
@@ -2719,50 +2728,50 @@ and x86 assembly? Here are some of the most important ones:
   Furthermore, some x86 instructions place special restrictions on
   their arguments.
 
-\item An argument of an \LangVar{} operator can be a deeply-nested
+\item An argument of an \LangVar{} operator can be a deeply nested
   expression, whereas x86 instructions restrict their arguments to be
   integer constants, registers, and memory locations.
 
 {\if\edition\racketEd      
-\item The order of execution in x86 is explicit in the syntax: a
-  sequence of instructions and jumps to labeled positions, whereas in
-  \LangVar{} the order of evaluation is a left-to-right depth-first
-  traversal of the abstract syntax tree.
-\fi}
+\item The order of execution in x86 is explicit in the syntax, which
+  is a sequence of instructions and jumps to labeled positions,
+  whereas in \LangVar{} the order of evaluation is a left-to-right
+  depth-first traversal of the abstract syntax tree.  \fi}
 
-\item A program in \LangVar{} can have any number of variables
+\item A program in \LangVar{} can have any number of variables,
   whereas x86 has 16 registers and the procedure call stack.
 {\if\edition\racketEd    
 \item Variables in \LangVar{} can shadow other variables with the
-  same name. In x86, registers have unique names and memory locations
+  same name. In x86, registers have unique names, and memory locations
   have unique addresses.
 \fi}  
 \end{enumerate}
 
 We ease the challenge of compiling from \LangVar{} to x86 by breaking
-down the problem into several steps, dealing with the above
-differences one at a time. Each of these steps is called a \emph{pass}
-of the compiler.\index{subject}{pass}\index{subject}{compiler pass}
+down the problem into several steps, which deal with these differences
+one at a time. Each of these steps is called a \emph{pass} of the
+compiler.\index{subject}{pass}\index{subject}{compiler pass}
 %
-This terminology comes from the way each step passes over, or
-traverses, the AST of the program.
+This term indicates that each step passes over, or traverses, the AST
+of the program.
 %
-Furthermore, we follow the nanopass approach, which means we strive
-for each pass to accomplish one clear objective (not two or three at
-the same time).
+Furthermore, we follow the nanopass approach, which means that we
+strive for each pass to accomplish one clear objective rather than two
+or three at the same time.
 %
-We begin by sketching how we might implement each pass, and give them
-names.  We then figure out an ordering of the passes and the
+We begin by sketching how we might implement each pass and give each
+pass a name.  We then figure out an ordering of the passes and the
 input/output language for each pass. The very first pass has
-\LangVar{} as its input language and the last pass has \LangXInt{} as
-its output language. In between we can choose whichever language is
-most convenient for expressing the output of each pass, whether that
-be \LangVar{}, \LangXInt{}, or new \emph{intermediate languages} of
-our own design.  Finally, to implement each pass we write one
-recursive function per nonterminal in the grammar of the input
-language of the pass.  \index{subject}{intermediate language}
+\LangVar{} as its input language, and the last pass has \LangXInt{} as
+its output language. In between these two passes, we can choose
+whichever language is most convenient for expressing the output of
+each pass, whether that be \LangVar{}, \LangXInt{}, or a new
+\emph{intermediate languages} of our own design.  Finally, to
+implement each pass we write one recursive function per nonterminal in
+the grammar of the input language of the pass.
+\index{subject}{intermediate language}
 
-Our compiler for \LangVar{} consists of the following passes.
+Our compiler for \LangVar{} consists of the following passes:
 %
 \begin{description}
 {\if\edition\racketEd
@@ -2772,7 +2781,7 @@ Our compiler for \LangVar{} consists of the following passes.
 
 \item[\key{remove\_complex\_operands}] ensures that each subexpression
   of a primitive operation or function call is a variable or integer,
-  that is, an \emph{atomic} expression. We refer to non-atomic
+  that is, an \emph{atomic} expression. We refer to nonatomic
   expressions as \emph{complex}.  This pass introduces temporary
   variables to hold the results of complex
   subexpressions.\index{subject}{atomic
@@ -2805,12 +2814,12 @@ approach is to combine them into a single step~\citep{Aho:2006wb}.
 %  
 \fi}
 
-The next question is: in what order should we apply these passes? This
+The next question is, in what order should we apply these passes? This
 question can be challenging because it is difficult to know ahead of
-time which orderings will be better (easier to implement, produce more
-efficient code, etc.) so oftentimes trial-and-error is
-involved. Nevertheless, we can plan ahead and make educated choices
-regarding the ordering.
+time which orderings will be better (that is, will be easier to
+implement, produce more efficient code, and so on), and therefore
+ordering often involves trial and error. Nevertheless, we can plan
+ahead and make educated choices regarding the ordering.
 
 \racket{What should be the ordering of \key{explicate\_control} with respect to
 \key{uniquify}? The \key{uniquify} pass should come first because
@@ -2823,14 +2832,14 @@ because the later removes the \key{let} form, but it is convenient to
 use \key{let} in the output of \key{remove\_complex\_operands}.}
 %
 \racket{The ordering of \key{uniquify} with respect to
-\key{remove\_complex\_operands} does not matter so we arbitrarily choose
+\key{remove\_complex\_operands} does not matter, so we arbitrarily choose
 \key{uniquify} to come first.}
 
 The \key{select\_instructions} and \key{assign\_homes} passes are
 intertwined.
 %
-In Chapter~\ref{ch:Lfun} we learn that, in x86, registers are used for
-passing arguments to functions and it is preferable to assign
+In chapter~\ref{ch:Lfun} we learn that in x86, registers are used for
+passing arguments to functions and that it is preferable to assign
 parameters to their corresponding registers.  This suggests that it
 would be better to start with the \key{select\_instructions} pass,
 which generates the instructions for argument passing, before
@@ -2838,13 +2847,13 @@ performing register allocation.
 %
 On the other hand, by selecting instructions first we may run into a
 dead end in \key{assign\_homes}. Recall that only one argument of an
-x86 instruction may be a memory access but \key{assign\_homes} might
+x86 instruction may be a memory access, but \key{assign\_homes} might
 be forced to assign both arguments to memory locations.
 %
 A sophisticated approach is to repeat the two passes until a solution
 is found. However, to reduce implementation complexity we recommend
 placing \key{select\_instructions} first, followed by the
-\key{assign\_homes}, then a third pass named \key{patch\_instructions}
+\key{assign\_homes}, and then a third pass named \key{patch\_instructions}
 that uses a reserved register to fix outstanding problems.
 
 \begin{figure}[tbp]
@@ -2853,22 +2862,22 @@ that uses a reserved register to fix outstanding problems.
 \begin{tikzpicture}[baseline=(current  bounding  box.center),scale=0.90]
 \node (Lvar) at (0,2)  {\large \LangVar{}};
 \node (Lvar-2) at (3,2)  {\large \LangVar{}};
-\node (Lvar-3) at (6,2)  {\large \LangVarANF{}};
+\node (Lvar-3) at (7,2)  {\large \LangVarANF{}};
 %\node (Cvar-1) at (6,0)  {\large \LangCVar{}};
-\node (Cvar-2) at (3,0)  {\large \LangCVar{}};
+\node (Cvar-2) at (0,0)  {\large \LangCVar{}};
 
-\node (x86-2) at (3,-2)  {\large \LangXVar{}};
-\node (x86-3) at (6,-2)  {\large \LangXVar{}};
-\node (x86-4) at (9,-2) {\large \LangXInt{}};
-\node (x86-5) at (12,-2) {\large \LangXInt{}};
+\node (x86-2) at (0,-2)  {\large \LangXVar{}};
+\node (x86-3) at (3,-2)  {\large \LangXVar{}};
+\node (x86-4) at (7,-2) {\large \LangXInt{}};
+\node (x86-5) at (11,-2) {\large \LangXInt{}};
 
 \path[->,bend left=15] (Lvar) edge [above] node {\ttfamily\footnotesize uniquify} (Lvar-2);
-\path[->,bend left=15] (Lvar-2) edge [above] node {\ttfamily\footnotesize remove\_complex.} (Lvar-3);
+\path[->,bend left=15] (Lvar-2) edge [above] node {\ttfamily\footnotesize remove\_complex\_operands} (Lvar-3);
 \path[->,bend left=15] (Lvar-3) edge [right] node {\ttfamily\footnotesize explicate\_control} (Cvar-2);
-\path[->,bend right=15] (Cvar-2) edge [left] node {\ttfamily\footnotesize select\_instr.} (x86-2);
-\path[->,bend left=15] (x86-2) edge [above] node {\ttfamily\footnotesize assign\_homes} (x86-3);
-\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch\_instr.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize prelude\_and\_concl.} (x86-5);
+\path[->,bend right=15] (Cvar-2) edge [right] node {\ttfamily\footnotesize select\_instructions} (x86-2);
+\path[->,bend right=15] (x86-2) edge [below] node {\ttfamily\footnotesize assign\_homes} (x86-3);
+\path[->,bend left=15] (x86-3) edge [above] node {\ttfamily\footnotesize patch\_instructions} (x86-4);
+\path[->,bend left=15] (x86-4) edge [above] node {\ttfamily\footnotesize prelude\_and\_conclusion} (x86-5);
 \end{tikzpicture}
 \fi}
 
@@ -2909,12 +2918,13 @@ prelude and conclusion.
   language that serves as the output of \code{explicate\_control}.}
 %
 The remainder of this chapter provides guidance on the implementation
-of each of the compiler passes in Figure~\ref{fig:Lvar-passes}.
+of each of the compiler passes represented in
+figure~\ref{fig:Lvar-passes}.
 
 %% The output of \key{uniquify} and \key{remove-complex-operands}
 %% are programs that are still in the \LangVar{} language, though the
 %% output of the later is a subset of \LangVar{} named \LangVarANF{}
-%% (Section~\ref{sec:remove-complex-opera-Lvar}).
+%% (section~\ref{sec:remove-complex-opera-Lvar}).
 %% %
 %% The output of \code{explicate\_control} is in an intermediate language
 %% \LangCVar{} designed to make the order of evaluation explicit in its
@@ -2946,7 +2956,7 @@ of each of the compiler passes in Figure~\ref{fig:Lvar-passes}.
 {\if\edition\racketEd  
 \subsection{The \LangCVar{} Intermediate Language}
 
-The output of \code{explicate\_control} is similar to the $C$
+The output of \code{explicate\_control} is similar to the C
 language~\citep{Kernighan:1988nx} in that it has separate syntactic
 categories for expressions and statements, so we name it \LangCVar{}.
 This style of intermediate language is also known as
@@ -2954,14 +2964,14 @@ This style of intermediate language is also known as
 statement such as \CASSIGN{\key{x}}{\CADD{\key{y}}{\key{z}}} involves three
 addresses: \code{x}, \code{y}, and \code{z}~\citep{Aho:2006wb}.
 
-The concrete syntax for \LangCVar{} is defined in
-Figure~\ref{fig:c0-concrete-syntax} and the abstract syntax for
-\LangCVar{} is defined in Figure~\ref{fig:c0-syntax}.
+The concrete syntax for \LangCVar{} is shown in
+figure~\ref{fig:c0-concrete-syntax}, and the abstract syntax for
+\LangCVar{} is shown in figure~\ref{fig:c0-syntax}.
 %
 The \LangCVar{} language supports the same operators as \LangVar{} but
 the arguments of operators are restricted to atomic
 expressions. Instead of \key{let} expressions, \LangCVar{} has
-assignment statements which can be executed in sequence using the
+assignment statements that can be executed in sequence using the
 \key{Seq} form. A sequence of statements always ends with
 \key{Return}, a guarantee that is baked into the grammar rules for
 \itm{tail}. The naming of this nonterminal comes from the term
@@ -2972,16 +2982,15 @@ program.
 A \LangCVar{} program consists of an alist mapping labels to
 tails. This is more general than necessary for the present chapter, as
 we do not yet introduce \key{goto} for jumping to labels, but it saves
-us from having to change the syntax in Chapter~\ref{ch:Lif}.  For now
-there will be just one label, \key{start}, and the whole program is
+us from having to change the syntax in chapter~\ref{ch:Lif}.  For now
+there is just one label, \key{start}, and the whole program is
 its tail.
 %
 The $\itm{info}$ field of the \key{CProgram} form, after the
-\code{explicate\_control} pass, contains a mapping from the symbol
-\key{locals} to a list of variables, that is, a list of all the
-variables used in the program. At the start of the program, these
-variables are uninitialized; they become initialized on their first
-assignment.
+\code{explicate\_control} pass, contains an alist that associates the
+symbol \key{locals} with a list of all the variables used in the
+program. At the start of the program, these variables are
+uninitialized; they become initialized on their first assignment.
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]
@@ -3056,21 +3065,21 @@ with a \key{let} nested inside the initializing expression of another
 \end{transformation}
 
 We recommend implementing \code{uniquify} by creating a structurally
-recursive function named \code{uniquify\_exp} that mostly just copies
-an expression. However, when encountering a \key{let}, it should
-generate a unique name for the variable and associate the old name
-with the new name in an alist.\footnote{The Racket function
+recursive function named \code{uniquify\_exp} that does little other
+than copy an expression. However, when encountering a \key{let}, it
+should generate a unique name for the variable and associate the old
+name with the new name in an alist.\footnote{The Racket function
   \code{gensym} is handy for generating unique variable names.} The
 \code{uniquify\_exp} function needs to access this alist when it gets
 to a variable reference, so we add a parameter to \code{uniquify\_exp}
 for the alist.
 
 The skeleton of the \code{uniquify\_exp} function is shown in
-Figure~\ref{fig:uniquify-Lvar}.
+figure~\ref{fig:uniquify-Lvar}.
 %% The function is curried so that it is
 %% convenient to partially apply it to an alist and then apply it to
 %% different expressions, as in the last case for primitive operations in
-%% Figure~\ref{fig:uniquify-Lvar}.
+%% figure~\ref{fig:uniquify-Lvar}.
 The
 %
 \href{https://docs.racket-lang.org/reference/for.html#%28form._%28%28lib._racket%2Fprivate%2Fbase..rkt%29._for%2Flist%29%29}{\key{for/list}}
@@ -3103,7 +3112,7 @@ produce a new list.\index{subject}{for/list}
 \normalfont\normalsize % I don't like the italics for exercises. -Jeremy
 
 Complete the \code{uniquify} pass by filling in the blanks in
-Figure~\ref{fig:uniquify-Lvar}, that is, implement the cases for
+figure~\ref{fig:uniquify-Lvar}; that is, implement the cases for
 variables and for the \key{let} form in the file \code{compiler.rkt}
 in the support code.
 \end{exercise}
@@ -3113,21 +3122,21 @@ in the support code.
 \label{ex:Lvar}
 
 Create five \LangVar{} programs that exercise the most interesting
-parts of the \key{uniquify} pass, that is, the programs should include
+parts of the \key{uniquify} pass; that is, the programs should include
 \key{let} forms, variables, and variables that shadow each other.
 The five programs should be placed in the subdirectory named
-\key{tests} and the file names should start with \code{var\_test\_}
+\key{tests}, and the file names should start with \code{var\_test\_}
 followed by a unique integer and end with the file extension
 \key{.rkt}.
 %
 The \key{run-tests.rkt} script in the support code checks whether the
 output programs produce the same result as the input programs.  The
 script uses the \key{interp-tests} function
-(Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to test
+(appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to test
 your \key{uniquify} pass on the example programs.  The \code{passes}
 parameter of \key{interp-tests} is a list that should have one entry
 for each pass in your compiler.  For now, define \code{passes} to
-contain just one entry for \code{uniquify} as shown below.
+contain just one entry for \code{uniquify} as follows:
 \begin{lstlisting}
 (define passes 
   (list (list "uniquify" uniquify interp_Lvar type-check-Lvar)))
@@ -3147,7 +3156,7 @@ into a restricted form in which the arguments of operations are atomic
 expressions.  Put another way, this pass removes complex
 operands\index{subject}{complex operand}, such as the expression
 \racket{\code{(- 10)}}\python{\code{-10}}
-in the program below. This is accomplished by introducing a new
+in the following program. This is accomplished by introducing a new
 temporary variable, assigning the complex operand to the new
 variable, and then using the new variable in place of the complex
 operand, as shown in the output of \code{remove\_complex\_operands} on the
@@ -3239,11 +3248,11 @@ operator arguments are restricted to be atomic expressions that are
 defined by the \Atm{} nonterminal. In particular, integer constants
 and variables are atomic.
 
-The atomic expressions are pure (they do not cause or depend on
-side-effects) whereas complex expressions may have side effects, such
-as \READ{}.  A language with this separation between pure versus
-side-effecting expressions is said to be in monadic normal
-form~\citep{Moggi:1991in,Danvy:2003fk} which explains the \textit{mon}
+The atomic expressions are pure (they do not cause or depend on side
+effects) whereas complex expressions may have side effects, such as
+\READ{}.  A language with this separation between pure expression
+versus expressions with side effects is said to be in monadic normal
+form~\citep{Moggi:1991in,Danvy:2003fk}, which explains the \textit{mon}
 in the name \LangVarANF{}. An important invariant of the
 \code{remove\_complex\_operands} pass is that the relative ordering
 among complex expressions is not changed, but the relative ordering
@@ -3268,7 +3277,7 @@ take an \LangVar{} expression as input.  The \code{rco\_exp} function
 returns an expression.  The \code{rco\_atom} function returns two
 things: an atomic expression and an alist mapping temporary variables to
 complex subexpressions. You can return multiple things from a function
-using Racket's \key{values} form and you can receive multiple things
+using Racket's \key{values} form, and you can receive multiple things
 from a function call using the \key{define-values} form.
 \fi}
 %
@@ -3289,7 +3298,7 @@ Returning to the example program with the expression \code{(+ 42 (-
   10))}, the subexpression \code{(- 10)} should be processed using the
 \code{rco\_atom} function because it is an argument of the \code{+}
 operator and therefore needs to become atomic.  The output of
-\code{rco\_atom} applied to \code{(- 10)} is as follows.
+\code{rco\_atom} applied to \code{(- 10)} is as follows:
 \begin{transformation}
 \begin{lstlisting}
   (- 10)
@@ -3323,7 +3332,7 @@ tmp_1
 %  
 \fi}
 
-Take special care of programs such as the following that
+Take special care of programs, such as the following, that
 %
 \racket{bind a variable to an atomic expression.}
 %
@@ -3397,18 +3406,17 @@ Implement the \code{remove\_complex\_operands} function in
 %
 Create three new \LangVar{} programs that exercise the interesting
 code in the \code{remove\_complex\_operands} pass.  Follow the guidelines
-regarding file names described in Exercise~\ref{ex:Lvar}.
+regarding file names described in exercise~\ref{ex:Lvar}.
 %
 In the \code{run-tests.rkt} script, add the following entry to the
-list of \code{passes} and then run the script to test your compiler.
+list of \code{passes}, and then run the script to test your compiler.
 \begin{lstlisting}
 (list "remove-complex" remove_complex_operands interp_Lvar type-check-Lvar)
 \end{lstlisting}
-While debugging your compiler, it is often useful to see the
-intermediate programs that are output from each pass. To print the
-intermediate programs, place \lstinline{(debug-level 1)} before the call to
-\code{interp-tests} in \code{run-tests.rkt}.
-\fi}
+In debugging your compiler, it is often useful to see the intermediate
+programs that are output from each pass. To print the intermediate
+programs, place \lstinline{(debug-level 1)} before the call to
+\code{interp-tests} in \code{run-tests.rkt}.  \fi}
 %
 {\if\edition\pythonEd
   Implement the \code{remove\_complex\_operands} pass in
@@ -3426,7 +3434,7 @@ intermediate programs, place \lstinline{(debug-level 1)} before the call to
 
 Create five \LangVar{} programs that exercise the most interesting
 parts of the \code{remove\_complex\_operands} pass.  The five programs
-should be placed in the subdirectory named \key{tests} and the file
+should be placed in the subdirectory named \key{tests}, and the file
 names should start with \code{var\_test\_} followed by a unique
 integer and end with the file extension \key{.py}.
 %% The \key{run-tests.rkt} script in the support code checks whether the
@@ -3457,7 +3465,7 @@ The \code{explicate\_control} pass compiles \LangVar{} programs into \LangCVar{}
 programs that make the order of execution explicit in their
 syntax. For now this amounts to flattening \key{let} constructs into a
 sequence of assignment statements. For example, consider the following
-\LangVar{} program.\\
+\LangVar{} program:\\
 % var_test_11.rkt
 \begin{minipage}{0.96\textwidth}
 \begin{lstlisting}
@@ -3467,11 +3475,11 @@ sequence of assignment statements. For example, consider the following
 \end{lstlisting}
 \end{minipage}\\
 %
-The output of the previous pass is shown below, on the left, and the
+The output of the previous pass is shown next, on the left, and the
 output of \code{explicate\_control} is on the right. Recall that the
-right-hand side of a \key{let} executes before its body, so the order
+right-hand side of a \key{let} executes before its body, so that the order
 of evaluation for this program is to assign \code{20} to \code{x.1},
-\code{22} to \code{x.2}, and \code{(+ x.1 x.2)} to \code{y}, then
+\code{22} to \code{x.2}, and \code{(+ x.1 x.2)} to \code{y}, and then to
 return \code{y}. Indeed, the output of \code{explicate\_control} makes
 this ordering explicit.
 \begin{transformation}
@@ -3520,11 +3528,11 @@ start:
 \end{figure}
 
 The organization of this pass depends on the notion of tail position
-that we have alluded to earlier. Here is the definition.
+to which we have alluded. Here is the definition.
 
-\begin{definition}
-  The following rules define when an expression is in \textbf{\emph{tail
-  position}}\index{subject}{tail position} for the language \LangVar{}.
+\begin{definition}\normalfont
+  The following rules define when an expression is in \emph{tail
+  position}\index{subject}{tail position} for the language \LangVar{}.
 \begin{enumerate}
 \item In $\PROGRAM{\code{()}}{e}$, expression $e$ is in tail position.
 \item If $\LET{x}{e_1}{e_2}$ is in tail position, then so is $e_2$.
@@ -3533,30 +3541,31 @@ that we have alluded to earlier. Here is the definition.
 
 We recommend implementing \code{explicate\_control} using two
 recursive functions, \code{explicate\_tail} and
-\code{explicate\_assign}, as suggested in the skeleton code in
-Figure~\ref{fig:explicate-control-Lvar}.  The \code{explicate\_tail}
-function should be applied to expressions in tail position whereas the
+\code{explicate\_assign}, as suggested in the skeleton code shown in
+figure~\ref{fig:explicate-control-Lvar}.  The \code{explicate\_tail}
+function should be applied to expressions in tail position, whereas the
 \code{explicate\_assign} should be applied to expressions that occur on
 the right-hand side of a \key{let}.
 %
 The \code{explicate\_tail} function takes an \Exp{} in \LangVar{} as
 input and produces a \Tail{} in \LangCVar{} (see
-Figure~\ref{fig:c0-syntax}).
+figure~\ref{fig:c0-syntax}).
 %
 The \code{explicate\_assign} function takes an \Exp{} in \LangVar{},
-the variable that it is to be assigned to, and a \Tail{} in
+the variable to which it is to be assigned to, and a \Tail{} in
 \LangCVar{} for the code that comes after the assignment.  The
 \code{explicate\_assign} function returns a $\Tail$ in \LangCVar{}.
 
 The \code{explicate\_assign} function is in accumulator-passing style:
 the \code{cont} parameter is used for accumulating the output. This
-accumulator-passing style plays an important role in how we generate
-high-quality code for conditional expressions in Chapter~\ref{ch:Lif}.
-The abbreviation \code{cont} is for continuation because it contains
-the generated code that should come after the current assignment.
-This code organization is also related to continuation-passing style,
-except that \code{cont} is not what happens next during compilation,
-but what happens next in the generated code.
+accumulator-passing style plays an important role in the way that we
+generate high-quality code for conditional expressions in
+chapter~\ref{ch:Lif}.  The abbreviation \code{cont} is for
+continuation because it contains the generated code that should come
+after the current assignment.  This code organization is also related
+to continuation-passing style, except that \code{cont} is not what
+happens next during compilation but is what happens next in the
+generated code.
 
 \begin{exercise}\normalfont\normalsize
 %
@@ -3581,7 +3590,7 @@ translating \racket{from \LangCVar{}} to \LangXVar{}. The target
 language of this pass is a variant of x86 that still uses variables,
 so we add an AST node of the form $\VAR{\itm{var}}$ to the \Arg{}
 nonterminal of the \LangXInt{} abstract syntax
-(Figure~\ref{fig:x86-int-ast}).
+(figure~\ref{fig:x86-int-ast}).
 \racket{We recommend implementing the
 \code{select\_instructions} with three auxiliary functions, one for
 each of the nonterminals of \LangCVar{}: $\Atm$, $\Stmt$, and
@@ -3590,16 +3599,16 @@ $\Tail$.}
   named \code{select\_stmt} for the $\Stmt$ nonterminal.}
 
 \racket{The cases for $\Atm$ are straightforward; variables stay the
-  same and integer constants change to immediates, that is, $\INT{n}$
+  same and integer constants change to immediates; that is, $\INT{n}$
   changes to $\IMM{n}$.}
 
 Next consider the cases for the $\Stmt$ nonterminal, starting with
-arithmetic operations. For example, consider the addition operation
-below, on the left side. There is an \key{addq} instruction in x86,
-but it performs an in-place update.  So we could move $\Arg_1$
-into the left-hand side \itm{var} and then add $\Arg_2$ to
-\itm{var}, where $\Arg_1$ and $\Arg_2$ are the translations of
-$\Atm_1$ and $\Atm_2$ respectively.
+arithmetic operations. For example, consider the following addition
+operation, on the left side. There is an \key{addq} instruction in
+x86, but it performs an in-place update.  So, we could move $\Arg_1$
+into the left-hand \itm{var} and then add $\Arg_2$ to \itm{var},
+where $\Arg_1$ and $\Arg_2$ are the translations of $\Atm_1$ and
+$\Atm_2$, respectively.
 \begin{transformation}
 {\if\edition\racketEd    
 \begin{lstlisting}
@@ -3620,9 +3629,9 @@ addq |$\Arg_2$|, |$\itm{var}$|
 There are also cases that require special care to avoid generating
 needlessly complicated code. For example, if one of the arguments of
 the addition is the same variable as the left-hand side of the
-assignment, as shown below, then there is no need for the extra move
+assignment, as shown next, then there is no need for the extra move
 instruction.  The assignment statement can be translated into a single
-\key{addq} instruction as follows.
+\key{addq} instruction, as follows.
 \begin{transformation}
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -3643,11 +3652,11 @@ addq |$\Arg_1$|, |$\itm{var}$|
 The \READOP{} operation does not have a direct counterpart in x86
 assembly, so we provide this functionality with the function
 \code{read\_int} in the file \code{runtime.c}, written in
-C~\citep{Kernighan:1988nx}. In general, we refer to all of the
+C~\citep{Kernighan:1988nx}. In general, we refer to all the
 functionality in this file as the \emph{runtime system}\index{subject}{runtime
   system}, or simply the \emph{runtime} for short. When compiling your
 generated x86 assembly code, you need to compile \code{runtime.c} to
-\code{runtime.o} (an ``object file'', using \code{gcc} with option
+\code{runtime.o} (an \emph{object file}, using \code{gcc} with option
 \code{-c}) and link it into the executable. For our purposes of code
 generation, all you need to do is translate an assignment of
 \READOP{} into a call to the \code{read\_int} function followed by a
@@ -3713,7 +3722,7 @@ all labels.
 {\if\edition\racketEd
 Implement the \code{select\_instructions} pass in
 \code{compiler.rkt}. Create three new example programs that are
-designed to exercise all of the interesting cases in this pass.
+designed to exercise all the interesting cases in this pass.
 %
 In the \code{run-tests.rkt} script, add the following entry to the
 list of \code{passes} and then run the script to test your compiler.
@@ -3736,19 +3745,19 @@ programs.
 \label{sec:assign-Lvar}
 
 The \code{assign\_homes} pass compiles \LangXVar{} programs to
-\LangXVar{} programs that no longer use program variables.
-Thus, the \code{assign\_homes} pass is responsible for placing all of
-the program variables in registers or on the stack. For runtime
-efficiency, it is better to place variables in registers, but as there
-are only 16 registers, some programs must necessarily resort to
-placing some variables on the stack. In this chapter we focus on the
-mechanics of placing variables on the stack. We study an algorithm for
-placing variables in registers in
-Chapter~\ref{ch:register-allocation-Lvar}.
+\LangXVar{} programs that no longer use program variables.  Thus, the
+\code{assign\_homes} pass is responsible for placing all the program
+variables in registers or on the stack. For runtime efficiency, it is
+better to place variables in registers, but because there are only
+sixteen registers, some programs must necessarily resort to placing
+some variables on the stack. In this chapter we focus on the mechanics
+of placing variables on the stack. We study an algorithm for placing
+variables in registers in chapter~\ref{ch:register-allocation-Lvar}.
 
 Consider again the following \LangVar{} program from
-Section~\ref{sec:remove-complex-opera-Lvar}.
+section~\ref{sec:remove-complex-opera-Lvar}:\\
 % var_test_20.rkt
+\begin{minipage}{0.96\textwidth}
 {\if\edition\racketEd
 \begin{lstlisting}
 (let ([a 42])
@@ -3763,8 +3772,9 @@ b = a
 print(b)
 \end{lstlisting}
 \fi}
+\end{minipage}\\
 %
-The output of \code{select\_instructions} is shown below, on the left,
+The output of \code{select\_instructions} is shown next, on the left,
 and the output of \code{assign\_homes} is on the right.  In this
 example, we assign variable \code{a} to stack location
 \code{-8(\%rbp)} and variable \code{b} to location \code{-16(\%rbp)}.
@@ -3786,11 +3796,11 @@ movq -16(%rbp), %rax
 \racket{
   The \code{assign\_homes} pass should replace all variables
   with stack locations.
-  The list of variables can be obtain from 
+  The list of variables can be obtained from 
   the \code{locals-types} entry in the $\itm{info}$ of the
   \code{X86Program} node. The \code{locals-types} entry is an alist
   mapping all the variables in the program to their types
-  (for now just \code{Integer}).
+  (for now, just \code{Integer}).
   As an aside, the \code{locals-types} entry is
   computed by \code{type-check-Cvar} in the support code, which
   installs it in the $\itm{info}$ field of the \code{CProgram} node,
@@ -3891,7 +3901,7 @@ from \key{rax} to the destination location, as follows.
 \normalfont\normalsize Implement the \key{patch\_instructions} pass in
 \racket{\code{compiler.rkt}}\python{\code{compiler.py}}.
 Create three new example programs that are
-designed to exercise all of the interesting cases in this pass.
+designed to exercise all the interesting cases in this pass.
 %
 {\if\edition\racketEd
 In the \code{run-tests.rkt} script, add the following entry to the
@@ -3914,8 +3924,8 @@ programs.
 
 The last step of the compiler from \LangVar{} to x86 is to generate
 the \code{main} function with a prelude and conclusion wrapped around
-the rest of the program, as shown in Figure~\ref{fig:p1-x86} and
-discussed in Section~\ref{sec:x86}.
+the rest of the program, as shown in figure~\ref{fig:p1-x86} and
+discussed in section~\ref{sec:x86}.
 
 When running on Mac OS X, your compiler should prefix an underscore to
 all labels, e.g., changing \key{main} to \key{\_main}.
@@ -3941,7 +3951,7 @@ list of \code{passes} and then run the script to test your compiler.
 \end{lstlisting}
 %  
 Uncomment the call to the \key{compiler-tests} function
-(Appendix~\ref{appendix:utilities}), which tests your complete
+(appendix~\ref{appendix:utilities}), which tests your complete
 compiler by executing the generated x86 code. It translates the x86
 AST that you produce into a string by invoking the \code{print-x86}
 method of the \code{print-x86-class} in \code{utilities.rkt}. Compile
@@ -3968,13 +3978,13 @@ translates the x86 AST that you produce into a string by invoking the
 
 This section describes two optional challenge exercises that involve
 adapting and improving the partial evaluator for \LangInt{} that was
-introduced in Section~\ref{sec:partial-evaluation}.
+introduced in section~\ref{sec:partial-evaluation}.
 
 \begin{exercise}\label{ex:pe-Lvar}
 \normalfont\normalsize
   
-Adapt the partial evaluator from Section~\ref{sec:partial-evaluation}
-(Figure~\ref{fig:pe-arith}) so that it applies to \LangVar{} programs
+Adapt the partial evaluator from section~\ref{sec:partial-evaluation}
+(figure~\ref{fig:pe-arith}) so that it applies to \LangVar{} programs
 instead of \LangInt{} programs. Recall that \LangVar{} adds variables and
 %
 \racket{\key{let} binding}\python{assignment}
@@ -3987,7 +3997,7 @@ the \code{pe\_exp}
 \python{and \code{pe\_stmt} functions.}
 %
 Once complete, add the partial evaluation pass to the front of your
-compiler and make sure that your compiler still passes all of the
+compiler, and make sure that your compiler still passes all of the
 tests.
 \end{exercise}
 
@@ -4009,13 +4019,15 @@ arithmetic. For example, your partial evaluator should translate
 \code{2 + input\_int()}
 \]
 \fi}
+%
 To accomplish this, the \code{pe\_exp} function should produce output
 in the form of the $\itm{residual}$ nonterminal of the following
 grammar. The idea is that when processing an addition expression, we
-can always produce either 1) an integer constant, 2) an addition
-expression with an integer constant on the left-hand side but not the
-right-hand side, or 3) or an addition expression in which neither
-subexpression is a constant.
+can always produce one of the following: (1) an integer constant, (2)
+an addition expression with an integer constant on the left-hand side
+but not the right-hand side, or (3) an addition expression in which
+neither subexpression is a constant.
+%
 {\if\edition\racketEd
 \[
 \begin{array}{lcl}
@@ -4055,10 +4067,11 @@ all, fast code is useless if it produces incorrect results!
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Register Allocation}
 \label{ch:register-allocation-Lvar}
+\setcounter{footnote}{0}
 
 \index{subject}{register allocation}
 
-In Chapter~\ref{ch:Lvar} we compiled \LangVar{} to x86, storing
+In chapter~\ref{ch:Lvar} we compiled \LangVar{} to x86, storing
 variables on the procedure call stack.  It can take 10s to 100s of
 cycles for the CPU to access locations on the stack whereas accessing
 a register takes only a single cycle. In this chapter we improve the
@@ -4070,7 +4083,7 @@ register. Fortunately, it is common for different variables to be
 in-use during different periods of time during program execution, and
 in those cases we can map multiple variables to the same register.
 
-The program in Figure~\ref{fig:reg-eg} serves as a running
+The program in figure~\ref{fig:reg-eg} serves as a running
 example. The source program is on the left and the output of
 instruction selection is on the right. The program is almost in the
 x86 assembly language but it still uses variables.  Consider variables
@@ -4152,19 +4165,19 @@ callq print_int
 \label{fig:reg-eg}
 \end{figure}
 
-The topic of Section~\ref{sec:liveness-analysis-Lvar} is how to
+The topic of section~\ref{sec:liveness-analysis-Lvar} is how to
 compute where a variable is in-use.  Once we have that information, we
 compute which variables are in-use at the same time, i.e., which ones
 \emph{interfere}\index{subject}{interfere} with each other, and
 represent this relation as an undirected graph whose vertices are
 variables and edges indicate when two variables interfere
-(Section~\ref{sec:build-interference}). We then model register
+(section~\ref{sec:build-interference}). We then model register
 allocation as a graph coloring problem
-(Section~\ref{sec:graph-coloring}).
+(section~\ref{sec:graph-coloring}).
 
 If we run out of registers despite these efforts, we place the
 remaining variables on the stack, similar to what we did in
-Chapter~\ref{ch:Lvar}. It is common to use the verb
+chapter~\ref{ch:Lvar}. It is common to use the verb
 \emph{spill}\index{subject}{spill} for assigning a variable to a stack
 location. The decision to spill a variable is handled as part of the
 graph coloring process.
@@ -4242,7 +4255,7 @@ rdi rsi rdx rcx r8 r9
 \end{lstlisting}
 If there are more than six arguments, then the convention is to use
 space on the frame of the caller for the rest of the
-arguments. However, in Chapter~\ref{ch:Lfun} we arrange never to
+arguments. However, in chapter~\ref{ch:Lfun} we arrange never to
 need more than six arguments.
 %
 \racket{For now, the only function we care about is \code{read\_int}
@@ -4255,7 +4268,7 @@ The register \code{rax} is used for the return value of a function.
 
 The next question is how these calling conventions impact register
 allocation. Consider the \LangVar{} program in
-Figure~\ref{fig:example-calling-conventions}.  We first analyze this
+figure~\ref{fig:example-calling-conventions}.  We first analyze this
 example from the caller point of view and then from the callee point
 of view. We refer to a variable that is in-use during a function call
 as being a \emph{call-live variable}\index{subject}{call-live
@@ -4286,15 +4299,15 @@ spill the variable to the stack.
 It is straightforward to implement this approach in a graph coloring
 register allocator. First, we know which variables are call-live
 because we already need to compute which variables are in-use at every
-instruction (Section~\ref{sec:liveness-analysis-Lvar}). Second, when
+instruction (section~\ref{sec:liveness-analysis-Lvar}). Second, when
 we build the interference graph
-(Section~\ref{sec:build-interference}), we can place an edge between
+(section~\ref{sec:build-interference}), we can place an edge between
 each of the call-live variables and the caller-saved registers in the
 interference graph. This will prevent the graph coloring algorithm
 from assigning them to caller-saved registers.
 
 Returning to the example in
-Figure~\ref{fig:example-calling-conventions}, let us analyze the
+figure~\ref{fig:example-calling-conventions}, let us analyze the
 generated x86 code on the right-hand side. Notice that variable
 \code{x} is assigned to \code{rbx}, a callee-saved register. Thus, it
 is already in a safe place during the second call to
@@ -4437,7 +4450,7 @@ $L_{\mathsf{after}}(k)$ for the set of live locations after
 instruction $I_k$ and $L_{\mathsf{before}}(k)$ for the set of live
 locations before instruction $I_k$.  \racket{We recommend representing
   these sets with the Racket \code{set} data structure described in
-  Figure~\ref{fig:set}.}  \python{We recommend representing these sets
+  figure~\ref{fig:set}.}  \python{We recommend representing these sets
   with the Python
   \href{https://docs.python.org/3.10/library/stdtypes.html\#set-types-set-frozenset}{\code{set}}
   data structure.}
@@ -4493,7 +4506,7 @@ $L_{\mathtt{before}}$ at the target of the jump. So we recommend
 maintaining an alist named \code{label->live} that maps each label to
 the $L_{\mathtt{before}}$ for the first instruction in its block. For
 now the only \code{jmp} in a \LangXVar{} program is the jump to the
-conclusion. (For example, see Figure~\ref{fig:reg-eg}.)  The
+conclusion. (For example, see figure~\ref{fig:reg-eg}.)  The
 conclusion reads from \ttm{rax} and \ttm{rsp}, so the alist should map
 \code{conclusion} to the set $\{\ttm{rax},\ttm{rsp}\}$.
 %
@@ -4501,7 +4514,7 @@ conclusion reads from \ttm{rax} and \ttm{rsp}, so the alist should map
 
 Let us walk through the above example, applying these formulas
 starting with the instruction on line 5. We collect the answers in
-Figure~\ref{fig:liveness-example-0}.  The $L_{\mathsf{after}}$ for the
+figure~\ref{fig:liveness-example-0}.  The $L_{\mathsf{after}}$ for the
 \code{addq b, c} instruction is $\emptyset$ because it is the last
 instruction (formula~\ref{eq:live-last-empty}).  The
 $L_{\mathsf{before}}$ for this instruction is $\{\ttm{b},\ttm{c}\}$
@@ -4565,9 +4578,9 @@ L_{\mathsf{after}}(5)=  \emptyset
 
 \begin{exercise}\normalfont\normalsize
   Perform liveness analysis by hand on the running example in
-  Figure~\ref{fig:reg-eg}, computing the live-before and live-after
+  figure~\ref{fig:reg-eg}, computing the live-before and live-after
   sets for each instruction. Compare your answers to the solution
-  shown in Figure~\ref{fig:live-eg}.
+  shown in figure~\ref{fig:live-eg}.
 \end{exercise}
 
 \begin{figure}[tp]
@@ -4715,7 +4728,7 @@ edge between two locations if they are live at the same time, that is,
 if they interfere with each other.
 %
 \racket{We recommend using the Racket \code{graph} package
-  (Figure~\ref{fig:graph}) to represent the interference graph.}
+  (figure~\ref{fig:graph}) to represent the interference graph.}
 %
 \python{We provide implementations of directed and undirected graph
   data structures in the file \code{graph.py} of the support code.}
@@ -4755,7 +4768,7 @@ So we have the following two rules.
   $(d,v)$.
 \end{enumerate}
 
-Working from the top to bottom of Figure~\ref{fig:live-eg}, we apply
+Working from the top to bottom of figure~\ref{fig:live-eg}, we apply
 the above rules to each instruction. We highlight a few of the
 instructions.  \racket{The first instruction is \lstinline{movq $1, v}
   and the live-after set is $\{\ttm{v},\ttm{rsp}\}$. Rule 1 applies,
@@ -4787,7 +4800,7 @@ instructions.  \racket{The first instruction is \lstinline{movq $1, v}
 %
 Figure~\ref{fig:interference-results} lists the interference results
 for all of the instructions and the resulting interference graph is
-shown in Figure~\ref{fig:interfere}.
+shown in figure~\ref{fig:interfere}.
 
 
 \begin{figure}[tbp]
@@ -5036,7 +5049,7 @@ particular, we assign $-1$ to \code{rax} and $-2$ to \code{rsp}.
 %% One might wonder why we include registers at all in the liveness
 %% analysis and interference graph. For example, we never allocate a
 %% variable to \code{rax} and \code{rsp}, so it would be harmless to
-%% leave them out.  As we see in Chapter~\ref{ch:Lvec}, when we begin
+%% leave them out.  As we see in chapter~\ref{ch:Lvec}, when we begin
 %% to use register for passing arguments to functions, it will be
 %% necessary for those registers to appear in the interference graph
 %% because those registers will also be assigned to variables, and we
@@ -5071,7 +5084,7 @@ while |$W \neq \emptyset$| do
 {\if\edition\racketEd      
 With the DSATUR algorithm in hand, let us return to the running
 example and consider how to color the interference graph in
-Figure~\ref{fig:interfere}.
+figure~\ref{fig:interfere}.
 %
 We start by assigning the register nodes to their own color. For
 example, \code{rax} is assigned the color $-1$ and \code{rsp} is
@@ -5311,7 +5324,7 @@ So we obtain the following coloring:
 %
 With the DSATUR algorithm in hand, let us return to the running
 example and consider how to color the interference graph in
-Figure~\ref{fig:interfere}. We annotate each variable node with a dash
+figure~\ref{fig:interfere}. We annotate each variable node with a dash
 to indicate that it has not yet been assigned a color. The saturation
 sets are also shown for each node; all of them start as the empty set.
 (We do not include the register nodes in the graph below because there
@@ -5483,12 +5496,12 @@ We recommend creating an auxiliary function named \code{color\_graph}
 that takes an interference graph and a list of all the variables in
 the program. This function should return a mapping of variables to
 their colors (represented as natural numbers). By creating this helper
-function, you will be able to reuse it in Chapter~\ref{ch:Lfun}
+function, you will be able to reuse it in chapter~\ref{ch:Lfun}
 when we add support for functions.
 
 To prioritize the processing of highly saturated nodes inside the
 \code{color\_graph} function, we recommend using the priority queue
-data structure \racket{described in Figure~\ref{fig:priority-queue}}\python{in the file \code{priority\_queue.py} of the support code}. \racket{In
+data structure \racket{described in figure~\ref{fig:priority-queue}}\python{in the file \code{priority\_queue.py} of the support code}. \racket{In
 addition, you will need to maintain a mapping from variables to their
 ``handles'' in the priority queue so that you can notify the priority
 queue when their saturation changes.}
@@ -5560,7 +5573,7 @@ assignment of variables to locations.
 \fi}
 
 Adapt the code from the \code{assign\_homes} pass
-(Section~\ref{sec:assign-Lvar}) to replace the variables with their
+(section~\ref{sec:assign-Lvar}) to replace the variables with their
 assigned location. Applying the above assignment to our running
 example, on the left, yields the program on the right.
 % why frame size of 32? -JGS
@@ -5667,7 +5680,7 @@ The remaining step in the compilation to x86 is to ensure that the
 instructions have at most one argument that is a memory access.
 %
 In the running example, the instruction \code{movq -8(\%rbp),
-    -16(\%rbp)} is problematic. Recall from Section~\ref{sec:patch-s0}
+    -16(\%rbp)} is problematic. Recall from section~\ref{sec:patch-s0}
   that the fix is to first move \code{-8(\%rbp)} into \code{rax} and
   then move \code{rax} into \code{-16(\%rbp)}.
 %
@@ -5768,7 +5781,7 @@ Run the script to test the \code{patch\_instructions} pass.
 
 Recall that this pass generates the prelude and conclusion
 instructions to satisfy the x86 calling conventions
-(Section~\ref{sec:calling-conventions}). With the addition of the
+(section~\ref{sec:calling-conventions}). With the addition of the
 register allocator, the callee-saved registers used by the register
 allocator must be saved in the prelude and restored in the conclusion.
 In the \code{allocate\_registers} pass,
@@ -5799,7 +5812,7 @@ prelude uses \code{pushq} to save each of the callee-saved registers,
 and \code{pushq} subtracts $8$ from the \code{rsp}.
 
 \racket{An overview of all of the passes involved in register
-  allocation is shown in Figure~\ref{fig:reg-alloc-passes}.}
+  allocation is shown in figure~\ref{fig:reg-alloc-passes}.}
 
 {\if\edition\racketEd      
 \begin{figure}[tbp]
@@ -5836,7 +5849,7 @@ and \code{pushq} subtracts $8$ from the \code{rsp}.
 \fi}
 
 Figure~\ref{fig:running-example-x86} shows the x86 code generated for
-the running example (Figure~\ref{fig:reg-eg}). To demonstrate both the
+the running example (figure~\ref{fig:reg-eg}). To demonstrate both the
 use of registers and the stack, we limit the register allocator for
 this example to use just two registers: \code{rbx} and \code{rcx}.  In
 the prelude\index{subject}{prelude} of the \code{main} function, we
@@ -5938,7 +5951,7 @@ main:
 \end{tcolorbox}
 \end{minipage}
 \caption{The x86 output from the running example
-  (Figure~\ref{fig:reg-eg}), limiting allocation to just \code{rbx}
+  (figure~\ref{fig:reg-eg}), limiting allocation to just \code{rbx}
   and \code{rcx}.}
 \label{fig:running-example-x86}
 \end{figure}
@@ -6018,7 +6031,7 @@ can accomplish this by taking into account which variables appear in
 {\if\edition\pythonEd
 %
 To motivate the need for move biasing we return to the running example
-and recall that in Section~\ref{sec:patch-instructions} we were able to
+and recall that in section~\ref{sec:patch-instructions} we were able to
 remove three trivial move instructions from the running
 example. However, we could remove another trivial move if we were able
 to allocate \code{y} and \code{tmp\_0} to the same register.  \fi}
@@ -6488,7 +6501,7 @@ vertices.
 Attacking the problem from a different angle, \citet{Briggs:1994kx}
 also propose \emph{biased coloring} in which a variable is assigned to
 the same color as another move-related variable if possible, as
-discussed in Section~\ref{sec:move-biasing}.
+discussed in section~\ref{sec:move-biasing}.
 %
 The algorithm of \citet{Chaitin:1981vl} and its successors iteratively
 performs coalescing, graph coloring, and spill code insertion until
@@ -6570,6 +6583,7 @@ appropriate.
 \index{subject}{Boolean}
 \index{subject}{control flow}
 \index{subject}{conditional expression}
+\setcounter{footnote}{0}
 
 The \LangVar{} language only has a single kind of value, the
 integers. In this chapter we add a second kind of value, the Booleans,
@@ -6619,7 +6633,7 @@ of \racket{\code{(car 1)}}\python{\code{1[0]}}, \racket{Typed
 \python{stating that a ``value of type \code{int} is not indexable''.}
 
 The \LangIf{} language performs type checking during compilation like
-\racket{Typed Racket}\python{MyPy}. In Chapter~\ref{ch:Ldyn} we study
+\racket{Typed Racket}\python{MyPy}. In chapter~\ref{ch:Ldyn} we study
 the alternative choice, that is, a dynamically typed language like
 \racket{Racket}\python{Python}.  The \LangIf{} language is a subset of
 \racket{Typed Racket}\python{MyPy}; for some operations we are more
@@ -6631,13 +6645,13 @@ books~\citep{Pierce:2002hj,Pierce:2004fk,Harper2016,Pierce:SF2}.
 
 This chapter is organized as follows.  We begin by defining the syntax
 and interpreter for the \LangIf{} language
-(Section~\ref{sec:lang-if}). We then introduce the idea of type
+(section~\ref{sec:lang-if}). We then introduce the idea of type
 checking and define a type checker for \LangIf{}
-(Section~\ref{sec:type-check-Lif}).
+(section~\ref{sec:type-check-Lif}).
 %
 \racket{To compile \LangIf{} we need to enlarge the intermediate
-  language \LangCVar{} into \LangCIf{} (Section~\ref{sec:Cif}) and
-  \LangXInt{} into \LangXIf{} (Section~\ref{sec:x86-if}).}
+  language \LangCVar{} into \LangCIf{} (section~\ref{sec:Cif}) and
+  \LangXInt{} into \LangXIf{} (section~\ref{sec:x86-if}).}
 %
 The remaining sections of this chapter discuss how Booleans and
 conditional control flow require changes to the existing compiler
@@ -6647,7 +6661,7 @@ number of operators that need to be handled in later passes.
 %
 The main event of this chapter is the \code{explicate\_control} pass
 that is responsible for translating \code{if}'s into conditional
-\code{goto}'s (Section~\ref{sec:explicate-control-Lif}).
+\code{goto}'s (section~\ref{sec:explicate-control-Lif}).
 %
 Regarding register allocation, there is the interesting question of
 how to handle conditional \code{goto}'s during liveness analysis.
@@ -6672,11 +6686,11 @@ We expand the set of operators to include
 \end{enumerate}
 
 \racket{We reorganize the abstract syntax for the primitive
-  operations in Figure~\ref{fig:Lif-syntax}, using only one grammar
+  operations in figure~\ref{fig:Lif-syntax}, using only one grammar
   rule for all of them. This means that the grammar no longer checks
   whether the arity of an operators matches the number of
   arguments. That responsibility is moved to the type checker for
-  \LangIf{} (Section~\ref{sec:type-check-Lif}).}
+  \LangIf{} (section~\ref{sec:type-check-Lif}).}
 
 
 \newcommand{\LifGrammarRacket}{
@@ -6760,7 +6774,7 @@ We expand the set of operators to include
 \fi}
 \end{tcolorbox}
 \caption{The concrete syntax of \LangIf{}, extending \LangVar{}
-  (Figure~\ref{fig:Lvar-concrete-syntax}) with Booleans and conditionals.}
+  (figure~\ref{fig:Lvar-concrete-syntax}) with Booleans and conditionals.}
 \label{fig:Lif-concrete-syntax}
 \end{figure}
 
@@ -6822,7 +6836,7 @@ We expand the set of operators to include
 
 Figure~\ref{fig:interp-Lif} defines the interpreter for \LangIf{},
 which inherits from the interpreter for \LangVar{}
-(Figure~\ref{fig:interp-Lvar}). The literals \TRUE{} and \FALSE{}
+(figure~\ref{fig:interp-Lvar}). The literals \TRUE{} and \FALSE{}
 evaluate to the corresponding Boolean values. The conditional
 expression $\CIF{e_1}{e_2}{\itm{e_3}}$ evaluates expression $e_1$
 and then either evaluates $e_2$ or $e_3$ depending on whether
@@ -6840,8 +6854,8 @@ evaluated if $e_1$ evaluates to \TRUE{}.
 \racket{With the increase in the number of primitive operations, the
   interpreter would become repetitive without some care.  We refactor
   the case for \code{Prim}, moving the code that differs with each
-  operation into the \code{interp\_op} method shown in in
-  Figure~\ref{fig:interp-op-Lif}. We handle the \code{and} and
+  operation into the \code{interp\_op} method shown in
+  figure~\ref{fig:interp-op-Lif}. We handle the \code{and} and
   \code{or} operations separately because of their short-circuiting
   behavior.}
 
@@ -6927,8 +6941,8 @@ class InterpLif(InterpLvar):
 \fi}
 \end{tcolorbox}
 \caption{Interpreter for the \LangIf{} language. \racket{(See
-    Figure~\ref{fig:interp-op-Lif} for \code{interp-op}.)}
-  \python{(See Figure~\ref{fig:interp-cmp-Lif} for \code{interp\_cmp}.)}}
+    figure~\ref{fig:interp-op-Lif} for \code{interp-op}.)}
+  \python{(See figure~\ref{fig:interp-cmp-Lif} for \code{interp\_cmp}.)}}
 \label{fig:interp-Lif}
 \end{figure}
 
@@ -7050,11 +7064,11 @@ argument of \code{not} must be an expression of type \BOOLTY{}.
 We implement type checking using classes and methods because they
 provide the open recursion needed to reuse code as we extend the type
 checker in later chapters, analogous to the use of classes and methods
-for the interpreters (Section~\ref{sec:extensible-interp}).
+for the interpreters (section~\ref{sec:extensible-interp}).
 
 We separate the type checker for the \LangVar{} subset into its own
-class, shown in Figure~\ref{fig:type-check-Lvar}. The type checker for
-\LangIf{} is shown in Figure~\ref{fig:type-check-Lif} and it inherits
+class, shown in figure~\ref{fig:type-check-Lvar}. The type checker for
+\LangIf{} is shown in figure~\ref{fig:type-check-Lif} and it inherits
 from the type checker for \LangVar{}. These type checkers are in the
 files
 \racket{\code{type-check-Lvar.rkt}}\python{\code{type\_check\_Lvar.py}}
@@ -7070,7 +7084,7 @@ error or returns \racket{an expression and} its type.
   we want to change or update the expression.}
 
 Next we discuss the \code{type\_check\_exp} function of \LangVar{} in
-Figure~\ref{fig:type-check-Lvar}.  The type of an integer constant is
+figure~\ref{fig:type-check-Lvar}.  The type of an integer constant is
 \INTTY{}.  To handle variables, the type checker uses the environment
 \code{env} to map variables to types.
 %
@@ -7323,7 +7337,7 @@ class TypeCheckLif(TypeCheckLvar):
 \end{figure}
 
 The type checker for \LangIf{} is defined in
-Figure~\ref{fig:type-check-Lif}.
+figure~\ref{fig:type-check-Lif}.
 %
 The type of a Boolean constant is \BOOLTY{}.
 %
@@ -7388,7 +7402,7 @@ expressions. A \code{goto} statement transfers control to the $\Tail$
 expression corresponding to its label.
 %
 Figure~\ref{fig:c1-concrete-syntax} defines the concrete syntax of the
-\LangCIf{} intermediate language and Figure~\ref{fig:c1-syntax}
+\LangCIf{} intermediate language and figure~\ref{fig:c1-syntax}
 defines its abstract syntax.
 %
 \fi}
@@ -7420,8 +7434,8 @@ A \code{goto} statement transfers control to the sequence of statements
 associated with its label.
 %
 The concrete syntax for \LangCIf{} is defined in
-Figure~\ref{fig:c1-concrete-syntax} and the abstract syntax is defined
-in Figure~\ref{fig:c1-syntax}.
+figure~\ref{fig:c1-concrete-syntax} and the abstract syntax is defined
+in figure~\ref{fig:c1-syntax}.
 %
 \fi}
 %
@@ -7499,7 +7513,7 @@ in Figure~\ref{fig:c1-syntax}.
 \fi}
 \end{tcolorbox}
 \caption{The concrete syntax of the \LangCIf{} intermediate language%
-  \racket{, an extension of \LangCVar{} (Figure~\ref{fig:c0-concrete-syntax})}.}
+  \racket{, an extension of \LangCVar{} (figure~\ref{fig:c0-concrete-syntax})}.}
 \label{fig:c1-concrete-syntax}
 \end{figure}
 
@@ -7534,7 +7548,7 @@ in Figure~\ref{fig:c1-syntax}.
 \index{subject}{Goto@\texttt{Goto}}
 \index{subject}{Return@\texttt{Return}}
 \caption{The abstract syntax of \LangCIf{}\racket{, an extension of \LangCVar{}
-  (Figure~\ref{fig:c0-syntax})}.}
+  (figure~\ref{fig:c0-syntax})}.}
 \label{fig:c1-syntax}
 \end{figure}
 
@@ -7611,7 +7625,7 @@ $\Atm$ to x86.
 \end{array}
 \]
 \end{tcolorbox}
-\caption{The concrete syntax of \LangXIf{}  (extends \LangXInt{} of Figure~\ref{fig:x86-int-concrete}).}
+\caption{The concrete syntax of \LangXIf{}  (extends \LangXInt{} of figure~\ref{fig:x86-int-concrete}).}
 \label{fig:x86-1-concrete}
 \end{figure}
 
@@ -7670,7 +7684,7 @@ $\Atm$ to x86.
 \]
 \fi}
 \end{tcolorbox}
-\caption{The abstract syntax of \LangXIf{} (extends \LangXInt{} of Figure~\ref{fig:x86-int-ast}).}
+\caption{The abstract syntax of \LangXIf{} (extends \LangXInt{} of figure~\ref{fig:x86-int-ast}).}
 \label{fig:x86-1}
 \end{figure}
 
@@ -7788,7 +7802,7 @@ Run the script to test your compiler.
 \label{sec:remove-complex-opera-Lif}
 
 The output language of \code{remove\_complex\_operands} is
-\LangIfANF{} (Figure~\ref{fig:Lif-anf-syntax}), the monadic
+\LangIfANF{} (figure~\ref{fig:Lif-anf-syntax}), the monadic
 normal form of \LangIf{}.  A Boolean constant is an atomic expressions
 but the \code{if} expression is not.  All three sub-expressions of an
 \code{if} are allowed to be complex expressions but the operands of
@@ -7866,7 +7880,7 @@ upcoming \code{explicate\_control} pass.
 \end{tcolorbox}
 \python{\index{subject}{Begin@\texttt{Begin}}}
 \caption{\LangIfANF{} is \LangIf{} in monadic normal form
-  (extends \LangVarANF in Figure~\ref{fig:Lvar-anf-syntax}).}
+  (extends \LangVarANF in figure~\ref{fig:Lvar-anf-syntax}).}
 \label{fig:Lif-anf-syntax}
 \end{figure}
 
@@ -8018,7 +8032,7 @@ Likewise, our language \LangCIf{} provides the ability to label a
 sequence of statements and to jump to a label via \code{goto}.
 
 As a preview of what \code{explicate\_control} will do,
-Figure~\ref{fig:explicate-control-s1-38} shows the output of
+figure~\ref{fig:explicate-control-s1-38} shows the output of
 \code{explicate\_control} on the above example. Note how the condition
 of every \code{if} is a comparison operation and that we have not
 duplicated any code, but instead used labels and \code{goto} to enable
@@ -8136,7 +8150,7 @@ block_1:
 
 {\if\edition\racketEd        
 %
-Recall that in Section~\ref{sec:explicate-control-Lvar} we implement
+Recall that in section~\ref{sec:explicate-control-Lvar} we implement
 \code{explicate\_control} for \LangVar{} using two recursive
 functions, \code{explicate\_tail} and \code{explicate\_assign}.  The
 former function translates expressions in tail position whereas the
@@ -8397,7 +8411,7 @@ then there is no need to generate a new label and entry in
 \fi}
 
 \racket{The skeleton for the \code{explicate\_pred} function is given
-  in Figure~\ref{fig:explicate-pred}.  It takes three parameters:
+  in figure~\ref{fig:explicate-pred}.  It takes three parameters:
   1) \code{cnd}, the condition expression of the \code{if},
   2) \code{thn}, the code generated by explicate for the ``then'' branch,
   and 3) \code{els}, the code generated by
@@ -8508,7 +8522,7 @@ This case demonstrates that we sometimes discard the \code{thn} or
 The case for \key{if} expressions in \code{explicate\_pred} is
 particularly illuminating because it deals with the challenges we
 discussed above regarding nested \key{if} expressions
-(Figure~\ref{fig:explicate-control-s1-38}).  The
+(figure~\ref{fig:explicate-control-s1-38}).  The
 \racket{\lstinline{thn^}}\python{\code{body}} and
 \racket{\lstinline{els^}}\python{\code{orelse}} branches of the
 \key{if} inherit their context from the current one, that is,
@@ -8536,7 +8550,7 @@ statements is not given, and is similar to the case for \code{if}
 expressions.
 
 The \code{explicate\_control} function itself is given in
-Figure~\ref{fig:explicate-control-Lif}. It applies
+figure~\ref{fig:explicate-control-Lif}. It applies
 \code{explicate\_stmt} to each statement in the program, from back to
 front. Thus, the result so-far, stored in \code{new\_body}, can be
 used as the continuation parameter in the next call to
@@ -8706,7 +8720,7 @@ The \code{select\_instructions} pass translates \LangCIf{} to
 %
 \racket{Recall that we implement this pass using three auxiliary
   functions, one for each of the nonterminals $\Atm$, $\Stmt$, and
-  $\Tail$ in \LangCIf{} (Figure~\ref{fig:c1-syntax}).}
+  $\Tail$ in \LangCIf{} (figure~\ref{fig:c1-syntax}).}
 %
 \racket{For $\Atm$, we have new cases for the Booleans.}
 %
@@ -8742,7 +8756,7 @@ result of translating $\Atm$ to x86.
 
 Next consider the cases for equality comparisons.  Translating this
 operation to x86 is slightly involved due to the unusual nature of the
-\key{cmpq} instruction that we discussed in Section~\ref{sec:x86-if}.
+\key{cmpq} instruction that we discussed in section~\ref{sec:x86-if}.
 We recommend translating an assignment with an equality on the
 right-hand side into a sequence of three instructions. \\
 \begin{tabular}{lll}
@@ -8830,7 +8844,7 @@ coloring algorithm itself does not change.
 \index{subject}{liveness analysis}
 
 Recall that for \LangVar{} we implemented liveness analysis for a
-single basic block (Section~\ref{sec:liveness-analysis-Lvar}).  With
+single basic block (section~\ref{sec:liveness-analysis-Lvar}).  With
 the addition of \key{if} expressions to \LangIf{},
 \code{explicate\_control} produces many basic blocks.
 
@@ -8864,7 +8878,7 @@ applies the topological sort algorithm.
 As an aside, a topological ordering is only guaranteed to exist if the
 graph does not contain any cycles. This is the case for the
 control-flow graphs that we generate from \LangIf{} programs.
-However, in Chapter~\ref{ch:Lwhile} we add loops to create \LangLoop{}
+However, in chapter~\ref{ch:Lwhile} we add loops to create \LangLoop{}
 and learn how to handle cycles in the control-flow graph.
 
 \racket{You'll need to construct a directed graph to represent the
@@ -8877,7 +8891,7 @@ and learn how to handle cycles in the control-flow graph.
 
 {\if\edition\racketEd
 The next question is how to analyze jump instructions.  Recall that in
-Section~\ref{sec:liveness-analysis-Lvar} we maintain an alist named
+section~\ref{sec:liveness-analysis-Lvar} we maintain an alist named
 \code{label->live} that maps each label to the set of live locations
 at the beginning of its block. We use \code{label->live} to determine
 the live-before set for each $\JMP{\itm{label}}$ instruction.  Now
@@ -8957,7 +8971,7 @@ same way as the instructions in \LangXVar{}.
 %
 Some instructions, e.g., the \key{movzbq} instruction, require special care,
 similar to the \key{movq} instruction. See rule number 1 in
-Section~\ref{sec:build-interference}.
+section~\ref{sec:build-interference}.
 
 \begin{exercise}\normalfont\normalsize
 Update the \code{build\_interference} pass for \LangXIfVar{}.
@@ -9260,7 +9274,7 @@ control-flow of the program.
 \subsection{Optimize Blocks}
 
 The algorithm for \code{explicate\_control} that we discussed in
-Section~\ref{sec:explicate-control-Lif} sometimes generates too many
+section~\ref{sec:explicate-control-Lif} sometimes generates too many
 blocks. It creates a basic block whenever a continuation \emph{might}
 get used more than once (e.g., whenever the \code{cont} parameter is
 passed into two or more recursive calls). However, some continuation
@@ -9419,7 +9433,7 @@ def create_block(promise, basic_blocks):
 Figure~\ref{fig:explicate-control-challenge} shows the output of
 improved \code{explicate\_control} on the above example.  As you can
 see, the number of basic blocks has been reduced from 4 blocks (see
-Figure~\ref{fig:explicate-control-s1-38}) down to 2 blocks.
+figure~\ref{fig:explicate-control-s1-38}) down to 2 blocks.
 
 \begin{figure}[tbp]
   \begin{tcolorbox}[colback=white]
@@ -9508,7 +9522,7 @@ block_1:
 \end{figure}
 
 %% Recall that in the example output of \code{explicate\_control} in
-%% Figure~\ref{fig:explicate-control-s1-38}, \code{block57} through
+%% figure~\ref{fig:explicate-control-s1-38}, \code{block57} through
 %% \code{block60} are trivial blocks, they do nothing but jump to another
 %% block. The first goal of this challenge assignment is to remove those
 %% blocks. Figure~\ref{fig:optimize-jumps} repeats the result of
@@ -9516,7 +9530,7 @@ block_1:
 %% the trivial blocks on the right. Let us focus on \code{block61}.  The
 %% \code{then} branch jumps to \code{block57}, which in turn jumps to
 %% \code{block55}. The optimized code on the right of
-%% Figure~\ref{fig:optimize-jumps} bypasses \code{block57}, with the
+%% figure~\ref{fig:optimize-jumps} bypasses \code{block57}, with the
 %% \code{then} branch jumping directly to \code{block55}. The story is
 %% similar for the \code{else} branch, as well as for the two branches in
 %% \code{block62}. After the jumps in \code{block61} and \code{block62}
@@ -9626,7 +9640,7 @@ block_1:
 \subsection{Remove Jumps}
 
 There is an opportunity for removing jumps that is apparent in the
-example of Figure~\ref{fig:if-example-x86}. The \code{start} block
+example of figure~\ref{fig:if-example-x86}. The \code{start} block
 ends with a jump to \code{block\_5} and there are no other jumps to
 \code{block\_5} in the rest of the program. In this situation we can
 avoid the runtime overhead of this jump by merging \code{block\_5}
@@ -9760,6 +9774,7 @@ and the case-of-case transformation~\citep{PeytonJones:1998}.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Loops and Dataflow Analysis}
 \label{ch:Lwhile}
+\setcounter{footnote}{0}
 
 % TODO: define R'_8
 
@@ -9900,7 +9915,7 @@ the condition remains true.
 \fi}
 \end{tcolorbox}
 
-\caption{The concrete syntax of \LangLoop{}, extending \LangIf{} (Figure~\ref{fig:Lif-concrete-syntax}).}
+\caption{The concrete syntax of \LangLoop{}, extending \LangIf{} (figure~\ref{fig:Lif-concrete-syntax}).}
 \label{fig:Lwhile-concrete-syntax}
 \end{figure}
 
@@ -9938,16 +9953,16 @@ the condition remains true.
 \python{
   \index{subject}{While@\texttt{While}}
   }
-\caption{The abstract syntax of \LangLoop{}, extending \LangIf{} (Figure~\ref{fig:Lif-syntax}).}
+\caption{The abstract syntax of \LangLoop{}, extending \LangIf{} (figure~\ref{fig:Lif-syntax}).}
 \label{fig:Lwhile-syntax}
 \end{figure}
 
 The concrete syntax of \LangLoop{} is defined in
-Figure~\ref{fig:Lwhile-concrete-syntax} and its abstract syntax is defined
-in Figure~\ref{fig:Lwhile-syntax}.
+figure~\ref{fig:Lwhile-concrete-syntax} and its abstract syntax is defined
+in figure~\ref{fig:Lwhile-syntax}.
 %
 The definitional interpreter for \LangLoop{} is shown in
-Figure~\ref{fig:interp-Lwhile}.
+figure~\ref{fig:interp-Lwhile}.
 %
 {\if\edition\racketEd    
 %
@@ -9955,7 +9970,7 @@ We add new cases for \code{SetBang}, \code{WhileLoop}, \code{Begin},
 and \code{Void} and we make changes to the cases for \code{Var} and
 \code{Let} regarding variables. To support assignment to variables and
 to make their lifetimes indefinite (see the second example in
-Section~\ref{sec:assignment-scoping}), we box the value that is bound
+section~\ref{sec:assignment-scoping}), we box the value that is bound
 to each variable (in \code{Let}). The case for \code{Var} unboxes the
 value.
 %
@@ -10039,7 +10054,7 @@ class InterpLwhile(InterpLif):
 \end{figure}
 
 The type checker for \LangLoop{} is defined in
-Figure~\ref{fig:type-check-Lwhile}.
+figure~\ref{fig:type-check-Lwhile}.
 %
 {\if\edition\racketEd    
 %
@@ -10150,7 +10165,7 @@ Indeed it does.  Recall that for register allocation, the compiler
 performs liveness analysis to determine which variables can share the
 same register.  To accomplish this we analyzed the control-flow graph
 in reverse topological order
-(Section~\ref{sec:liveness-analysis-Lif}), but topological order is
+(section~\ref{sec:liveness-analysis-Lif}), but topological order is
 only well-defined for acyclic graphs.
 
 Let us return to the example of computing the sum of the first five
@@ -10367,7 +10382,7 @@ guaranteed that iteratively applying liveness analysis to all blocks
 in the program will eventually produce the least fixed point solution.
 
 Next let us consider dataflow analysis in general and discuss the
-generic work list algorithm (Figure~\ref{fig:generic-dataflow}). 
+generic work list algorithm (figure~\ref{fig:generic-dataflow}). 
 %
 The algorithm has four parameters: the control-flow graph \code{G}, a
 function \code{transfer} that applies the analysis to one block, the
@@ -10513,7 +10528,7 @@ The approach that we've sketched above requires only a small
 modification to \code{remove\_complex\_operands} to handle
 \code{get!}. However, it requires a new pass, called
 \code{uncover-get!}, that we discuss in
-Section~\ref{sec:uncover-get-bang}.
+section~\ref{sec:uncover-get-bang}.
 
 As an aside, this problematic interaction between \code{set!} and the
 pass \code{remove\_complex\_operands} is particular to Racket and not
@@ -10753,11 +10768,11 @@ only for their effect. Their result values are discarded. We can
 generate better code by taking this fact into account.
 
 The output language of \code{explicate\_control} is \LangCLoop{}
-(Figure~\ref{fig:c7-syntax}), which is nearly identical to
+(figure~\ref{fig:c7-syntax}), which is nearly identical to
 \LangCIf{}. The only syntactic difference is the addition of \VOID{}
 and that \code{read} may appear as a statement.  The most significant
 difference between the programs generated by \code{explicate\_control}
-in Chapter~\ref{ch:Lif} versus \code{explicate\_control} in this
+in chapter~\ref{ch:Lif} versus \code{explicate\_control} in this
 chapter is that the control-flow graphs of the later may contain
 cycles.
 
@@ -10776,7 +10791,7 @@ cycles.
 \]
 \end{tcolorbox}
 
-\caption{The abstract syntax of \LangCLoop{}, extending \LangCIf{} (Figure~\ref{fig:c1-syntax}).}
+\caption{The abstract syntax of \LangCLoop{}, extending \LangCIf{} (figure~\ref{fig:c1-syntax}).}
 \label{fig:c7-syntax}
 \end{figure}
 
@@ -10848,16 +10863,16 @@ off the instruction for moving the result into the left-hand side.
 \section{Register Allocation}
 \label{sec:register-allocation-loop}
 
-As discussed in Section~\ref{sec:dataflow-analysis}, the presence of
+As discussed in section~\ref{sec:dataflow-analysis}, the presence of
 loops in \LangLoop{} means that the control-flow graphs may contain cycles,
 which complicates the liveness analysis needed for register
 allocation.
 %
 We recommend using the generic \code{analyze\_dataflow} function that
-was presented at the end of Section~\ref{sec:dataflow-analysis} to
+was presented at the end of section~\ref{sec:dataflow-analysis} to
 perform liveness analysis, replacing the code in
 \code{uncover\_live} that processed the basic blocks in topological
-order (Section~\ref{sec:liveness-analysis-Lif}).
+order (section~\ref{sec:liveness-analysis-Lif}).
 
 The \code{analyze\_dataflow} function has four parameters.
 \begin{enumerate}
@@ -10964,6 +10979,7 @@ for the compilation of \LangLoop{}.
 \index{subject}{vector}
 \index{subject}{allocate}
 \index{subject}{heap allocate}
+\setcounter{footnote}{0}
 
 %% \margincomment{\scriptsize To do: Flesh out this chapter, e.g., make sure
 %%   all the IR grammars are spelled out! \\ --Jeremy}
@@ -10984,7 +11000,7 @@ needed, which is why we also study \emph{garbage collection}
 
 Section~\ref{sec:r3} introduces the \LangVec{} language including its
 interpreter and type checker. The \LangVec{} language extends the \LangLoop{}
-language of Chapter~\ref{ch:Lwhile} with tuples.
+language of chapter~\ref{ch:Lwhile} with tuples.
 %
 Section~\ref{sec:GC} describes a garbage collection algorithm based on
 copying live tuples back and forth between two halves of the heap. The
@@ -10999,7 +11015,7 @@ including a new compiler pass named \code{expose\_allocation}.
 \label{sec:r3}
 
 Figure~\ref{fig:Lvec-concrete-syntax} defines the concrete syntax for
-\LangVec{} and Figure~\ref{fig:Lvec-syntax} defines the abstract syntax.
+\LangVec{} and figure~\ref{fig:Lvec-syntax} defines the abstract syntax.
 %
 \racket{The \LangVec{} language includes the forms: \code{vector} for
   creating a tuple, \code{vector-ref} for reading an element of a
@@ -11107,7 +11123,7 @@ print( t[0] + t[2][0] if t[1] else 44 )
 \fi}
 \end{tcolorbox}
 \caption{The concrete syntax of \LangVec{}, extending \LangLoop{}
-  (Figure~\ref{fig:Lwhile-concrete-syntax}).}
+  (figure~\ref{fig:Lwhile-concrete-syntax}).}
 \label{fig:Lvec-concrete-syntax}
 \end{figure}
 
@@ -11229,7 +11245,7 @@ that reads from the vector it was bound to.
 For example, the following program returns \code{42} even though the
 variable \code{x} goes out of scope when the function returns, prior
 to reading the tuple element at index zero. (We study the compilation
-of functions in Chapter~\ref{ch:Lfun}.)
+of functions in chapter~\ref{ch:Lfun}.)
 %  
 \begin{center}
 \begin{minipage}{0.96\textwidth}
@@ -11260,7 +11276,7 @@ Figure~\ref{fig:interp-Lvec} shows the definitional interpreter for the
 %
 \python{We represent tuples with Python lists in the interpreter
   because we need to write to them
-  (Section~\ref{sec:expose-allocation}).  (Python tuples are
+  (section~\ref{sec:expose-allocation}).  (Python tuples are
   immutable.)  We define element access, the \code{is} operator, and
   the \code{len} operator for \LangVec{} in terms of the corresponding
   operations in Python.}
@@ -11333,13 +11349,13 @@ Figure~\ref{fig:type-check-Lvec} shows the type checker for
 we need to know which elements of the tuple are themselves tuples for
 the purposes of garbage collection. We can obtain this information
 during type checking. The type checker in
-Figure~\ref{fig:type-check-Lvec} not only computes the type of an
+figure~\ref{fig:type-check-Lvec} not only computes the type of an
 expression, it also
 %
 \racket{wraps every tuple creation with the form $(\key{HasType}~e~T)$,
   where $T$ is the tuple's type.
 To create the s-expression for the \code{Vector} type in
-Figure~\ref{fig:type-check-Lvec}, we use the
+figure~\ref{fig:type-check-Lvec}, we use the
 \href{https://docs.racket-lang.org/reference/quasiquote.html}{unquote-splicing
   operator} \code{,@} to insert the list \code{t*} without its usual
 start and end parentheses. \index{subject}{unquote-slicing}}
@@ -11505,19 +11521,19 @@ A copying collector makes more room by copying all of the live objects
 from the FromSpace into the ToSpace and then performs a sleight of
 hand, treating the ToSpace as the new FromSpace and the old FromSpace
 as the new ToSpace.  In the example of
-Figure~\ref{fig:copying-collector}, the root set consists of three
+figure~\ref{fig:copying-collector}, the root set consists of three
 pointers, one in a register and two on the stack.  All of the live
 objects have been copied to the ToSpace (the right-hand side of
-Figure~\ref{fig:copying-collector}) in a way that preserves the
+figure~\ref{fig:copying-collector}) in a way that preserves the
 pointer relationships. For example, the pointer in the register still
 points to a tuple that in turn points to two other tuples.  There are
 four tuples that are not reachable from the root set and therefore do
 not get copied into the ToSpace.
 
-The exact situation in Figure~\ref{fig:copying-collector} cannot be
+The exact situation in figure~\ref{fig:copying-collector} cannot be
 created by a well-typed program in \LangVec{} because it contains a
 cycle. However, creating cycles will be possible once we get to
-\LangDyn{} (Chapter~\ref{ch:Ldyn}).  We design the garbage collector
+\LangDyn{} (chapter~\ref{ch:Ldyn}).  We design the garbage collector
 to deal with cycles to begin with so we will not need to revisit this
 issue.
 
@@ -11560,7 +11576,7 @@ and the \emph{scan pointer} respectively. The algorithm starts by
 copying all tuples that are immediately reachable from the root set
 into the ToSpace to form the initial queue.  When we copy a tuple, we
 mark the old tuple to indicate that it has been visited. We discuss
-how this marking is accomplish in Section~\ref{sec:data-rep-gc}. Note
+how this marking is accomplish in section~\ref{sec:data-rep-gc}. Note
 that any pointers inside the copied tuples in the queue still point
 back to the FromSpace. Once the initial queue has been created, the
 algorithm enters a loop in which it repeatedly processes the tuple at
@@ -11581,7 +11597,7 @@ newly copied objects.
 \label{fig:cheney}
 \end{figure}
 
-Getting back to Figure~\ref{fig:cheney}, in the first step we copy the
+Getting back to figure~\ref{fig:cheney}, in the first step we copy the
 tuple whose second element is $42$ to the back of the queue. The other
 pointer goes to a tuple that has already been copied, so we do not
 need to copy it again, but we do need to update the pointer to the new
@@ -11629,7 +11645,7 @@ root stack instead of putting it on the procedure call
 stack. Furthermore, we always spill tuple-typed variables if they are
 live during a call to the collector, thereby ensuring that no pointers
 are in registers during a collection. Figure~\ref{fig:shadow-stack}
-reproduces the example from Figure~\ref{fig:copying-collector} and
+reproduces the example from figure~\ref{fig:copying-collector} and
 contrasts it with the data layout using a root stack. The root stack
 contains the two pointers from the regular stack and also the pointer
 in the second register.
@@ -11649,7 +11665,7 @@ The problem of distinguishing between pointers and other kinds of data
 also arises inside of each tuple on the heap. We solve this problem by
 attaching a tag, an extra 64-bits, to each
 tuple. Figure~\ref{fig:tuple-rep} zooms in on the tags for two of the
-tuples in the example from Figure~\ref{fig:copying-collector}. Note
+tuples in the example from figure~\ref{fig:copying-collector}. Note
 that we have drawn the bits in a big-endian way, from right-to-left,
 with bit location 0 (the least significant bit) on the far right,
 which corresponds to the direction of the x86 shifting instructions
@@ -11741,7 +11757,7 @@ next allocation.
 %%   rootstack (which is an array of pointers).  The \code{cheney} function
 %%   also communicates with \code{collect} through the global
 %%   variables \code{fromspace\_begin} and \code{fromspace\_end}
-%%   mentioned in Figure~\ref{fig:gc-header} as well as the pointers for
+%%   mentioned in figure~\ref{fig:gc-header} as well as the pointers for
 %%   the ToSpace:
 %% \begin{lstlisting}
 %%    static int64_t* tospace_begin;
@@ -12106,17 +12122,17 @@ pass, which is \LangAlloc{} in monadic normal form.
   \end{tcolorbox}
 
 \caption{The abstract syntax of \LangCVec{}, extending
-  \racket{\LangCLoop{} (Figure~\ref{fig:c7-syntax})}\python{\LangCIf{}
-  (Figure~\ref{fig:c1-syntax})}.}
+  \racket{\LangCLoop{} (figure~\ref{fig:c7-syntax})}\python{\LangCIf{}
+  (figure~\ref{fig:c1-syntax})}.}
 \label{fig:c2-syntax}
 \end{figure}
 
 The output of \code{explicate\_control} is a program in the
 intermediate language \LangCVec{}, whose abstract syntax is defined in
-Figure~\ref{fig:c2-syntax}.
+figure~\ref{fig:c2-syntax}.
 %
 %% \racket{(The concrete syntax is defined in
-%%   Figure~\ref{fig:c2-concrete-syntax} of the Appendix.)}
+%%   figure~\ref{fig:c2-concrete-syntax} of the Appendix.)}
 %
 The new expressions of \LangCVec{} include \key{allocate},
 %
@@ -12134,7 +12150,7 @@ assignment to a tuple element.}
 The \code{explicate\_control} pass can treat these new forms much like
 the other forms that we've already encountered.  The output of the
 \code{explicate\_control} pass on the running example is shown on the
-left-side of Figure~\ref{fig:select-instr-output-gc} in the next
+left-side of figure~\ref{fig:select-instr-output-gc} in the next
 section.
 
 
@@ -12238,7 +12254,7 @@ enough space for the tuple being allocated, which is $8(\itm{len}+1)$
 bytes because each element is 8 bytes (64 bits) and we use 8 bytes for
 the tag.  We then initialize the \itm{tag} and finally copy the
 address in \code{r11} to the left-hand side. Refer to
-Figure~\ref{fig:tuple-rep} to see how the tag is organized.
+figure~\ref{fig:tuple-rep} to see how the tag is organized.
 %
 \racket{We recommend using the Racket operations
 \code{bitwise-ior} and \code{arithmetic-shift} to compute the tag
@@ -12333,7 +12349,7 @@ available for use by the register allocator.
 \end{array}
 \]
   \end{tcolorbox}
-\caption{The concrete syntax of \LangXGlobal{}  (extends \LangXIf{} of Figure~\ref{fig:x86-1-concrete}).}
+\caption{The concrete syntax of \LangXGlobal{}  (extends \LangXIf{} of figure~\ref{fig:x86-1-concrete}).}
 \label{fig:x86-2-concrete}
 \end{figure}
 
@@ -12352,7 +12368,7 @@ available for use by the register allocator.
 \]
 \end{tcolorbox}
 
-\caption{The abstract syntax of \LangXGlobal{} (extends \LangXIf{} of Figure~\ref{fig:x86-1}).}
+\caption{The abstract syntax of \LangXGlobal{} (extends \LangXIf{} of figure~\ref{fig:x86-1}).}
 \label{fig:x86-2}
 \end{figure}
 
@@ -12546,7 +12562,7 @@ variables in the root stack. We do not want the garbage collector to
 accidentally think that some uninitialized variable is a pointer that
 needs to be followed. Thus, we zero-out all locations on the root
 stack in the prelude of \code{main}. In
-Figure~\ref{fig:print-x86-output-gc}, the instruction
+figure~\ref{fig:print-x86-output-gc}, the instruction
 %
 \lstinline{movq $0, 0(%r15)}
 %
@@ -12666,8 +12682,8 @@ for the compilation of \LangVec{}.
 
 The language \LangStruct{} extends \LangVec{} with support for simple
 structures. Its concrete syntax is defined in
-Figure~\ref{fig:Lstruct-concrete-syntax} and the abstract syntax is in
-Figure~\ref{fig:Lstruct-syntax}. Recall that a \code{struct} in Typed
+figure~\ref{fig:Lstruct-concrete-syntax} and the abstract syntax is in
+figure~\ref{fig:Lstruct-syntax}. Recall that a \code{struct} in Typed
 Racket is a user-defined data type that contains named fields and that
 is heap allocated, similar to a vector. The following is an example of
 a structure definition, in this case the definition of a \code{point}
@@ -12709,7 +12725,7 @@ type.
 \]
 \end{tcolorbox}
 \caption{The concrete syntax of \LangStruct{}, extending \LangVec{}
-  (Figure~\ref{fig:Lvec-concrete-syntax}).}
+  (figure~\ref{fig:Lvec-concrete-syntax}).}
 \label{fig:Lstruct-concrete-syntax}
 \end{figure}
 
@@ -12733,7 +12749,7 @@ type.
 \end{tcolorbox}
 
 \caption{The abstract syntax of \LangStruct{}, extending \LangVec{}
-  (Figure~\ref{fig:Lvec-syntax}).}
+  (figure~\ref{fig:Lvec-syntax}).}
 \label{fig:Lstruct-syntax}
 \end{figure}
 
@@ -12799,7 +12815,7 @@ Arrays correspond to the \code{list} type in Python language.
 }
 
 Figure~\ref{fig:Lvecof-concrete-syntax} defines the concrete syntax
-for \LangArray{} and Figure~\ref{fig:Lvecof-syntax} defines the
+for \LangArray{} and figure~\ref{fig:Lvecof-syntax} defines the
 abstract syntax, extending \LangVec{} with the
 \racket{\code{Vectorof}}\python{\code{list}} type and the
 %
@@ -12821,7 +12837,7 @@ The \code{len} function is also applicable to arrays.
 %
 We include integer multiplication in \LangArray{}, as it is
 useful in many examples involving arrays such as computing the
-inner product of two arrays (Figure~\ref{fig:inner_product}).
+inner product of two arrays (figure~\ref{fig:inner_product}).
 
 \newcommand{\LarrayGrammarRacket}{
 \begin{array}{lcl}
@@ -12892,7 +12908,7 @@ inner product of two arrays (Figure~\ref{fig:inner_product}).
 \]
 \fi}
 \end{tcolorbox}
-\caption{The concrete syntax of \LangArray{}, extending \LangVec{} (Figure~\ref{fig:Lvec-concrete-syntax}).}
+\caption{The concrete syntax of \LangArray{}, extending \LangVec{} (figure~\ref{fig:Lvec-concrete-syntax}).}
 \label{fig:Lvecof-concrete-syntax}
 \end{figure}
 
@@ -12931,7 +12947,7 @@ inner product of two arrays (Figure~\ref{fig:inner_product}).
 \]
 \fi}
 \end{tcolorbox}
-\caption{The abstract syntax of \LangArray{}, extending \LangVec{} (Figure~\ref{fig:Lvec-syntax}).}
+\caption{The abstract syntax of \LangArray{}, extending \LangVec{} (figure~\ref{fig:Lvec-syntax}).}
 \label{fig:Lvecof-syntax}
 \end{figure}
 
@@ -12974,7 +12990,7 @@ print( prod )
 
 {\if\edition\racketEd
 The type checker for \LangArray{} is defined in
-Figure~\ref{fig:type-check-Lvecof}. The result type of
+figure~\ref{fig:type-check-Lvecof}. The result type of
 \code{make-vector} is \code{(Vectorof T)} where \code{T} is the type
 of the initializing expression.  The length expression is required to
 have type \code{Integer}. The type checking of the operators
@@ -12989,7 +13005,7 @@ multiplication: it takes two integers and returns an integer.
 {\if\edition\pythonEd    
 %
 The type checker for \LangArray{} is defined in
-Figure~\ref{fig:type-check-Lvecof}. The result type of a list literal
+figure~\ref{fig:type-check-Lvecof}. The result type of a list literal
 is \code{list[T]} where \code{T} is the type of the initializing
 expressions.  The type checking of the \code{len} function and the
 subscript operator is updated to handle lists. The type checker now
@@ -13126,7 +13142,7 @@ class TypeCheckLarray(TypeCheckLtup):
 \end{figure}
 
 The interpreter for \LangArray{} is defined in
-Figure~\ref{fig:interp-Lvecof}.
+figure~\ref{fig:interp-Lvecof}.
 \racket{The \code{make-vector} operator is
 implemented with Racket's \code{make-vector} function and
 multiplication is \code{fx*}, multiplication for \code{fixnum}
@@ -13199,7 +13215,7 @@ garbage collector will need to inspect arrays. An immediate thought is
 to use the same representation for arrays that we use for tuples.
 However, we limit tuples to a length of $50$ so that their length and
 pointer mask can fit into the 64-bit tag at the beginning of each
-tuple (Section~\ref{sec:data-rep-gc}). We intend arrays to allow
+tuple (section~\ref{sec:data-rep-gc}). We intend arrays to allow
 millions of elements, so we need more bits to store the length.
 However, because arrays are homogeneous, we only need one bit for the
 pointer mask instead of one bit per array element.  Finally, the
@@ -13221,11 +13237,11 @@ an array:
 \item The bit at position $62$ distinguishes between a tuple ($0$)
   versus an array ($1$).
 
-\item The left-most bit is reserved for use in Chapter~\ref{ch:Lgrad}.
+\item The left-most bit is reserved for use in chapter~\ref{ch:Lgrad}.
 \end{itemize}
 
 
-%% Recall that in Chapter~\ref{ch:Ldyn}, we use a $3$-bit tag to
+%% Recall that in chapter~\ref{ch:Ldyn}, we use a $3$-bit tag to
 %% differentiate the kinds of values that have been injected into the
 %% \code{Any} type. We use the bit pattern \code{110} (or $6$ in decimal)
 %% to indicate that the value is an array.
@@ -13271,10 +13287,10 @@ equal to zero and less than the array's length.
 
 %% The array-access operators \code{vectorof-ref} and
 %% \code{vectorof-set!} are similar to the \code{any-vector-ref} and
-%% \code{any-vector-set!} operators of Chapter~\ref{ch:Ldyn} in
+%% \code{any-vector-set!} operators of chapter~\ref{ch:Ldyn} in
 %% that the type checker cannot tell whether the index will be in bounds,
 %% so the bounds check must be performed at run time.  Recall that the
-%% \code{reveal-casts} pass (Section~\ref{sec:reveal-casts-Rany}) wraps
+%% \code{reveal-casts} pass (section~\ref{sec:reveal-casts-Rany}) wraps
 %% an \code{If} arround a vector reference for update to check whether
 %% the index is less than the length.  You should do the same for
 %% \code{vectorof-ref} and \code{vectorof-set!} .
@@ -13324,16 +13340,16 @@ Add cases for \code{AllocateArray} to \code{explicate\_tail} and
 \subsection{Select Instructions}
 
 Generate instructions for \code{AllocateArray} similar to those for
-\code{Allocate} in Section~\ref{sec:select-instructions-gc} except
+\code{Allocate} in section~\ref{sec:select-instructions-gc} except
 that the tag at the front of the array should instead use the
-representation discussed in Section~\ref{sec:array-rep}.
+representation discussed in section~\ref{sec:array-rep}.
 
 Regarding \racket{\code{vectorof-length}}\python{\code{array\_len}},
 extract the length from the tag according to the representation discussed in
-Section~\ref{sec:array-rep}.
+section~\ref{sec:array-rep}.
 
 The instructions generated for accessing an element of an array differ
-from those for a tuple (Section~\ref{sec:select-instructions-gc}) in
+from those for a tuple (section~\ref{sec:select-instructions-gc}) in
 that the index is not a constant so the offset must be computed at
 runtime.
 
@@ -13349,7 +13365,7 @@ runtime.
 
 Implement a compiler for the \LangArray{} language by extending your
 compiler for \LangLoop{}. Test your compiler on a half dozen new
-programs, including the one in Figure~\ref{fig:inner_product} and also
+programs, including the one in figure~\ref{fig:inner_product} and also
 a program that multiplies two matrices. Note that although matrices
 are 2-dimensional arrays, they can be encoded into 1-dimensional
 arrays by laying out each row in the array, one after the next.
@@ -13359,7 +13375,7 @@ arrays by laying out each row in the array, one after the next.
 {\if\edition\racketEd
 \section{Challenge: Generational Collection}
 
-The copying collector described in Section~\ref{sec:GC} can incur
+The copying collector described in section~\ref{sec:GC} can incur
 significant runtime overhead because the call to \code{collect} takes
 time proportional to all of the live data. One way to reduce this
 overhead is to reduce how much data is inspected in each call to
@@ -13467,13 +13483,14 @@ present these findings.
 \chapter{Functions}
 \label{ch:Lfun}
 \index{subject}{function}
+\setcounter{footnote}{0}
 
 This chapter studies the compilation of a subset of \racket{Typed
   Racket}\python{Python} in which only top-level function definitions
 are allowed. This kind of function appears in the C programming
 language and it serves as an important stepping stone to implementing
 lexically-scoped functions in the form of \key{lambda} abstractions,
-which is the topic of Chapter~\ref{ch:Llambda}.
+which is the topic of chapter~\ref{ch:Llambda}.
 
 \section{The \LangFun{} Language}
 
@@ -13486,13 +13503,13 @@ program, including all of the function definitions (so the ordering of
 function definitions does not matter).
 %
 \python{The abstract syntax for function parameters in
-  Figure~\ref{fig:Lfun-syntax} is a list of pairs, where each pair
+  figure~\ref{fig:Lfun-syntax} is a list of pairs, where each pair
   consists of a parameter name and its type.  This design differs from
   Python's \code{ast} module, which has a more complex structure for
   function parameters to handle keyword parameters,
   defaults, and so on. The type checker in \code{type\_check\_Lfun} converts the
   complex Python abstract syntax into the simpler syntax of
-  Figure~\ref{fig:Lfun-syntax}. The fourth and sixth parameters of the
+  figure~\ref{fig:Lfun-syntax}. The fourth and sixth parameters of the
   \code{FunctionDef} constructor are for decorators and a type
   comment, neither of which are used by our compiler. We recommend
   replacing them with \code{None} in the \code{shrink} pass.
@@ -13610,7 +13627,7 @@ nested inside each other.
 \fi}
 \end{tcolorbox}
 
-\caption{The concrete syntax of \LangFun{}, extending \LangVec{} (Figure~\ref{fig:Lvec-concrete-syntax}).}
+\caption{The concrete syntax of \LangFun{}, extending \LangVec{} (figure~\ref{fig:Lvec-concrete-syntax}).}
 \label{fig:Lfun-concrete-syntax}
 \end{figure}
 
@@ -13650,12 +13667,12 @@ nested inside each other.
 \fi}
 \end{tcolorbox}
 
-\caption{The abstract syntax of \LangFun{}, extending \LangVec{} (Figure~\ref{fig:Lvec-syntax}).}
+\caption{The abstract syntax of \LangFun{}, extending \LangVec{} (figure~\ref{fig:Lvec-syntax}).}
 \label{fig:Lfun-syntax}
 \end{figure}
 
 
-The program in Figure~\ref{fig:Lfun-function-example} is a
+The program in figure~\ref{fig:Lfun-function-example} is a
 representative example of defining and using functions in \LangFun{}.
 We define a function \code{map} that applies some other function
 \code{f} to both elements of a tuple and returns a new tuple
@@ -13700,7 +13717,7 @@ print( map(inc, (0, 41))[1] )
 \end{figure}
 
 The definitional interpreter for \LangFun{} is in
-Figure~\ref{fig:interp-Lfun}. The case for the
+figure~\ref{fig:interp-Lfun}. The case for the
 %
 \racket{\code{ProgramDefsExp}}\python{\code{Module}}
 %
@@ -13830,7 +13847,7 @@ class InterpLfun(InterpLtup):
 %\margincomment{TODO: explain type checker}
 
 The type checker for \LangFun{} is in
-Figure~\ref{fig:type-check-Lfun}.
+figure~\ref{fig:type-check-Lfun}.
 %
 \python{(We omit the code that parses function parameters into the
   simpler abstract syntax.)}
@@ -13990,11 +14007,11 @@ instruction. For example, the following puts the address of the
 \begin{lstlisting}
    leaq inc(%rip), %rbx
 \end{lstlisting}
-Recall from Section~\ref{sec:select-instructions-gc} that
+Recall from section~\ref{sec:select-instructions-gc} that
 \verb!inc(%rip)! is an example of instruction-pointer relative
 addressing.
 
-In Section~\ref{sec:x86} we used the \code{callq} instruction to jump
+In section~\ref{sec:x86} we used the \code{callq} instruction to jump
 to functions whose locations were given by a label, such as
 \code{read\_int}. To support function calls in this chapter we instead
 will be jumping to functions whose location are given by an address in
@@ -14030,7 +14047,7 @@ rdi rsi rdx rcx r8 r9
 If there are more than six arguments, then the calling convention
 mandates using space on the frame of the caller for the rest of the
 arguments. However, to ease the implementation of efficient tail calls
-(Section~\ref{sec:tail-call}), we arrange never to need more than six
+(section~\ref{sec:tail-call}), we arrange never to need more than six
 arguments.
 %
 The return value of the function is stored in register \code{rax}.
@@ -14039,7 +14056,7 @@ The return value of the function is stored in register \code{rax}.
 
 Regarding frames \index{subject}{frame} and the procedure call stack,
 \index{subject}{procedure call stack} recall from
-Section~\ref{sec:x86} that the stack grows down and each function call
+section~\ref{sec:x86} that the stack grows down and each function call
 uses a chunk of space on the stack called a frame. The caller sets the
 stack pointer, register \code{rsp}, to the last data item in its
 frame. The callee must not change anything in the caller's frame, that
@@ -14057,19 +14074,19 @@ interpret the garbage bits in those slots as memory addresses and try
 to traverse them, causing serious mayhem!
 
 Regarding the sharing of registers between different functions, recall
-from Section~\ref{sec:calling-conventions} that the registers are
+from section~\ref{sec:calling-conventions} that the registers are
 divided into two groups, the caller-saved registers and the
 callee-saved registers. The caller should assume that all the
 caller-saved registers get overwritten with arbitrary values by the
 callee. For that reason we recommend in
-Section~\ref{sec:calling-conventions} that variables that are live
+section~\ref{sec:calling-conventions} that variables that are live
 during a function call should not be assigned to caller-saved
 registers.
 
 On the flip side, if the callee wants to use a callee-saved register,
 the callee must save the contents of those registers on their stack
 frame and then put them back prior to returning to the caller.  For
-that reason we recommend in Section~\ref{sec:calling-conventions} that if
+that reason we recommend in section~\ref{sec:calling-conventions} that if
 the register allocator assigns a variable to a callee-saved register,
 then the prelude of the \code{main} function must save that register
 to the stack and the conclusion of \code{main} must restore it.  This
@@ -14078,7 +14095,7 @@ recommendation now generalizes to all functions.
 Recall that the base pointer, register \code{rbp}, is used as a
 point-of-reference within a frame, so that each local variable can be
 accessed at a fixed offset from the base pointer
-(Section~\ref{sec:x86}).
+(section~\ref{sec:x86}).
 %
 Figure~\ref{fig:call-frames} shows the general layout of the caller
 and callee frames.
@@ -14117,7 +14134,7 @@ $-8(j+k)$(\key{\%rbp}) &  & local variable $k$ \\
 \label{fig:call-frames}
 \end{figure}
 
-%% Recall from Section~\ref{sec:x86} that the stack is also used for
+%% Recall from section~\ref{sec:x86} that the stack is also used for
 %% local variables and for storing the values of callee-saved registers
 %% (we shall refer to all of these collectively as ``locals''), and that
 %% at the beginning of a function we move the stack pointer \code{rsp}
@@ -14202,7 +14219,7 @@ arguments from their sources in the caller's frame, the target
 locations in the callee's frame might collide with the sources for
 later arguments! We solve this problem by using the heap instead of
 the stack for passing more than six arguments
-(Section~\ref{sec:limit-functions-r4}).
+(section~\ref{sec:limit-functions-r4}).
 
 As mentioned above, for a tail call we pop the caller's frame prior to
 making the tail call. The instructions for popping a frame are the
@@ -14270,11 +14287,11 @@ particular, we use \code{leaq} to convert the function name (a label
 in x86) to an address in a register.  Thus, we create a new pass that
 changes function references from $\VAR{f}$ to $\FUNREF{f}{n}$ where
 $n$ is the arity of the function.\python{\footnote{The arity is not
-    needed in this chapter but is used in Chapter~\ref{ch:Ldyn}.}}
+    needed in this chapter but is used in chapter~\ref{ch:Ldyn}.}}
 This pass is named \code{reveal\_functions} and the output language
 is \LangFunRef{}.
 
-%is defined in Figure~\ref{fig:f1-syntax}.
+%is defined in figure~\ref{fig:f1-syntax}.
 %% The concrete syntax for a
 %% function reference is $\CFUNREF{f}$.
 
@@ -14302,7 +14319,7 @@ is \LangFunRef{}.
 %% \end{minipage}
 %% }
 %% \caption{The abstract syntax \LangFunRef{}, an extension of \LangFun{}
-%%   (Figure~\ref{fig:Lfun-syntax}).}
+%%   (figure~\ref{fig:Lfun-syntax}).}
 %% \label{fig:f1-syntax}
 %% \end{figure}
 
@@ -14421,8 +14438,8 @@ classified as a complex expression so that we generate an assignment
 statement with a left-hand side that can serve as the target of the
 \code{leaq}.
 
-The output of this pass, \LangFunANF{} (Figure~\ref{fig:Lfun-anf-syntax}),
-extends \LangAllocANF{} (Figure~\ref{fig:Lvec-anf-syntax}) with \code{FunRef}
+The output of this pass, \LangFunANF{} (figure~\ref{fig:Lfun-anf-syntax}),
+extends \LangAllocANF{} (figure~\ref{fig:Lvec-anf-syntax}) with \code{FunRef}
 and \racket{\code{Apply}}\python{\code{Call}} in the grammar for expressions
 and augments programs to include a list of function definitions.
 %
@@ -14527,7 +14544,7 @@ Figure~\ref{fig:c3-syntax} defines the abstract syntax for \LangCFun{}, the
 output of \code{explicate\_control}.
 %
 %% \racket{(The concrete syntax is given in
-%%   Figure~\ref{fig:c3-concrete-syntax} of the Appendix.)}
+%%   figure~\ref{fig:c3-concrete-syntax} of the Appendix.)}
 %
 The auxiliary functions for assignment\racket{ and tail contexts} should
 be updated with cases for
@@ -14609,7 +14626,7 @@ appropriate explicate functions for the various contexts.
 \fi}
   \end{tcolorbox}
 
-\caption{The abstract syntax of \LangCFun{}, extending \LangCVec{} (Figure~\ref{fig:c2-syntax}).}
+\caption{The abstract syntax of \LangCFun{}, extending \LangCVec{} (figure~\ref{fig:c2-syntax}).}
 \label{fig:c3-syntax}
 \end{figure}
 
@@ -14621,10 +14638,10 @@ appropriate explicate functions for the various contexts.
 
 The output of select instructions is a program in the \LangXIndCall{}
 language, whose concrete syntax is defined in
-Figure~\ref{fig:x86-3-concrete} and abstract syntax is defined in
-Figure~\ref{fig:x86-3}.  We use the \code{align} directive on the
+figure~\ref{fig:x86-3-concrete} and abstract syntax is defined in
+figure~\ref{fig:x86-3}.  We use the \code{align} directive on the
 labels of function definitions to make sure the bottom three bits are
-zero, which we make use of in Chapter~\ref{ch:Ldyn}. We discuss the
+zero, which we make use of in chapter~\ref{ch:Ldyn}. We discuss the
 new instructions as needed in this section.  \index{subject}{x86}
 
 \newcommand{\GrammarXIndCall}{
@@ -14662,7 +14679,7 @@ new instructions as needed in this section.  \index{subject}{x86}
 \]
   \end{tcolorbox}
 
-\caption{The concrete syntax of \LangXIndCall{} (extends \LangXGlobal{} of Figure~\ref{fig:x86-2-concrete}).}
+\caption{The concrete syntax of \LangXIndCall{} (extends \LangXGlobal{} of figure~\ref{fig:x86-2-concrete}).}
 \label{fig:x86-3-concrete}
 \end{figure}
 
@@ -14700,7 +14717,7 @@ new instructions as needed in this section.  \index{subject}{x86}
 \fi}
   \end{tcolorbox}
 \caption{The abstract syntax of \LangXIndCall{} (extends
-  \LangXGlobal{} of Figure~\ref{fig:x86-2}).}
+  \LangXGlobal{} of figure~\ref{fig:x86-2}).}
 \label{fig:x86-3}
 \end{figure}
 
@@ -14739,11 +14756,11 @@ leaq |$f$|(%rip), |$\itm{lhs}'$|
 
 Regarding function definitions, we need to remove the parameters and
 instead perform parameter passing using the conventions discussed in
-Section~\ref{sec:fun-x86}. That is, the arguments are passed in
+section~\ref{sec:fun-x86}. That is, the arguments are passed in
 registers. We recommend turning the parameters into local variables
 and generating instructions at the beginning of the function to move
 from the argument passing registers
-(Section~\ref{sec:calling-conventions-fun}) to these local variables.
+(section~\ref{sec:calling-conventions-fun}) to these local variables.
 
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -14786,7 +14803,7 @@ $\Rightarrow$
 \end{minipage}
 \end{center}
 Recall that we use the label \code{start} for the initial block of a
-program, and in Section~\ref{sec:select-Lvar} we recommend labeling
+program, and in section~\ref{sec:select-Lvar} we recommend labeling
 the conclusion of the program with \code{conclusion}, so that
 $\RETURN{Arg}$ can be compiled to an assignment to \code{rax} followed
 by a jump to \code{conclusion}. With the addition of function
@@ -14804,11 +14821,11 @@ to obtain unique labels.
 By changing the parameters to local variables, we are giving the
 register allocator control over which registers or stack locations to
 use for them. If you implemented the move-biasing challenge
-(Section~\ref{sec:move-biasing}), the register allocator will try to
+(section~\ref{sec:move-biasing}), the register allocator will try to
 assign the parameter variables to the corresponding argument register,
 in which case the \code{patch\_instructions} pass will remove the
 \code{movq} instruction. This happens in the example translation in
-Figure~\ref{fig:add-fun} of Section~\ref{sec:functions-example}, in
+figure~\ref{fig:add-fun} of section~\ref{sec:functions-example}, in
 the \code{add} function.
 %
 Also, note that the register allocator will perform liveness analysis
@@ -14883,7 +14900,7 @@ $R$.
 With the addition of function definitions, we compute a separate interference
 graph for each function (not just one for the whole program).
 
-Recall that in Section~\ref{sec:reg-alloc-gc} we discussed the need to
+Recall that in section~\ref{sec:reg-alloc-gc} we discussed the need to
 spill tuple-typed variables that are live during a call to
 \code{collect}, the garbage collector.  With the addition of functions
 to our language, we need to revisit this issue. Functions that perform
@@ -14901,9 +14918,9 @@ call-live variables and the caller-saved registers).
 
 The primary change to the \code{allocate\_registers} pass is adding an
 auxiliary function for handling definitions (the \Def{} nonterminal
-in Figure~\ref{fig:x86-3}) with one case for function definitions. The
+in figure~\ref{fig:x86-3}) with one case for function definitions. The
 logic is the same as described in
-Chapter~\ref{ch:register-allocation-Lvar}, except now register
+chapter~\ref{ch:register-allocation-Lvar}, except now register
 allocation is performed many times, once for each function definition,
 instead of just once for the whole program.
 
@@ -14929,13 +14946,13 @@ the conclusion of a function, except the \code{retq} is replaced with
 
 Regarding function definitions, we generate a prelude and conclusion
 for each one. This code is similar to the prelude and conclusion
-generated for the \code{main} function in Chapter~\ref{ch:Lvec}. To
+generated for the \code{main} function in chapter~\ref{ch:Lvec}. To
 review, the prelude of every function should carry out the following
 steps.
 % TODO: .align the functions!
 \begin{enumerate}
 %% \item Start with \code{.global} and \code{.align} directives followed
-%%   by the label for the function.  (See Figure~\ref{fig:add-fun} for an
+%%   by the label for the function.  (See figure~\ref{fig:add-fun} for an
   %%   example.)
 \item Push \code{rbp} to the stack and set \code{rbp} to current stack
   pointer.
@@ -15316,12 +15333,13 @@ mainconclusion:
 \label{ch:Llambda}
 \index{subject}{lambda}
 \index{subject}{lexical scoping}
+\setcounter{footnote}{0}
 
 This chapter studies lexically scoped functions. Lexical scoping means
 that a function's body may refer to variables whose binding site is
 outside of the function, in an enclosing scope.
 %
-Consider the example in Figure~\ref{fig:lexical-scoping} written in
+Consider the example in figure~\ref{fig:lexical-scoping} written in
 \LangLam{}, which extends \LangFun{} with the \key{lambda} form for
 creating lexically scoped functions.  The body of the \key{lambda}
 refers to three variables: \code{x}, \code{y}, and \code{z}. The
@@ -15376,7 +15394,7 @@ is to compile them into top-level function definitions, translating
 from \LangLam{} into \LangFun{}.  However, the compiler must give
 special treatment to variable occurrences such as \code{x} and
 \code{y} in the body of the \code{lambda} of
-Figure~\ref{fig:lexical-scoping}. After all, an \LangFun{} function
+figure~\ref{fig:lexical-scoping}. After all, an \LangFun{} function
 may not refer to variables defined outside of it. To identify such
 variable occurrences, we review the standard notion of free variable.
 
@@ -15413,11 +15431,11 @@ an arrangement called a \emph{flat closure} (which we shorten to just
 ``closure'').\index{subject}{closure}\index{subject}{flat closure}
 %
 By design, we have all the ingredients to make closures:
-Chapter~\ref{ch:Lvec} gave us tuples and Chapter~\ref{ch:Lfun} gave us
+chapter~\ref{ch:Lvec} gave us tuples and chapter~\ref{ch:Lfun} gave us
 function pointers. The function pointer resides at index $0$ and the
 values for the free variables fill in the rest of the tuple.
 
-Let us revisit the example in Figure~\ref{fig:lexical-scoping} to see
+Let us revisit the example in figure~\ref{fig:lexical-scoping} to see
 how closures work. It is a three-step dance. The program calls
 function \code{f}, which creates a closure for the \code{lambda}. The
 closure is a tuple whose first element is a pointer to the top-level
@@ -15427,12 +15445,12 @@ element is \code{4}, the value of \code{y}. The closure does not
 contain an element for \code{z} because \code{z} is not a free
 variable of the \code{lambda}. Creating the closure is step 1 of the
 dance. The closure is returned from \code{f} and bound to \code{g}, as
-shown in Figure~\ref{fig:closures}.
+shown in figure~\ref{fig:closures}.
 %
 The second call to \code{f} creates another closure, this time with
 \code{3} in the second slot (for \code{x}). This closure is also
 returned from \code{f} but bound to \code{h}, which is also shown in
-Figure~\ref{fig:closures}.
+figure~\ref{fig:closures}.
 
 \begin{figure}[tbp]
   \centering
@@ -15442,12 +15460,12 @@ Figure~\ref{fig:closures}.
   \end{tcolorbox}
   \end{minipage}
 \caption{Flat closure representations for the two functions
-  produced by the \key{lambda} in Figure~\ref{fig:lexical-scoping}.}
+  produced by the \key{lambda} in figure~\ref{fig:lexical-scoping}.}
 \label{fig:closures}
 \end{figure}
 
 Continuing with the example, consider the application of \code{g} to
-\code{11} in Figure~\ref{fig:lexical-scoping}.  To apply a closure, we
+\code{11} in figure~\ref{fig:lexical-scoping}.  To apply a closure, we
 obtain the function pointer from the first element of the closure and
 call it, passing in the closure itself and then the regular arguments,
 in this case \code{11}. This technique for applying a closure is step
@@ -15462,9 +15480,9 @@ appropriate elements from the closure parameter.
 %
 This three-step dance is known as \emph{closure conversion}.  We
 discuss the details of closure conversion in
-Section~\ref{sec:closure-conversion} and show the code generated from
-the example in Section~\ref{sec:example-lambda}. But first we define
-the syntax and semantics of \LangLam{} in Section~\ref{sec:r5}.
+section~\ref{sec:closure-conversion} and show the code generated from
+the example in section~\ref{sec:example-lambda}. But first we define
+the syntax and semantics of \LangLam{} in section~\ref{sec:r5}.
 
 \section{The \LangLam{} Language}
 \label{sec:r5}
@@ -15482,11 +15500,11 @@ syntax for function application.
 %
 \racket{The \code{procedure-arity} operation returns the number of parameters
   of a given function, an operation that we need for the translation
-  of dynamic typing in Chapter~\ref{ch:Ldyn}.}
+  of dynamic typing in chapter~\ref{ch:Ldyn}.}
 %
 \python{The \code{arity} operation returns the number of parameters of
   a given function, an operation that we need for the translation
-  of dynamic typing in Chapter~\ref{ch:Ldyn}.
+  of dynamic typing in chapter~\ref{ch:Ldyn}.
   The \code{arity} operation is not in Python, but the same functionality
   is available in a more complex form. We include \code{arity} in the
   \LangLam{} source language to enable testing.}
@@ -15558,7 +15576,7 @@ syntax for function application.
 \]
 \fi}
 \end{tcolorbox}
-\caption{The concrete syntax of \LangLam{}, extending \LangFun{} (Figure~\ref{fig:Lfun-concrete-syntax}) 
+\caption{The concrete syntax of \LangLam{}, extending \LangFun{} (figure~\ref{fig:Lfun-concrete-syntax}) 
   with \key{lambda}.}
 \label{fig:Llam-concrete-syntax}
 \end{figure}
@@ -15601,7 +15619,7 @@ syntax for function application.
 \fi}
 \end{tcolorbox}
 
-\caption{The abstract syntax of \LangLam{}, extending \LangFun{} (Figure~\ref{fig:Lfun-syntax}).}
+\caption{The abstract syntax of \LangLam{}, extending \LangFun{} (figure~\ref{fig:Lfun-syntax}).}
 \label{fig:Llam-syntax}
 \end{figure}
 
@@ -15908,7 +15926,7 @@ print( g(20) )
 \fi} The correct output for this example is \code{42} because the call
 to \code{f} is required to use the current value of \code{x} (which is
 \code{10}). Unfortunately, the closure conversion pass
-(Section~\ref{sec:closure-conversion}) generates code for the
+(section~\ref{sec:closure-conversion}) generates code for the
 \code{lambda} that copies the old value of \code{x} into a
 closure. Thus, if we naively apply closure conversion, the output of
 this program would be \code{32}.
@@ -16018,7 +16036,7 @@ def main() -> int :
 %%   communicate the arity of a function to the point of closure
 %%   creation.}
 %% %
-%% \python{In Chapter~\ref{ch:Ldyn} we need to access the arity of a
+%% \python{In chapter~\ref{ch:Ldyn} we need to access the arity of a
 %%   function at runtime. Thus, we need to communicate the arity of a
 %%   function to the point of closure creation.}
 %% %
@@ -16051,7 +16069,7 @@ conservative. It is possible to develop a more liberal condition using
 static program analysis.
 
 Consider again the first example from
-Section~\ref{sec:assignment-scoping}:
+section~\ref{sec:assignment-scoping}:
 %
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -16134,7 +16152,7 @@ recommend defining two auxiliary functions:
 %
 To compute the variables that are assigned-to, we recommend using the
 \code{collect-set!} function that we introduced in
-Section~\ref{sec:uncover-get-bang}, but updated to include the new AST
+section~\ref{sec:uncover-get-bang}, but updated to include the new AST
 forms such as \code{Lambda}.
 %
 \fi}
@@ -16525,7 +16543,7 @@ your previously created test programs.
 
 Compile the $\CLOSURE{\itm{arity}}{\Exp^{*}}$ form into code
 that allocates and initializes a tuple, similar to the translation of
-the tuple creation in Section~\ref{sec:expose-allocation}.
+the tuple creation in section~\ref{sec:expose-allocation}.
 The only difference is replacing the use of
 \ALLOC{\itm{len}}{\itm{type}} with
 \ALLOCCLOS{\itm{len}}{\itm{type}}{\itm{arity}}.
@@ -16535,7 +16553,7 @@ The only difference is replacing the use of
 \label{sec:explicate-r5}
 
 The output language of \code{explicate\_control} is \LangCLam{} whose
-abstract syntax is defined in Figure~\ref{fig:Clam-syntax}.
+abstract syntax is defined in figure~\ref{fig:Clam-syntax}.
 %
 \racket{The only differences with respect to \LangCFun{} is the
   addition of the \code{AllocateClosure} form to the grammar for
@@ -16599,7 +16617,7 @@ abstract syntax is defined in Figure~\ref{fig:Clam-syntax}.
 \fi}
   \end{tcolorbox}
 
-\caption{The abstract syntax of \LangCLam{}, extending \LangCFun{} (Figure~\ref{fig:c3-syntax}).}
+\caption{The abstract syntax of \LangCLam{}, extending \LangCFun{} (figure~\ref{fig:c3-syntax}).}
 \label{fig:Clam-syntax}
 \end{figure}
 
@@ -16609,10 +16627,10 @@ abstract syntax is defined in Figure~\ref{fig:Clam-syntax}.
 
 Compile \ALLOCCLOS{\itm{len}}{\itm{type}}{\itm{arity}} in almost the
 same way as the \ALLOC{\itm{len}}{\itm{type}} form
-(Section~\ref{sec:select-instructions-gc}). The only difference is
+(section~\ref{sec:select-instructions-gc}). The only difference is
 that you should place the \itm{arity} in the tag that is stored at
 position $0$ of the vector. Recall that in
-Section~\ref{sec:select-instructions-gc} a portion of the 64-bit tag
+section~\ref{sec:select-instructions-gc} a portion of the 64-bit tag
 was not used. We store the arity in the $5$ bits starting at position
 $58$.
 
@@ -17005,6 +17023,7 @@ and used in Chez Scheme version 1~\citep{Dybvig:2006aa}.
 \chapter{Dynamic Typing}
 \label{ch:Ldyn}
 \index{subject}{dynamic typing}
+\setcounter{footnote}{0}
 
 In this chapter we learn how to compile \LangDyn{}, a dynamically
 typed language that is a subset of \racket{Racket}\python{Python}. The
@@ -17184,12 +17203,12 @@ There is no type checker for \LangDyn{} because it only checks types
 at runtime.
 
 The definitional interpreter for \LangDyn{} is presented in
-\racket{Figure~\ref{fig:interp-Ldyn}}
+\racket{figure~\ref{fig:interp-Ldyn}}
 \python{Figures~\ref{fig:interp-Ldyn} and \ref{fig:interp-Ldyn-2}}
 and its auxiliary functions are defined in
-Figure~\ref{fig:interp-Ldyn-aux}. Consider the match case for
+figure~\ref{fig:interp-Ldyn-aux}. Consider the match case for
 \INT{n}.  Instead of simply returning the integer \code{n} (as
-in the interpreter for \LangVar{} in Figure~\ref{fig:interp-Lvar}), the
+in the interpreter for \LangVar{} in figure~\ref{fig:interp-Lvar}), the
 interpreter for \LangDyn{} creates a \emph{tagged value}\index{subject}{tagged
   value} that combines an underlying value with a tag that identifies
 what kind of value it is. We define the following \racket{struct}\python{class}
@@ -17233,11 +17252,11 @@ information that a type does.
 
 Next consider the match case for accessing the element of a tuple.
 The \racket{\code{check-tag}}\python{\code{untag}} auxiliary function
-(Figure~\ref{fig:interp-Ldyn-aux}) is used to ensure that the first
+(figure~\ref{fig:interp-Ldyn-aux}) is used to ensure that the first
 argument is a tuple and the second is an integer.
 \racket{
 If they are not, a \code{trapped-error} is raised.  Recall from
-Section~\ref{sec:interp_Lint} that when a definition interpreter
+section~\ref{sec:interp_Lint} that when a definition interpreter
 raises a \code{trapped-error} error, the compiled code must also
 signal an error by exiting with return code \code{255}.  A
 \code{trapped-error} is also raised if the index is not less than the
@@ -17556,7 +17575,7 @@ type, called \racket{\code{Any}}\python{\code{AnyType()}}, and define
 operations such as \code{Inject} and \code{Project} for creating and
 using them, yielding the statically typed \LangAny{} intermediate
 language. We describe how to compile \LangDyn{} to \LangAny{} in
-Section~\ref{sec:compile-r7} but first we describe the \LangAny{}
+section~\ref{sec:compile-r7} but first we describe the \LangAny{}
 language in greater detail.
 
 \section{The \LangAny{} Language}
@@ -17635,13 +17654,13 @@ language in greater detail.
 \fi}
 \end{tcolorbox}
 
-\caption{The abstract syntax of \LangAny{}, extending \LangLam{} (Figure~\ref{fig:Llam-syntax}).}
+\caption{The abstract syntax of \LangAny{}, extending \LangLam{} (figure~\ref{fig:Llam-syntax}).}
 \label{fig:Lany-syntax}
 \end{figure}
 
-The abstract syntax of \LangAny{} is defined in Figure~\ref{fig:Lany-syntax}.
+The abstract syntax of \LangAny{} is defined in figure~\ref{fig:Lany-syntax}.
 %% \racket{(The concrete syntax of \LangAny{} is in the Appendix,
-%%   Figure~\ref{fig:Lany-concrete-syntax}.)}
+%%   figure~\ref{fig:Lany-concrete-syntax}.)}
 The $\INJECT{e}{T}$ form
 converts the value produced by expression $e$ of type $T$ into a
 tagged value.  The $\PROJECT{e}{T}$ form converts the tagged value
@@ -17665,13 +17684,13 @@ to produce a tagged value; they return  {\TRUE} if the tag corresponds to
 the predicate and they return {\FALSE} otherwise.}
 
 The type checker for \LangAny{} is shown in
-Figure~\ref{fig:type-check-Lany}
+figure~\ref{fig:type-check-Lany}
 %
 \racket{ and uses the auxiliary functions in
-Figure~\ref{fig:type-check-Lany-aux}}.
+figure~\ref{fig:type-check-Lany-aux}}.
 %
-The interpreter for \LangAny{} is in Figure~\ref{fig:interp-Lany} and
-its auxiliary functions are in Figure~\ref{fig:interp-Lany-aux}.
+The interpreter for \LangAny{} is in figure~\ref{fig:interp-Lany} and
+its auxiliary functions are in figure~\ref{fig:interp-Lany-aux}.
 
 
 \begin{figure}[btp]
@@ -17983,17 +18002,17 @@ Figure~\ref{fig:compile-r7-Lany} shows the compilation of many of the
 is that given any subexpression $e$ in the \LangDyn{} program, the
 pass will produce an expression $e'$ in \LangAny{} that has type
 \ANYTY{}. For example, the first row in
-Figure~\ref{fig:compile-r7-Lany} shows the compilation of the Boolean
+figure~\ref{fig:compile-r7-Lany} shows the compilation of the Boolean
 \TRUE{}, which must be injected to produce an expression of type
 \ANYTY{}.
 %
-The second row of Figure~\ref{fig:compile-r7-Lany}, the compilation of
+The second row of figure~\ref{fig:compile-r7-Lany}, the compilation of
 addition, is representative of compilation for many primitive
 operations: the arguments have type \ANYTY{} and must be projected to
 \INTTYPE{} before the addition can be performed.
 
 The compilation of \key{lambda} (third row of
-Figure~\ref{fig:compile-r7-Lany}) shows what happens when we need to
+figure~\ref{fig:compile-r7-Lany}) shows what happens when we need to
 produce type annotations: we simply use \ANYTY{}.
 %
 % TODO:update the following for python, and the tests and interpreter. -Jeremy
@@ -18373,7 +18392,7 @@ translation of \code{Project}.}
 The \code{any-vector-ref} and \code{any-vector-set!} operations
 combine the projection action with the vector operation.  Also, the
 read and write operations allow arbitrary expressions for the index so
-the type checker for \LangAny{} (Figure~\ref{fig:type-check-Lany})
+the type checker for \LangAny{} (figure~\ref{fig:type-check-Lany})
 cannot guarantee that the index is within bounds. Thus, we insert code
 to perform bounds checking at runtime. The translation for
 \code{any-vector-ref} is as follows and the other two operations are
@@ -18400,7 +18419,7 @@ translated in a similar way.
 The \code{any\_tuple\_load} operation combines the projection action
 with the load operation.  Also, the load operation allows arbitrary
 expressions for the index so the type checker for \LangAny{}
-(Figure~\ref{fig:type-check-Lany}) cannot guarantee that the index is
+(figure~\ref{fig:type-check-Lany}) cannot guarantee that the index is
 within bounds. Thus, we insert code to perform bounds checking at
 runtime. The translation for \code{any\_tuple\_load} is as follows.
 
@@ -18446,13 +18465,13 @@ Update this pass to handle the \code{TagOf}, \code{ValueOf}, and
 \label{sec:explicate-Lany}
 
 The output of \code{explicate\_control} is the \LangCAny{} language
-whose syntax is defined in Figure~\ref{fig:c5-syntax}.
+whose syntax is defined in figure~\ref{fig:c5-syntax}.
 %
 \racket{The \code{ValueOf} form that we added to \LangAny{} remains an
   expression and the \code{Exit} expression becomes a $\Tail$. Also,
   note that the index argument of \code{vector-ref} and
   \code{vector-set!} is an $\Atm$ instead of an integer, as it was in
-  \LangCVec{} (Figure~\ref{fig:c2-syntax}).}
+  \LangCVec{} (figure~\ref{fig:c2-syntax}).}
 %
 \python{
   Update the auxiliary functions \code{explicate\_tail}, \code{explicate\_effect},
@@ -18516,7 +18535,7 @@ whose syntax is defined in Figure~\ref{fig:c5-syntax}.
 \fi}
   \end{tcolorbox}
 
-\caption{The abstract syntax of \LangCAny{}, extending \LangCLam{} (Figure~\ref{fig:Clam-syntax}).}
+\caption{The abstract syntax of \LangCAny{}, extending \LangCLam{} (figure~\ref{fig:Clam-syntax}).}
 \label{fig:c5-syntax}
 \end{figure}
 
@@ -18704,7 +18723,7 @@ movq %r11, |$\itm{lhs'}$|
 
 This operation combines the effect of \code{ValueOf} with reading an
 element of the tuple (see
-Section~\ref{sec:select-instructions-gc}). However, the index may be
+section~\ref{sec:select-instructions-gc}). However, the index may be
 an arbitrary atom so instead of computing the offset at compile time,
 we must generate instructions to compute the offset at runtime as
 follows. Note the use of the new instruction \code{imulq}.
@@ -18881,6 +18900,7 @@ for the compilation of \LangDyn{}.
 %% \label{ch:Lobject}
 %% \index{subject}{objects}
 %% \index{subject}{classes}
+%% \setcounter{footnote}{0}
 
 %% \fi}
 
@@ -18889,6 +18909,7 @@ for the compilation of \LangDyn{}.
 \chapter{Gradual Typing}
 \label{ch:Lgrad}
 \index{subject}{gradual typing}
+\setcounter{footnote}{0}
 
 This chapter studies a language, \LangGrad{}, in which the programmer
 can choose between static and dynamic type checking in different parts
@@ -18903,8 +18924,8 @@ adding or removing type annotations on parameters and
 variables~\citep{Anderson:2002kd,Siek:2006bh}.
 %
 The concrete syntax of \LangGrad{} is defined in
-Figure~\ref{fig:Lgrad-concrete-syntax} and its abstract syntax is
-defined in Figure~\ref{fig:Lgrad-syntax}. The main syntactic
+figure~\ref{fig:Lgrad-concrete-syntax} and its abstract syntax is
+defined in figure~\ref{fig:Lgrad-syntax}. The main syntactic
 difference between \LangLam{} and \LangGrad{} is that type annotations
 are optional, which is specified in the grammar using the \Param{} and
 \itm{ret} nonterminals. In the abstract syntax, type annotations are
@@ -19001,7 +19022,7 @@ absent.
 \fi}
 \end{tcolorbox}
 
-\caption{The concrete syntax of \LangGrad{}, extending \LangVec{} (Figure~\ref{fig:Lvec-concrete-syntax}).}
+\caption{The concrete syntax of \LangGrad{}, extending \LangVec{} (figure~\ref{fig:Lvec-concrete-syntax}).}
 \label{fig:Lgrad-concrete-syntax}
 \end{figure}
 
@@ -19041,7 +19062,7 @@ absent.
 \fi}
 \end{tcolorbox}
 
-\caption{The abstract syntax of \LangGrad{}, extending \LangVec{} (Figure~\ref{fig:Lvec-syntax}).}
+\caption{The abstract syntax of \LangGrad{}, extending \LangVec{} (figure~\ref{fig:Lvec-syntax}).}
 \label{fig:Lgrad-syntax}
 \end{figure}
 
@@ -19057,8 +19078,8 @@ next two sections.
 \label{sec:gradual-type-check}
 
 We begin by discussing the type checking of a partially-typed variant
-of the \code{map} example from Chapter~\ref{ch:Lfun}, shown in
-Figure~\ref{fig:gradual-map}.  The \code{map} function itself is
+of the \code{map} example from chapter~\ref{ch:Lfun}, shown in
+figure~\ref{fig:gradual-map}.  The \code{map} function itself is
 statically typed, so there is nothing special happening there with
 respect to type checking. On the other hand, the \code{inc} function
 does not have type annotations, so parameter \code{x} is given the
@@ -19076,7 +19097,7 @@ So the type checker allows the \code{+} operator to be applied
 to \code{x} because \CANYTY{} is consistent with \INTTY{}.
 %
 Next consider the call to the \code{map} function in
-Figure~\ref{fig:gradual-map} with the arguments \code{inc} and a
+figure~\ref{fig:gradual-map} with the arguments \code{inc} and a
 tuple. The \code{inc} function has type
 \racket{\code{(Any -> Any)}}\python{\code{Callable[[Any],Any]}}
 but parameter \code{f} of \code{map} has type
@@ -19161,7 +19182,7 @@ print(t[1])
 
 It is also helpful to consider how gradual typing handles programs with an
 error, such as applying \code{map} to a function that sometimes
-returns a Boolean, as shown in Figure~\ref{fig:map-maybe_inc}.  The
+returns a Boolean, as shown in figure~\ref{fig:map-maybe_inc}.  The
 type checker for \LangGrad{} accepts this program because the type of
 \code{maybe\_inc} is consistent with the type of parameter \code{f} of
 \code{map}, that is,
@@ -19188,7 +19209,7 @@ and \ref{fig:type-check-Lgradual-3}.
 %% \]
 %% \end{minipage}
 %% }
-%% \caption{The abstract syntax of \LangCast{}, extending \LangLam{} (Figure~\ref{fig:Lwhile-syntax}).}
+%% \caption{The abstract syntax of \LangCast{}, extending \LangLam{} (figure~\ref{fig:Lwhile-syntax}).}
 %% \label{fig:Lgrad-prime-syntax}
 %% \end{figure}
 
@@ -19690,11 +19711,11 @@ The runtime behavior of casts involving simple types such as
 \INTTY{} and \BOOLTY{} is straightforward.  For example, a
 cast from \INTTY{} to \CANYTY{} can be accomplished with the
 \code{Inject} operator of \LangAny{}, which puts the integer into a
-tagged value (Figure~\ref{fig:interp-Lany}). Similarly, a cast from
+tagged value (figure~\ref{fig:interp-Lany}). Similarly, a cast from
 \CANYTY{} to \INTTY{} is accomplished with the \code{Project}
 operator, that is, by checking the value's tag and either retrieving
 the underlying integer or signalling an error if the tag is not the
-one for integers (Figure~\ref{fig:interp-Lany-aux}).
+one for integers (figure~\ref{fig:interp-Lany-aux}).
 %
 Things get more interesting for casts involving function, tuple, or array
 types.
@@ -19703,7 +19724,7 @@ Consider the cast of the function \code{maybe\_inc} from
 \racket{\code{(Any -> Any)}}\python{\code{Callable[[Any], Any]}}
 to
 \racket{\code{(Integer -> Integer)}}\python{\code{Callable[[int], int]}}
-in Figure~\ref{fig:map-maybe_inc}.
+in figure~\ref{fig:map-maybe_inc}.
 When the \code{maybe\_inc} function flows through
 this cast at runtime, we don't know whether it will return
 an integer, as that depends on the input from the user.
@@ -19718,11 +19739,11 @@ casts the return value from \CANYTY{} to \INTTY{}.
 %
 There are further complicatons regarding casts on mutable data
 such as the \code{list} type introduced in
-the challenge assignment of Section~\ref{sec:arrays}.
+the challenge assignment of section~\ref{sec:arrays}.
 %
 \fi}
 %
-Consider the example in Figure~\ref{fig:map-bang} that
+Consider the example in figure~\ref{fig:map-bang} that
 defines a partially-typed version of \code{map} whose parameter
 \code{v} has type
 \racket{\code{(Vector Any Any)}}\python{\code{list[Any]}}
@@ -19743,7 +19764,7 @@ whose elements are the result
 of casting each of the original elements to the appropriate target
 type.
 However, this approach is not valid for mutable data structures.
-In the example of Figure~\ref{fig:map-bang},
+In the example of figure~\ref{fig:map-bang},
 if the cast created a new \racket{tuple}\python{array}, then the updates inside of
 \code{map\_inplace} would happen to the new \racket{tuple}\python{array} and not
 the original one.
@@ -19972,15 +19993,15 @@ print( v[1] )
 
 The \LangCast{} interpreter uses an auxiliary function named
 \code{apply\_cast} to cast a value from a source type to a target type,
-shown in Figure~\ref{fig:apply_cast}. You'll find that it handles all
+shown in figure~\ref{fig:apply_cast}. You'll find that it handles all
 of the kinds of casts that we've discussed in this section.
 %
 The interpreter for \LangCast{} is defined in
-Figure~\ref{fig:interp-Lcast}, with the case for \code{Cast}
+figure~\ref{fig:interp-Lcast}, with the case for \code{Cast}
 dispatching to \code{apply\_cast}.
 \racket{To handle the addition of tuple
 proxies, we update the tuple primitives in \code{interp-op} using the
-functions in Figure~\ref{fig:guarded-tuple}.}
+functions in figure~\ref{fig:guarded-tuple}.}
 Next we turn to the individual passes needed for compiling \LangGrad{}.
 
 
@@ -20088,7 +20109,7 @@ class InterpLcast(InterpLany):
 \label{sec:gradual-resolution}
 
 Recall that when we added support for arrays in
-Section~\ref{sec:arrays}, the syntax for the array operations were the
+section~\ref{sec:arrays}, the syntax for the array operations were the
 same as for tuple operations (e.g., accessing an element, getting the
 length). So we performed overload resolution, with a pass named
 \code{resolve}, to separate the array and tuple operations.  In
@@ -20112,7 +20133,7 @@ AST node, which is added to the program by a new pass named
 language.  We now discuss the details of this pass.
 
 The \code{cast\_insert} pass is closely related to the type checker
-for \LangGrad{} (starting in Figure~\ref{fig:type-check-Lgradual-1}).
+for \LangGrad{} (starting in figure~\ref{fig:type-check-Lgradual-1}).
 In particular, the type checker allows implicit casts between
 consistent types. The job of the \code{cast\_insert} pass is to make
 those casts explicit. It does so by inserting
@@ -20120,7 +20141,7 @@ those casts explicit. It does so by inserting
 %
 For the most part, the implicit casts occur in places where the type
 checker checks two types for consistency.  Consider the case for
-binary operators in Figure~\ref{fig:type-check-Lgradual-1}. The type
+binary operators in figure~\ref{fig:type-check-Lgradual-1}. The type
 checker requires that the type of the left operand is consistent with
 \INTTY{}. Thus, the \code{cast\_insert} pass should insert a
 \code{Cast} around the left operand, converting from its type to
@@ -20130,7 +20151,7 @@ necessary to insert a cast, e.g., if the left operand already has type
 
 Some of the implicit casts are not as straightforward. One such case
 arises with the
-conditional expression. In Figure~\ref{fig:type-check-Lgradual-1} we
+conditional expression. In figure~\ref{fig:type-check-Lgradual-1} we
 see that the type checker requires that the two branches have
 consistent types and that type of the conditional expression is the
 join of the branches' types. In the target language \LangCast{}, both
@@ -20164,13 +20185,13 @@ auxiliary function named \code{lower\_cast} that takes an expression
 to expression in \LangProxy{}.
 
 The \code{lower\_cast} function can follow a code structure similar to
-the \code{apply\_cast} function (Figure~\ref{fig:apply_cast}) used in
+the \code{apply\_cast} function (figure~\ref{fig:apply_cast}) used in
 the interpreter for \LangCast{} because it must handle the same cases
 as \code{apply\_cast} and it needs to mimic the behavior of
 \code{apply\_cast}. The most interesting cases are those concerning
 the casts involving tuple, array, and function types.
 
-As mentioned in Section~\ref{sec:interp-casts}, a cast from one array
+As mentioned in section~\ref{sec:interp-casts}, a cast from one array
 type to another array type is accomplished by creating a proxy that
 intercepts the operations on the underlying array. Here we make the
 creation of the proxy explicit with the
@@ -20198,7 +20219,7 @@ instead of \racket{\code{vector}}\python{\code{Tuple}} to create the
 tuples of functions.
 %
 Figure~\ref{fig:map-bang-lower-cast} shows the output of
-\code{lower\_casts} on the example in Figure~\ref{fig:map-bang} that
+\code{lower\_casts} on the example in figure~\ref{fig:map-bang} that
 involved casting an array of integers to an array of \CANYTY{}.
 
 \begin{figure}[tbp]
@@ -20248,7 +20269,7 @@ def main() -> int:
 \end{tcolorbox}
 
 \caption{Output of \code{lower\_casts} on the example in
-  Figure~\ref{fig:map-bang}.}
+  figure~\ref{fig:map-bang}.}
 \label{fig:map-bang-lower-cast}
 \end{figure}
 
@@ -20261,7 +20282,7 @@ in the parameters.). Afterwards, call the underlying function and then
 cast the result from the source return type to the target return type.
 Figure~\ref{fig:map-lower-cast} shows the output of the
 \code{lower\_casts} pass on the \code{map} example in
-Figure~\ref{fig:gradual-map}. Note that the \code{inc} argument in the
+figure~\ref{fig:gradual-map}. Note that the \code{inc} argument in the
 call to \code{map} is wrapped in a \code{lambda}.
 
 \begin{figure}[tbp]
@@ -20298,7 +20319,7 @@ def main() -> int:
 \end{tcolorbox}
 
 \caption{Output of \code{lower\_casts} on the example in
-  Figure~\ref{fig:gradual-map}.}
+  figure~\ref{fig:gradual-map}.}
 \label{fig:map-lower-cast}
 \end{figure}
 
@@ -20311,7 +20332,7 @@ has been the job of the interpreter.
 %
 \racket{For example, the interpreter for \LangCast{} implements
   \code{vector-ref} using the \code{guarded-vector-ref} function in
-  Figure~\ref{fig:guarded-tuple}.}
+  figure~\ref{fig:guarded-tuple}.}
 %
 In the \code{differentiate\_proxies} pass we shift this responsibility
 to the generated code.
@@ -20541,7 +20562,7 @@ The translation of array operations is similar to the ones for tuples.
 
 {\if\edition\racketEd    
 Recall that the \code{reveal\_casts} pass
-(Section~\ref{sec:reveal-casts-Lany}) is responsible for lowering
+(section~\ref{sec:reveal-casts-Lany}) is responsible for lowering
 \code{Inject} and \code{Project} into lower-level operations.
 %
 In particular, \code{Project} turns into a conditional expression that
@@ -20589,8 +20610,8 @@ to x86.  To do so, the first question we need to answer is how to
 differentiate between tuple and tuples proxies, and likewise for
 arrays and array proxies.  We need just one bit to accomplish this,
 and use the bit in position $63$ of the 64-bit tag at the front of
-every tuple (see Figure~\ref{fig:tuple-rep}) or array
-(Section~\ref{sec:array-rep}). So far, this bit has been set to $0$,
+every tuple (see figure~\ref{fig:tuple-rep}) or array
+(section~\ref{sec:array-rep}). So far, this bit has been set to $0$,
 so for \racket{\code{inject-vector}}\python{\code{InjectTuple}} we leave
 it that way.
 {\if\edition\racketEd    
@@ -20708,13 +20729,13 @@ to \code{proxy\_vecof\_length}.
 
 We have another batch of operations to deal with, those for the
 \CANYTY{} type. Recall that overload resolution
-(Section~\ref{sec:gradual-resolution}) generates an
+(section~\ref{sec:gradual-resolution}) generates an
 \racket{\code{any-vector-ref}}\python{\code{any\_load\_unsafe}} when
 there is a element access on something of type \CANYTY{}, and
 similarly for
 \racket{\code{any-vector-set!}}\python{\code{any\_store\_unsafe}} and
 \racket{\code{any-vector-length}}\python{\code{any\_len}}. In
-Section~\ref{sec:select-Lany} we selected instructions for these
+section~\ref{sec:select-Lany} we selected instructions for these
 operations based on the idea that the underlying value was a tuple or
 array. But in the current setting, the underlying value is of type
 \PTUPLETYNAME{} or \PARRAYTYNAME{}.  We have added two runtime
@@ -20909,6 +20930,7 @@ online gradual typing bibliography for more material:
 \label{ch:Lpoly}
 \index{subject}{parametric polymorphism}
 \index{subject}{generics}
+\setcounter{footnote}{0}
 
 This chapter studies the compilation of
 generics\index{subject}{generics} (aka. parametric
@@ -20916,7 +20938,7 @@ polymorphism\index{subject}{parametric polymorphism}), compiling the
 \LangPoly{} subset of \racket{Typed Racket}\python{Python}.  Generics
 enable programmers to make code more reusable by parameterizing
 functions and data structures with respect to the types that they
-operate on. For example, Figure~\ref{fig:map-poly} revisits the
+operate on. For example, figure~\ref{fig:map-poly} revisits the
 \code{map} example but this time gives it a more fitting type.  This
 \code{map} function is parameterized with respect to the element type
 of the tuple. The type of \code{map} is the following generic type
@@ -20933,7 +20955,7 @@ specified by the \code{All} type with parameter \code{T}.
 \fi
 %
 The idea is that \code{map} can be used at \emph{all} choices of a
-type for parameter \code{T}. In Figure~\ref{fig:map-poly} we apply
+type for parameter \code{T}. In figure~\ref{fig:map-poly} we apply
 \code{map} to a tuple of integers, implicitly choosing
 \racket{\code{Integer}}\python{\code{int}} for \code{T}, but we could
 have just as well applied \code{map} to a tuple of Booleans.
@@ -20988,7 +21010,7 @@ print(t[1])
 \end{figure}
 
 Figure~\ref{fig:Lpoly-concrete-syntax} defines the concrete syntax of
-\LangPoly{} and Figure~\ref{fig:Lpoly-syntax} defines the abstract
+\LangPoly{} and figure~\ref{fig:Lpoly-syntax} defines the abstract
 syntax.
 %
 \if\edition\racketEd
@@ -20997,7 +21019,7 @@ declaration comes before the \code{define}. In the abstract syntax,
 the return type in the \code{Def} is \CANYTY{}, but that should be
 ignored in favor of the return type in the type declaration.  (The
 \CANYTY{} comes from using the same parser as in
-Chapter~\ref{ch:Ldyn}.)  The presence of a type declaration
+chapter~\ref{ch:Ldyn}.)  The presence of a type declaration
 enables the use of an \code{All} type for a function, thereby making
 it generic.
 \fi
@@ -21077,7 +21099,7 @@ The grammar for types is extended to include the type of a generic
 \end{tcolorbox}
 
 \caption{The concrete syntax of \LangPoly{}, extending \LangLam{}
-    (Figure~\ref{fig:Llam-concrete-syntax}).}
+    (figure~\ref{fig:Llam-concrete-syntax}).}
 \label{fig:Lpoly-concrete-syntax}
 \end{figure}
 
@@ -21122,7 +21144,7 @@ The grammar for types is extended to include the type of a generic
 \end{tcolorbox}
 
 \caption{The abstract syntax of \LangPoly{}, extending \LangLam{}
-    (Figure~\ref{fig:Llam-syntax}).}
+    (figure~\ref{fig:Llam-syntax}).}
 \label{fig:Lpoly-syntax}
 \end{figure}
 
@@ -21134,7 +21156,7 @@ type annotations contain type variables.}  Many languages with generics, such as
 C++~\citep{stroustrup88:_param_types} and Standard
 ML~\citep{Milner:1990fk}, only support second-class generics, so it
 may be helpful to see an example of first-class generics in action. In
-Figure~\ref{fig:apply-twice} we define a function \code{apply\_twice}
+figure~\ref{fig:apply-twice} we define a function \code{apply\_twice}
 whose parameter is a generic function. Indeed, because the grammar for
 $\Type$ includes the \code{All} type, a generic function may also be
 returned from a function or stored inside a tuple. The body of
@@ -21178,7 +21200,7 @@ print(apply_twice(id))
 
 
 
-The type checker for \LangPoly{} in Figure~\ref{fig:type-check-Lpoly}
+The type checker for \LangPoly{} in figure~\ref{fig:type-check-Lpoly}
 has several new responsibilities (compared to \LangLam{}) which we
 discuss in the following paragraphs.
 
@@ -21203,7 +21225,7 @@ the type arguments are deduced by matching the type of the parameters
 with the types of the arguments.
 %
 The \code{match\_types} auxiliary function
-(Figure~\ref{fig:type-check-Lpoly-aux}) carries out this deduction by
+(figure~\ref{fig:type-check-Lpoly-aux}) carries out this deduction by
 recursively descending through a parameter type \code{param\_ty} and
 the corresponding argument type \code{arg\_ty}, making sure that they
 are equal except when there is a type parameter in the parameter
@@ -21216,7 +21238,7 @@ part of the argument type.  The return type of the application is the
 return type of the generic function, but with the type parameters
 replaced by the deduced type arguments, using the
 \code{substitute\_type} auxiliary function, which is also listed in
-Figure~\ref{fig:type-check-Lpoly-aux}.
+figure~\ref{fig:type-check-Lpoly-aux}.
 
 
 The type checker extends type equality to handle the \code{All} type.
@@ -21232,14 +21254,14 @@ is equivalent to
 %
 Two generic types should be considered equal if they differ only in
 the choice of the names of the type parameters. The definition of type
-equality in Figure~\ref{fig:type-check-Lpoly-aux} renames the type
+equality in figure~\ref{fig:type-check-Lpoly-aux} renames the type
 parameters in one type to match the type parameters of the other type.
 
 \if\edition\racketEd
 %
 The type checker also ensures that only defined type variables appear
 in type annotations. The \code{check\_well\_formed} function defined
-in Figure~\ref{fig:well-formed-types} recursively inspects a type,
+in figure~\ref{fig:well-formed-types} recursively inspects a type,
 making sure that each type variable has been defined.
 %
 \fi
@@ -21597,8 +21619,8 @@ built to support gradual typing. The work of compiling generic
 functions is performed in two passes, \code{resolve} and
 \code{erase\_types}, that we discuss next. The output of
 \code{erase\_types} is \LangCast{}
-(Section~\ref{sec:gradual-insert-casts}), so the rest of the
-compilation is handled by the compiler of Chapter~\ref{ch:Lgrad}.
+(section~\ref{sec:gradual-insert-casts}), so the rest of the
+compilation is handled by the compiler of chapter~\ref{ch:Lgrad}.
 
 \section{Resolve Types}
 \label{sec:generic-resolve}
@@ -21615,7 +21637,7 @@ interpreter never analyzes type annotations, instantiation can be a
 no-op and simply return the generic function.
 %
 The output language of the \code{resolve} pass is \LangInst{}, defined
-in Figure~\ref{fig:Lpoly-prime-syntax}.
+in figure~\ref{fig:Lpoly-prime-syntax}.
 
 \if\edition\racketEd    
 The \code{resolve} pass combines the type declaration and polymorphic
@@ -21681,12 +21703,12 @@ compiler.
 \end{tcolorbox}
 
 \caption{The abstract syntax of \LangInst{}, extending \LangLam{}
-    (Figure~\ref{fig:Llam-syntax}).}
+    (figure~\ref{fig:Llam-syntax}).}
 \label{fig:Lpoly-prime-syntax}
 \end{figure}
 
 The output of the \code{resolve} pass on the generic \code{map}
-example is listed in Figure~\ref{fig:map-resolve}. Note that the use
+example is listed in figure~\ref{fig:map-resolve}. Note that the use
 of \code{map} is wrapped in an \code{inst} node, with the parameter
 \code{T} chosen to be \racket{\code{Integer}} \python{\code{int}}.
 
@@ -21725,10 +21747,10 @@ print(t[1])
 \section{Erase Types}
 \label{sec:erase_types}
 
-We use the \CANYTY{} type from Chapter~\ref{ch:Ldyn} to
-represent type variables. For example, Figure~\ref{fig:map-erase}
+We use the \CANYTY{} type from chapter~\ref{ch:Ldyn} to
+represent type variables. For example, figure~\ref{fig:map-erase}
 shows the output of the \code{erase\_types} pass on the polymorphic
-\code{map} (Figure~\ref{fig:map-poly}). The occurrences of
+\code{map} (figure~\ref{fig:map-poly}). The occurrences of
 type parameter \code{a} are replaced by \CANYTY{} and the polymorphic
 \code{All} types are removed from the type of \code{map}. 
 
@@ -21776,7 +21798,7 @@ $T_2 = $ \code{Callable[[Callable[[int], int],tuple[int,int]], tuple[int,int]]}
 
 This process of type erasure creates a challenge at points of
 instantiation. For example, consider the instantiation of
-\code{map} in Figure~\ref{fig:map-resolve}.
+\code{map} in figure~\ref{fig:map-resolve}.
 The type of \code{map} is
 %
 \if\edition\racketEd    
@@ -21819,10 +21841,10 @@ Callable[[Callable[[Any], Any], tuple[Any, Any]], tuple[Any, Any]]
 %
 but we need to convert it to the instantiated type.  This is easy to
 do in the language \LangCast{} with a single \code{cast}.  In
-Figure~\ref{fig:map-erase}, the instantiation of \code{map} has been
+figure~\ref{fig:map-erase}, the instantiation of \code{map} has been
 compiled to a \code{cast} from the type of \code{map} to the
 instantiated type. The source and target type of a cast must be
-consistent (Figure~\ref{fig:consistent}), which indeed is the case
+consistent (figure~\ref{fig:consistent}), which indeed is the case
 because both the source and target are obtained from the same generic
 type of \code{map}, replacing the type parameters with \CANYTY{} in
 the former and with the deduced type arguments in the later. (Recall
@@ -22082,6 +22104,7 @@ needed to compile \LangPoly{}.
 \appendix
 
 \chapter{Appendix}
+\setcounter{footnote}{0}
 
 \if\edition\racketEd
 
@@ -22274,7 +22297,7 @@ registers.
 %% \section{Concrete Syntax for Intermediate Languages}
 
 %% The concrete syntax of \LangAny{} is defined in
-%% Figure~\ref{fig:Lany-concrete-syntax}.
+%% figure~\ref{fig:Lany-concrete-syntax}.
 
 %% \begin{figure}[tp]
 %% \centering
@@ -22302,7 +22325,7 @@ registers.
 %% \end{minipage}
 %% }
 %% \caption{The concrete syntax of \LangAny{}, extending \LangLam{}
-%%   (Figure~\ref{fig:Llam-syntax}).}
+%%   (figure~\ref{fig:Llam-syntax}).}
 %% \label{fig:Lany-concrete-syntax}
 %% \end{figure}
 
@@ -22365,7 +22388,7 @@ registers.
 %% \]
 %% \end{minipage}
 %% }
-%% \caption{The \LangCFun{} language, extending \LangCVec{} (Figure~\ref{fig:c2-concrete-syntax}) with functions.}
+%% \caption{The \LangCFun{} language, extending \LangCVec{} (figure~\ref{fig:c2-concrete-syntax}) with functions.}
 %% \label{fig:c3-concrete-syntax}
 %% \end{figure}
 
