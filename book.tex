@@ -13492,7 +13492,6 @@ meet every year at the International Symposium on Memory Management to
 present these findings.
 
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Functions}
 \label{ch:Lfun}
@@ -13502,19 +13501,20 @@ present these findings.
 This chapter studies the compilation of a subset of \racket{Typed
   Racket}\python{Python} in which only top-level function definitions
 are allowed. This kind of function appears in the C programming
-language and it serves as an important stepping stone to implementing
-lexically-scoped functions in the form of \key{lambda} abstractions,
+language, and it serves as an important stepping-stone to implementing
+lexically scoped functions in the form of \key{lambda} abstractions,
 which is the topic of chapter~\ref{ch:Llambda}.
 
 \section{The \LangFun{} Language}
 
-The concrete and abstract syntax for function definitions and function
-application is shown in figures~\ref{fig:Lfun-concrete-syntax} and
-\ref{fig:Lfun-syntax}, where we define the \LangFun{} language.
-Programs in \LangFun{} begin with zero or more function definitions.
-The function names from these definitions are in-scope for the entire
-program, including all the function definitions (so the ordering of
-function definitions does not matter).
+The concrete syntax and abstract syntax for function definitions and
+function application are shown in
+figures~\ref{fig:Lfun-concrete-syntax} and \ref{fig:Lfun-syntax}, with
+which we define the \LangFun{} language.  Programs in \LangFun{} begin
+with zero or more function definitions.  The function names from these
+definitions are in scope for the entire program, including all the
+function definitions, and therefore the ordering of function
+definitions does not matter.
 %
 \python{The abstract syntax for function parameters in
   figure~\ref{fig:Lfun-syntax} is a list of pairs, where each pair
@@ -13529,11 +13529,10 @@ function definitions does not matter).
   replacing them with \code{None} in the \code{shrink} pass.
 }
 %
-The concrete syntax for function application\index{subject}{function
-  application} is 
-\python{$\CAPPLY{\Exp}{\Exp\code{,} \ldots}$}
-\racket{$\CAPPLY{\Exp}{\Exp \ldots}$}
- where the first expression
+The concrete syntax for function application
+\index{subject}{function application}
+is \python{$\CAPPLY{\Exp}{\Exp\code{,} \ldots}$}\racket{$\CAPPLY{\Exp}{\Exp \ldots}$},
+where the first expression
 must evaluate to a function and the remaining expressions are the arguments.  The
 abstract syntax for function application is
 $\APPLY{\Exp}{\Exp^*}$.
@@ -13563,9 +13562,9 @@ through $\Type_n$ and whose return type is $\Type_R$. The main
 limitation of these functions (with respect to
 \racket{Racket}\python{Python} functions) is that they are not
 lexically scoped. That is, the only external entities that can be
-referenced from inside a function body are other globally-defined
-functions. The syntax of \LangFun{} prevents function definitions from being
-nested inside each other.
+referenced from inside a function body are other globally defined
+functions. The syntax of \LangFun{} prevents function definitions from
+being nested inside each other.
 
 \newcommand{\LfunGrammarRacket}{
   \begin{array}{lcl}
@@ -13686,7 +13685,7 @@ nested inside each other.
 \end{figure}
 
 
-The program in figure~\ref{fig:Lfun-function-example} is a
+The program shown in figure~\ref{fig:Lfun-function-example} is a
 representative example of defining and using functions in \LangFun{}.
 We define a function \code{map} that applies some other function
 \code{f} to both elements of a tuple and returns a new tuple
@@ -13730,7 +13729,7 @@ print( map(inc, (0, 41))[1] )
 \label{fig:Lfun-function-example}
 \end{figure}
 
-The definitional interpreter for \LangFun{} is in
+The definitional interpreter for \LangFun{} is shown in
 figure~\ref{fig:interp-Lfun}. The case for the
 %
 \racket{\code{ProgramDefsExp}}\python{\code{Module}}
@@ -13745,7 +13744,7 @@ top-level function definitions.
   top-level environment using a mutable cons cell for each function
   definition. Note that the \code{lambda} value for each function is
   incomplete; it does not yet include the environment.  Once the
-  top-level environment is constructed, we then iterate over it and
+  top-level environment has been constructed, we iterate over it and
   update the \code{lambda} values to use the top-level environment.}
 %
 \python{We create a dictionary named \code{env} and fill it in
@@ -13860,13 +13859,13 @@ class InterpLfun(InterpLtup):
 
 %\margincomment{TODO: explain type checker}
 
-The type checker for \LangFun{} is in
+The type checker for \LangFun{} is shown in
 figure~\ref{fig:type-check-Lfun}.
 %
 \python{(We omit the code that parses function parameters into the
   simpler abstract syntax.)}
 %
-Similar to the interpreter, the case for the
+Similarly to the interpreter, the case for the
 \racket{\code{ProgramDefsExp}}\python{\code{Module}}
 %
 AST is responsible for setting up the mutual recursion between the
@@ -14017,20 +14016,20 @@ as is needed for jump instructions. Labels can also be used to mark
 the beginning of the instructions for a function.  Going further, we
 can obtain the address of a label by using the \key{leaq}
 instruction. For example, the following puts the address of the
-\code{inc} label into the \code{rbx} register.
+\code{inc} label into the \code{rbx} register:
 \begin{lstlisting}
    leaq inc(%rip), %rbx
 \end{lstlisting}
 Recall from section~\ref{sec:select-instructions-gc} that
-\verb!inc(%rip)! is an example of instruction-pointer relative
+\verb!inc(%rip)! is an example of instruction-pointer-relative
 addressing.
 
 In section~\ref{sec:x86} we used the \code{callq} instruction to jump
 to functions whose locations were given by a label, such as
 \code{read\_int}. To support function calls in this chapter we instead
-will be jumping to functions whose location are given by an address in
-a register, that is, we shall use \emph{indirect function calls}. The
-x86 syntax for this is a \code{callq} instruction but with an asterisk
+jump to functions whose location are given by an address in
+a register; that is, we use \emph{indirect function calls}. The
+x86 syntax for this is a \code{callq} instruction that requires an asterisk
 before the register name.\index{subject}{indirect function call}
 \begin{lstlisting}
    callq *%rbx
@@ -14054,7 +14053,7 @@ the target. However, \code{callq} does not handle
 
 Regarding parameter passing, recall that the x86-64 calling
 convention for Unix-based system uses the following six registers to
-pass arguments to a function, in this order.
+pass arguments to a function, in the given order.
 \begin{lstlisting}
 rdi rsi rdx rcx r8 r9
 \end{lstlisting}
@@ -14077,7 +14076,7 @@ frame. The callee must not change anything in the caller's frame, that
 is, anything that is at or above the stack pointer. The callee is free
 to use locations that are below the stack pointer.
 
-Recall that we store variables of tuple type on the root stack.  So
+Recall that we store variables of tuple type on the root stack.  So,
 the prelude of a function needs to move the root stack pointer
 \code{r15} up according to the number of variables of tuple type and
 the conclusion needs to move the root stack pointer back down.  Also,
@@ -14091,7 +14090,7 @@ Regarding the sharing of registers between different functions, recall
 from section~\ref{sec:calling-conventions} that the registers are
 divided into two groups, the caller-saved registers and the
 callee-saved registers. The caller should assume that all the
-caller-saved registers get overwritten with arbitrary values by the
+caller-saved registers are overwritten with arbitrary values by the
 callee. For that reason we recommend in
 section~\ref{sec:calling-conventions} that variables that are live
 during a function call should not be assigned to caller-saved
@@ -14107,7 +14106,7 @@ to the stack and the conclusion of \code{main} must restore it.  This
 recommendation now generalizes to all functions.
 
 Recall that the base pointer, register \code{rbp}, is used as a
-point-of-reference within a frame, so that each local variable can be
+point of reference within a frame, so that each local variable can be
 accessed at a fixed offset from the base pointer
 (section~\ref{sec:x86}).
 %
@@ -14188,9 +14187,9 @@ arrange to use only a constant amount of space for a long chain of
 nested function calls.
 
 A \emph{tail call}\index{subject}{tail call} is a function call that
-happens as the last action in a function body. 
-For example, in the following
-program, the recursive call to \code{tail\_sum} is a tail call.
+happens as the last action in a function body.  For example, in the
+following program, the recursive call to \code{tail\_sum} is a tail
+call:
 \begin{center}
 {\if\edition\racketEd  
 \begin{lstlisting}
@@ -14216,15 +14215,15 @@ print( tail_sum(3, 0) + 36)
 \end{center}
 At a tail call, the frame of the caller is no longer needed, so we can
 pop the caller's frame before making the tail call. With this
-approach, a recursive function that only makes tail calls ends up 
+approach, a recursive function that makes only tail calls ends up 
 using a constant amount of stack space.  Functional languages like
 Racket rely heavily on recursive functions, so the definition of
 Racket \emph{requires} that all tail calls be optimized in this way.
 \index{subject}{frame}
 
-Some care is needed with regards to argument passing in tail calls.
-As mentioned above, for arguments beyond the sixth, the convention is
-to use space in the caller's frame for passing arguments.  But for a
+Some care is needed with regard to argument passing in tail calls.  As
+mentioned, for arguments beyond the sixth, the convention is to use
+space in the caller's frame for passing arguments.  However, for a
 tail call we pop the caller's frame and can no longer use it.  An
 alternative is to use space in the callee's frame for passing
 arguments. However, this option is also problematic because the caller
@@ -14235,22 +14234,22 @@ later arguments! We solve this problem by using the heap instead of
 the stack for passing more than six arguments
 (section~\ref{sec:limit-functions-r4}).
 
-As mentioned above, for a tail call we pop the caller's frame prior to
+As mentioned, for a tail call we pop the caller's frame prior to
 making the tail call. The instructions for popping a frame are the
 instructions that we usually place in the conclusion of a
 function. Thus, we also need to place such code immediately before
 each tail call. These instructions include restoring the callee-saved
 registers, so it is fortunate that the argument passing registers are
-all caller-saved registers!
+all caller-saved registers.
 
-One last note regarding which instruction to use to make the tail
+One note remains regarding which instruction to use to make the tail
 call. When the callee is finished, it should not return to the current
-function, but it should return to the function that called the current
+function but instead return to the function that called the current
 one. Thus, the return address that is already on the stack is the
-right one and we should not use \key{callq} to make the tail call, as
-that would overwrite the return address. Instead we simply use the
-\key{jmp} instruction. Like the indirect function call, we write an
-\emph{indirect jump}\index{subject}{indirect jump} with a register
+right one, and we should not use \key{callq} to make the tail call
+because that would overwrite the return address. Instead we simply use
+the \key{jmp} instruction. As with the indirect function call, we write
+an \emph{indirect jump}\index{subject}{indirect jump} with a register
 prefixed with an asterisk.  We recommend using \code{rax} to hold the
 jump target because the conclusion can overwrite just about everything
 else.
@@ -14296,7 +14295,7 @@ FunctionDef('main', [], int, None, |$\Stmt\ldots$|Return(Constant(0)), None)
 The syntax of \LangFun{} is inconvenient for purposes of compilation
 in that it conflates the use of function names and local
 variables. This is a problem because we need to compile the use of a
-function name differently than the use of a local variable.  In
+function name differently from the use of a local variable.  In
 particular, we use \code{leaq} to convert the function name (a label
 in x86) to an address in a register.  Thus, we create a new pass that
 changes function references from $\VAR{f}$ to $\FUNREF{f}{n}$ where
@@ -14399,7 +14398,7 @@ the $k$th element of the tuple, where $k = i - 6$.
 \fi}
 
 For function calls with too many arguments, the \code{limit\_functions}
-pass transforms them in the following way.
+pass transforms them in the following way:
 
 \begin{tabular}{lll}
 \begin{minipage}{0.3\textwidth}
@@ -14445,12 +14444,12 @@ complex expression.  On the other hand, the arguments of
 \racket{\code{Apply}}\python{\code{Call}} should be atomic
 expressions.
 %
-Regarding \code{FunRef}, as discussed above, the function label needs
-to be converted to an address using the \code{leaq} instruction. Thus,
-even though \code{FunRef} seems rather simple, it needs to be
-classified as a complex expression so that we generate an assignment
-statement with a left-hand side that can serve as the target of the
-\code{leaq}.
+Regarding \code{FunRef}, as discussed previously, the function label
+needs to be converted to an address using the \code{leaq}
+instruction. Thus, even though \code{FunRef} seems rather simple, it
+needs to be classified as a complex expression so that we generate an
+assignment statement with a left-hand side that can serve as the
+target of the \code{leaq}.
 
 The output of this pass, \LangFunANF{} (figure~\ref{fig:Lfun-anf-syntax}),
 extends \LangAllocANF{} (figure~\ref{fig:Lvec-anf-syntax}) with \code{FunRef}
@@ -14651,12 +14650,13 @@ appropriate explicate functions for the various contexts.
 \index{subject}{instruction selection}
 
 The output of select instructions is a program in the \LangXIndCall{}
-language, whose concrete syntax is defined in
-figure~\ref{fig:x86-3-concrete} and abstract syntax is defined in
-figure~\ref{fig:x86-3}.  We use the \code{align} directive on the
-labels of function definitions to make sure the bottom three bits are
-zero, which we make use of in chapter~\ref{ch:Ldyn}. We discuss the
-new instructions as needed in this section.  \index{subject}{x86}
+language; the definition of its concrete syntax is shown in
+figure~\ref{fig:x86-3-concrete}, and the definition of its abstract
+syntax is shown in figure~\ref{fig:x86-3}.  We use the \code{align}
+directive on the labels of function definitions to make sure the
+bottom three bits are zero, which we put to use in
+chapter~\ref{ch:Ldyn}. We discuss the new instructions as needed in
+this section.  \index{subject}{x86}
 
 \newcommand{\GrammarXIndCall}{
 \begin{array}{lcl}
@@ -14739,7 +14739,7 @@ An assignment of a function reference to a variable becomes a
 load-effective-address instruction as follows, where $\itm{lhs}'$ is
 the translation of $\itm{lhs}$ from \Atm{} in \LangCFun{} to \Arg{} in
 \LangXIndCallVar{}. The \code{FunRef} becomes a \code{Global} AST
-node, whose concrete syntax is instruction-pointer relative
+node, whose concrete syntax is instruction-pointer-relative
 addressing.
 
 \begin{center}
@@ -14773,7 +14773,7 @@ instead perform parameter passing using the conventions discussed in
 section~\ref{sec:fun-x86}. That is, the arguments are passed in
 registers. We recommend turning the parameters into local variables
 and generating instructions at the beginning of the function to move
-from the argument passing registers
+from the argument-passing registers
 (section~\ref{sec:calling-conventions-fun}) to these local variables.
 
 {\if\edition\racketEd
@@ -14793,7 +14793,8 @@ from the argument passing registers
 The basic blocks $B'$ are the same as $B$ except that the
 \code{start} block is modified to add the instructions for moving from
 the argument registers to the parameter variables. So the \code{start}
-block of $B$ shown on the left is changed to the code on the right.
+block of $B$ shown on the left of the following is changed to the code
+on the right:
 \begin{center}
 \begin{minipage}{0.3\textwidth}
 \begin{lstlisting}
@@ -14826,34 +14827,34 @@ but their labels need to be unique. We recommend prepending the
 function's name to \code{start} and \code{conclusion}, respectively,
 to obtain unique labels.
 
-\racket{The interpreter for \LangXIndCall{} needs to know how many
-  parameters the function expects, but the parameters are no longer in
-  the syntax of function definitions. Instead, add an entry to
-  $\itm{info}$ that maps \code{num-params} to the number of parameters
-  to construct $\itm{info}'$.}
+\racket{The interpreter for \LangXIndCall{} needs to be given the
+  number of parameters the function expects, but the parameters are no
+  longer in the syntax of function definitions. Instead, add an entry
+  to $\itm{info}$ that maps \code{num-params} to the number of
+  parameters to construct $\itm{info}'$.}
 
 By changing the parameters to local variables, we are giving the
 register allocator control over which registers or stack locations to
-use for them. If you implemented the move-biasing challenge
+use for them. If you implement the move-biasing challenge
 (section~\ref{sec:move-biasing}), the register allocator will try to
 assign the parameter variables to the corresponding argument register,
 in which case the \code{patch\_instructions} pass will remove the
-\code{movq} instruction. This happens in the example translation in
-figure~\ref{fig:add-fun} of section~\ref{sec:functions-example}, in
+\code{movq} instruction. This happens in the example translation given
+in figure~\ref{fig:add-fun} in section~\ref{sec:functions-example}, in
 the \code{add} function.
 %
 Also, note that the register allocator will perform liveness analysis
 on this sequence of move instructions and build the interference
 graph. So, for example, $x_1$ will be marked as interfering with
-\code{rsi} and that will prevent the assignment of $x_1$ to
-\code{rsi}, which is good, because that would overwrite the argument
-that needs to move into $x_2$.
+\code{rsi}, and that will prevent the mapping of $x_1$ to \code{rsi},
+which is good because otherwise the first \code{movq} would overwrite
+the argument in \code{rsi} that is needed for $x_2$.
 
 Next, consider the compilation of function calls. In the mirror image
 of the handling of parameters in function definitions, the arguments
-are moved to the argument passing registers.  Note that the function
+are moved to the argument-passing registers.  Note that the function
 is not given as a label, but its address is produced by the argument
-$\itm{arg}_0$. So we translate the call into an indirect function
+$\itm{arg}_0$. So, we translate the call into an indirect function
 call. The return value from the function is stored in \code{rax}, so
 it needs to be moved into the \itm{lhs}.
 \begin{lstlisting}
@@ -14866,17 +14867,17 @@ it needs to be moved into the \itm{lhs}.
   movq %rax, |$\itm{lhs}$|
 \end{lstlisting}
 The \code{IndirectCallq} AST node includes an integer for the arity of
-the function, i.e., the number of parameters. That information is
+the function, that is, the number of parameters. That information is
 useful in the \code{uncover\_live} pass for determining which
 argument-passing registers are potentially read during the call.
 
 For tail calls, the parameter passing is the same as non-tail calls:
-generate instructions to move the arguments into the argument
-passing registers.  After that we need to pop the frame from the
-procedure call stack.  However, we do not yet know how big the frame
-is; that gets determined during register allocation. So instead of
-generating those instructions here, we invent a new instruction that
-means ``pop the frame and then do an indirect jump'', which we name
+generate instructions to move the arguments into the argument-passing
+registers.  After that we need to pop the frame from the procedure
+call stack.  However, we do not yet know how big the frame is; that
+gets determined during register allocation. So, instead of generating
+those instructions here, we invent a new instruction that means ``pop
+the frame and then do an indirect jump,'' which we name
 \code{TailJmp}. The abstract syntax for this instruction includes an
 argument that specifies where to jump and an integer that represents
 the arity of the function being called.
@@ -14902,7 +14903,7 @@ that is to force variables that are live across a function call to be assigned t
 registers or to be spilled to the stack.
 
 Regarding the set of read locations $R$, the arity field of
-\code{TailJmp} and \code{IndirectCallq} determines how many of the
+\code{TailJmp} and \code{IndirectCallq} determine how many of the
 argument-passing registers should be considered as read by those
 instructions. Also, the target field of \code{TailJmp} and
 \code{IndirectCallq} should be included in the set of read locations
@@ -14932,9 +14933,9 @@ call-live variables and the caller-saved registers).
 
 The primary change to the \code{allocate\_registers} pass is adding an
 auxiliary function for handling definitions (the \Def{} nonterminal
-in figure~\ref{fig:x86-3}) with one case for function definitions. The
-logic is the same as described in
-chapter~\ref{ch:register-allocation-Lvar}, except now register
+shown in figure~\ref{fig:x86-3}) with one case for function
+definitions. The logic is the same as described in
+chapter~\ref{ch:register-allocation-Lvar} except that now register
 allocation is performed many times, once for each function definition,
 instead of just once for the whole program.
 
@@ -14945,8 +14946,8 @@ In \code{patch\_instructions}, you should deal with the x86
 idiosyncrasy that the destination argument of \code{leaq} must be a
 register. Additionally, you should ensure that the argument of
 \code{TailJmp} is \itm{rax}, our reserved register---because we
-trample many other registers before the tail call (as explained in the
-next section).
+trample many other registers before the tail call, as explained in the
+next section.
 
 \section{Prelude and Conclusion}
 
@@ -14955,14 +14956,14 @@ Now that register allocation is complete, we can translate the
 \code{TailJmp} would simply be \code{jmp *$\itm{arg}$}.  However,
 before the jump we need to pop the current frame to achieve efficient
 tail calls.  This sequence of instructions is the same as the code for
-the conclusion of a function, except the \code{retq} is replaced with
+the conclusion of a function, except that the \code{retq} is replaced with
 \code{jmp *$\itm{arg}$}.
 
 Regarding function definitions, we generate a prelude and conclusion
 for each one. This code is similar to the prelude and conclusion
-generated for the \code{main} function in chapter~\ref{ch:Lvec}. To
-review, the prelude of every function should carry out the following
-steps.
+generated for the \code{main} function presented in
+chapter~\ref{ch:Lvec}. To review, the prelude of every function should
+carry out the following steps:
 % TODO: .align the functions!
 \begin{enumerate}
 %% \item Start with \code{.global} and \code{.align} directives followed
@@ -14970,10 +14971,10 @@ steps.
   %%   example.)
 \item Push \code{rbp} to the stack and set \code{rbp} to current stack
   pointer.
-\item Push to the stack all of the callee-saved registers that were
+\item Push to the stack all the callee-saved registers that were
   used for register allocation.
 \item Move the stack pointer \code{rsp} down to make room for the
-  regular spills. (Aligned to 16 bytes.)
+  regular spills (aligned to 16 bytes).
 \item Move the root stack pointer \code{r15} up by the size of the
   root-stack frame for this function, which depends on the number of
   spilled tuple-typed variables. \label{root-stack-init}
@@ -14981,12 +14982,12 @@ steps.
 \item Jump to the start block.
 \end{enumerate}
 The prelude of the \code{main} function has an additional task: call
-the \code{initialize} function to set up the garbage collector and
+the \code{initialize} function to set up the garbage collector, and
 then move the value of the global \code{rootstack\_begin} in
-\code{r15}. This initialization should happen before step \ref{root-stack-init}
-above, which depends on \code{r15}.
+\code{r15}. This initialization should happen before step
+\ref{root-stack-init}, which depends on \code{r15}.
 
-The conclusion of every function should do the following.
+The conclusion of every function should do the following:
 \begin{enumerate}
 \item Move the stack pointer back up past the regular spills.
 \item Restore the callee-saved registers by popping them from the
@@ -15010,8 +15011,8 @@ compiling \LangFun{} to x86.
 
 \begin{exercise}\normalfont\normalsize
 Expand your compiler to handle \LangFun{} as outlined in this chapter.
-Create 8 new programs that use functions, including examples that pass
-functions and return functions from other functions, recursive
+Create eight new programs that use functions, including examples that
+pass functions and return functions from other functions, recursive
 functions, functions that create vectors, and functions that make tail
 calls. Test your compiler on these new programs and all your
 previously created test programs.
@@ -15021,24 +15022,24 @@ previously created test programs.
 \begin{figure}[tbp]
   \begin{tcolorbox}[colback=white]
 {\if\edition\racketEd    
-    \begin{tikzpicture}[baseline=(current  bounding  box.center)]
+    \begin{tikzpicture}[baseline=(current  bounding  box.center),scale=0.90]
 \node (Lfun) at (0,2)  {\large \LangFun{}};
-\node (Lfun-1) at (3,2)  {\large \LangFun{}};
-\node (Lfun-2) at (6,2)  {\large \LangFun{}};
-\node (F1-1) at (9,2)  {\large \LangFunRef{}};
-\node (F1-2) at (9,0)  {\large \LangFunRef{}};
-\node (F1-3) at (6,0)  {\large \LangFunRefAlloc{}};
-\node (F1-4) at (3,0)  {\large \LangFunRefAlloc{}};
+\node (Lfun-1) at (4,2)  {\large \LangFun{}};
+\node (Lfun-2) at (7,2)  {\large \LangFun{}};
+\node (F1-1) at (11,2)  {\large \LangFunRef{}};
+\node (F1-2) at (11,0)  {\large \LangFunRef{}};
+\node (F1-3) at (7,0)  {\large \LangFunRefAlloc{}};
+\node (F1-4) at (4,0)  {\large \LangFunRefAlloc{}};
 \node (F1-5) at (0,0)  {\large \LangFunANF{}};
-\node (C3-2) at (3,-2)  {\large \LangCFun{}};
+\node (C3-2) at (0,-2)  {\large \LangCFun{}};
 
-\node (x86-2) at (3,-4)  {\large \LangXIndCallVar{}};
-\node (x86-3) at (6,-4)  {\large \LangXIndCallVar{}};
-\node (x86-4) at (9,-4) {\large \LangXIndCall{}};
-\node (x86-5) at (9,-6) {\large \LangXIndCallFlat{}};
+\node (x86-2) at (0,-4)  {\large \LangXIndCallVar{}};
+\node (x86-3) at (4,-4)  {\large \LangXIndCallVar{}};
+\node (x86-4) at (8,-4) {\large \LangXIndCall{}};
+\node (x86-5) at (8,-6) {\large \LangXIndCallFlat{}};
 
-\node (x86-2-1) at (3,-6)  {\large \LangXIndCallVar{}};
-\node (x86-2-2) at (6,-6)  {\large \LangXIndCallVar{}};
+\node (x86-2-1) at (0,-6)  {\large \LangXIndCallVar{}};
+\node (x86-2-2) at (4,-6)  {\large \LangXIndCallVar{}};
 
 \path[->,bend left=15] (Lfun) edge [above] node
      {\ttfamily\footnotesize shrink} (Lfun-1);
@@ -15049,24 +15050,24 @@ previously created test programs.
 \path[->,bend left=15] (F1-1) edge [left] node
      {\ttfamily\footnotesize limit\_functions} (F1-2);
 \path[->,bend left=15] (F1-2) edge [below] node
-     {\ttfamily\footnotesize expose\_alloc.} (F1-3);
+     {\ttfamily\footnotesize expose\_allocation} (F1-3);
 \path[->,bend left=15] (F1-3) edge [below] node
      {\ttfamily\footnotesize uncover\_get!} (F1-4);
 \path[->,bend right=15] (F1-4) edge [above] node
-     {\ttfamily\footnotesize remove\_complex.} (F1-5);
-\path[->,bend right=15] (F1-5) edge [left] node
+     {\ttfamily\footnotesize remove\_complex\_operands} (F1-5);
+\path[->,bend right=15] (F1-5) edge [right] node
      {\ttfamily\footnotesize explicate\_control} (C3-2);
-\path[->,bend right=15] (C3-2) edge [left] node
-     {\ttfamily\footnotesize select\_instr.} (x86-2);
-\path[->,bend left=15] (x86-2) edge [left] node
+\path[->,bend right=15] (C3-2) edge [right] node
+     {\ttfamily\footnotesize select\_instructions} (x86-2);
+\path[->,bend left=15] (x86-2) edge [right] node
      {\ttfamily\footnotesize uncover\_live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node 
-     {\ttfamily\footnotesize build\_inter.} (x86-2-2);
-\path[->,bend right=15] (x86-2-2) edge [left] node
-     {\ttfamily\footnotesize allocate\_reg.} (x86-3);
+     {\ttfamily\footnotesize build\_interference} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [right] node
+     {\ttfamily\footnotesize allocate\_registers} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node
-     {\ttfamily\footnotesize patch\_instr.} (x86-4);
-\path[->,bend right=15] (x86-4) edge [left] node {\ttfamily\footnotesize prelude.} (x86-5);
+     {\ttfamily\footnotesize patch\_instructions} (x86-4);
+\path[->,bend right=15] (x86-4) edge [right] node {\ttfamily\footnotesize prelude\_and\_conclusion} (x86-5);
 \end{tikzpicture}
 \fi}
 {\if\edition\pythonEd
