@@ -13408,23 +13408,23 @@ For this challenge assignment, the goal is to adapt the copying
 collector implemented in \code{runtime.c} to use two generations, one
 for young data and one for old data. Each generation consists of a
 FromSpace and a ToSpace. The following is a sketch of how to adapt the
-\code{collect} function to use the two generations.
+\code{collect} function to use the two generations:
 
 \begin{enumerate}
-\item Copy the young generation's FromSpace to its ToSpace then switch
-  the role of the ToSpace and FromSpace
+\item Copy the young generation's FromSpace to its ToSpace and then
+  switch the role of the ToSpace and FromSpace
 \item If there is enough space for the requested number of bytes in
   the young FromSpace, then return from \code{collect}.
 \item If there is not enough space in the young FromSpace for the
   requested bytes, then move the data from the young generation to the
   old one with the following steps:
   \begin{enumerate}
-  \item If there is enough room in the old FromSpace, copy the young
+  \item[a.] If there is enough room in the old FromSpace, copy the young
     FromSpace to the old FromSpace and then return.
-  \item If there is not enough room in the old FromSpace, then collect
+  \item[b.] If there is not enough room in the old FromSpace, then collect
     the old generation by copying the old FromSpace to the old ToSpace
     and swap the roles of the old FromSpace and ToSpace.
-  \item If there is enough room now, copy the young FromSpace to the
+  \item[c.] If there is enough room now, copy the young FromSpace to the
     old FromSpace and return. Otherwise, allocate a larger FromSpace
     and ToSpace for the old generation.  Copy the young FromSpace and
     the old FromSpace into the larger FromSpace for the old
@@ -13433,16 +13433,16 @@ FromSpace and a ToSpace. The following is a sketch of how to adapt the
 \end{enumerate}
 
 We recommend that you generalize the \code{cheney} function so that it
-can be used for all the copies mentioned above: between the young
-FromSpace and ToSpace, between the old FromSpace and ToSpace, and
-between the young FromSpace and old FromSpace. This can be
-accomplished by adding parameters to \code{cheney} that replace its
-use of the global variables \code{fromspace\_begin},
-\code{fromspace\_end}, \code{tospace\_begin}, and \code{tospace\_end}.
+can be used for all the copies mentioned: between the young FromSpace
+and ToSpace, between the old FromSpace and ToSpace, and between the
+young FromSpace and old FromSpace. This can be accomplished by adding
+parameters to \code{cheney} that replace its use of the global
+variables \code{fromspace\_begin}, \code{fromspace\_end},
+\code{tospace\_begin}, and \code{tospace\_end}.
 
 Note that the collection of the young generation does not traverse the
 old generation. This introduces a potential problem: there may be
-young data that is only reachable through pointers in the old
+young data that is reachable only through pointers in the old
 generation. If these pointers are not taken into account, the
 collector could throw away young data that is live!  One solution,
 called \emph{pointer recording}, is to maintain a set of all the
@@ -13450,7 +13450,7 @@ pointers from the old generation into the new generation and consider
 this set as part of the root set.  To maintain this set, the compiler
 must insert extra instructions around every \code{vector-set!}. If the
 vector being modified is in the old generation, and if the value being
-written is a pointer into the new generation, than that pointer must
+written is a pointer into the new generation, then that pointer must
 be added to the set. Also, if the value being overwritten was a
 pointer into the new generation, then that pointer should be removed
 from the set.
@@ -13460,7 +13460,7 @@ from the set.
   generational garbage collection, as outlined in this section.
   Update the code generation for \code{vector-set!} to implement
   pointer recording. Make sure that your new compiler and runtime
-  passes your test suite.
+  execute without error on your test suite.
 \end{exercise}
 
 \fi}
@@ -13471,13 +13471,13 @@ from the set.
 including the ones used in the compilation of Standard ML.
 
 There are many alternatives to copying collectors (and their bigger
-siblings, the generational collectors) when its comes to garbage
+siblings, the generational collectors) with regard to garbage
 collection, such as mark-and-sweep~\citep{McCarthy:1960dz} and
 reference counting~\citep{Collins:1960aa}.  The strengths of copying
 collectors are that allocation is fast (just a comparison and pointer
 increment), there is no fragmentation, cyclic garbage is collected,
-and the time complexity of collection only depends on the amount of
-live data, and not on the amount of garbage~\citep{Wilson:1992fk}. The
+and the time complexity of collection depends only on the amount of
+live data and not on the amount of garbage~\citep{Wilson:1992fk}. The
 main disadvantages of a two-space copying collector is that it uses a
 lot of extra space and takes a long time to perform the copy, though
 these problems are ameliorated in generational collectors.
