@@ -17552,15 +17552,17 @@ class InterpLdyn(InterpLlambda):
 
 \section{Representation of Tagged Values}
 
-The interpreter for \LangDyn{} introduced a new kind of value, a tagged
-value. To compile \LangDyn{} to x86 we must decide how to represent tagged
-values at the bit level. Because almost every operation in \LangDyn{}
-involves manipulating tagged values, the representation must be
-efficient. Recall that all our values are 64 bits.  We shall steal
-the 3 right-most bits to encode the tag.  We use $001$ to identify
-integers, $100$ for Booleans, $010$ for tuples, $011$ for procedures,
-and $101$ for the void value\python{, \key{None}}. We define the following auxiliary
-function for mapping types to tag codes.
+The interpreter for \LangDyn{} introduced a new kind of value: the
+tagged value. To compile \LangDyn{} to x86 we must decide how to
+represent tagged values at the bit level. Because almost every
+operation in \LangDyn{} involves manipulating tagged values, the
+representation must be efficient. Recall that all our values are 64
+bits.  We shall steal the right-most $3$ bits to encode the tag.  We use
+$001$ to identify integers, $100$ for Booleans, $010$ for tuples,
+$011$ for procedures, and $101$ for the void value\python{,
+  \key{None}}. We define the following auxiliary function for mapping
+types to tag codes:
+%
 {\if\edition\racketEd
 \begin{align*}
 \itm{tagof}(\key{Integer}) &= 001 \\
@@ -17579,21 +17581,22 @@ function for mapping types to tag codes.
 \itm{tagof}(\key{type(None)}) &= 101
 \end{align*}
 \fi}
+%
 This stealing of 3 bits comes at some price: integers are now restricted
-to the range from $-2^{60}$ to $2^{60}-1$. The stealing does not adversely
+to the range $-2^{60}$ to $2^{60}-1$. The stealing does not adversely
 affect tuples and procedures because those values are addresses, and
-our addresses are 8-byte aligned so the rightmost 3 bits are unused,
+our addresses are 8-byte aligned so the rightmost 3 bits are unused;
 they are always $000$. Thus, we do not lose information by overwriting
-the rightmost 3 bits with the tag and we can simply zero-out the tag
+the rightmost 3 bits with the tag, and we can simply zero out the tag
 to recover the original address.
 
 To make tagged values into first-class entities, we can give them a
-type, called \racket{\code{Any}}\python{\code{AnyType()}}, and define
+type called \racket{\code{Any}}\python{\code{AnyType()}} and define
 operations such as \code{Inject} and \code{Project} for creating and
 using them, yielding the statically typed \LangAny{} intermediate
 language. We describe how to compile \LangDyn{} to \LangAny{} in
-section~\ref{sec:compile-r7} but first we describe the \LangAny{}
-language in greater detail.
+section~\ref{sec:compile-r7}; in th next section we describe the
+\LangAny{} language in greater detail.
 
 \section{The \LangAny{} Language}
 \label{sec:Rany-lang}
@@ -17675,39 +17678,40 @@ language in greater detail.
 \label{fig:Lany-syntax}
 \end{figure}
 
-The abstract syntax of \LangAny{} is defined in figure~\ref{fig:Lany-syntax}.
+The definition of the abstract syntax of \LangAny{} is given in
+figure~\ref{fig:Lany-syntax}.
 %% \racket{(The concrete syntax of \LangAny{} is in the Appendix,
 %%   figure~\ref{fig:Lany-concrete-syntax}.)}
-The $\INJECT{e}{T}$ form
-converts the value produced by expression $e$ of type $T$ into a
-tagged value.  The $\PROJECT{e}{T}$ form converts the tagged value
-produced by expression $e$ into a value of type $T$ or halts the
-program if the type tag does not match $T$.
+The $\INJECT{e}{T}$ form converts the value produced by expression $e$
+of type $T$ into a tagged value.  The $\PROJECT{e}{T}$ form either
+converts the tagged value produced by expression $e$ into a value of
+type $T$ or halts the program if the type tag does not match $T$.
 %
 Note that in both \code{Inject} and \code{Project}, the type $T$ is
-restricted to a flat type $\FType$, which simplifies the
-implementation and corresponds with the needs for compiling \LangDyn{}.
+restricted to be a flat type (the nonterminal $\FType$) which
+simplifies the implementation and complies with the needs for
+compiling \LangDyn{}.
 
 The \racket{\code{any-vector}} operators
-\python{\code{any\_tuple\_load} and \code{any\_len}}
-adapt the tuple operations so that they can be applied to a value of
-type \racket{\code{Any}}\python{\code{AnyType}}.  They also generalize the
-tuple operations in that the index is not restricted to be a literal
+\python{\code{any\_tuple\_load} and \code{any\_len}} adapt the tuple
+operations so that they can be applied to a value of type
+\racket{\code{Any}}\python{\code{AnyType}}.  They also generalize the
+tuple operations in that the index is not restricted to a literal
 integer in the grammar but is allowed to be any expression.
 
 \racket{The type predicates such as
 \racket{\key{boolean?}}\python{\key{is\_bool}} expect their argument
 to produce a tagged value; they return  {\TRUE} if the tag corresponds to
-the predicate and they return {\FALSE} otherwise.}
+the predicate and return {\FALSE} otherwise.}
 
 The type checker for \LangAny{} is shown in
 figure~\ref{fig:type-check-Lany}
 %
-\racket{ and uses the auxiliary functions in
+\racket{ and uses the auxiliary functions presented in
 figure~\ref{fig:type-check-Lany-aux}}.
 %
-The interpreter for \LangAny{} is in figure~\ref{fig:interp-Lany} and
-its auxiliary functions are in figure~\ref{fig:interp-Lany-aux}.
+The interpreter for \LangAny{} is shown in figure~\ref{fig:interp-Lany} and
+its auxiliary functions are shown in figure~\ref{fig:interp-Lany-aux}.
 
 
 \begin{figure}[btp]
@@ -18023,10 +18027,11 @@ figure~\ref{fig:compile-r7-Lany} shows the compilation of the Boolean
 \TRUE{}, which must be injected to produce an expression of type
 \ANYTY{}.
 %
-The second row of figure~\ref{fig:compile-r7-Lany}, the compilation of
-addition, is representative of compilation for many primitive
-operations: the arguments have type \ANYTY{} and must be projected to
-\INTTYPE{} before the addition can be performed.
+The compilation of addition is shown in the second row of
+figure~\ref{fig:compile-r7-Lany}. The compilation of addition is
+representative of many primitive operations: the arguments have type
+\ANYTY{} and must be projected to \INTTYPE{} before the addition can
+be performed.
 
 The compilation of \key{lambda} (third row of
 figure~\ref{fig:compile-r7-Lany}) shows what happens when we need to
@@ -18289,7 +18294,7 @@ Call(Name('any_tuple_load'),
 \fi}
   \end{tcolorbox}
 
-  \caption{Cast Insertion}
+  \caption{Cast insertion}
 \label{fig:compile-r7-Lany}
 \end{figure}
 
@@ -18300,11 +18305,11 @@ Call(Name('any_tuple_load'),
 
 % TODO: define R'_6
 
-In the \code{reveal\_casts} pass we recommend compiling \code{Project}
-into a conditional expression that checks whether the value's tag
-matches the target type; if it does, the value is converted to a value
-of the target type by removing the tag; if it does not, the program
-exits.
+In the \code{reveal\_casts} pass, we recommend compiling
+\code{Project} into a conditional expression that checks whether the
+value's tag matches the target type; if it does, the value is
+converted to a value of the target type by removing the tag; if it
+does not, the program exits.
 %
 {\if\edition\racketEd
 %
@@ -18313,9 +18318,9 @@ To perform these actions we need a new primitive operation,
 The \code{tag-of-any} operation retrieves the type tag from a tagged
 value of type \code{Any}.  The \code{ValueOf} form retrieves the
 underlying value from a tagged value.  The \code{ValueOf} form
-includes the type for the underlying value which is used by the type
+includes the type for the underlying value that is used by the type
 checker.  Finally, the \code{Exit} form ends the execution of the
-program.
+program:
 %
 \fi}
 %
@@ -18408,12 +18413,12 @@ translation of \code{Project}.}
 {\if\edition\racketEd    
 The \code{any-vector-ref} and \code{any-vector-set!} operations
 combine the projection action with the vector operation.  Also, the
-read and write operations allow arbitrary expressions for the index so
+read and write operations allow arbitrary expressions for the index, so
 the type checker for \LangAny{} (figure~\ref{fig:type-check-Lany})
 cannot guarantee that the index is within bounds. Thus, we insert code
 to perform bounds checking at runtime. The translation for
-\code{any-vector-ref} is as follows and the other two operations are
-translated in a similar way.
+\code{any-vector-ref} is as follows, and the other two operations are
+translated in a similar way:
 \begin{center}
 \begin{minipage}{0.95\textwidth}
 \begin{lstlisting}
@@ -18481,13 +18486,13 @@ Update this pass to handle the \code{TagOf}, \code{ValueOf}, and
 \section{Explicate Control and \LangCAny{}}
 \label{sec:explicate-Lany}
 
-The output of \code{explicate\_control} is the \LangCAny{} language
-whose syntax is defined in figure~\ref{fig:c5-syntax}.
+The output of \code{explicate\_control} is the \LangCAny{} language,
+whose syntax definition is shown in figure~\ref{fig:c5-syntax}.
 %
 \racket{The \code{ValueOf} form that we added to \LangAny{} remains an
   expression and the \code{Exit} expression becomes a $\Tail$. Also,
   note that the index argument of \code{vector-ref} and
-  \code{vector-set!} is an $\Atm$ instead of an integer, as it was in
+  \code{vector-set!} is an $\Atm$, instead of an integer as it was in
   \LangCVec{} (figure~\ref{fig:c2-syntax}).}
 %
 \python{
@@ -18560,11 +18565,11 @@ whose syntax is defined in figure~\ref{fig:c5-syntax}.
 \section{Select Instructions}
 \label{sec:select-Lany}
 
-In the \code{select\_instructions} pass we translate the primitive
+In the \code{select\_instructions} pass, we translate the primitive
 operations on the \ANYTY{} type to x86 instructions that manipulate
-the 3 tag bits of the tagged value. In the following descriptions,
+the three tag bits of the tagged value. In the following descriptions,
 given an atom $e$ we use a primed variable $e'$ to refer to the result
-of translating $e$ into an x86 argument.
+of translating $e$ into an x86 argument:
 
 \paragraph{\racket{\code{make-any}}\python{\code{make\_any}}}
 
@@ -18572,7 +18577,7 @@ We recommend compiling the
 \racket{\code{make-any}}\python{\code{make\_any}} operation as follows
 if the tag is for \INTTY{} or \BOOLTY{}.  The \key{salq} instruction
 shifts the destination to the left by the number of bits specified its
-source argument (in this case $3$, the length of the tag) and it
+source argument (in this case three, the length of the tag), and it
 preserves the sign of the integer. We use the \key{orq} instruction to
 combine the tag and the value to form the tagged value.  \\
 %
@@ -18598,7 +18603,7 @@ orq $|$\itm{tag}$|, |\itm{lhs'}|
 %
 The instruction selection for tuples and procedures is different
 because their is no need to shift them to the left. The rightmost 3
-bits are already zeros so we simply combine the value and the tag
+bits are already zeros, so we simply combine the value and the tag
 using \key{orq}.  \\
 %
 {\if\edition\racketEd
@@ -18627,8 +18632,8 @@ orq $|$\itm{tag}$|, |\itm{lhs'}|
 
 Recall that the \racket{\code{tag-of-any}}\python{\code{TagOf}}
 operation extracts the type tag from a value of type \ANYTY{}. The
-type tag is the bottom three bits, so we obtain the tag by taking the
-bitwise-and of the value with $111$ ($7$ in decimal).
+type tag is the bottom $3$ bits, so we obtain the tag by taking the
+bitwise-and of the value with $111$ ($7$ decimal).
 %
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -18651,11 +18656,11 @@ andq $7, |\itm{lhs'}|
 
 \paragraph{\code{ValueOf}}
 
-The instructions for \key{ValueOf} also differ depending on whether
+The instructions for \key{ValueOf} also differ, depending on whether
 the type $T$ is a pointer (tuple or function) or not (integer or
 Boolean). The following shows the instruction selection for integers
-and Booleans.  We produce an untagged value by shifting it to the
-right by 3 bits.
+and Booleans, in which we produce an untagged value by shifting it to
+the right by 3 bits:
 %
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -18675,10 +18680,10 @@ sarq $3, |\itm{lhs'}|
 \end{lstlisting}
 \fi}
 %
-In the case for tuples and procedures, we zero-out the rightmost 3
+In the case for tuples and procedures, we zero out the rightmost 3
 bits. We accomplish this by creating the bit pattern $\ldots 0111$
-($7$ in decimal) and apply bitwise-not to obtain $\ldots 11111000$ (-8
-in decimal) which we \code{movq} into the destination $\itm{lhs'}$.
+($7$ decimal) and apply bitwise-not to obtain $\ldots 11111000$ (-8
+decimal), which we \code{movq} into the destination $\itm{lhs'}$.
 Finally, we apply \code{andq} with the tagged value to get the desired
 result.
 %
@@ -18741,7 +18746,7 @@ movq %r11, |$\itm{lhs'}$|
 This operation combines the effect of \code{ValueOf} with reading an
 element of the tuple (see
 section~\ref{sec:select-instructions-gc}). However, the index may be
-an arbitrary atom so instead of computing the offset at compile time,
+an arbitrary atom, so instead of computing the offset at compile time,
 we must generate instructions to compute the offset at runtime as
 follows. Note the use of the new instruction \code{imulq}.
 \begin{center}
@@ -18790,16 +18795,16 @@ movq 0(%r11) |$\itm{lhs'}$|
 
 There is an interesting interaction between tagged values and garbage
 collection that has an impact on register allocation.  A variable of
-type \ANYTY{} might refer to a tuple and therefore it might be a root
+type \ANYTY{} might refer to a tuple, and therefore it might be a root
 that needs to be inspected and copied during garbage collection. Thus,
 we need to treat variables of type \ANYTY{} in a similar way to
-variables of tuple type for purposes of register allocation.  In
-particular,
+variables of tuple type for purposes of register allocation,
+with particular attention to the following:
 \begin{itemize}
 \item If a variable of type \ANYTY{} is live during a function call,
   then it must be spilled. This can be accomplished by changing
   \code{build\_interference} to mark all variables of type \ANYTY{}
-  that are live after a \code{callq} as interfering with all the
+  that are live after a \code{callq} to be interfering with all the
   registers.
 
 \item If a variable of type \ANYTY{} is spilled, it must be spilled to
@@ -18807,7 +18812,7 @@ particular,
 \end{itemize}
 
 Another concern regarding the root stack is that the garbage collector
-needs to differentiate between (1) plain old pointers to tuples, (2) a
+needs to differentiate among (1) plain old pointers to tuples, (2) a
 tagged value that points to a tuple, and (3) a tagged value that is
 not a tuple. We enable this differentiation by choosing not to use the
 tag $000$ in the $\itm{tagof}$ function. Instead, that bit pattern is
@@ -18827,10 +18832,10 @@ other kinds of values.
 \begin{exercise}\normalfont\normalsize
 Expand your compiler to handle \LangDyn{} as outlined in this chapter.
 Create tests for \LangDyn{} by adapting ten of your previous test programs
-by removing type annotations. Add 5 more tests programs that
+by removing type annotations. Add five more test programs that
 specifically rely on the language being dynamically typed. That is,
 they should not be legal programs in a statically typed language, but
-nevertheless, they should be valid \LangDyn{} programs that run to
+nevertheless they should be valid \LangDyn{} programs that run to
 completion without error.
 \end{exercise}
 
@@ -18839,26 +18844,26 @@ completion without error.
   \begin{tcolorbox}[colback=white]
     \begin{tikzpicture}[baseline=(current  bounding  box.center),scale=0.85]
 \node (Lfun) at (0,4)  {\large \LangDyn{}};
-\node (Lfun-2) at (3,4)  {\large \LangDyn{}};
-\node (Lfun-3) at (6,4)  {\large \LangDyn{}};
-\node (Lfun-4) at (9,4)  {\large \LangDynFunRef{}};
+\node (Lfun-2) at (4,4)  {\large \LangDyn{}};
+\node (Lfun-3) at (8,4)  {\large \LangDyn{}};
+\node (Lfun-4) at (12,4)  {\large \LangDynFunRef{}};
 \node (Lfun-5) at (12,2)  {\large \LangAnyFunRef{}};
-\node (Lfun-6) at (9,2)  {\large \LangAnyFunRef{}};
-\node (Lfun-7) at (6,2)  {\large \LangAnyFunRef{}};
+\node (Lfun-6) at (8,2)  {\large \LangAnyFunRef{}};
+\node (Lfun-7) at (4,2)  {\large \LangAnyFunRef{}};
 
-\node (F1-2) at (3,2)  {\large \LangAnyFunRef{}};
-\node (F1-3) at (0,2)  {\large \LangAnyFunRef{}};
-\node (F1-4) at (0,0)  {\large \LangAnyAlloc{}};
-\node (F1-5) at (3,0)  {\large \LangAnyAlloc{}};
-\node (F1-6) at (6,0)  {\large \LangAnyAlloc{}};
-\node (C3-2) at (3,-2)  {\large \LangCAny{}};
+\node (F1-2) at (0,2)  {\large \LangAnyFunRef{}};
+\node (F1-3) at (0,0)  {\large \LangAnyFunRef{}};
+\node (F1-4) at (4,0)  {\large \LangAnyAlloc{}};
+\node (F1-5) at (8,0)  {\large \LangAnyAlloc{}};
+\node (F1-6) at (12,0)  {\large \LangAnyAlloc{}};
+\node (C3-2) at (0,-2)  {\large \LangCAny{}};
 
-\node (x86-2) at (3,-4)  {\large \LangXIndCallVar{}};
-\node (x86-2-1) at (3,-6)  {\large \LangXIndCallVar{}};
-\node (x86-2-2) at (6,-6)  {\large \LangXIndCallVar{}};
-\node (x86-3) at (6,-4)  {\large \LangXIndCallVar{}};
-\node (x86-4) at (9,-4) {\large \LangXIndCall{}};
-\node (x86-5) at (9,-6) {\large \LangXIndCall{}};
+\node (x86-2) at (0,-4)  {\large \LangXIndCallVar{}};
+\node (x86-2-1) at (0,-6)  {\large \LangXIndCallVar{}};
+\node (x86-2-2) at (4,-6)  {\large \LangXIndCallVar{}};
+\node (x86-3) at (4,-4)  {\large \LangXIndCallVar{}};
+\node (x86-4) at (8,-4) {\large \LangXIndCall{}};
+\node (x86-5) at (8,-6) {\large \LangXIndCall{}};
 
 \path[->,bend left=15] (Lfun) edge [above] node
      {\ttfamily\footnotesize shrink} (Lfun-2);
@@ -18871,32 +18876,32 @@ completion without error.
 \path[->,bend left=15] (Lfun-5) edge [below] node
      {\ttfamily\footnotesize reveal\_casts} (Lfun-6);
 \path[->,bend left=15] (Lfun-6) edge [below] node
-     {\ttfamily\footnotesize convert\_assign.} (Lfun-7);
+     {\ttfamily\footnotesize convert\_assignments} (Lfun-7);
      
 \path[->,bend right=15] (Lfun-7) edge [above] node
-     {\ttfamily\footnotesize convert\_to\_clos.} (F1-2);
-\path[->,bend right=15] (F1-2) edge [above] node
-     {\ttfamily\footnotesize limit\_fun.} (F1-3);
-\path[->,bend right=15] (F1-3) edge [right] node
-     {\ttfamily\footnotesize expose\_alloc.} (F1-4);
+     {\ttfamily\footnotesize convert\_to\_closures} (F1-2);
+\path[->,bend right=15] (F1-2) edge [right] node
+     {\ttfamily\footnotesize limit\_functions} (F1-3);
+\path[->,bend right=15] (F1-3) edge [below] node
+     {\ttfamily\footnotesize expose\_allocation} (F1-4);
 \path[->,bend right=15] (F1-4) edge [below] node
      {\ttfamily\footnotesize uncover\_get!} (F1-5);
 \path[->,bend left=15] (F1-5) edge [above] node
-     {\ttfamily\footnotesize remove\_complex.} (F1-6);
+     {\ttfamily\footnotesize remove\_complex\_operands} (F1-6);
 \path[->,bend left=15] (F1-6) edge [right] node
      {\ttfamily\footnotesize explicate\_control} (C3-2);
-\path[->,bend left=15] (C3-2) edge [left] node
-     {\ttfamily\footnotesize select\_instr.} (x86-2);
-\path[->,bend right=15] (x86-2) edge [left] node
+\path[->,bend left=15] (C3-2) edge [right] node
+     {\ttfamily\footnotesize select\_instructions} (x86-2);
+\path[->,bend right=15] (x86-2) edge [right] node
      {\ttfamily\footnotesize uncover\_live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node 
-     {\ttfamily\footnotesize build\_inter.} (x86-2-2);
-\path[->,bend right=15] (x86-2-2) edge [left] node
-     {\ttfamily\footnotesize allocate\_reg.} (x86-3);
+     {\ttfamily\footnotesize build\_interference} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [right] node
+     {\ttfamily\footnotesize allocate\_registers} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node
-     {\ttfamily\footnotesize patch\_instr.} (x86-4);
+     {\ttfamily\footnotesize patch\_instructions} (x86-4);
 \path[->,bend left=15] (x86-4) edge [right] node
-     {\ttfamily\footnotesize prelude\_and\_conc.} (x86-5);
+     {\ttfamily\footnotesize prelude\_and\_conclusion} (x86-5);
 \end{tikzpicture}
   \end{tcolorbox}
 
