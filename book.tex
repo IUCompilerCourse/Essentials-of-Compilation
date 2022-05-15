@@ -15354,17 +15354,17 @@ This chapter studies lexically scoped functions. Lexical scoping means
 that a function's body may refer to variables whose binding site is
 outside of the function, in an enclosing scope.
 %
-Consider the example in figure~\ref{fig:lexical-scoping} written in
-\LangLam{}, which extends \LangFun{} with the \key{lambda} form for
+Consider the example shown in figure~\ref{fig:lexical-scoping} written
+in \LangLam{}, which extends \LangFun{} with the \key{lambda} form for
 creating lexically scoped functions.  The body of the \key{lambda}
 refers to three variables: \code{x}, \code{y}, and \code{z}. The
 binding sites for \code{x} and \code{y} are outside of the
 \key{lambda}. Variable \code{y} is \racket{bound by the enclosing
-  \key{let}}\python{a local variable of function \code{f}} and
+  \key{let}}\python{a local variable of function \code{f}}, and
 \code{x} is a parameter of function \code{f}. Note that function
 \code{f} returns the \key{lambda} as its result value. The main
 expression of the program includes two calls to \code{f} with
-different arguments for \code{x}, first \code{5} then \code{3}. The
+different arguments for \code{x}: first \code{5} and then \code{3}. The
 functions returned from \code{f} are bound to variables \code{g} and
 \code{h}. Even though these two functions were created by the same
 \code{lambda}, they are really different functions because they use
@@ -15373,34 +15373,33 @@ different values for \code{x}. Applying \code{g} to \code{11} produces
 so the result of the program is \code{42}.
 
 \begin{figure}[btp]
-  \begin{tcolorbox}[colback=white]
-    {\if\edition\racketEd
+\begin{tcolorbox}[colback=white]
+{\if\edition\racketEd
 % lambda_test_21.rkt
 \begin{lstlisting}
-   (define (f [x : Integer]) : (Integer -> Integer)
-      (let ([y 4])
-         (lambda: ([z : Integer]) : Integer
-            (+ x (+ y z)))))
+(define (f [x : Integer]) : (Integer -> Integer)
+   (let ([y 4])
+      (lambda: ([z : Integer]) : Integer
+         (+ x (+ y z)))))
 
-   (let ([g (f 5)])
-     (let ([h (f 3)])
-       (+ (g 11) (h 15))))
+(let ([g (f 5)])
+  (let ([h (f 3)])
+    (+ (g 11) (h 15))))
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
-    def f(x : int) -> Callable[[int], int]:
-        y = 4
-        return lambda z: x + y + z
+def f(x : int) -> Callable[[int], int]:
+    y = 4
+    return lambda z: x + y + z
 
-    g = f(5)
-    h = f(3)
-    print( g(11) + h(15) )
+g = f(5)
+h = f(3)
+print( g(11) + h(15) )
 \end{lstlisting}
 \fi}
-  \end{tcolorbox}
-
-  \caption{Example of a lexically scoped function.}
+\end{tcolorbox}
+\caption{Example of a lexically scoped function.}
 \label{fig:lexical-scoping}
 \end{figure}
 
@@ -15408,13 +15407,13 @@ The approach that we take for implementing lexically scoped functions
 is to compile them into top-level function definitions, translating
 from \LangLam{} into \LangFun{}.  However, the compiler must give
 special treatment to variable occurrences such as \code{x} and
-\code{y} in the body of the \code{lambda} of
+\code{y} in the body of the \code{lambda} shown in
 figure~\ref{fig:lexical-scoping}. After all, an \LangFun{} function
 may not refer to variables defined outside of it. To identify such
 variable occurrences, we review the standard notion of free variable.
 
-\begin{definition}
-A variable is \textbf{free in expression} $e$ if the variable occurs
+\begin{definition}\normalfont
+A variable is \emph{free in expression} $e$ if the variable occurs
 inside $e$ but does not have an enclosing definition that is also in
 $e$.\index{subject}{free variable}
 \end{definition}
@@ -15422,8 +15421,8 @@ $e$.\index{subject}{free variable}
 For example, in the expression
 \racket{\code{(+ x (+ y z))}}\python{\code{x + y + z}}
 the variables \code{x}, \code{y}, and \code{z} are all free.  On the other hand,
-only \code{x} and \code{y} are free in the following expression
-because \code{z} is defined by the \code{lambda}.
+only \code{x} and \code{y} are free in the following expression,
+because \code{z} is defined by the \code{lambda}
 {\if\edition\racketEd
 \begin{lstlisting}
    (lambda: ([z : Integer]) : Integer
@@ -15436,26 +15435,27 @@ because \code{z} is defined by the \code{lambda}.
 \end{lstlisting}
 \fi}
 %
-So the free variables of a \code{lambda} are the ones that need
-special treatment. We need to transport, at runtime, the values of
-those variables from the point where the \code{lambda} was created to
-the point where the \code{lambda} is applied. An efficient solution to
-the problem, due to \citet{Cardelli:1983aa}, is to bundle the values
-of the free variables together with a function pointer into a tuple,
-an arrangement called a \emph{flat closure} (which we shorten to just
-``closure'').\index{subject}{closure}\index{subject}{flat closure}
+\noindent Thus the free variables of a \code{lambda} are the ones that
+need special treatment. We need to transport at runtime the values
+of those variables from the point where the \code{lambda} was created
+to the point where the \code{lambda} is applied. An efficient solution
+to the problem, due to \citet{Cardelli:1983aa}, is to bundle the
+values of the free variables together with a function pointer into a
+tuple, an arrangement called a \emph{flat closure} (which we shorten
+to just \emph{closure}).\index{subject}{closure}\index{subject}{flat
+  closure}
 %
 By design, we have all the ingredients to make closures:
-chapter~\ref{ch:Lvec} gave us tuples and chapter~\ref{ch:Lfun} gave us
-function pointers. The function pointer resides at index $0$ and the
+chapter~\ref{ch:Lvec} gave us tuples, and chapter~\ref{ch:Lfun} gave us
+function pointers. The function pointer resides at index $0$, and the
 values for the free variables fill in the rest of the tuple.
 
-Let us revisit the example in figure~\ref{fig:lexical-scoping} to see
-how closures work. It is a three-step dance. The program calls
+Let us revisit the example shown in figure~\ref{fig:lexical-scoping}
+to see how closures work. It is a three-step dance. The program calls
 function \code{f}, which creates a closure for the \code{lambda}. The
 closure is a tuple whose first element is a pointer to the top-level
-function that we will generate for the \code{lambda}, the second
-element is the value of \code{x}, which is \code{5}, and the third
+function that we will generate for the \code{lambda}; the second
+element is the value of \code{x}, which is \code{5}; and the third
 element is \code{4}, the value of \code{y}. The closure does not
 contain an element for \code{z} because \code{z} is not a free
 variable of the \code{lambda}. Creating the closure is step 1 of the
@@ -15480,33 +15480,33 @@ figure~\ref{fig:closures}.
 \end{figure}
 
 Continuing with the example, consider the application of \code{g} to
-\code{11} in figure~\ref{fig:lexical-scoping}.  To apply a closure, we
-obtain the function pointer from the first element of the closure and
-call it, passing in the closure itself and then the regular arguments,
-in this case \code{11}. This technique for applying a closure is step
-2 of the dance.
+\code{11} shown in figure~\ref{fig:lexical-scoping}.  To apply a
+closure, we obtain the function pointer from the first element of the
+closure and call it, passing in the closure itself and then the
+regular arguments, in this case \code{11}. This technique for applying
+a closure is step 2 of the dance.
 %
-But doesn't this \code{lambda} only take 1 argument, for parameter
+But doesn't this \code{lambda} take only one argument, for parameter
 \code{z}? The third and final step of the dance is generating a
 top-level function for a \code{lambda}.  We add an additional
-parameter for the closure and we insert an initialization at the beginning
+parameter for the closure and insert an initialization at the beginning
 of the function for each free variable, to bind those variables to the
 appropriate elements from the closure parameter.
 %
 This three-step dance is known as \emph{closure conversion}.  We
 discuss the details of closure conversion in
 section~\ref{sec:closure-conversion} and show the code generated from
-the example in section~\ref{sec:example-lambda}. But first we define
+the example in section~\ref{sec:example-lambda}. First, we define
 the syntax and semantics of \LangLam{} in section~\ref{sec:r5}.
 
 \section{The \LangLam{} Language}
 \label{sec:r5}
 
-The concrete and abstract syntax for \LangLam{}, a language with anonymous
-functions and lexical scoping, is defined in
-figures~\ref{fig:Llam-concrete-syntax} and \ref{fig:Llam-syntax}. It adds
-the \key{lambda} form to the grammar for \LangFun{}, which already has
-syntax for function application. 
+The definitions of the concrete syntax and abstract syntax for
+\LangLam{}, a language with anonymous functions and lexical scoping,
+are shown in figures~\ref{fig:Llam-concrete-syntax} and
+\ref{fig:Llam-syntax}. They add the \key{lambda} form to the grammar
+for \LangFun{}, which already has syntax for function application.
 %
 \python{The syntax also includes an assignment statement that includes
   a type annotation for the variable on the left-hand side, which
@@ -15907,9 +15907,9 @@ class TypeCheckLlambda(TypeCheckLfun):
 \section{Assignment and Lexically Scoped Functions}
 \label{sec:assignment-scoping}
 
-The combination of lexically-scoped functions and assignment to
+The combination of lexically scoped functions and assignment to
 variables raises a challenge with the flat-closure approach to
-implementing lexically-scoped functions. Consider the following
+implementing lexically scoped functions. Consider the following
 example in which function \code{f} has a free variable \code{x} that
 is changed after \code{f} is created but before the call to \code{f}.
 % loop_test_11.rkt
@@ -15943,7 +15943,7 @@ to \code{f} is required to use the current value of \code{x} (which is
 \code{10}). Unfortunately, the closure conversion pass
 (section~\ref{sec:closure-conversion}) generates code for the
 \code{lambda} that copies the old value of \code{x} into a
-closure. Thus, if we naively apply closure conversion, the output of
+closure. Thus, if we naively applied closure conversion, the output of
 this program would be \code{32}.
 
 A first attempt at solving this problem would be to save a pointer to
@@ -15952,7 +15952,7 @@ the lambda to dereference the pointer. Of course, this would require
 assigning \code{x} to the stack and not to a register. However, the
 problem goes a bit deeper.
 Consider the following example that returns a function that refers to
-a local variable of the enclosing function.
+a local variable of the enclosing function:
 \begin{center}
 \begin{minipage}{\textwidth}
 {\if\edition\racketEd
@@ -15983,7 +15983,7 @@ print( f()() )
 In this example, the lifetime of \code{x} extends beyond the lifetime
 of the call to \code{f}. Thus, if we were to store \code{x} on the
 stack frame for the call to \code{f}, it would be gone by the time we
-call \code{g}, leaving us with dangling pointers for
+called \code{g}, leaving us with dangling pointers for
 \code{x}. This example demonstrates that when a variable occurs free
 inside a function, its lifetime becomes indefinite. Thus, the value of
 the variable needs to live on the heap.  The verb
@@ -16069,7 +16069,7 @@ def main() -> int :
 The purpose of the \code{convert\_assignments} pass is to address the
 challenge regarding the interaction between variable assignments and
 closure conversion.  First we identify which variables need to be
-boxed, then we transform the program to box those variables. In
+boxed, and then we transform the program to box those variables. In
 general, boxing introduces runtime overhead that we would like to
 avoid, so we should box as few variables as possible. We recommend
 boxing the variables in the intersection of the following two sets of
@@ -16112,14 +16112,14 @@ print( g(20) )
 \end{lstlisting}
 \fi}
 %
-\noindent The variables \code{x} and \code{y} are assigned-to.  The
+\noindent The variables \code{x} and \code{y} are assigned to.  The
 variables \code{x} and \code{z} occur free inside the
 \code{lambda}. Thus, variable \code{x} needs to be boxed but not
 \code{y} or \code{z}.  The boxing of \code{x} consists of three
-transformations: initialize \code{x} with a tuple whose elements are uninitialized,
-replace reads from \code{x} with tuple reads, and replace each assignment to \code{x}
-with a tuple write. The output of \code{convert\_assignments} for
-this example is as follows.
+transformations: initialize \code{x} with a tuple whose elements are
+uninitialized, replace reads from \code{x} with tuple reads, and
+replace each assignment to \code{x} with a tuple write. The output of
+\code{convert\_assignments} for this example is as follows:
 %
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -16154,7 +16154,7 @@ def main() -> int:
 \fi}
 
 To compute the free variables of all the \code{lambda} expressions, we
-recommend defining two auxiliary functions:
+recommend defining the following two auxiliary functions:
 \begin{enumerate}
 \item \code{free\_variables} computes the free variables of an expression, and
 \item \code{free\_in\_lambda} collects all the variables that are
@@ -16165,16 +16165,16 @@ recommend defining two auxiliary functions:
 
 {\if\edition\racketEd
 %
-To compute the variables that are assigned-to, we recommend using the
-\code{collect-set!} function that we introduced in
-section~\ref{sec:uncover-get-bang}, but updated to include the new AST
-forms such as \code{Lambda}.
+To compute the variables that are assigned to, we recommend updating
+the \code{collect-set!} function that we introduced in
+section~\ref{sec:uncover-get-bang} to include the new AST forms such
+as \code{Lambda}.
 %
 \fi}
   
 {\if\edition\pythonEd
 %
-To compute the variables that are assigned-to, we recommend defining
+To compute the variables that are assigned to, we recommend defining
 an auxiliary function named \code{assigned\_vars\_stmt} that returns
 the set of variables that occur in the left-hand side of an assignment
 statement, and otherwise returns the empty set.
@@ -16182,7 +16182,7 @@ statement, and otherwise returns the empty set.
 \fi}
 
 Let $\mathit{AF}$ be the intersection of the set of variables that are
-free in a \code{lambda} and that are assigned-to in the enclosing
+free in a \code{lambda} and that are assigned to in the enclosing
 function definition.
 
 Next we discuss the \code{convert\_assignments} pass.  In the case for
@@ -16207,8 +16207,8 @@ $\VAR{x}$ to a tuple read.
 %
 \noindent In the case for assignment, recursively process the
 right-hand side \itm{rhs} to obtain \itm{rhs'}.  If the left-hand side
-$x$ is in $\mathit{AF}$, translate the assignment into a tuple-write
-as follows.
+$x$ is in $\mathit{AF}$, translate the assignment into a tuple write
+as follows:
 %
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -16226,17 +16226,17 @@ as follows.
 \fi}
 %
 {\if\edition\racketEd
-The case for \code{Lambda} is non-trivial, but it is similar to the
+The case for \code{Lambda} is nontrivial, but it is similar to the
 case for function definitions, which we discuss next.
 \fi}
 %
 To translate a function definition, we first compute $\mathit{AF}$,
 the intersection of the variables that are free in a \code{lambda} and
-that are assigned-to. We then apply assignment conversion to the body
+that are assigned to. We then apply assignment conversion to the body
 of the function definition. Finally, we box the parameters of this
 function definition that are in $\mathit{AF}$. For example,
 the parameter \code{x} of the following function \code{g}
-needs to be boxed.
+needs to be boxed:
 {\if\edition\racketEd
 \begin{lstlisting}
 (define (g [x : Integer]) : Integer
@@ -16286,23 +16286,24 @@ def g(x_0 : int)-> int:
 \label{sec:closure-conversion}
 \index{subject}{closure conversion}
 
-The compiling of lexically-scoped functions into top-level function
+The compiling of lexically scoped functions into top-level function
 definitions and flat closures is accomplished in the pass
 \code{convert\_to\_closures} that comes after \code{reveal\_functions}
 and before \code{limit\_functions}.
 
 As usual, we implement the pass as a recursive function over the
-AST. The interesting cases are the ones for \key{lambda} and function
+AST. The interesting cases are for \key{lambda} and function
 application. We transform a \key{lambda} expression into an expression
-that creates a closure, that is, a tuple whose first element is a
-function pointer and the rest of the elements are the values of the
-free variables of the \key{lambda}.
+that creates a closure, that is, a tuple for which the first element
+is a function pointer and the rest of the elements are the values of
+the free variables of the \key{lambda}.
 %
 However, we use the \code{Closure} AST node instead of using a tuple
 so that we can record the arity.
 %
-In the generated code below, \itm{fvs} is the free variables of the
-lambda and \itm{name} is a unique symbol generated to identify the lambda.
+In the generated code that follows, \itm{fvs} is the free variables of
+the lambda and \itm{name} is a unique symbol generated to identify the
+lambda.
 %
 \racket{The \itm{arity} is the number of parameters (the length of
   \itm{ps}).}
@@ -16325,7 +16326,7 @@ Closure(|$n$|, [FunRef(|\itm{name}|, |$n$|), |\itm{fvs}, \ldots|])
 %
 In addition to transforming each \key{Lambda} AST node into a
 tuple, we create a top-level function definition for each
-\key{Lambda}, as shown below.\\
+\key{Lambda}, as shown next.\\
 \begin{minipage}{0.8\textwidth}
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -16349,11 +16350,11 @@ def |\itm{name}|(clos : |\itm{closTy}|, |\itm{ps'}, \ldots|) -> |\itm{rt'}|:
 The \code{clos} parameter refers to the closure.  Translate the type
 annotations in \itm{ps} and the return type \itm{rt}, as discussed in
 the next paragraph, to obtain \itm{ps'} and \itm{rt'}.  The type
-\itm{closTy} is a tuple type whose first element type is
+\itm{closTy} is a tuple type for which the first element type is
 \python{\code{Bottom()}}\racket{\code{\_} (the dummy type)} and the rest of
 the element types are the types of the free variables in the
 lambda. We use \python{\code{Bottom()}}\racket{\code{\_}} because it
-is non-trivial to give a type to the function in the closure's type.%
+is nontrivial to give a type to the function in the closure's type.%
 %
 \footnote{To give an accurate type to a closure, we would need to add
   existential types to the type checker~\citep{Minamide:1996ys}.}
@@ -16366,7 +16367,7 @@ their values in the closure.
 Closure conversion turns every function into a tuple, so the type
 annotations in the program must also be translated.  We recommend
 defining an auxiliary recursive function for this purpose.  Function
-types should be translated as follows.
+types should be translated as follows:
 %
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -16383,13 +16384,13 @@ TupleType([FunctionType([TupleType([]), |$T'_1, \ldots, T'_n$|], |$T'_r$|)])
 \end{lstlisting}
 \fi}
 %
-The above type says that the first thing in the tuple is a
+This type indicates that the first thing in the tuple is a
 function. The first parameter of the function is a tuple (a closure)
 and the rest of the parameters are the ones from the original
 function, with types $T'_1, \ldots, T'_n$.  The type for the closure
-omits the types of the free variables because 1) those types are not
-available in this context and 2) we do not need them in the code that
-is generated for function application. So this type only describes the
+omits the types of the free variables because (1) those types are not
+available in this context, and (2) we do not need them in the code that
+is generated for function application. So this type describes only the
 first component of the closure tuple. At runtime the tuple may have
 more components, but we ignore them at this point.
 
@@ -16460,7 +16461,7 @@ to support the type checking of \code{lambda} expressions, so we
 translate it to a regular \code{Assign} statement.
 
 The top-level function definitions need to be updated to take an extra
-closure parameter but that parameter is ignored in the body of those
+closure parameter, but that parameter is ignored in the body of those
 functions.
 
 \section{An Example Translation}
@@ -16548,7 +16549,7 @@ def main() -> int:
 
 \begin{exercise}\normalfont\normalsize
 Expand your compiler to handle \LangLam{} as outlined in this chapter.
-Create 5 new programs that use \key{lambda} functions and make use of
+Create five new programs that use \key{lambda} functions and make use of
 lexical scoping. Test your compiler on these new programs and all
 your previously created test programs.
 \end{exercise}
@@ -16567,10 +16568,11 @@ The only difference is replacing the use of
 \section{Explicate Control and \LangCLam{}}
 \label{sec:explicate-r5}
 
-The output language of \code{explicate\_control} is \LangCLam{} whose
-abstract syntax is defined in figure~\ref{fig:Clam-syntax}.
+The output language of \code{explicate\_control} is \LangCLam{}; the
+definition of its abstract syntax is shown in
+figure~\ref{fig:Clam-syntax}.
 %
-\racket{The only differences with respect to \LangCFun{} is the
+\racket{The only differences with respect to \LangCFun{} are the
   addition of the \code{AllocateClosure} form to the grammar for
   $\Exp$ and the \code{procedure-arity} operator.  The handling of
   \code{AllocateClosure} in the \code{explicate\_control} pass is
@@ -16651,7 +16653,7 @@ $58$.
 
 \racket{Compile the \code{procedure-arity} operator into a sequence of
 instructions that access the tag from position $0$ of the vector and
-extract the $5$-bits starting at position $58$ from the tag.}
+extract the $5$ bits starting at position $58$ from the tag.}
 %
 \python{Compile a call to the \code{arity} operator to a sequence of
 instructions that access the tag from position $0$ of the tuple
@@ -16665,23 +16667,23 @@ $58$ from the tag.}
 {\if\edition\racketEd    
 \begin{tikzpicture}[baseline=(current  bounding  box.center),scale=0.85]
 \node (Lfun) at (0,2)  {\large \LangLam{}};
-\node (Lfun-2) at (3,2)  {\large \LangLam{}};
-\node (Lfun-3) at (6,2)  {\large \LangLam{}};
-\node (F1-0) at (9,2)  {\large \LangLamFunRef{}};
-\node (F1-1) at (12,2)  {\large \LangLamFunRef{}};
-\node (F1-2) at (12,0)  {\large \LangFunRef{}};
-\node (F1-3) at (9,0)  {\large \LangFunRef{}};
-\node (F1-4) at (6,0)  {\large \LangFunRefAlloc{}};
-\node (F1-5) at (3,0)  {\large \LangFunRefAlloc{}};
-\node (F1-6) at (0,0)  {\large \LangFunANF{}};
-\node (C3-2) at (3,-2)  {\large \LangCFun{}};
+\node (Lfun-2) at (4,2)  {\large \LangLam{}};
+\node (Lfun-3) at (8,2)  {\large \LangLam{}};
+\node (F1-0) at (12,2)  {\large \LangLamFunRef{}};
+\node (F1-1) at (12,0)  {\large \LangLamFunRef{}};
+\node (F1-2) at (8,0)  {\large \LangFunRef{}};
+\node (F1-3) at (4,0)  {\large \LangFunRef{}};
+\node (F1-4) at (0,0)  {\large \LangFunRefAlloc{}};
+\node (F1-5) at (0,-2)  {\large \LangFunRefAlloc{}};
+\node (F1-6) at (4,-2)  {\large \LangFunANF{}};
+\node (C3-2) at (8,-2)  {\large \LangCFun{}};
 
-\node (x86-2) at (3,-4)  {\large \LangXIndCallVar{}};
-\node (x86-2-1) at (3,-6)  {\large \LangXIndCallVar{}};
-\node (x86-2-2) at (6,-6)  {\large \LangXIndCallVar{}};
-\node (x86-3) at (6,-4)  {\large \LangXIndCallVar{}};
-\node (x86-4) at (9,-4) {\large \LangXIndCall{}};
-\node (x86-5) at (9,-6) {\large \LangXIndCall{}};
+\node (x86-2) at (0,-5)  {\large \LangXIndCallVar{}};
+\node (x86-2-1) at (0,-7)  {\large \LangXIndCallVar{}};
+\node (x86-2-2) at (4,-7)  {\large \LangXIndCallVar{}};
+\node (x86-3) at (4,-5)  {\large \LangXIndCallVar{}};
+\node (x86-4) at (8,-5) {\large \LangXIndCall{}};
+\node (x86-5) at (8,-7) {\large \LangXIndCall{}};
 
 \path[->,bend left=15] (Lfun) edge [above] node
      {\ttfamily\footnotesize shrink} (Lfun-2);
@@ -16689,32 +16691,32 @@ $58$ from the tag.}
      {\ttfamily\footnotesize uniquify} (Lfun-3);
 \path[->,bend left=15] (Lfun-3) edge [above] node
      {\ttfamily\footnotesize reveal\_functions} (F1-0);
-\path[->,bend left=15] (F1-0) edge [above] node
-     {\ttfamily\footnotesize convert\_assign.} (F1-1);
-\path[->,bend left=15] (F1-1) edge [left] node
-     {\ttfamily\footnotesize convert\_to\_clos.} (F1-2);
-\path[->,bend left=15] (F1-2) edge [below] node
-     {\ttfamily\footnotesize limit\_fun.} (F1-3);
+\path[->,bend left=15] (F1-0) edge [left] node
+     {\ttfamily\footnotesize convert\_assignments} (F1-1);
+\path[->,bend left=15] (F1-1) edge [below] node
+     {\ttfamily\footnotesize convert\_to\_closures} (F1-2);
+\path[->,bend right=15] (F1-2) edge [above] node
+     {\ttfamily\footnotesize limit\_functions} (F1-3);
 \path[->,bend right=15] (F1-3) edge [above] node
-     {\ttfamily\footnotesize expose\_alloc.} (F1-4);
-\path[->,bend left=15] (F1-4) edge [below] node
+     {\ttfamily\footnotesize expose\_allocation} (F1-4);
+\path[->,bend left=15] (F1-4) edge [right] node
      {\ttfamily\footnotesize uncover\_get!} (F1-5);
-\path[->,bend right=15] (F1-5) edge [above] node
-     {\ttfamily\footnotesize remove\_complex.} (F1-6);
-\path[->,bend right=15] (F1-6) edge [right] node
+\path[->,bend right=15] (F1-5) edge [below] node
+     {\ttfamily\footnotesize remove\_complex\_operands} (F1-6);
+\path[->,bend left=15] (F1-6) edge [above] node
      {\ttfamily\footnotesize explicate\_control} (C3-2);
-\path[->,bend left=15] (C3-2) edge [left] node
-     {\ttfamily\footnotesize select\_instr.} (x86-2);
-\path[->,bend right=15] (x86-2) edge [left] node
+\path[->] (C3-2) edge [right] node
+     {\ttfamily\footnotesize select\_instructions} (x86-2);
+\path[->,bend right=15] (x86-2) edge [right] node
      {\ttfamily\footnotesize uncover\_live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node 
-     {\ttfamily\footnotesize build\_inter.} (x86-2-2);
-\path[->,bend right=15] (x86-2-2) edge [left] node
-     {\ttfamily\footnotesize allocate\_reg.} (x86-3);
+     {\ttfamily\footnotesize build\_interference} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [right] node
+     {\ttfamily\footnotesize allocate\_registers} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node
-     {\ttfamily\footnotesize patch\_instr.} (x86-4);
+     {\ttfamily\footnotesize patch\_instructions} (x86-4);
 \path[->,bend left=15] (x86-4) edge [right] node
-     {\ttfamily\footnotesize prelude\_and\_conc.} (x86-5);
+     {\ttfamily\footnotesize prelude\_and\_conclusion} (x86-5);
 \end{tikzpicture}
 \fi}
 {\if\edition\pythonEd
@@ -16771,7 +16773,7 @@ $58$ from the tag.}
 \fi}
   \end{tcolorbox}
 
-  \caption{Diagram of the passes for \LangLam{}, a language with lexically-scoped
+  \caption{Diagram of the passes for \LangLam{}, a language with lexically scoped
   functions.}
 \label{fig:Llambda-passes}
 \end{figure}
@@ -16784,13 +16786,13 @@ needed for the compilation of \LangLam{}.
 \section{Challenge: Optimize Closures}
 \label{sec:optimize-closures}
 
-In this chapter we compiled lexically-scoped functions into a
+In this chapter we compile lexically scoped functions into a
 relatively efficient representation: flat closures. However, even this
 representation comes with some overhead. For example, consider the
 following program with a function \code{tail\_sum} that does not have
 any free variables and where all the uses of \code{tail\_sum} are in
-applications where we know that only \code{tail\_sum} is being applied
-(and not any other functions).
+applications in which we know that only \code{tail\_sum} is being applied
+(and not any other functions):
 \begin{center}
 \begin{minipage}{0.95\textwidth}
 {\if\edition\racketEd  
@@ -16817,7 +16819,7 @@ print( tail_sum(3, 0) + 36)
 \end{minipage}
 \end{center}
 As described in this chapter, we uniformly apply closure conversion to
-all functions, obtaining the following output for this program.
+all functions, obtaining the following output for this program:
 \begin{center}
 \begin{minipage}{0.95\textwidth}
 {\if\edition\racketEd  
@@ -16851,12 +16853,12 @@ def main() -> int :
 \end{minipage}
 \end{center}
 
-In the previous chapter, there would be no allocation in the program
-and the calls to \code{tail\_sum} would be direct calls. In contrast,
-the above program allocates memory for each closure and the calls to
-\code{tail\_sum} are indirect. These two differences incur
-considerable overhead in a program such as this one, where the
-allocations and indirect calls occur inside a tight loop.
+If this program were compiled according to the previous chapter, there
+would be no allocation and the calls to \code{tail\_sum} would be
+direct calls. In contrast, the program presented here allocates memory
+for each closure and the calls to \code{tail\_sum} are indirect. These
+two differences incur considerable overhead in a program such as this,
+in which the allocations and indirect calls occur inside a tight loop.
 
 One might think that this problem is trivial to solve: can't we just
 recognize calls of the form \APPLY{\FUNREF{$f$}{$n$}}{$\mathit{args}$}
@@ -16864,12 +16866,12 @@ and compile them to direct calls instead of treating it like a call to
 a closure? We would also drop the new \code{fvs} parameter of
 \code{tail\_sum}.
 %
-However, this problem is not so trivial because a global function may
-``escape'' and become involved in applications that also involve
+However, this problem is not so trivial, because a global function may
+\emph{escape} and become involved in applications that also involve
 closures. Consider the following example in which the application
 \CAPPLY{\code{f}}{\code{41}} needs to be compiled into a closure
-application, because the \code{lambda} may flow into \code{f}, but the
-\code{inc} function might also flow into \code{f}.
+application because the \code{lambda} may flow into \code{f}, but the
+\code{inc} function might also flow into \code{f}:
 \begin{center}
 \begin{minipage}{\textwidth}
 % lambda_test_30.rkt
@@ -16909,7 +16911,7 @@ need to perform closure conversion on the function.
   of closure conversion that does not apply closure conversion to
   global functions that do not escape but instead compiles them as
   regular functions. Create several new test cases that check whether
-  you properly detect whether global functions escape or not.
+  your compiler properly detect whether global functions escape or not.
 \end{exercise}
 
 So far we have reduced the overhead of calling global functions, but
@@ -16936,7 +16938,7 @@ print( f(21) )
 \fi}
 %
 \noindent Closure conversion compiles the application
-\CAPPLY{\code{f}}{\code{21}} into an indirect call:
+\CAPPLY{\code{f}}{\code{21}} into an indirect call, as follows:
 %
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -16965,8 +16967,8 @@ def main() -> int:
 \end{lstlisting}
 \fi}
 %
-\noindent but we can instead compile the application
-\CAPPLY{\code{f}}{\code{21}} into a direct call:
+\noindent However, we can instead compile the application
+\CAPPLY{\code{f}}{\code{21}} into a direct call, as follows:
 %
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -16994,7 +16996,7 @@ following exercise we recommend that you compile an application to a
 direct call when the operator is a variable and \racket{the variable
   is \code{let}-bound to a closure}\python{the previous assignment to
   the variable is a closure}.  This can be accomplished by maintaining
-an environment mapping variables to function names.  Extend the
+an environment that maps variables to function names.  Extend the
 environment whenever you encounter a closure on the right-hand side of
 a \racket{\code{let}}\python{assignment}, mapping the variable to the
 name of the global function for the closure. This pass should come
@@ -17006,9 +17008,9 @@ compiles known calls into direct calls. Verify that your compiler is
 successful in this regard on several example programs.
 \end{exercise}
 
-These exercises only scratches the surface of optimizing of
-closures. A good next step for the interested reader is to look at the
-work of \citet{Keep:2012ab}.
+These exercises only scratch the surface of closure optimization. A
+good next step for the interested reader is to look at the work of
+\citet{Keep:2012ab}.
 
 \section{Further Reading}
 
@@ -17017,7 +17019,7 @@ about a decade. They were invented by \citet{Church:1932aa}, who
 proposed the lambda calculus as a foundation for logic. Anonymous
 functions were included in the LISP~\citep{McCarthy:1960dz}
 programming language but were initially dynamically scoped. The Scheme
-dialect of LISP adopted lexical scoping and
+dialect of LISP adopted lexical scoping, and
 \citet{Guy-L.-Steele:1978yq} demonstrated how to efficiently compile
 Scheme programs. However, environments were represented as linked
 lists, so variable look-up was linear in the size of the
@@ -17028,7 +17030,7 @@ using flat closures, which were invented by
 the ML language~\citep{Gordon:1978aa,Milner:1990fk}.  With flat
 closures, variable look-up is constant time but the time to create a
 closure is proportional to the number of its free variables.  Flat
-closures were reinvented by \citet{Dybvig:1987ab} in his Ph.D. thesis
+closures were reinvented by \citet{Dybvig:1987ab} in his PhD thesis
 and used in Chez Scheme version 1~\citep{Dybvig:2006aa}.
 
 % todo: related work on assignment conversion (e.g. orbit and rabbit
