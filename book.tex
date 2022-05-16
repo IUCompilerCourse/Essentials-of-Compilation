@@ -20957,16 +20957,16 @@ online gradual typing bibliography for more material:
 \setcounter{footnote}{0}
 
 This chapter studies the compilation of
-generics\index{subject}{generics} (aka. parametric
+generics\index{subject}{generics} (aka parametric
 polymorphism\index{subject}{parametric polymorphism}), compiling the
 \LangPoly{} subset of \racket{Typed Racket}\python{Python}.  Generics
 enable programmers to make code more reusable by parameterizing
-functions and data structures with respect to the types that they
-operate on. For example, figure~\ref{fig:map-poly} revisits the
-\code{map} example but this time gives it a more fitting type.  This
+functions and data structures with respect to the types on which they
+operate. For example, figure~\ref{fig:map-poly} revisits the
+\code{map} example and this time gives it a more fitting type.  This
 \code{map} function is parameterized with respect to the element type
 of the tuple. The type of \code{map} is the following generic type
-specified by the \code{All} type with parameter \code{T}.
+specified by the \code{All} type with parameter \code{T}:
 \if\edition\racketEd
 \begin{lstlisting}
   (All (T) ((T -> T) (Vector T T) -> (Vector T T)))
@@ -20979,10 +20979,11 @@ specified by the \code{All} type with parameter \code{T}.
 \fi
 %
 The idea is that \code{map} can be used at \emph{all} choices of a
-type for parameter \code{T}. In figure~\ref{fig:map-poly} we apply
-\code{map} to a tuple of integers, implicitly choosing
-\racket{\code{Integer}}\python{\code{int}} for \code{T}, but we could
-have just as well applied \code{map} to a tuple of Booleans.
+type for parameter \code{T}. In the example shown in
+figure~\ref{fig:map-poly} we apply \code{map} to a tuple of integers,
+implicitly choosing \racket{\code{Integer}}\python{\code{int}} for
+\code{T}, but we could have just as well applied \code{map} to a tuple
+of Booleans.
 %
 A \emph{monomorphic} function is simply one that is not generic.
 %
@@ -21033,16 +21034,16 @@ print(t[1])
 \label{fig:map-poly}
 \end{figure}
 
-Figure~\ref{fig:Lpoly-concrete-syntax} defines the concrete syntax of
-\LangPoly{} and figure~\ref{fig:Lpoly-syntax} defines the abstract
-syntax.
+Figure~\ref{fig:Lpoly-concrete-syntax} pressents the definition of the
+concrete syntax of \LangPoly{}, and figure~\ref{fig:Lpoly-syntax}
+shows the definition of the abstract syntax.
 %
 \if\edition\racketEd
 We add a second form for function definitions in which a type
 declaration comes before the \code{define}. In the abstract syntax,
 the return type in the \code{Def} is \CANYTY{}, but that should be
 ignored in favor of the return type in the type declaration.  (The
-\CANYTY{} comes from using the same parser as in
+\CANYTY{} comes from using the same parser as discussed in
 chapter~\ref{ch:Ldyn}.)  The presence of a type declaration
 enables the use of an \code{All} type for a function, thereby making
 it generic.
@@ -21173,12 +21174,12 @@ The grammar for types is extended to include the type of a generic
 \end{figure}
 
 By including the \code{All} type in the $\Type$ nonterminal of the
-grammar we choose to make generics first-class, which has interesting
+grammar we choose to make generics first class, which has interesting
 repercussions on the compiler.\footnote{The Python \code{typing} library does
 not include syntax for the \code{All} type. It is inferred for functions whose
 type annotations contain type variables.}  Many languages with generics, such as
 C++~\citep{stroustrup88:_param_types} and Standard
-ML~\citep{Milner:1990fk}, only support second-class generics, so it
+ML~\citep{Milner:1990fk}, support only second-class generics, so it
 may be helpful to see an example of first-class generics in action. In
 figure~\ref{fig:apply-twice} we define a function \code{apply\_twice}
 whose parameter is a generic function. Indeed, because the grammar for
@@ -21223,16 +21224,10 @@ print(apply_twice(id))
 \end{figure}
 
 
+The type checker for \LangPoly{} shown in
+figure~\ref{fig:type-check-Lpoly} has several new responsibilities
+(compared to \LangLam{}) which we discuss in the following paragraphs.
 
-The type checker for \LangPoly{} in figure~\ref{fig:type-check-Lpoly}
-has several new responsibilities (compared to \LangLam{}) which we
-discuss in the following paragraphs.
-
-\if\edition\racketEd
-%
-TODO: function definitions
-%
-\fi
 \if\edition\pythonEd
 %
 Regarding function definitions, if the type annotations on its
@@ -21243,8 +21238,8 @@ a function type.
 %
 \fi
 
-The type checking of function application is extended to handle the
-case where the operator expression is a generic function. In that case
+The type checking of a function application is extended to handle the
+case in which the operator expression is a generic function. In that case
 the type arguments are deduced by matching the type of the parameters
 with the types of the arguments.
 %
@@ -21253,13 +21248,13 @@ The \code{match\_types} auxiliary function
 recursively descending through a parameter type \code{param\_ty} and
 the corresponding argument type \code{arg\_ty}, making sure that they
 are equal except when there is a type parameter in the parameter
-type. Upon encouterning a type parameter for the first time, the
+type. Upon encounterning a type parameter for the first time, the
 algorithm deduces an association of the type parameter to the
 corresponding part of the argument type. If it is not the first time
 that the type parameter has been encountered, the algorithm looks up
 its deduced type and makes sure that it is equal to the corresponding
 part of the argument type.  The return type of the application is the
-return type of the generic function, but with the type parameters
+return type of the generic function with the type parameters
 replaced by the deduced type arguments, using the
 \code{substitute\_type} auxiliary function, which is also listed in
 figure~\ref{fig:type-check-Lpoly-aux}.
@@ -21278,15 +21273,16 @@ is equivalent to
 %
 Two generic types should be considered equal if they differ only in
 the choice of the names of the type parameters. The definition of type
-equality in figure~\ref{fig:type-check-Lpoly-aux} renames the type
+equality shown in figure~\ref{fig:type-check-Lpoly-aux} renames the type
 parameters in one type to match the type parameters of the other type.
 
 \if\edition\racketEd
 %
 The type checker also ensures that only defined type variables appear
-in type annotations. The \code{check\_well\_formed} function defined
-in figure~\ref{fig:well-formed-types} recursively inspects a type,
-making sure that each type variable has been defined.
+in type annotations. The \code{check\_well\_formed} function for which
+the definition is shown in figure~\ref{fig:well-formed-types}
+recursively inspects a type, making sure that each type variable has
+been defined.
 %
 \fi
 
@@ -21579,47 +21575,47 @@ def check_type_equal(self, t1, t2, e):
 \section{Compiling Generics}
 \label{sec:compiling-poly}
 
-Broadly speaking, there are four approaches to compiling generics,
-which we describe below.
+Broadly speaking, there are four approaches to compiling generics, as
+follows:
 
 \begin{description}
 \item[Monomorphization] generates a different version of a generic
-  function for each set of type arguments that it is used with,
+  function for each set of type arguments with which it is used,
   producing type-specialized code. This approach results in the most
   efficient code but requires whole-program compilation (no separate
   compilation) and may increase code size.  Unfortunately,
-  monomorphization is incompatible with first-class generics
-  because it is not always possible to determine which generic
-  functions are used with which type arguments during compilation. (It
-  can be done at runtime, with just-in-time compilation.)
-  Monomorphization is used to compile C++
-  templates~\citep{stroustrup88:_param_types} and generic functions in
-  NESL~\citep{Blelloch:1993aa} and ML~\citep{Weeks:2006aa}.
+  monomorphization is incompatible with first-class generics, because
+  it is not always possible to determine which generic functions are
+  used with which type arguments during compilation. (It can be done
+  at runtime, with just-in-time compilation.)  Monomorphization is
+  used to compile C++ templates~\citep{stroustrup88:_param_types} and
+  generic functions in NESL~\citep{Blelloch:1993aa} and
+  ML~\citep{Weeks:2006aa}.
   
 \item[Uniform representation] generates one version of each generic
-  function and requires all values to have a common ``boxed'' format,
+  function and requires all values to have a common \emph{boxed} format,
   such as the tagged values of type \CANYTY{} in \LangAny{}. Both
   generic and monomorphic code is compiled similarly to code in a
   dynamically typed language (like \LangDyn{}), in which primitive
   operators require their arguments to be projected from \CANYTY{} and
-  their results are injected into \CANYTY{}.  (In object-oriented
+  their results to be injected into \CANYTY{}.  (In object-oriented
   languages, the projection is accomplished via virtual method
   dispatch.) The uniform representation approach is compatible with
   separate compilation and with first-class generics.  However, it
-  produces the least-efficient code because it introduces overhead in
+  produces the least efficient code because it introduces overhead in
   the entire program. This approach is used in
   Java~\citep{Bracha:1998fk},
-  CLU~\cite{liskov79:_clu_ref,Liskov:1993dk}, and some implementations
+  CLU~\citep{liskov79:_clu_ref,Liskov:1993dk}, and some implementations
   of ML~\citep{Cardelli:1984aa,Appel:1987aa}.
   
 \item[Mixed representation] generates one version of each generic
   function, using a boxed representation for type variables. However,
-  monomorphic code is compiled as usual (as in \LangLam{}) and
+  monomorphic code is compiled as usual (as in \LangLam{}), and
   conversions are performed at the boundaries between monomorphic code
-  and polymorphic code (e.g. when a generic function is instantiated
+  and polymorphic code (e.g., when a generic function is instantiated
   and called). This approach is compatible with separate compilation
   and first-class generics and maintains efficiency in monomorphic
-  code. The trade off is increased overhead at the boundary between
+  code. The trade-off is increased overhead at the boundary between
   monomorphic and generic code.  This approach is used in
   implementations of ML~\citep{Leroy:1992qb} and Java, starting in
   Java 5 with the addition of autoboxing.
@@ -21628,7 +21624,7 @@ which we describe below.
   monomorphic and generic code. Each generic function is compiled to a
   single function with extra parameters that describe the type
   arguments. The type information is used by the generated code to
-  know how to access the unboxed values at runtime. This approach is
+  determine how to access the unboxed values at runtime. This approach is
   used in implementation of Napier88~\citep{Morrison:1991aa} and
   ML~\citep{Harper:1995um}.  Type passing is compatible with separate
   compilation and first-class generics and maintains the
@@ -21637,7 +21633,7 @@ which we describe below.
 \end{description}
 
 In this chapter we use the mixed representation approach, partly
-because of its favorable attributes, and partly because it is
+because of its favorable attributes and partly because it is
 straightforward to implement using the tools that we have already
 built to support gradual typing. The work of compiling generic
 functions is performed in two passes, \code{resolve} and
@@ -21660,8 +21656,8 @@ function, to produce a monomorphic function. However, because the
 interpreter never analyzes type annotations, instantiation can be a
 no-op and simply return the generic function.
 %
-The output language of the \code{resolve} pass is \LangInst{}, defined
-in figure~\ref{fig:Lpoly-prime-syntax}.
+The output language of the \code{resolve} pass is \LangInst{},
+for which the definition is shown in figure~\ref{fig:Lpoly-prime-syntax}.
 
 \if\edition\racketEd    
 The \code{resolve} pass combines the type declaration and polymorphic
@@ -21771,11 +21767,11 @@ print(t[1])
 \section{Erase Types}
 \label{sec:erase_types}
 
-We use the \CANYTY{} type from chapter~\ref{ch:Ldyn} to
+We use the \CANYTY{} type presented in chapter~\ref{ch:Ldyn} to
 represent type variables. For example, figure~\ref{fig:map-erase}
-shows the output of the \code{erase\_types} pass on the polymorphic
+shows the output of the \code{erase\_types} pass on the generic
 \code{map} (figure~\ref{fig:map-poly}). The occurrences of
-type parameter \code{a} are replaced by \CANYTY{} and the polymorphic
+type parameter \code{a} are replaced by \CANYTY{}, and the generic
 \code{All} types are removed from the type of \code{map}. 
 
 \begin{figure}[tbp]
@@ -21822,7 +21818,7 @@ $T_2 = $ \code{Callable[[Callable[[int], int],tuple[int,int]], tuple[int,int]]}
 
 This process of type erasure creates a challenge at points of
 instantiation. For example, consider the instantiation of
-\code{map} in figure~\ref{fig:map-resolve}.
+\code{map} shown in figure~\ref{fig:map-resolve}.
 The type of \code{map} is
 %
 \if\edition\racketEd    
@@ -21864,15 +21860,15 @@ Callable[[Callable[[Any], Any], tuple[Any, Any]], tuple[Any, Any]]
 \fi
 %
 but we need to convert it to the instantiated type.  This is easy to
-do in the language \LangCast{} with a single \code{cast}.  In
-figure~\ref{fig:map-erase}, the instantiation of \code{map} has been
-compiled to a \code{cast} from the type of \code{map} to the
-instantiated type. The source and target type of a cast must be
-consistent (figure~\ref{fig:consistent}), which indeed is the case
-because both the source and target are obtained from the same generic
-type of \code{map}, replacing the type parameters with \CANYTY{} in
-the former and with the deduced type arguments in the later. (Recall
-that the \CANYTY{} type is consistent with any type.)
+do in the language \LangCast{} with a single \code{cast}.  In the
+example shown in figure~\ref{fig:map-erase}, the instantiation of
+\code{map} has been compiled to a \code{cast} from the type of
+\code{map} to the instantiated type. The source and the target type of a
+cast must be consistent (figure~\ref{fig:consistent}), which indeed is
+the case because both the source and target are obtained from the same
+generic type of \code{map}, replacing the type parameters with
+\CANYTY{} in the former and with the deduced type arguments in the
+latter. (Recall that the \CANYTY{} type is consistent with any type.)
 
 To implement the \code{erase\_types} pass, we first recommend defining
 a recursive function that translates types, named
@@ -21913,12 +21909,12 @@ AllType(|$xs$|, |$T_1$|)
 \fi
 where $T'_1$ is the result of applying \code{erase\_type} to $T_1$.
 %
-In this compiler pass, apply the \code{erase\_type} function to all of
+In this compiler pass, apply the \code{erase\_type} function to all 
 the type annotations in the program.
 
 Regarding the translation of expressions, the case for \code{Inst} is
 the interesting one. We translate it into a \code{Cast}, as shown
-below.
+next.
 The type of hte subexpression $e$ is a generic type of the form
 \racket{$\LP\key{All}~\itm{xs}~T\RP$}
 \python{$\key{AllType}\LP\itm{xs}, T\RP$}.  The source type of the
@@ -21936,7 +21932,7 @@ erasure.
 (Cast |$e'$| |$T_s$| |$T_t$|)
 \end{lstlisting}
 %
-where $T_t = \LP\code{erase\_type}~\LP\code{substitute\_type}~s~T\RP\RP$
+where $T_t = \LP\code{erase\_type}~\LP\code{substitute\_type}~s~T\RP\RP$,
 and $s = \LP\code{map}~\code{cons}~xs~ts\RP$.
 \fi
 \if\edition\pythonEd
@@ -21965,81 +21961,78 @@ annotations and the body.
 
 \begin{exercise}\normalfont\normalsize
   Implement a compiler for the polymorphic language \LangPoly{} by
-  extending and adapting your compiler for \LangGrad{}. Create 6 new test
-  programs that use polymorphic functions. Some of them should make
-  use of first-class generics. 
+  extending and adapting your compiler for \LangGrad{}. Create six new
+  test programs that use polymorphic functions. Some of them should
+  make use of first-class generics.
 \end{exercise}
 
 \begin{figure}[p]
 \begin{tcolorbox}[colback=white]  
 \if\edition\racketEd    
 \begin{tikzpicture}[baseline=(current  bounding  box.center),scale=0.85]
-\node (Lpoly) at (12,4)  {\large \LangPoly{}};
-\node (Lpolyp) at (9,4)  {\large \LangInst{}};
-\node (Lgradualp) at (6,4)  {\large \LangCast{}};
-\node (Llambdapp) at (3,4)  {\large \LangProxy{}};
-\node (Llambdaproxy) at (0,4)  {\large \LangPVec{}};
-\node (Llambdaproxy-2) at (0,2)  {\large \LangPVec{}};
-\node (Llambdaproxy-3) at (3,2)  {\large \LangPVec{}};
-\node (Llambdaproxy-4) at (6,2)  {\large \LangPVecFunRef{}};
-\node (Llambdaproxy-5) at (9,2)  {\large \LangPVecFunRef{}};
-\node (F1-1) at (12,2)  {\large \LangPVecFunRef{}};
-\node (F1-2) at (12,0)  {\large \LangPVecFunRef{}};
-\node (F1-3) at (9,0)  {\large \LangPVecFunRef{}};
-\node (F1-4) at (6,0)  {\large \LangPVecAlloc{}};
-\node (F1-5) at (3,0)  {\large \LangPVecAlloc{}};
-\node (F1-6) at (0,0)  {\large \LangPVecAlloc{}};
-\node (C3-2) at (3,-2)  {\large \LangCLoopPVec{}};
+\node (Lpolyp) at (0,4)  {\large \LangInst{}};
+\node (Lgradualp) at (4,4)  {\large \LangCast{}};
+\node (Llambdapp) at (8,4)  {\large \LangProxy{}};
+\node (Llambdaproxy) at (12,4)  {\large \LangPVec{}};
+\node (Llambdaproxy-2) at (12,2)  {\large \LangPVec{}};
+\node (Llambdaproxy-3) at (8,2)  {\large \LangPVec{}};
+\node (Llambdaproxy-4) at (4,2)  {\large \LangPVecFunRef{}};
+\node (Llambdaproxy-5) at (0,2)  {\large \LangPVecFunRef{}};
+\node (F1-1) at (0,0)  {\large \LangPVecFunRef{}};
+\node (F1-2) at (4,0)  {\large \LangPVecFunRef{}};
+\node (F1-3) at (8,0)  {\large \LangPVecFunRef{}};
+\node (F1-4) at (12,0)  {\large \LangPVecAlloc{}};
+\node (F1-5) at (12,-2)  {\large \LangPVecAlloc{}};
+\node (F1-6) at (8,-2)  {\large \LangPVecAlloc{}};
+\node (C3-2) at (4,-2)  {\large \LangCLoopPVec{}};
 
-\node (x86-2) at (3,-4)  {\large \LangXIndCallVar{}};
-\node (x86-2-1) at (3,-6)  {\large \LangXIndCallVar{}};
-\node (x86-2-2) at (6,-6)  {\large \LangXIndCallVar{}};
-\node (x86-3) at (6,-4)  {\large \LangXIndCallVar{}};
-\node (x86-4) at (9,-4) {\large \LangXIndCall{}};
-\node (x86-5) at (9,-6) {\large \LangXIndCall{}};
+\node (x86-2) at (0,-4)  {\large \LangXIndCallVar{}};
+\node (x86-2-1) at (0,-6)  {\large \LangXIndCallVar{}};
+\node (x86-2-2) at (4,-6)  {\large \LangXIndCallVar{}};
+\node (x86-3) at (4,-4)  {\large \LangXIndCallVar{}};
+\node (x86-4) at (8,-4) {\large \LangXIndCall{}};
+\node (x86-5) at (8,-6) {\large \LangXIndCall{}};
 
 
-\path[->,bend right=15] (Lpoly) edge [above] node
-     {\ttfamily\footnotesize type\_check} (Lpolyp);
-\path[->,bend right=15] (Lpolyp) edge [above] node
+\path[->,bend left=15] (Lpolyp) edge [above] node
      {\ttfamily\footnotesize erase\_types} (Lgradualp);
-\path[->,bend right=15] (Lgradualp) edge [above] node
+\path[->,bend left=15] (Lgradualp) edge [above] node
      {\ttfamily\footnotesize lower\_casts} (Llambdapp);
-\path[->,bend right=15] (Llambdapp) edge [above] node
+\path[->,bend left=15] (Llambdapp) edge [above] node
      {\ttfamily\footnotesize differentiate\_proxies} (Llambdaproxy);
-\path[->,bend right=15] (Llambdaproxy) edge [right] node
+\path[->,bend left=15] (Llambdaproxy) edge [left] node
      {\ttfamily\footnotesize shrink} (Llambdaproxy-2);
 \path[->,bend left=15] (Llambdaproxy-2) edge [above] node
      {\ttfamily\footnotesize uniquify} (Llambdaproxy-3);
-\path[->,bend left=15] (Llambdaproxy-3) edge [above] node
+\path[->,bend right=15] (Llambdaproxy-3) edge [above] node
      {\ttfamily\footnotesize reveal\_functions} (Llambdaproxy-4);
-\path[->,bend left=15] (Llambdaproxy-4) edge [above] node
+\path[->,bend right=15] (Llambdaproxy-4) edge [above] node
      {\ttfamily\footnotesize reveal\_casts} (Llambdaproxy-5);
-\path[->,bend left=15] (Llambdaproxy-5) edge [above] node
+\path[->,bend right=15] (Llambdaproxy-5) edge [right] node
      {\ttfamily\footnotesize convert\_assignments} (F1-1);
-\path[->,bend left=15] (F1-1) edge [left] node
-     {\ttfamily\footnotesize convert\_to\_clos.} (F1-2);
-\path[->,bend left=15] (F1-2) edge [below] node
-     {\ttfamily\footnotesize limit\_fun.} (F1-3);
-\path[->,bend right=15] (F1-3) edge [above] node
-     {\ttfamily\footnotesize expose\_alloc.} (F1-4);
-\path[->,bend right=15] (F1-4) edge [above] node
+\path[->,bend right=15] (F1-1) edge [below] node
+     {\ttfamily\footnotesize convert\_to\_closures} (F1-2);
+\path[->,bend left=15] (F1-2) edge [above] node
+     {\ttfamily\footnotesize limit\_functions} (F1-3);
+\path[->,bend left=15] (F1-3) edge [above] node
+     {\ttfamily\footnotesize expose\_allocation} (F1-4);
+\path[->,bend left=15] (F1-4) edge [left] node
      {\ttfamily\footnotesize uncover\_get!} (F1-5);
-\path[->,bend right=15] (F1-5) edge [above] node
-     {\ttfamily\footnotesize remove\_complex.} (F1-6);
-\path[->,bend right=15] (F1-6) edge [right] node
+\path[->,bend left=15] (F1-5) edge [below] node
+     {\ttfamily\footnotesize remove\_complex\_operands} (F1-6);
+\path[->,bend right=15] (F1-6) edge [above] node
      {\ttfamily\footnotesize explicate\_control} (C3-2);
-\path[->,bend left=15] (C3-2) edge [left] node
-     {\ttfamily\footnotesize select\_instr.} (x86-2);
-\path[->,bend right=15] (x86-2) edge [left] node
+\path[->,bend right=15] (C3-2) edge [right] node
+     {\ttfamily\footnotesize select\_instructions} (x86-2);
+\path[->,bend right=15] (x86-2) edge [right] node
      {\ttfamily\footnotesize uncover\_live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node 
-     {\ttfamily\footnotesize build\_inter.} (x86-2-2);
-\path[->,bend right=15] (x86-2-2) edge [left] node
-     {\ttfamily\footnotesize allocate\_reg.} (x86-3);
+     {\ttfamily\footnotesize build\_interference} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [right] node
+     {\ttfamily\footnotesize allocate\_registers} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node
-     {\ttfamily\footnotesize patch\_instr.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize prelude\_and\_conc.} (x86-5);
+     {\ttfamily\footnotesize patch\_instructions} (x86-4);
+\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize prelude\_and\_conclusion} (x86-5);
 \end{tikzpicture}
 \fi
 \if\edition\pythonEd
