@@ -46,7 +46,7 @@
 \lstset{%
 language=Lisp,
 basicstyle=\ttfamily\small,
-morekeywords={seq,assign,program,block,define,lambda,match,goto,if,else,then,struct,Integer,Boolean,Vector,Void,Any,while,begin,define,public,override,class},
+morekeywords={lambda,match,goto,if,else,then,struct,Integer,Boolean,Vector,Void,Any,while,begin,define,public,override,class},
 deletekeywords={read,mapping,vector},
 escapechar=|,
 columns=flexible,
@@ -18882,7 +18882,7 @@ completion without error.
      {\ttfamily\footnotesize convert\_to\_closures} (F1-2);
 \path[->,bend right=15] (F1-2) edge [right] node
      {\ttfamily\footnotesize limit\_functions} (F1-3);
-\path[->,bend right=15] (F1-3) edge [below] node
+\path[->,bend right=15] (F1-3) edge [left] node
      {\ttfamily\footnotesize expose\_allocation} (F1-4);
 \path[->,bend right=15] (F1-4) edge [below] node
      {\ttfamily\footnotesize uncover\_get!} (F1-5);
@@ -18933,26 +18933,26 @@ for the compilation of \LangDyn{}.
 \index{subject}{gradual typing}
 \setcounter{footnote}{0}
 
-This chapter studies a language, \LangGrad{}, in which the programmer
+This chapter studies the language \LangGrad{}, in which the programmer
 can choose between static and dynamic type checking in different parts
 of a program, thereby mixing the statically typed \LangLam{} language
 with the dynamically typed \LangDyn{}. There are several approaches to
-mixing static and dynamic typing, including multi-language
+mixing static and dynamic typing, including multilanguage
 integration~\citep{Tobin-Hochstadt:2006fk,Matthews:2007zr} and hybrid
 type checking~\citep{Flanagan:2006mn,Gronski:2006uq}. In this chapter
 we focus on \emph{gradual typing}\index{subject}{gradual typing}, in which the
 programmer controls the amount of static versus dynamic checking by
 adding or removing type annotations on parameters and
 variables~\citep{Anderson:2002kd,Siek:2006bh}.
-%
-The concrete syntax of \LangGrad{} is defined in
-figure~\ref{fig:Lgrad-concrete-syntax} and its abstract syntax is
-defined in figure~\ref{fig:Lgrad-syntax}. The main syntactic
-difference between \LangLam{} and \LangGrad{} is that type annotations
-are optional, which is specified in the grammar using the \Param{} and
-\itm{ret} nonterminals. In the abstract syntax, type annotations are
-not optional but we use the \CANYTY{} type when a type annotation is
-absent.
+
+The definition of the concrete syntax of \LangGrad{} is shown in
+figure~\ref{fig:Lgrad-concrete-syntax} and the definnintion of its
+abstract syntax is shown in figure~\ref{fig:Lgrad-syntax}. The main
+syntactic difference between \LangLam{} and \LangGrad{} is that type
+annotations are optional, which is specified in the grammar using the
+\Param{} and \itm{ret} nonterminals. In the abstract syntax, type
+annotations are not optional, but we use the \CANYTY{} type when a type
+annotation is absent.
 
 \newcommand{\LgradGrammarRacket}{
 \begin{array}{lcl}
@@ -19099,7 +19099,7 @@ next two sections.
 \section{Type Checking \LangGrad{}}
 \label{sec:gradual-type-check}
 
-We begin by discussing the type checking of a partially-typed variant
+We begin by discussing the type checking of a partially typed variant
 of the \code{map} example from chapter~\ref{ch:Lfun}, shown in
 figure~\ref{fig:gradual-map}.  The \code{map} function itself is
 statically typed, so there is nothing special happening there with
@@ -19107,21 +19107,21 @@ respect to type checking. On the other hand, the \code{inc} function
 does not have type annotations, so parameter \code{x} is given the
 type \CANYTY{} and the return type of \code{inc} is \CANYTY{}.  Now
 consider the \code{+} operator inside \code{inc}. It expects both
-arguments to have type \INTTY{}, but its first argument \code{x}
-has type \CANYTY{}.  In a gradually typed language, such differences
-are allowed so long as the types are \emph{consistent}, that is, they
-are equal except in places where there is an \CANYTY{} type. That is,
-the type \CANYTY{} is consistent with every other type.
-Figure~\ref{fig:consistent} defines the
+arguments to have type \INTTY{}, but its first argument \code{x} has
+type \CANYTY{}.  In a gradually typed language, such differences are
+allowed so long as the types are \emph{consistent}; that is, they are
+equal except in places where there is an \CANYTY{} type. That is, the
+type \CANYTY{} is consistent with every other type.
+Figure~\ref{fig:consistent} shows the definitionn of the
 \racket{\code{consistent?}}\python{\code{consistent}} method.
 %
 So the type checker allows the \code{+} operator to be applied
 to \code{x} because \CANYTY{} is consistent with \INTTY{}.
 %
-Next consider the call to the \code{map} function in
+Next consider the call to the \code{map} function shown in
 figure~\ref{fig:gradual-map} with the arguments \code{inc} and a
 tuple. The \code{inc} function has type
-\racket{\code{(Any -> Any)}}\python{\code{Callable[[Any],Any]}}
+\racket{\code{(Any -> Any)}}\python{\code{Callable[[Any],Any]}},
 but parameter \code{f} of \code{map} has type
 \racket{\code{(Integer -> Integer)}}\python{\code{Callable[[int],int]}}.
 The type checker for \LangGrad{} accepts this call because the two types are
@@ -19156,7 +19156,7 @@ print(t[1])
   \fi}
   \end{tcolorbox}
 
-  \caption{A partially-typed version of the \code{map} example.}
+  \caption{A partially typed version of the \code{map} example.}
 \label{fig:gradual-map}
 \end{figure}
 
@@ -19207,14 +19207,14 @@ error, such as applying \code{map} to a function that sometimes
 returns a Boolean, as shown in figure~\ref{fig:map-maybe_inc}.  The
 type checker for \LangGrad{} accepts this program because the type of
 \code{maybe\_inc} is consistent with the type of parameter \code{f} of
-\code{map}, that is,
+\code{map}; that is,
 \racket{\code{(Any -> Any)}}\python{\code{Callable[[Any],Any]}}
 is consistent with
 \racket{\code{(Integer -> Integer)}}\python{\code{Callable[[int],int]}}.
 One might say that a gradual type checker is optimistic in that it
 accepts programs that might execute without a runtime type error.
 %
-The type checker for \LangGrad{} is defined in
+The definition of the type checker for \LangGrad{} is shown in
 figures~\ref{fig:type-check-Lgradual-1}, \ref{fig:type-check-Lgradual-2},
 and \ref{fig:type-check-Lgradual-3}.
 
@@ -19285,13 +19285,13 @@ Here we give a preview of how the runtime checking is accomplished;
 the following sections provide the details.
 
 The runtime checking is carried out by a new \code{Cast} AST node that
-is generate in a new pass named \code{cast\_insert}.  The output of
+is generated in a new pass named \code{cast\_insert}.  The output of
 \code{cast\_insert} is a program in the \LangCast{} language, which
 simply adds \code{Cast} and \CANYTY{} to \LangLam{}.
 %
 Figure~\ref{fig:map-cast} shows the output of \code{cast\_insert} for
 \code{map} and \code{maybe\_inc}.  The idea is that \code{Cast} is
-inserted every time the type checker sees two types that are
+inserted every time the type checker encounters two types that are
 consistent but not equal. In the \code{inc} function, \code{x} is
 cast to \INTTY{} and the result of the \code{+} is cast to
 \CANYTY{}.  In the call to \code{map}, the \code{inc} argument
@@ -19735,21 +19735,21 @@ cast from \INTTY{} to \CANYTY{} can be accomplished with the
 \code{Inject} operator of \LangAny{}, which puts the integer into a
 tagged value (figure~\ref{fig:interp-Lany}). Similarly, a cast from
 \CANYTY{} to \INTTY{} is accomplished with the \code{Project}
-operator, that is, by checking the value's tag and either retrieving
+operator, by checking the value's tag and either retrieving
 the underlying integer or signalling an error if the tag is not the
 one for integers (figure~\ref{fig:interp-Lany-aux}).
 %
-Things get more interesting for casts involving function, tuple, or array
-types.
+Things get more interesting with casts involving function, tuple, or
+array types.
 
 Consider the cast of the function \code{maybe\_inc} from
 \racket{\code{(Any -> Any)}}\python{\code{Callable[[Any], Any]}}
 to
 \racket{\code{(Integer -> Integer)}}\python{\code{Callable[[int], int]}}
-in figure~\ref{fig:map-maybe_inc}.
+shown in figure~\ref{fig:map-maybe_inc}.
 When the \code{maybe\_inc} function flows through
 this cast at runtime, we don't know whether it will return
-an integer, as that depends on the input from the user.
+an integer, because that depends on the input from the user.
 The \LangCast{} interpreter therefore delays the checking
 of the cast until the function is applied. To do so it
 wraps \code{maybe\_inc} in a new function that casts its parameter
@@ -19765,20 +19765,18 @@ the challenge assignment of section~\ref{sec:arrays}.
 %
 \fi}
 %
-Consider the example in figure~\ref{fig:map-bang} that
-defines a partially-typed version of \code{map} whose parameter
+Consider the example presented in figure~\ref{fig:map-bang} that
+defines a partially typed version of \code{map} whose parameter
 \code{v} has type
 \racket{\code{(Vector Any Any)}}\python{\code{list[Any]}}
 and that updates \code{v} in place
-instead of returning a new tuple. So we name this function
+instead of returning a new tuple. So, we name this function
 \code{map\_inplace}. We apply \code{map\_inplace} to an
 \racket{tuple}\python{array} of integers, so the type checker inserts a
 cast from
-\racket{\code{(Vector Integer Integer)}}
-\python{\code{list[int]}}
+\racket{\code{(Vector Integer Integer)}}\python{\code{list[int]}}
 to
-\racket{\code{(Vector Any Any)}}
-\python{\code{list[Any]}}.
+\racket{\code{(Vector Any Any)}}\python{\code{list[Any]}}.
 A naive way for the \LangCast{} interpreter to cast between
 \racket{tuple}\python{array} types would be a build a new
 \racket{tuple}\python{array}
@@ -19787,7 +19785,7 @@ of casting each of the original elements to the appropriate target
 type.
 However, this approach is not valid for mutable data structures.
 In the example of figure~\ref{fig:map-bang},
-if the cast created a new \racket{tuple}\python{array}, then the updates inside of
+if the cast created a new \racket{tuple}\python{array}, then the updates inside
 \code{map\_inplace} would happen to the new \racket{tuple}\python{array} and not
 the original one.
 
@@ -19849,18 +19847,18 @@ from \CANYTY{} to \INTTY{}.
   the proxy casts the tagged value from \CANYTY{} to \INTTY{}.
 }
 
-The final category of cast that we need to consider are casts between
-the \CANYTY{} type and higher-order types such as functions or
+The final category of cast that we need to consider consist of casts between
+the \CANYTY{} type and higher-order types such as functions and
 \racket{tuples}\python{lists}. Figure~\ref{fig:map-any} shows a
 variant of \code{map\_inplace} in which parameter \code{v} does not
 have a type annotation, so it is given type \CANYTY{}. In the call to
 \code{map\_inplace}, the \racket{tuple}\python{list} has type
-\racket{\code{(Vector Integer Integer)}}\python{\code{list[int]}}
+\racket{\code{(Vector Integer Integer)}}\python{\code{list[int]}},
 so the type checker inserts a cast to \CANYTY{}. A first thought is to use
 \code{Inject}, but that doesn't work because
 \racket{\code{(Vector Integer Integer)}}\python{\code{list[int]}} is not
 a flat type. Instead, we must first cast to
-\racket{\code{(Vector Any Any)}}\python{\code{list[Any]}} (which is flat)
+\racket{\code{(Vector Any Any)}}\python{\code{list[Any]}}, which is flat,
 and then inject to \CANYTY{}.
 
 \begin{figure}[tbp]
@@ -20016,14 +20014,14 @@ print( v[1] )
 The \LangCast{} interpreter uses an auxiliary function named
 \code{apply\_cast} to cast a value from a source type to a target type,
 shown in figure~\ref{fig:apply_cast}. You'll find that it handles all
-of the kinds of casts that we've discussed in this section.
+the kinds of casts that we've discussed in this section.
 %
-The interpreter for \LangCast{} is defined in
+The definition of the interpreter for \LangCast{} is shown in
 figure~\ref{fig:interp-Lcast}, with the case for \code{Cast}
 dispatching to \code{apply\_cast}.
 \racket{To handle the addition of tuple
 proxies, we update the tuple primitives in \code{interp-op} using the
-functions in figure~\ref{fig:guarded-tuple}.}
+functions given in figure~\ref{fig:guarded-tuple}.}
 Next we turn to the individual passes needed for compiling \LangGrad{}.
 
 
@@ -20196,21 +20194,21 @@ to type \CANYTY{} (if they are not already of that type).
 \section{Lower Casts}
 \label{sec:lower_casts}
 
-The next step in the journey towards x86 is the \code{lower\_casts}
+The next step in the journey toward x86 is the \code{lower\_casts}
 pass that translates the casts in \LangCast{} to the lower-level
 \code{Inject} and \code{Project} operators and new operators for
 proxies, extending the \LangLam{} language to \LangProxy{}.
 The \LangProxy{} language can also be described as an extension of
 \LangAny{}, with the addition of proxies. We recommend creating an
 auxiliary function named \code{lower\_cast} that takes an expression
-(in \LangCast{}), a source type, and a target type, and translates it
-to expression in \LangProxy{}.
+(in \LangCast{}), a source type, and a target type and translates it
+to an expression in \LangProxy{}.
 
 The \code{lower\_cast} function can follow a code structure similar to
 the \code{apply\_cast} function (figure~\ref{fig:apply_cast}) used in
-the interpreter for \LangCast{} because it must handle the same cases
+the interpreter for \LangCast{}, because it must handle the same cases
 as \code{apply\_cast} and it needs to mimic the behavior of
-\code{apply\_cast}. The most interesting cases are those concerning
+\code{apply\_cast}. The most interesting cases concern
 the casts involving tuple, array, and function types.
 
 As mentioned in section~\ref{sec:interp-casts}, a cast from one array
@@ -20218,7 +20216,7 @@ type to another array type is accomplished by creating a proxy that
 intercepts the operations on the underlying array. Here we make the
 creation of the proxy explicit with the
 \racket{\code{vectorof-proxy}}\python{\code{ListProxy}} AST node. It
-takes fives arguments, the first is an expression for the array, the
+takes fives arguments: the first is an expression for the array, the
 second is a function for casting an element that is being read from
 the array, the third is a function for casting an element that is
 being written to the array, the fourth is the type of the underlying
@@ -20234,15 +20232,15 @@ Because there is a separate element type for each slot in the tuple,
 we need not just one function for casting during a read, but instead a tuple
 of functions.
 %
-Also, as we shall see in the next section, we need to differentiate
+Also, as we show in the next section, we need to differentiate
 these tuples from the user-created ones, so we recommend using a new
 AST node named \racket{\code{raw-vector}}\python{\code{RawTuple}}
 instead of \racket{\code{vector}}\python{\code{Tuple}} to create the
 tuples of functions.
 %
 Figure~\ref{fig:map-bang-lower-cast} shows the output of
-\code{lower\_casts} on the example in figure~\ref{fig:map-bang} that
-involved casting an array of integers to an array of \CANYTY{}.
+\code{lower\_casts} on the example given in figure~\ref{fig:map-bang}
+that involved casting an array of integers to an array of \CANYTY{}.
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]  
@@ -20290,7 +20288,7 @@ def main() -> int:
 \fi}
 \end{tcolorbox}
 
-\caption{Output of \code{lower\_casts} on the example in
+\caption{Output of \code{lower\_casts} on the example shown in
   figure~\ref{fig:map-bang}.}
 \label{fig:map-bang-lower-cast}
 \end{figure}
@@ -20299,11 +20297,11 @@ A cast from one function type to another function type is accomplished
 by generating a \code{lambda} whose parameter and return types match
 the target function type. The body of the \code{lambda} should cast
 the parameters from the target type to the source type. (Yes,
-backwards! Functions are contravariant\index{subject}{contravariant}
-in the parameters.). Afterwards, call the underlying function and then
+backward! Functions are contravariant\index{subject}{contravariant}
+in the parameters.). Afterward, call the underlying function and then
 cast the result from the source return type to the target return type.
 Figure~\ref{fig:map-lower-cast} shows the output of the
-\code{lower\_casts} pass on the \code{map} example in
+\code{lower\_casts} pass on the \code{map} example give in
 figure~\ref{fig:gradual-map}. Note that the \code{inc} argument in the
 call to \code{map} is wrapped in a \code{lambda}.
 
@@ -20340,7 +20338,7 @@ def main() -> int:
 \fi}
 \end{tcolorbox}
 
-\caption{Output of \code{lower\_casts} on the example in
+\caption{Output of \code{lower\_casts} on the example shown in
   figure~\ref{fig:gradual-map}.}
 \label{fig:map-lower-cast}
 \end{figure}
@@ -20349,11 +20347,11 @@ def main() -> int:
 \section{Differentiate Proxies}
 \label{sec:differentiate-proxies}
 
-So far the responsibility of differentiating tuples and tuple proxies
+So far, the responsibility of differentiating tuples and tuple proxies
 has been the job of the interpreter.
 %
 \racket{For example, the interpreter for \LangCast{} implements
-  \code{vector-ref} using the \code{guarded-vector-ref} function in
+  \code{vector-ref} using the \code{guarded-vector-ref} function shown in
   figure~\ref{fig:guarded-tuple}.}
 %
 In the \code{differentiate\_proxies} pass we shift this responsibility
@@ -20378,10 +20376,10 @@ can be either arrays or array proxies.
 These new types come with a suite of new primitive operations.
 
 {\if\edition\racketEd    
-A tuple proxy is represented by a tuple containing three things: 1) the
-underlying tuple, 2) a tuple of functions for casting elements that
-are read from the tuple, and 3) a tuple of functions for casting
-values to be written to the tuple. So we define the following
+A tuple proxy is represented by a tuple containing three things: (1) the
+underlying tuple, (2) a tuple of functions for casting elements that
+are read from the tuple, and (3) a tuple of functions for casting
+values to be written to the tuple. So, we define the following
 abbreviation for the type of a tuple proxy:
 \[
 \itm{TupleProxy} (T\ldots \Rightarrow T'\ldots)
@@ -20541,7 +20539,9 @@ Tuple(|$e'_1, \ldots, e'_n$|)
 \end{lstlisting}
 \fi}
 
-The \racket{\code{vector-proxy}}\python{\code{TupleProxy}} AST translates as follows.
+The \racket{\code{vector-proxy}}\python{\code{TupleProxy}} AST
+translates as follows:
+%
 {\if\edition\racketEd    
 \begin{lstlisting}
 (vector-proxy |$e_1~e_2~e_3$|)
@@ -20589,7 +20589,7 @@ Recall that the \code{reveal\_casts} pass
 %
 In particular, \code{Project} turns into a conditional expression that
 inspects the tag and retrieves the underlying value.  Here we need to
-augment the translation of \code{Project} to handle the situation when
+augment the translation of \code{Project} to handle the situation in which
 the target type is \code{PVector}.  Instead of using
 \code{vector-length} we need to use \code{proxy-vector-length}.
 \begin{lstlisting}
@@ -20620,18 +20620,19 @@ Otherwise, the only other changes are adding cases that copy the new AST nodes.
 The auxiliary function that translates type annotations needs to be
 updated to handle the \PTUPLETYNAME{} and \PARRAYTYNAME{} types.
 %
-Otherwise, the only other changes are adding cases that copy the new AST nodes.
+Otherwise, the only other changes are adding cases that copy the new
+AST nodes.
 
 \section{Select Instructions}
 \label{sec:select-instructions-gradual}
 
 Recall that the \code{select\_instructions} pass is responsible for
-lowering the primitive operations into x86 instructions.  So we need
+lowering the primitive operations into x86 instructions.  So, we need
 to translate the new operations on \PTUPLETYNAME{} and \PARRAYTYNAME{}
 to x86.  To do so, the first question we need to answer is how to
 differentiate between tuple and tuples proxies, and likewise for
-arrays and array proxies.  We need just one bit to accomplish this,
-and use the bit in position $63$ of the 64-bit tag at the front of
+arrays and array proxies.  We need just one bit to accomplish this;
+we use the bit in position $63$ of the 64-bit tag at the front of
 every tuple (see figure~\ref{fig:tuple-rep}) or array
 (section~\ref{sec:array-rep}). So far, this bit has been set to $0$,
 so for \racket{\code{inject-vector}}\python{\code{InjectTuple}} we leave
@@ -20681,11 +20682,12 @@ movq %r11, |$\itm{lhs'}$|
   of the tag and also bit $62$, to differentiate between arrays and tuples.}
 
 The \racket{\code{proxy?} operation consumes}
-\python{\code{is\_tuple\_proxy} and \code{is\_array\_proxy} operations consume}
-the information so carefully
-stashed away by the injections.  It
-isolates the $63$rd bit to tell whether the value is a tuple/array or
-a proxy.
+\python{\code{is\_tuple\_proxy} and \code{is\_array\_proxy} operations
+  consume}
+%
+the information so carefully stashed away by the injections.  It
+isolates bit $63$ to tell whether the value is a tuple/array or a
+proxy.
 %
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -20717,7 +20719,7 @@ straightforward to translate, so we leave that to the reader.
 
 Regarding the element access operations for tuples and arrays, the
 runtime provides procedures that implement them (they are recursive
-functions!)  so here we simply need to translate these tuple
+functions!), so here we simply need to translate these tuple
 operations into the appropriate function call. For example, here is
 the translation for
 \racket{\code{proxy-vector-ref}}\python{\code{proxy\_tuple\_load}}.
@@ -20749,7 +20751,7 @@ to \code{proxy\_vecof\_set}, and
 \racket{\code{proxy-vectof-length}}\python{\code{proxy\_array\_len}}
 to \code{proxy\_vecof\_length}.
 
-We have another batch of operations to deal with, those for the
+We have another batch of operations to deal with: those for the
 \CANYTY{} type. Recall that overload resolution
 (section~\ref{sec:gradual-resolution}) generates an
 \racket{\code{any-vector-ref}}\python{\code{any\_load\_unsafe}} when
@@ -20758,7 +20760,7 @@ similarly for
 \racket{\code{any-vector-set!}}\python{\code{any\_store\_unsafe}} and
 \racket{\code{any-vector-length}}\python{\code{any\_len}}. In
 section~\ref{sec:select-Lany} we selected instructions for these
-operations based on the idea that the underlying value was a tuple or
+operations on the basis of the idea that the underlying value was a tuple or
 array. But in the current setting, the underlying value is of type
 \PTUPLETYNAME{} or \PARRAYTYNAME{}.  We have added two runtime
 functions to deal with this: \code{proxy\_vec\_ref},
@@ -20770,7 +20772,7 @@ tuples (e.g. \code{proxy\_vector\_ref}) or arrays
 (e.g. \code{proxy\_vecof\_ref}).
 %
 So \racket{\code{any-vector-ref}}\python{\code{any\_load\_unsafe}}
-can be translated follows.
+can be translated as follows.
 We begin by projecting the underlying value out of the tagged value and
 then call the \code{proxy\_vec\_ref} procedure in the runtime.
 {\if\edition\racketEd
@@ -20803,18 +20805,18 @@ the \code{proxy\_vec\_ref}, \code{proxy\_vec\_set},
 and \code{proxy\_vec\_length} functions.
 
 \begin{exercise}\normalfont\normalsize
-  Implement a compiler for the gradually-typed \LangGrad{} language by
-  extending and adapting your compiler for \LangLam{}. Create 10 new
-  partially-typed test programs. In addition to testing with these
-  new programs, also test your compiler on all the tests for \LangLam{}
+  Implement a compiler for the gradually typed \LangGrad{} language by
+  extending and adapting your compiler for \LangLam{}. Create ten new
+  partially typed test programs. In addition to testing with these
+  new programs, test your compiler on all the tests for \LangLam{}
   and for \LangDyn{}.
 %
   \racket{Sometimes you may get a type checking error on the
-    \LangDyn{} programs but you can adapt them by inserting a cast to
-    the \CANYTY{} type around each subexpression causing a type
-    error. While \LangDyn{} does not have explicit casts, you can
+    \LangDyn{} programs, but you can adapt them by inserting a cast to
+    the \CANYTY{} type around each subexpression that has caused a type
+    error. Although \LangDyn{} does not have explicit casts, you can
     induce one by wrapping the subexpression \code{e} with a call to
-    an un-annotated identity function, like this: \code{((lambda (x) x) e)}.}
+    an unannotated identity function, as follows: \code{((lambda (x) x) e)}.}
 %
   \python{Sometimes you may get a type checking error on the
     \LangDyn{} programs but you can adapt them by inserting a
@@ -20825,72 +20827,72 @@ and \code{proxy\_vec\_length} functions.
 \begin{figure}[p]
 \begin{tcolorbox}[colback=white]  
 \begin{tikzpicture}[baseline=(current  bounding  box.center),scale=0.85]
-\node (Lgradual) at (12,4)  {\large \LangGrad{}};
-\node (Lgradual2) at (9,4)  {\large \LangGrad{}};
-\node (Lgradual3) at (6,4)  {\large \LangCast{}};
-\node (Lgradual4) at (3,4)  {\large \LangProxy{}};
-\node (Lgradualr) at (0,4)  {\large \LangPVec{}};
-\node (Lgradualp) at (0,2)  {\large \LangPVec{}};
-\node (Llambdapp) at (3,2)  {\large \LangPVec{}};
-\node (Llambdaproxy-4) at (6,2)  {\large \LangPVecFunRef{}};
-\node (Llambdaproxy-5) at (9,2)  {\large \LangPVecFunRef{}};
-\node (F1-1) at (12,2)  {\large \LangPVecFunRef{}};
-\node (F1-2) at (12,0)  {\large \LangPVecFunRef{}};
-\node (F1-3) at (9,0)  {\large \LangPVecFunRef{}};
-\node (F1-4) at (6,0)  {\large \LangPVecAlloc{}};
-\node (F1-5) at (3,0)  {\large \LangPVecAlloc{}};
-\node (F1-6) at (0,0)  {\large \LangPVecAlloc{}};
-\node (C3-2) at (3,-2)  {\large \LangCLoopPVec{}};
+\node (Lgradual) at (0,4)  {\large \LangGrad{}};
+\node (Lgradual2) at (4,4)  {\large \LangGrad{}};
+\node (Lgradual3) at (8,4)  {\large \LangCast{}};
+\node (Lgradual4) at (12,4)  {\large \LangProxy{}};
+\node (Lgradualr) at (12,2)  {\large \LangPVec{}};
+\node (Lgradualp) at (8,2)  {\large \LangPVec{}};
+\node (Llambdapp) at (4,2)  {\large \LangPVec{}};
+\node (Llambdaproxy-4) at (0,2)  {\large \LangPVecFunRef{}};
+\node (Llambdaproxy-5) at (0,0)  {\large \LangPVecFunRef{}};
+\node (F1-1) at (4,0)  {\large \LangPVecFunRef{}};
+\node (F1-2) at (8,0)  {\large \LangPVecFunRef{}};
+\node (F1-3) at (12,0)  {\large \LangPVecFunRef{}};
+\node (F1-4) at (12,-2)  {\large \LangPVecAlloc{}};
+\node (F1-5) at (8,-2)  {\large \LangPVecAlloc{}};
+\node (F1-6) at (4,-2)  {\large \LangPVecAlloc{}};
+\node (C3-2) at (0,-2)  {\large \LangCLoopPVec{}};
 
-\node (x86-2) at (3,-4)  {\large \LangXIndCallVar{}};
-\node (x86-2-1) at (3,-6)  {\large \LangXIndCallVar{}};
-\node (x86-2-2) at (6,-6)  {\large \LangXIndCallVar{}};
-\node (x86-3) at (6,-4)  {\large \LangXIndCallVar{}};
-\node (x86-4) at (9,-4) {\large \LangXIndCall{}};
-\node (x86-5) at (9,-6) {\large \LangXIndCall{}};
+\node (x86-2) at (0,-4)  {\large \LangXIndCallVar{}};
+\node (x86-2-1) at (0,-6)  {\large \LangXIndCallVar{}};
+\node (x86-2-2) at (4,-6)  {\large \LangXIndCallVar{}};
+\node (x86-3) at (4,-4)  {\large \LangXIndCallVar{}};
+\node (x86-4) at (8,-4) {\large \LangXIndCall{}};
+\node (x86-5) at (8,-6) {\large \LangXIndCall{}};
 
 
-\path[->,bend right=15] (Lgradual) edge [above] node
+\path[->,bend left=15] (Lgradual) edge [above] node
      {\ttfamily\footnotesize shrink} (Lgradual2);
-\path[->,bend right=15] (Lgradual2) edge [above] node
+\path[->,bend left=15] (Lgradual2) edge [above] node
      {\ttfamily\footnotesize uniquify} (Lgradual3);
-\path[->,bend right=15] (Lgradual3) edge [above] node
+\path[->,bend left=15] (Lgradual3) edge [above] node
      {\ttfamily\footnotesize reveal\_functions} (Lgradual4);
-\path[->,bend right=15] (Lgradual4) edge [above] node
+\path[->,bend left=15] (Lgradual4) edge [left] node
      {\ttfamily\footnotesize resolve} (Lgradualr);
-\path[->,bend right=15] (Lgradualr) edge [right] node
+\path[->,bend left=15] (Lgradualr) edge [below] node
      {\ttfamily\footnotesize cast\_insert} (Lgradualp);
-\path[->,bend right=15] (Lgradualp) edge [below] node
+\path[->,bend right=15] (Lgradualp) edge [above] node
      {\ttfamily\footnotesize lower\_casts} (Llambdapp);
-\path[->,bend left=15] (Llambdapp) edge [above] node
-     {\ttfamily\footnotesize differentiate.} (Llambdaproxy-4);
-\path[->,bend left=15] (Llambdaproxy-4) edge [above] node
+\path[->,bend right=15] (Llambdapp) edge [above] node
+     {\ttfamily\footnotesize differentiate\_proxies} (Llambdaproxy-4);
+\path[->,bend right=15] (Llambdaproxy-4) edge [right] node
      {\ttfamily\footnotesize reveal\_casts} (Llambdaproxy-5);
-\path[->,bend left=15] (Llambdaproxy-5) edge [above] node
+\path[->,bend right=15] (Llambdaproxy-5) edge [below] node
      {\ttfamily\footnotesize convert\_assignments} (F1-1);
-\path[->,bend left=15] (F1-1) edge [left] node
-     {\ttfamily\footnotesize convert\_to\_clos.} (F1-2);
-\path[->,bend left=15] (F1-2) edge [below] node
-     {\ttfamily\footnotesize limit\_fun.} (F1-3);
-\path[->,bend right=15] (F1-3) edge [above] node
-     {\ttfamily\footnotesize expose\_alloc.} (F1-4);
-\path[->,bend right=15] (F1-4) edge [above] node
+\path[->,bend left=15] (F1-1) edge [above] node
+     {\ttfamily\footnotesize convert\_to\_closures} (F1-2);
+\path[->,bend left=15] (F1-2) edge [above] node
+     {\ttfamily\footnotesize limit\_functions} (F1-3);
+\path[->,bend left=15] (F1-3) edge [left] node
+     {\ttfamily\footnotesize expose\_allocation} (F1-4);
+\path[->,bend left=15] (F1-4) edge [below] node
      {\ttfamily\footnotesize uncover\_get!} (F1-5);
 \path[->,bend right=15] (F1-5) edge [above] node
-     {\ttfamily\footnotesize remove\_complex.} (F1-6);
-\path[->,bend right=15] (F1-6) edge [right] node
+     {\ttfamily\footnotesize remove\_complex\_operands} (F1-6);
+\path[->,bend right=15] (F1-6) edge [above] node
      {\ttfamily\footnotesize explicate\_control} (C3-2);
-\path[->,bend left=15] (C3-2) edge [left] node
-     {\ttfamily\footnotesize select\_instr.} (x86-2);
-\path[->,bend right=15] (x86-2) edge [left] node
+\path[->,bend right=15] (C3-2) edge [right] node
+     {\ttfamily\footnotesize select\_instructions} (x86-2);
+\path[->,bend right=15] (x86-2) edge [right] node
      {\ttfamily\footnotesize uncover\_live} (x86-2-1);
 \path[->,bend right=15] (x86-2-1) edge [below] node 
-     {\ttfamily\footnotesize build\_inter.} (x86-2-2);
-\path[->,bend right=15] (x86-2-2) edge [left] node
-     {\ttfamily\footnotesize allocate\_reg.} (x86-3);
+     {\ttfamily\footnotesize build\_interference} (x86-2-2);
+\path[->,bend right=15] (x86-2-2) edge [right] node
+     {\ttfamily\footnotesize allocate\_registers} (x86-3);
 \path[->,bend left=15] (x86-3) edge [above] node
-     {\ttfamily\footnotesize patch\_instr.} (x86-4);
-\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize prelude\_and\_conc.} (x86-5);
+     {\ttfamily\footnotesize patch\_instructions} (x86-4);
+\path[->,bend left=15] (x86-4) edge [right] node {\ttfamily\footnotesize prelude\_and\_conclusion} (x86-5);
 \end{tikzpicture}
 \end{tcolorbox}
 
@@ -20917,27 +20919,27 @@ original location of the cast in the source program.
 
 The problem addressed by space-efficient casts also relates to
 higher-order casts. It turns out that in partially typed programs, a
-function or tuple can flow through very many casts at runtime. With
+function or tuple can flow through a great many casts at runtime. With
 the approach described in this chapter, each cast adds another
 \code{lambda} wrapper or a tuple proxy. Not only does this take up
 considerable space, but it also makes the function calls and tuple
-operations slow.  For example, a partially-typed version of quicksort
+operations slow.  For example, a partially typed version of quicksort
 could, in the worst case, build a chain of proxies of length $O(n)$
 around the tuple, changing the overall time complexity of the
 algorithm from $O(n^2)$ to $O(n^3)$! \citet{Herman:2006uq} suggested a
 solution to this problem by representing casts using the coercion
 calculus of \citet{Henglein:1994nz}, which prevents the creation of
 long chains of proxies by compressing them into a concise normal
-form. \citet{Siek:2015ab} give an algorithm for compressing coercions
+form. \citet{Siek:2015ab} give an algorithm for compressing coercions,
 and \citet{Kuhlenschmidt:2019aa} show how to implement these ideas in
-the Grift compiler.
+the Grift compiler:
 \begin{center}
   \url{https://github.com/Gradual-Typing/Grift}
 \end{center}
 
 There are also interesting interactions between gradual typing and
 other language features, such as generics, information-flow types, and
-type inference, to name a few. We recommend the reader to consult the
+type inference, to name a few. We recommend to the reader the
 online gradual typing bibliography for more material:
 \begin{center}
   \url{http://samth.github.io/gradual-typing-bib/}
