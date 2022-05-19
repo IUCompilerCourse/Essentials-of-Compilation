@@ -1504,7 +1504,7 @@ do anything.  On the other hand, if the error is a
 \code{trapped-error}, then the compiler must produce an executable and
 it is required to report that an error occurred. To signal an error,
 exit with a return code of \code{255}.  The interpreters in chapters
-\ref{ch:Ldyn} and \ref{ch:Lgrad} use
+\ref{ch:Ldyn} and \ref{ch:Lgrad} and in section \ref{sec:arrays} use
 \code{trapped-error}.
 \fi}
 
@@ -12822,6 +12822,8 @@ mark. The following example uses \code{set-point-x!} to change the
 \section{Challenge: Arrays}
 \label{sec:arrays}
 
+% TODO mention trapped-error
+
 In this chapter we have studied tuples, that is, heterogeneous
 sequences of elements whose length is determined at compile time. This
 challenge is also about sequences, but this time the length is
@@ -13168,9 +13170,15 @@ class TypeCheckLarray(TypeCheckLtup):
 The definition of the interpreter for \LangArray{} is shown in
 figure~\ref{fig:interp-Lvecof}.
 \racket{The \code{make-vector} operator is
-implemented with Racket's \code{make-vector} function, and
-multiplication is \code{fx*}, multiplication for \code{fixnum}
-integers.}
+  interpreted using Racket's \code{make-vector} function,
+  and multiplication is interpreted using \code{fx*},
+  which is multiplication for \code{fixnum} integers.
+  In the \code{resolve} pass (Section~\ref{sec:array-resolution})
+  we translate array access operations
+  into \code{vectorof-ref} and \code{vectorof-set!} operations,
+  which we interpret using \code{vector} operations with additional
+  bounds checks that signal a \code{trapped-error}.
+}
 %
 \python{We implement list creation with a Python list comprehension
   and multiplication is implemented with Python multiplication.  We
@@ -13189,7 +13197,17 @@ integers.}
     (define/override (interp-op op)
       (match op
         ['make-vector make-vector]
-        ['* fx*]
+        ['vectorof-length vector-length]
+        ['vectorof-ref
+         (lambda (v i)
+           (if (< i (vector-length v))
+               (vector-ref v i)
+               (error 'trapped-error "index ~a out of bounds\nin ~v" i v)))]
+        ['vectorof-set!
+         (lambda (v i e)
+           (if (< i (vector-length v))
+               (vector-set! v i e)
+               (error 'trapped-error "index ~a out of bounds\nin ~v" i v)))]
         [else (super interp-op op)]))
     ))
 
@@ -13274,6 +13292,7 @@ an array:
 In the following subsections we provide hints regarding how to update
 the passes to handle arrays.
 
+
 \subsection{Overload Resolution}
 \label{sec:array-resolution}
 
@@ -13303,10 +13322,14 @@ When these operators are applied to tuples, leave them as is.
 
 \subsection{Bounds Checking}
 
-We recommend inserting a new pass named \code{check\_bounds} that
-inserts code around each \racket{\code{vector-ref} and \code{vector-set!}}
-\python{subscript} operation to ensure that the index is greater than or
-equal to zero and less than the array's length.
+Recall that the interpreter for \LangArray{} signals a
+\code{trapped-error} when there is an array access that is out of
+bounds. Therefore your compiler is obliged to also catch these errors
+during execution and halt execution and signal an error. We recommend
+inserting a new pass named \code{check\_bounds} that inserts code
+around each \racket{\code{vectorof-ref} and \code{vectorof-set!}}
+\python{subscript} operation to ensure that the index is greater than
+or equal to zero and less than the array's length.
 
 %% \subsection{Reveal Casts}
 
