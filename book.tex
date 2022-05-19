@@ -2672,10 +2672,10 @@ register allocation (chapter~\ref{ch:register-allocation-Lvar}).
 \Arg &::=&  \IMM{\Int} \MID \REG{\Reg}
    \MID \DEREF{\Reg}{\Int} \\
 \Instr &::=& \BININSTR{\code{addq}}{\Arg}{\Arg} 
-       \MID \BININSTR{\code{subq}}{\Arg}{\Arg}
-       \MID \UNIINSTR{\code{negq}}{\Arg}\\
-      &\MID& \BININSTR{\code{movq}}{\Arg}{\Arg}
-       \MID \PUSHQ{\Arg}
+       \MID \BININSTR{\code{subq}}{\Arg}{\Arg}\\
+       &\MID& \UNIINSTR{\code{negq}}{\Arg}
+       \MID \BININSTR{\code{movq}}{\Arg}{\Arg}\\
+       &\MID& \PUSHQ{\Arg}
        \MID \POPQ{\Arg} \\
       &\MID& \CALLQ{\itm{label}}{\itm{int}}
        \MID \RETQ{}
@@ -11095,8 +11095,8 @@ print( t[0] + t[2][0] if t[1] else 44 )
  \Type &::=& \LP\key{Vector}\;\Type^{*}\RP \\
 \itm{op} &::=& \code{vector} \MID \code{vector-length} \\
 \Exp &::=& \VECREF{\Exp}{\INT{\Int}} \\
-     &\MID& \VECSET{\Exp}{\INT{\Int}}{\Exp} \\
-     &\MID& \LP\key{HasType}~\Exp~\Type \RP 
+     &\MID& \VECSET{\Exp}{\INT{\Int}}{\Exp} 
+%     &\MID& \LP\key{HasType}~\Exp~\Type \RP 
 \end{array}
 }
 \newcommand{\LtupGrammarPython}{
@@ -11370,30 +11370,47 @@ class InterpLtup(InterpLwhile):
 \end{figure}
 
 Figure~\ref{fig:type-check-Lvec} shows the type checker for
-\LangVec{}, which deserves some explanation. When allocating a tuple,
-we need to know which elements of the tuple are themselves tuples for
-the purposes of garbage collection. We can obtain this information
-during type checking. The type checker shown in
-figure~\ref{fig:type-check-Lvec} not only computes the type of an
-expression; it also
+\LangVec{}.
 %
-\racket{wraps every tuple creation with the form $(\key{HasType}~e~T)$,
-  where $T$ is the tuple's type.
-To create the s-expression for the \code{Vector} type in
-figure~\ref{fig:type-check-Lvec}, we use the
+The type of a tuple is a
+\racket{\code{Vector}}\python{\code{TupleType}} type that contains a
+type for each of its elements.
+%
+\racket{To create the s-expression for the \code{Vector} type, we use the
 \href{https://docs.racket-lang.org/reference/quasiquote.html}{unquote-splicing
   operator} \code{,@} to insert the list \code{t*} without its usual
 start and end parentheses. \index{subject}{unquote-splicing}}
 %
-\python{records the type of each tuple expression in a new field
-  named \code{has\_type}. Because the type checker has to compute the type
-  of each tuple access, the index must be a constant.}
+The type of accessing the ith element of a tuple is the ith element
+type of the tuple's type, if there is one. If not, an error is
+signaled. Note that the index \code{i} is required to be a constant
+integer (and not, for example, a call to
+\racket{\code{read}}\python{input\_int}) so that the type checker
+can determine the element's type given the tuple type. 
+%
+\racket{
+  Regarding writing an element to a tuple, the element's type must
+  be equal to the ith element type of the tuple's type.
+  The result type is \code{Void}.}
+
+
+%% When allocating a tuple,
+%% we need to know which elements of the tuple are themselves tuples for
+%% the purposes of garbage collection. We can obtain this information
+%% during type checking. The type checker shown in
+%% figure~\ref{fig:type-check-Lvec} not only computes the type of an
+%% expression; it also
+%% %
+%% \racket{wraps every tuple creation with the form $(\key{HasType}~e~T)$,
+%%   where $T$ is the tuple's type.
+%
+%records the type of each tuple expression in a new field named \code{has\_type}. 
 
 
 \begin{figure}[tp]
   \begin{tcolorbox}[colback=white]
     {\if\edition\racketEd
-\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 (define type-check-Lvec-class
   (class type-check-Lif-class
     (super-new)
@@ -11406,7 +11423,7 @@ start and end parentheses. \index{subject}{unquote-splicing}}
           [(Prim 'vector es)
            (define-values (e* t*) (for/lists (e* t*) ([e es]) (recur e)))
            (define t `(Vector ,@t*))
-           (values (HasType (Prim 'vector e*) t)  t)]
+           (values (Prim 'vector e*)  t)]
           [(Prim 'vector-ref (list e1 (Int i)))
            (define-values (e1^ t) (recur e1))
            (match t
@@ -11415,15 +11432,15 @@ start and end parentheses. \index{subject}{unquote-splicing}}
                 (error 'type-check "index ~a out of bounds\nin ~v" i e))
               (values (Prim 'vector-ref (list e1^ (Int i)))  (list-ref ts i))]
              [else (error 'type-check "expect Vector, not ~a\nin ~v" t e)])]
-          [(Prim 'vector-set! (list e1 (Int i) arg) )
+          [(Prim 'vector-set! (list e1 (Int i) elt) )
            (define-values (e-vec t-vec) (recur e1))
-           (define-values (e-arg^ t-arg) (recur arg))
+           (define-values (e-elt^ t-elt) (recur elt))
            (match t-vec
              [`(Vector ,ts ...)
               (unless (and (0 . <= . i) (i . < . (length ts)))
                 (error 'type-check "index ~a out of bounds\nin ~v" i e))
-              (check-type-equal? (list-ref ts i) t-arg e)
-              (values (Prim 'vector-set! (list e-vec (Int i) e-arg^))  'Void)]
+              (check-type-equal? (list-ref ts i) t-elt e)
+              (values (Prim 'vector-set! (list e-vec (Int i) e-elt^))  'Void)]
              [else (error 'type-check "expect Vector, not ~a\nin ~v" t-vec e)])]
           [(Prim 'vector-length (list e))
            (define-values (e^ t) (recur e))
@@ -11438,12 +11455,6 @@ start and end parentheses. \index{subject}{unquote-splicing}}
              [(`(Vector ,ts1 ...)  `(Vector ,ts2 ...))  (void)]
              [(other wise)  (check-type-equal? t1 t2 e)])
            (values (Prim 'eq? (list e1 e2)) 'Boolean)]
-          [(HasType (Prim 'vector es) t)
-           ((type-check-exp env) (Prim 'vector es))]
-          [(HasType e1 t)
-           (define-values (e1^ t^) (recur e1))
-           (check-type-equal? t t^ e)
-           (values (HasType e1^ t) t)]
           [else ((super type-check-exp env) e)]
           )))
     ))
@@ -11464,15 +11475,15 @@ class TypeCheckLtup(TypeCheckLwhile):
         return bool
       case Tuple(es, Load()):
         ts = [self.type_check_exp(e, env) for e in es]
-        e.has_type = tuple(ts)
+        e.has_type = TupleType(ts)
         return e.has_type
-      case Subscript(tup, Constant(index), Load()):
+      case Subscript(tup, Constant(i), Load()):
         tup_ty = self.type_check_exp(tup, env)
-        index_ty = self.type_check_exp(Constant(index), env)
-        check_type_equal(index_ty, int, index)
+        i_ty = self.type_check_exp(Constant(i), env)
+        check_type_equal(i_ty, int, i)
         match tup_ty:
-          case tuple(ts):
-            return ts[index]
+          case TupleType(ts):
+            return ts[i]
           case _:
             raise Exception('error: expected a tuple, not ' + repr(tup_ty))
       case _:
@@ -11819,18 +11830,18 @@ print( ((42,),)[0][0] )
 \fi}
 
 
-{\if\edition\racketEd
-\section{Shrink}
-\label{sec:shrink-Lvec}
+%% {\if\edition\racketEd
+%% \section{Shrink}
+%% \label{sec:shrink-Lvec}
 
-Recall that the \code{shrink} pass translates the primitives operators
-into a smaller set of primitives.
-%
-This pass comes after type checking, and the type checker adds a
-\code{HasType} AST node around each \code{vector} AST node, so you'll
-need to add a case for \code{HasType} to the \code{shrink} pass.
+%% Recall that the \code{shrink} pass translates the primitives operators
+%% into a smaller set of primitives.
+%% %
+%% This pass comes after type checking, and the type checker adds a
+%% \code{HasType} AST node around each \code{vector} AST node, so you'll
+%% need to add a case for \code{HasType} to the \code{shrink} pass.
 
-\fi}
+%% \fi}
 
 \section{Expose Allocation}
 \label{sec:expose-allocation}
@@ -11874,20 +11885,30 @@ make sure that there are $n$ bytes ready to be allocated. During
 instruction selection, the \CCOLLECT{$n$} form will become a call to
 the \code{collect} function in \code{runtime.c}.
 %
-The \CALLOCATE{$n$}{$T$} form obtains memory for $n$ elements (and
+The \CALLOCATE{$n$}{$\itm{type}$} form obtains memory for $n$ elements (and
 space at the front for the 64-bit tag), but the elements are not
-initialized.  \index{subject}{allocate} The $T$ parameter is the type
+initialized.  \index{subject}{allocate} The $\itm{type}$ parameter is the type
 of the tuple:
 %
 \VECTY{\racket{$\Type_1 \ldots \Type_n$}\python{$\Type_1, \ldots, \Type_n$}}
 %
-where $\Type_i$ is the type of the $i$th element in the tuple. The
-\CGLOBALVALUE{\itm{name}} form reads the value of a global variable, such
-as \code{free\_ptr}.
+where $\Type_i$ is the type of the $i$th element.
+%
+The \CGLOBALVALUE{\itm{name}} form reads the value of a global
+variable, such as \code{free\_ptr}.
 %
 \python{The \code{begin} form is an expression that executes a
   sequence of statements and then produces the value of the expression
   at the end.}
+
+\racket{
+  The type information that you need for \CALLOCATE{$n$}{$\itm{type}$}
+  can be obtained by running the
+  \code{type-check-Lvec-has-type} type checker immediately before the
+  \code{expose\_allocation} pass. This version fo the type checker
+  places a special AST node of the form $(\key{HasType}~e~\itm{type})$
+  around each tuple creation. The concrete syntax
+    for \code{HasType} is \code{has-type}.}
 
 The following shows the transformation of tuple creation into (1) a
 sequence of temporary variable bindings for the initializing
@@ -13062,8 +13083,7 @@ integer.
            (define-values (e1^ t1) (recur e1))
            (define-values (e2^ elt-type) (recur e2))
            (define vec-type `(Vectorof ,elt-type))
-           (values (HasType (Prim 'make-vector (list e1^ e2^)) vec-type)
-                   vec-type)]
+           (values (Prim 'make-vector (list e1^ e2^)) vec-type)]
           [(Prim 'vector-ref (list e1 e2))
            (define-values (e1^ t1) (recur e1))
            (define-values (e2^ t2) (recur e2))
@@ -13298,7 +13318,7 @@ the passes to handle arrays.
 
 As noted previously, with the addition of arrays, several operators
 have become \emph{overloaded}; that is, they can be applied to values
-of more than one type. In this case, the element access and \code{len}
+of more than one type. In this case, the element access and length
 operators can be applied to both tuples and arrays. This kind of
 overloading is quite common in programming languages, so many
 compilers perform \emph{overload resolution}\index{subject}{overload
@@ -13325,11 +13345,13 @@ When these operators are applied to tuples, leave them as is.
 Recall that the interpreter for \LangArray{} signals a
 \code{trapped-error} when there is an array access that is out of
 bounds. Therefore your compiler is obliged to also catch these errors
-during execution and halt execution and signal an error. We recommend
-inserting a new pass named \code{check\_bounds} that inserts code
-around each \racket{\code{vectorof-ref} and \code{vectorof-set!}}
+during execution and halt, signaling an error. We recommend inserting
+a new pass named \code{check\_bounds} that inserts code around each
+\racket{\code{vectorof-ref} and \code{vectorof-set!}}
 \python{subscript} operation to ensure that the index is greater than
-or equal to zero and less than the array's length.
+or equal to zero and less than the array's length. If not, the program
+should halt, for which we recommend using a new primitive operation
+named \code{exit}.
 
 %% \subsection{Reveal Casts}
 
@@ -13374,6 +13396,16 @@ length specified by the $\Exp$ (of type \INTTY), but does not
 initialize the elements of the array. Generate code in this pass to
 initialize the elements analogous to the case for tuples.
 
+
+{\if\edition\racketEd
+\section{Uncover \texttt{get!}}
+\label{sec:uncover-get-bang-vecof}
+
+Add cases for \code{AllocateArray} to \code{collect-set!} and
+\code{uncover-get!-exp}.
+
+\fi}
+
 \subsection{Remove Complex Operands}
 
 Add cases in the \code{rco\_atom} and \code{rco\_exp} for
@@ -13393,13 +13425,15 @@ except that the tag at the front of the array should instead use the
 representation discussed in section~\ref{sec:array-rep}.
 
 Regarding \racket{\code{vectorof-length}}\python{\code{array\_len}},
-extract the length from the tag according to the representation discussed in
-section~\ref{sec:array-rep}.
+extract the length from the tag.
 
 The instructions generated for accessing an element of an array differ
 from those for a tuple (section~\ref{sec:select-instructions-gc}) in
-that the index is not a constant so the offset must be computed at
-runtime.
+that the index is not a constant so you need to generate instructions
+that compute the offset at runtime.
+
+Compile the \code{exit} primitive into a call to the \code{exit}
+function of the C standard library, with an argument of $255$.
 
 %% Also, note that assignment to an array element may appear in
 %% as a stand-alone statement, so make sure to handle that situation in
