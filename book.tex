@@ -18370,22 +18370,19 @@ does not, the program exits.
 {\if\edition\racketEd
 %
 To perform these actions we need a new primitive operation,
-\code{tag-of-any}, and two new forms, \code{ValueOf} and \code{Exit}.
+\code{tag-of-any}, and a new form, \code{ValueOf}.
 The \code{tag-of-any} operation retrieves the type tag from a tagged
 value of type \code{Any}.  The \code{ValueOf} form retrieves the
 underlying value from a tagged value.  The \code{ValueOf} form
 includes the type for the underlying value that is used by the type
-checker.  Finally, the \code{Exit} form ends the execution of the
-program:
+checker.
 %
 \fi}
 %
 {\if\edition\pythonEd
 %
-To perform these actions we need the \code{exit} function (from the C
-standard library) and two new AST classes: \code{TagOf} and
-\code{ValueOf}. The \code{exit} function ends the execution of the
-program.  The \code{TagOf} operation retrieves the type tag from a
+To perform these actions we need two new AST classes: \code{TagOf} and
+\code{ValueOf}. The \code{TagOf} operation retrieves the type tag from a
 tagged value of type \ANYTY{}.  The \code{ValueOf} operation retrieves
 the underlying value from a tagged value.  The \code{ValueOf}
 operation includes the type for the underlying value which is used by
@@ -19619,12 +19616,9 @@ class TypeCheckLgrad(TypeCheckLlambda):
                  (unless (and (0 . <= . i) (i . < . (length ts)))
                    (error 'type-check "invalid index ~a in ~a" i e))
                  (values (Prim 'vector-ref (list e1^ (Int i))) (list-ref ts i))]
-                [else (define e1^^ (make-cast e1^ t1 'Any))
-                      (define e2^^ (make-cast e2^ t2 'Integer))
-                      (values (Prim 'any-vector-ref (list e1^^ e2^^)) 'Any)])]
+                [else (values (Prim 'any-vector-ref (list e1^ e2^)) 'Any)])]
              ['Any
-              (define e2^^ (make-cast e2^ t2 'Integer))
-              (values (Prim 'any-vector-ref (list e1^ e2^^)) 'Any)]
+              (values (Prim 'any-vector-ref (list e1^ e2^)) 'Any)]
              [else (error 'type-check "expected vector not ~a\nin ~v" t1 e)])]
 	  [(Prim 'vector-set! (list e1 e2 e3) )
            (define-values (e1^ t1) (recur e1))
@@ -19638,17 +19632,11 @@ class TypeCheckLgrad(TypeCheckLlambda):
                  (unless (and (0 . <= . i) (i . < . (length ts)))
                    (error 'type-check "invalid index ~a in ~a" i e))
                  (check-consistent? (list-ref ts i) t3 e)
-                 (define e3^^ (make-cast e3^ t3 (list-ref ts i)))
-                 (values (Prim 'vector-set! (list e1^ (Int i) e3^^)) 'Void)]
+                 (values (Prim 'vector-set! (list e1^ (Int i) e3^)) 'Void)]
                 [else
-                 (define e1^^ (make-cast e1^ t1 'Any))
-                 (define e2^^ (make-cast e2^ t2 'Integer))
-                 (define e3^^ (make-cast e3^ t3 'Any))
-                 (values (Prim 'any-vector-set! (list e1^^ e2^^ e3^^)) 'Void)])]
+                 (values (Prim 'any-vector-set! (list e1^ e2^ e3^)) 'Void)])]
              ['Any
-              (define e2^^ (make-cast e2^ t2 'Integer))
-              (define e3^^ (make-cast e3^ t3 'Any))
-              (values (Prim 'any-vector-set! (list e1^ e2^^ e3^^)) 'Void)]
+              (values (Prim 'any-vector-set! (list e1^ e2^ e3^)) 'Void)]
 	     [else (error 'type-check "expected vector not ~a\nin ~v" t1 e)])]
 \end{lstlisting}
 \end{tcolorbox}
@@ -19664,8 +19652,7 @@ class TypeCheckLgrad(TypeCheckLlambda):
            (define-values (e2^ t2) (recur e2))
            (check-consistent? t1 t2 e)
            (define T (meet t1 t2))
-           (values (Prim 'eq? (list (make-cast e1^ t1 T) (make-cast e2^ t2 T)))
-                   'Boolean)]
+           (values (Prim 'eq? (list e1^ e2^)) 'Boolean)]
           [(Prim 'not (list e1))
            (define-values (e1^ t1) (recur e1))
            (match t1
@@ -19673,9 +19660,8 @@ class TypeCheckLgrad(TypeCheckLlambda):
               (recur (If (Prim 'eq? (list e1 (Inject (Bool #f) 'Boolean)))
                          (Bool #t) (Bool #f)))]
              [else
-              (define-values (t-ret new-es^)
-                (type-check-op 'not (list t1) (list e1^) e))
-              (values (Prim 'not new-es^) t-ret)])]
+              (define t-ret (type-check-op 'not (list t1) e))
+              (values (Prim 'not (list e1^)) t-ret)])]
           [(Prim 'and (list e1 e2))
            (recur (If e1 e2 (Bool #f)))]
           [(Prim 'or (list e1 e2))
@@ -19686,8 +19672,8 @@ class TypeCheckLgrad(TypeCheckLlambda):
            (define-values (new-es ts)
              (for/lists (exprs types) ([e es])
                (recur e)))
-           (define-values (t-ret new-es^) (type-check-op op ts new-es e))
-           (values (Prim op new-es^) t-ret)]
+           (define t-ret (type-check-op op ts e))
+           (values (Prim op new-es) t-ret)]
           [(If e1 e2 e3)
            (define-values (e1^ T1) (recur e1))
 	   (define-values (e2^ T2) (recur e2))
@@ -19696,28 +19682,23 @@ class TypeCheckLgrad(TypeCheckLlambda):
            (match T1
              ['Boolean
               (define Tif (join T2 T3))
-              (values (If e1^ (make-cast e2^ T2 Tif)
-                          (make-cast e3^ T3 Tif)) Tif)]
+              (values (If e1^ e2^e3^) Tif)]
              ['Any
               (define Tif (meet T2 T3))
               (values (If (Prim 'eq? (list e1^ (Inject (Bool #f) 'Boolean)))
-                          (make-cast e3^ T3 Tif) (make-cast e2^ T2 Tif))
+                          e3^ e2^)
                       Tif)]
              [else (error 'type-check "expected Boolean not ~a\nin ~v" T1 e)])]
-          [(HasType e1 T)
-           (define-values (e1^ T1) (recur e1))
-           (check-consistent? T1 T)
-           (values (make-cast e1^ T1 T) T)]          
           [(SetBang x e1)
            (define-values (e1^ T1) (recur e1))
            (define varT (dict-ref env x))
            (check-consistent? T1 varT e)
-           (values (SetBang x (make-cast e1^ T1 varT)) 'Void)]
+           (values (SetBang x e1^) 'Void)]
           [(WhileLoop e1 e2)
            (define-values (e1^ T1) (recur e1))
            (check-consistent? T1 'Boolean e)
            (define-values (e2^ T2) ((type-check-exp env) e2))
-           (values (WhileLoop (make-cast e1^ T1 'Boolean) e2^) 'Void)]
+           (values (WhileLoop e1^ e2^) 'Void)]
 \end{lstlisting}
 \end{tcolorbox}
 \caption{Type checker for the \LangGrad{} language, part 2.}
@@ -19734,15 +19715,9 @@ class TypeCheckLgrad(TypeCheckLlambda):
 	     [`(,T1ps ... -> ,T1rt)
               (for ([T2 T2s] [Tp T1ps])
                 (check-consistent? T2 Tp e))
-              (define e2s^^ (for/list ([e2 e2s^] [src T2s] [tgt T1ps])
-                              (make-cast e2 src tgt)))
-	      (values (Apply e1^ e2s^^) T1rt)]
+	      (values (Apply e1^ e2s^) T1rt)]
              [`Any
-              (define e1^^ (make-cast e1^ 'Any
-                                      `(,@(for/list ([e e2s]) 'Any) -> Any)))
-              (define e2s^^ (for/list ([e2 e2s^] [src T2s])
-                              (make-cast e2 src 'Any)))
-              (values (Apply e1^^ e2s^^) 'Any)]
+              (values (Apply e1^ e2s^) 'Any)]
 	     [else (error 'type-check "expected function not ~a\nin ~v" T1 e)])]
           [(Lambda params Tr e1)
            (define-values (xs Ts) (for/lists (l1 l2) ([p params])
@@ -19752,8 +19727,8 @@ class TypeCheckLgrad(TypeCheckLlambda):
            (define-values (e1^ T1) 
              ((type-check-exp (append (map cons xs Ts) env)) e1))
            (check-consistent? Tr T1 e)
-           (values (Lambda (for/list ([x xs] [T Ts]) `[,x : ,T]) Tr
-                           (make-cast e1^ T1 Tr)) `(,@Ts -> ,Tr))]
+           (values (Lambda (for/list ([x xs] [T Ts]) `[,x : ,T]) Tr e1^)
+                   `(,@Ts -> ,Tr))]
           [else  ((super type-check-exp env) e)]
           )))
 \end{lstlisting}
@@ -19791,22 +19766,9 @@ class TypeCheckLgrad(TypeCheckLlambda):
          `(,@(for/list ([t1 ts1] [t2 ts2]) (meet t1 t2))
            -> ,(meet rt1 rt2))]))
 
-    (define/public (make-cast e src tgt)
-      (cond [(equal? src tgt) e] [else (Cast e src tgt)]))
-
     (define/public (check-consistent? t1 t2 e)
       (unless (consistent? t1 t2)
         (error 'type-check "~a is inconsistent with ~a\nin ~v" t1 t2 e)))
-
-    (define/override (type-check-op op arg-types args e)
-      (match (dict-ref (operator-types) op)
-        [`(,param-types . ,return-type)
-         (for ([at arg-types] [pt param-types]) 
-           (check-consistent? at pt e))
-         (values return-type
-                 (for/list ([e args] [s arg-types] [t param-types])
-                   (make-cast e s t)))]
-        [else (error 'type-check-op "unrecognized ~a" op)]))
 
     (define explicit-prim-ops
       (set-union
