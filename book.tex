@@ -19054,17 +19054,21 @@ adding or removing type annotations on parameters and
 variables~\citep{Anderson:2002kd,Siek:2006bh}.
 
 The definition of the concrete syntax of \LangGrad{} is shown in
-figure~\ref{fig:Lgrad-concrete-syntax} and the definnintion of its
+figure~\ref{fig:Lgrad-concrete-syntax} and the definition of its
 abstract syntax is shown in figure~\ref{fig:Lgrad-syntax}. The main
 syntactic difference between \LangLam{} and \LangGrad{} is that type
 annotations are optional, which is specified in the grammar using the
 \Param{} and \itm{ret} nonterminals. In the abstract syntax, type
 annotations are not optional, but we use the \CANYTY{} type when a type
 annotation is absent.
+%
+Both the type checker and the interpreter for \LangGrad{} require some
+interesting changes to enable gradual typing, which we discuss in the
+next two sections.
 
 \newcommand{\LgradGrammarRacket}{
 \begin{array}{lcl}
-  \Type &::=& (\Type \ldots \; \key{->}\; \Type) \\
+  \Type &::=& \LP\Type \ldots \; \key{->}\; \Type\RP \\
   \Param &::=& \Var \MID \LS\Var \key{:} \Type\RS \\
   \itm{ret} &::=& \epsilon \MID \key{:} \Type \\
   \Exp &::=& \LP\Exp \; \Exp \ldots\RP 
@@ -19076,7 +19080,7 @@ annotation is absent.
 
 \newcommand{\LgradASTRacket}{
 \begin{array}{lcl}
-  \Type &::=& (\Type \ldots \; \key{->}\; \Type) \\
+  \Type &::=& \LP\Type \ldots \; \key{->}\; \Type\RP \\
   \Param &::=& \Var \MID \LS\Var \key{:} \Type\RS \\
   \Exp &::=& \APPLY{\Exp}{\Exp\ldots}
   \MID \LAMBDA{\LP\Param\ldots\RP}{\Type}{\Exp} \\
@@ -19196,9 +19200,6 @@ annotation is absent.
 \label{fig:Lgrad-syntax}
 \end{figure}
 
-Both the type checker and the interpreter for \LangGrad{} require some
-interesting changes to enable gradual typing, which we discuss in the
-next two sections.
 
 % TODO: more road map -Jeremy
 
@@ -19212,15 +19213,15 @@ of the \code{map} example from chapter~\ref{ch:Lfun}, shown in
 figure~\ref{fig:gradual-map}.  The \code{map} function itself is
 statically typed, so there is nothing special happening there with
 respect to type checking. On the other hand, the \code{inc} function
-does not have type annotations, so parameter \code{x} is given the
-type \CANYTY{} and the return type of \code{inc} is \CANYTY{}.  Now
-consider the \code{+} operator inside \code{inc}. It expects both
-arguments to have type \INTTY{}, but its first argument \code{x} has
-type \CANYTY{}.  In a gradually typed language, such differences are
-allowed so long as the types are \emph{consistent}; that is, they are
-equal except in places where there is an \CANYTY{} type. That is, the
-type \CANYTY{} is consistent with every other type.
-Figure~\ref{fig:consistent} shows the definition of the
+does not have type annotations, so the type checker assigns the type
+\CANYTY{} to parameter \code{x} and the return type.  Now consider the
+\code{+} operator inside \code{inc}. It expects both arguments to have
+type \INTTY{}, but its first argument \code{x} has type \CANYTY{}.  In
+a gradually typed language, such differences are allowed so long as
+the types are \emph{consistent}; that is, they are equal except in
+places where there is an \CANYTY{} type. That is, the type \CANYTY{}
+is consistent with every other type.  Figure~\ref{fig:consistent}
+shows the definition of the
 \racket{\code{consistent?}}\python{\code{consistent}} method.
 %
 So the type checker allows the \code{+} operator to be applied
@@ -19315,7 +19316,7 @@ error, such as applying \code{map} to a function that sometimes
 returns a Boolean, as shown in figure~\ref{fig:map-maybe_inc}.  The
 type checker for \LangGrad{} accepts this program because the type of
 \code{maybe\_inc} is consistent with the type of parameter \code{f} of
-\code{map}; that is,
+\code{map}; that is, 
 \racket{\code{(Any -> Any)}}\python{\code{Callable[[Any],Any]}}
 is consistent with
 \racket{\code{(Integer -> Integer)}}\python{\code{Callable[[int],int]}}.
@@ -19414,7 +19415,7 @@ In the next section we see how to interpret the \code{Cast} node.
 \begin{figure}[btp]
   \begin{tcolorbox}[colback=white]
 {\if\edition\racketEd        
-\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+\begin{lstlisting}
 (define (map [f : (Integer -> Integer)] [v : (Vector Integer Integer)])
                    : (Vector Integer Integer)
   (vector (f (vector-ref v 0)) (f (vector-ref v 1))))
@@ -19589,55 +19590,52 @@ class TypeCheckLgrad(TypeCheckLlambda):
 {\if\edition\racketEd        
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]  
-\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-(define type-check-gradual-class
-  (class type-check-Llambda-class
-    (super-new)
-    (inherit operator-types type-predicates)
-
-    (define/override (type-check-exp env)
-      (lambda (e)
-	(define recur (type-check-exp env))
-	(match e
-	  [(Prim 'vector-length (list e1))
-           (define-values (e1^ t) (recur e1))
-	   (match t
-             [`(Vector ,ts ...)
-              (values (Prim 'vector-length (list e1^)) 'Integer)]
-             ['Any (values (Prim 'any-vector-length (list e1^)) 'Integer)])]
-	  [(Prim 'vector-ref (list e1 e2))
-           (define-values (e1^ t1) (recur e1))
-           (define-values (e2^ t2) (recur e2))
-           (check-consistent? t2 'Integer e)
-	   (match t1
-	     [`(Vector ,ts ...)
-              (match e2^
-                [(Int i)
-                 (unless (and (0 . <= . i) (i . < . (length ts)))
-                   (error 'type-check "invalid index ~a in ~a" i e))
-                 (values (Prim 'vector-ref (list e1^ (Int i))) (list-ref ts i))]
-                [else (values (Prim 'any-vector-ref (list e1^ e2^)) 'Any)])]
-             ['Any
-              (values (Prim 'any-vector-ref (list e1^ e2^)) 'Any)]
-             [else (error 'type-check "expected vector not ~a\nin ~v" t1 e)])]
-	  [(Prim 'vector-set! (list e1 e2 e3) )
-           (define-values (e1^ t1) (recur e1))
-           (define-values (e2^ t2) (recur e2))
-           (define-values (e3^ t3) (recur e3))
-           (check-consistent? t2 'Integer e)
-	   (match t1
-	     [`(Vector ,ts ...)
-              (match e2^
-                [(Int i)
-                 (unless (and (0 . <= . i) (i . < . (length ts)))
-                   (error 'type-check "invalid index ~a in ~a" i e))
-                 (check-consistent? (list-ref ts i) t3 e)
-                 (values (Prim 'vector-set! (list e1^ (Int i) e3^)) 'Void)]
-                [else
-                 (values (Prim 'any-vector-set! (list e1^ e2^ e3^)) 'Void)])]
-             ['Any
-              (values (Prim 'any-vector-set! (list e1^ e2^ e3^)) 'Void)]
-	     [else (error 'type-check "expected vector not ~a\nin ~v" t1 e)])]
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+(define/override (type-check-exp env)
+  (lambda (e)
+    (define recur (type-check-exp env))
+    (match e
+      [(Prim op es) #:when (not (set-member? explicit-prim-ops op))
+       (define-values (new-es ts)
+         (for/lists (exprs types) ([e es])
+           (recur e)))
+       (define t-ret (type-check-op op ts e))
+       (values (Prim op new-es) t-ret)]
+      [(Prim 'eq? (list e1 e2))
+       (define-values (e1^ t1) (recur e1))
+       (define-values (e2^ t2) (recur e2))
+       (check-consistent? t1 t2 e)
+       (define T (meet t1 t2))
+       (values (Prim 'eq? (list e1^ e2^)) 'Boolean)]
+      [(Prim 'and (list e1 e2))
+       (recur (If e1 e2 (Bool #f)))]
+      [(Prim 'or (list e1 e2))
+       (define tmp (gensym 'tmp))
+       (recur (Let tmp e1 (If (Var tmp) (Var tmp) e2)))]
+      [(If e1 e2 e3)
+       (define-values (e1^ T1) (recur e1))
+       (define-values (e2^ T2) (recur e2))
+       (define-values (e3^ T3) (recur e3))
+       (check-consistent? T1 'Boolean e)
+       (check-consistent? T2 T3 e)
+       (define Tif (meet T2 T3))
+       (values (If e1^ e2^ e3^) Tif)]
+      [(SetBang x e1)
+       (define-values (e1^ T1) (recur e1))
+       (define varT (dict-ref env x))
+       (check-consistent? T1 varT e)
+       (values (SetBang x e1^) 'Void)]
+      [(WhileLoop e1 e2)
+       (define-values (e1^ T1) (recur e1))
+       (check-consistent? T1 'Boolean e)
+       (define-values (e2^ T2) ((type-check-exp env) e2))
+       (values (WhileLoop e1^ e2^) 'Void)]
+      [(Prim 'vector-length (list e1))
+       (define-values (e1^ t) (recur e1))
+       (match t
+         [`(Vector ,ts ...)
+          (values (Prim 'vector-length (list e1^)) 'Integer)]
+         ['Any (values (Prim 'vector-length (list e1^)) 'Integer)])]
 \end{lstlisting}
 \end{tcolorbox}
 \caption{Type checker for the \LangGrad{} language, part 1.}
@@ -19646,59 +19644,59 @@ class TypeCheckLgrad(TypeCheckLlambda):
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]  
-\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-          [(Prim 'eq? (list e1 e2))
-           (define-values (e1^ t1) (recur e1))
-           (define-values (e2^ t2) (recur e2))
-           (check-consistent? t1 t2 e)
-           (define T (meet t1 t2))
-           (values (Prim 'eq? (list e1^ e2^)) 'Boolean)]
-          [(Prim 'not (list e1))
-           (define-values (e1^ t1) (recur e1))
-           (match t1
-             ['Any
-              (recur (If (Prim 'eq? (list e1 (Inject (Bool #f) 'Boolean)))
-                         (Bool #t) (Bool #f)))]
-             [else
-              (define t-ret (type-check-op 'not (list t1) e))
-              (values (Prim 'not (list e1^)) t-ret)])]
-          [(Prim 'and (list e1 e2))
-           (recur (If e1 e2 (Bool #f)))]
-          [(Prim 'or (list e1 e2))
-           (define tmp (gensym 'tmp))
-           (recur (Let tmp e1 (If (Var tmp) (Var tmp) e2)))]
-	  [(Prim op es)
-           #:when (not (set-member? explicit-prim-ops op))
-           (define-values (new-es ts)
-             (for/lists (exprs types) ([e es])
-               (recur e)))
-           (define t-ret (type-check-op op ts e))
-           (values (Prim op new-es) t-ret)]
-          [(If e1 e2 e3)
-           (define-values (e1^ T1) (recur e1))
-	   (define-values (e2^ T2) (recur e2))
-	   (define-values (e3^ T3) (recur e3))
-	   (check-consistent? T2 T3 e)
-           (match T1
-             ['Boolean
-              (define Tif (join T2 T3))
-              (values (If e1^ e2^e3^) Tif)]
-             ['Any
-              (define Tif (meet T2 T3))
-              (values (If (Prim 'eq? (list e1^ (Inject (Bool #f) 'Boolean)))
-                          e3^ e2^)
-                      Tif)]
-             [else (error 'type-check "expected Boolean not ~a\nin ~v" T1 e)])]
-          [(SetBang x e1)
-           (define-values (e1^ T1) (recur e1))
-           (define varT (dict-ref env x))
-           (check-consistent? T1 varT e)
-           (values (SetBang x e1^) 'Void)]
-          [(WhileLoop e1 e2)
-           (define-values (e1^ T1) (recur e1))
-           (check-consistent? T1 'Boolean e)
-           (define-values (e2^ T2) ((type-check-exp env) e2))
-           (values (WhileLoop e1^ e2^) 'Void)]
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+      [(Prim 'vector-ref (list e1 e2))
+       (define-values (e1^ t1) (recur e1))
+       (define-values (e2^ t2) (recur e2))
+       (check-consistent? t2 'Integer e)
+       (match t1
+         [`(Vector ,ts ...)
+          (match e2^
+            [(Int i)
+             (unless (and (0 . <= . i) (i . < . (length ts)))
+               (error 'type-check "invalid index ~a in ~a" i e))
+             (values (Prim 'vector-ref (list e1^ (Int i))) (list-ref ts i))]
+            [else (values (Prim 'vector-ref (list e1^ e2^)) 'Any)])]
+         ['Any (values (Prim 'vector-ref (list e1^ e2^)) 'Any)]
+         [else (error 'type-check "expected vector not ~a\nin ~v" t1 e)])]
+      [(Prim 'vector-set! (list e1 e2 e3) )
+       (define-values (e1^ t1) (recur e1))
+       (define-values (e2^ t2) (recur e2))
+       (define-values (e3^ t3) (recur e3))
+       (check-consistent? t2 'Integer e)
+       (match t1
+         [`(Vector ,ts ...)
+          (match e2^
+            [(Int i)
+             (unless (and (0 . <= . i) (i . < . (length ts)))
+               (error 'type-check "invalid index ~a in ~a" i e))
+             (check-consistent? (list-ref ts i) t3 e)
+             (values (Prim 'vector-set! (list e1^ (Int i) e3^)) 'Void)]
+            [else (values (Prim 'vector-set! (list e1^ e2^ e3^)) 'Void)])]
+         ['Any (values (Prim 'vector-set! (list e1^ e2^ e3^)) 'Void)]
+         [else (error 'type-check "expected vector not ~a\nin ~v" t1 e)])]
+      [(Apply e1 e2s)
+       (define-values (e1^ T1) (recur e1))
+       (define-values (e2s^ T2s) (for/lists (e* ty*) ([e2 e2s]) (recur e2)))
+       (match T1
+         [`(,T1ps ... -> ,T1rt)
+          (for ([T2 T2s] [Tp T1ps])
+            (check-consistent? T2 Tp e))
+          (values (Apply e1^ e2s^) T1rt)]
+         [`Any (values (Apply e1^ e2s^) 'Any)]
+         [else (error 'type-check "expected function not ~a\nin ~v" T1 e)])]
+      [(Lambda params Tr e1)
+       (define-values (xs Ts) (for/lists (l1 l2) ([p params])
+                                (match p
+                                  [`[,x : ,T] (values x T)]
+                                  [(? symbol? x) (values x 'Any)])))
+       (define-values (e1^ T1) 
+         ((type-check-exp (append (map cons xs Ts) env)) e1))
+       (check-consistent? Tr T1 e)
+       (values (Lambda (for/list ([x xs] [T Ts]) `[,x : ,T]) Tr e1^)
+               `(,@Ts -> ,Tr))]
+      [else ((super type-check-exp env) e)]
+      )))
 \end{lstlisting}
 \end{tcolorbox}
 \caption{Type checker for the \LangGrad{} language, part 2.}
@@ -19707,30 +19705,37 @@ class TypeCheckLgrad(TypeCheckLlambda):
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]
-\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-	  [(Apply e1 e2s)
-	   (define-values (e1^ T1) (recur e1))
-	   (define-values (e2s^ T2s) (for/lists (e* ty*) ([e2 e2s]) (recur e2)))
-	   (match T1
-	     [`(,T1ps ... -> ,T1rt)
-              (for ([T2 T2s] [Tp T1ps])
-                (check-consistent? T2 Tp e))
-	      (values (Apply e1^ e2s^) T1rt)]
-             [`Any
-              (values (Apply e1^ e2s^) 'Any)]
-	     [else (error 'type-check "expected function not ~a\nin ~v" T1 e)])]
-          [(Lambda params Tr e1)
-           (define-values (xs Ts) (for/lists (l1 l2) ([p params])
-                                    (match p
-                                      [`[,x : ,T] (values x T)]
-                                      [(? symbol? x) (values x 'Any)])))
-           (define-values (e1^ T1) 
-             ((type-check-exp (append (map cons xs Ts) env)) e1))
-           (check-consistent? Tr T1 e)
-           (values (Lambda (for/list ([x xs] [T Ts]) `[,x : ,T]) Tr e1^)
-                   `(,@Ts -> ,Tr))]
-          [else  ((super type-check-exp env) e)]
-          )))
+\begin{lstlisting}
+(define/override (type-check-def env)
+  (lambda (e)
+    (match e
+      [(Def f params rt info body)
+       (define-values (xs ps) (for/lists (l1 l2) ([p params])
+                                (match p
+                                  [`[,x : ,T] (values x T)]
+                                  [(? symbol? x) (values x 'Any)])))
+       (define new-env (append (map cons xs ps) env))
+       (define-values (body^ ty^) ((type-check-exp new-env) body))
+       (check-consistent? ty^ rt e)
+       (Def f (for/list ([x xs] [T ps]) `[,x : ,T]) rt info body^)]
+      [else (error 'type-check "ill-formed function definition ~a" e)]
+      )))
+
+(define/override (type-check-program e)
+  (match e
+    [(Program info body)
+     (define-values (body^ ty) ((type-check-exp '()) body))
+     (check-consistent? ty 'Integer e)
+     (ProgramDefsExp info '() body^)]
+    [(ProgramDefsExp info ds body)
+     (define new-env (for/list ([d ds]) 
+                       (cons (Def-name d) (fun-def-type d))))
+     (define ds^ (for/list ([d ds])
+                   ((type-check-def new-env) d)))
+     (define-values (body^ ty) ((type-check-exp new-env) body))
+     (check-consistent? ty 'Integer e)
+     (ProgramDefsExp info ds^ body^)]
+    [else (super type-check-program e)]))
 \end{lstlisting}
 \end{tcolorbox}
 \caption{Type checker for the \LangGrad{} language, part 3.}
@@ -19739,55 +19744,55 @@ class TypeCheckLgrad(TypeCheckLlambda):
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]  
-\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
-    (define/public (join t1 t2)
-      (match* (t1 t2)
-        [('Integer 'Integer) 'Integer]
-        [('Boolean 'Boolean) 'Boolean]
-        [('Void  'Void) 'Void]
-        [('Any t2) t2]
-        [(t1 'Any) t1]
-        [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))
-         `(Vector ,@(for/list ([t1 ts1] [t2 ts2]) (join t1 t2)))]
-        [(`(,ts1 ... -> ,rt1) `(,ts2 ... -> ,rt2))
-         `(,@(for/list ([t1 ts1] [t2 ts2]) (join t1 t2))
-           -> ,(join rt1 rt2))]))
+\begin{lstlisting}
+(define/public (join t1 t2)
+  (match* (t1 t2)
+    [('Integer 'Integer) 'Integer]
+    [('Boolean 'Boolean) 'Boolean]
+    [('Void  'Void) 'Void]
+    [('Any t2) t2]
+    [(t1 'Any) t1]
+    [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))
+     `(Vector ,@(for/list ([t1 ts1] [t2 ts2]) (join t1 t2)))]
+    [(`(,ts1 ... -> ,rt1) `(,ts2 ... -> ,rt2))
+     `(,@(for/list ([t1 ts1] [t2 ts2]) (join t1 t2))
+       -> ,(join rt1 rt2))]))
 
-    (define/public (meet t1 t2)
-      (match* (t1 t2)
-        [('Integer 'Integer) 'Integer]
-        [('Boolean  'Boolean) 'Boolean]
-        [('Void 'Void) 'Void]
-        [('Any t2) 'Any]
-        [(t1 'Any) 'Any]
-        [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))
-         `(Vector ,@(for/list ([t1 ts1] [t2 ts2]) (meet t1 t2)))]
-        [(`(,ts1 ... -> ,rt1) `(,ts2 ... -> ,rt2))
-         `(,@(for/list ([t1 ts1] [t2 ts2]) (meet t1 t2))
-           -> ,(meet rt1 rt2))]))
+(define/public (meet t1 t2)
+  (match* (t1 t2)
+    [('Integer 'Integer) 'Integer]
+    [('Boolean  'Boolean) 'Boolean]
+    [('Void 'Void) 'Void]
+    [('Any t2) 'Any]
+    [(t1 'Any) 'Any]
+    [(`(Vector ,ts1 ...) `(Vector ,ts2 ...))
+     `(Vector ,@(for/list ([t1 ts1] [t2 ts2]) (meet t1 t2)))]
+    [(`(,ts1 ... -> ,rt1) `(,ts2 ... -> ,rt2))
+     `(,@(for/list ([t1 ts1] [t2 ts2]) (meet t1 t2))
+       -> ,(meet rt1 rt2))]))
 
-    (define/public (check-consistent? t1 t2 e)
-      (unless (consistent? t1 t2)
-        (error 'type-check "~a is inconsistent with ~a\nin ~v" t1 t2 e)))
+(define/public (check-consistent? t1 t2 e)
+  (unless (consistent? t1 t2)
+    (error 'type-check "~a is inconsistent with ~a\nin ~v" t1 t2 e)))
 
-    (define explicit-prim-ops
-      (set-union
-       (type-predicates)
-       (set 'procedure-arity 'eq?
-            'vector 'vector-length 'vector-ref 'vector-set!
-            'any-vector-length 'any-vector-ref 'any-vector-set!)))
+(define explicit-prim-ops
+  (set-union
+   (type-predicates)
+   (set 'procedure-arity 'eq? 'not 'and 'or
+        'vector 'vector-length 'vector-ref 'vector-set!
+        'any-vector-length 'any-vector-ref 'any-vector-set!)))
 
-    (define/override (fun-def-type d)
-      (match d
-	[(Def f params rt info body)
-         (define ps
-           (for/list ([p params])
-             (match p
-               [`[,x : ,T] T]
-               [(? symbol?) 'Any]
-               [else (error 'fun-def-type "unmatched parameter ~a" p)])))
-	 `(,@ps -> ,rt)]
-	[else (error 'fun-def-type "ill-formed function definition in ~a" d)]))
+(define/override (fun-def-type d)
+  (match d
+    [(Def f params rt info body)
+     (define ps
+       (for/list ([p params])
+         (match p
+           [`[,x : ,T] T]
+           [(? symbol?) 'Any]
+           [else (error 'fun-def-type "unmatched parameter ~a" p)])))
+     `(,@ps -> ,rt)]
+    [else (error 'fun-def-type "ill-formed definition in ~a" d)]))
 \end{lstlisting}
 \end{tcolorbox}
 
@@ -19812,8 +19817,8 @@ operator, by checking the value's tag and either retrieving
 the underlying integer or signaling an error if the tag is not the
 one for integers (figure~\ref{fig:interp-Lany-aux}).
 %
-Things get more interesting with casts involving function, tuple, or
-array types.
+Things get more interesting with casts involving
+\racket{function and tuple types}\python{function, tuple, and array types}.
 
 Consider the cast of the function \code{maybe\_inc} from
 \racket{\code{(Any -> Any)}}\python{\code{Callable[[Any], Any]}}
@@ -20215,6 +20220,7 @@ updated with new cases for the \CANYTY{} type, translating the element
 access and length operations to the primitives \code{any\_load},
 \code{any\_store}, and \code{any\_len}.
 
+\fi}
 
 \section{Cast Insertion}
 \label{sec:gradual-insert-casts}
@@ -20247,10 +20253,10 @@ arises with the
 conditional expression. In figure~\ref{fig:type-check-Lgradual-1} we
 see that the type checker requires that the two branches have
 consistent types and that type of the conditional expression is the
-join of the branches' types. In the target language \LangCast{}, both
+meet of the branches' types. In the target language \LangCast{}, both
 branches will need to have the same type, and that type
 will be the type of the conditional expression. Thus, each branch requires
-a \code{Cast} to convert from its type to the join type.
+a \code{Cast} to convert from its type to the meet of the branches' types.
 
 The case for the function call exhibits another interesting situation. If
 the function expression is of type \CANYTY{}, then it needs to be cast
@@ -20261,6 +20267,16 @@ of them. Furthermore, in \LangCast{} the argument types will need to
 exactly match the parameter types, so we must cast all the arguments
 to type \CANYTY{} (if they are not already of that type).
 
+{\if\edition\racketEd
+%  
+Likewise, the cases for the tuple operators \code{vector-length},
+\code{vector-ref}, and \code{vector-set!} need to handle the situation
+where the tuple expression is of type \CANYTY{}. Instead of
+handling these situations with casts, we recommend translating
+the special-purpose variants of the tuple operators that handle
+tuples of type \CANYTY{}: \code{any-vector-length},
+\code{any-vector-ref}, and \code{any-vector-set!}.
+%
 \fi}
 
 
@@ -20282,13 +20298,36 @@ the \code{apply\_cast} function (figure~\ref{fig:apply_cast}) used in
 the interpreter for \LangCast{}, because it must handle the same cases
 as \code{apply\_cast} and it needs to mimic the behavior of
 \code{apply\_cast}. The most interesting cases concern
-the casts involving tuple, array, and function types.
+the casts involving \racket{tuple and function types}\python{tuple, array, and function types}.
+
+
+{\if\edition\racketEd
+
+As mentioned in section~\ref{sec:interp-casts}, a cast from one tuple
+type to another tuple type is accomplished by creating a proxy that
+intercepts the operations on the underlying tuple. Here we make the
+creation of the proxy explicit with the \code{vector-proxy} AST
+node. It takes three arguments: the first is an expression for the
+tuple, the second is tuple of functions for casting an element that is
+being read from the tuple, and the third is a tuple of functions for
+casting an element that is being written to the array.  You can create
+the functions for reading and writing using lambda expressions.  Also,
+as we show in the next section, we need to differentiate these tuples
+of functions from the user-created ones, so we recommend using a new
+AST node named \code{raw-vector} instead of \code{vector}.
+%
+Figure~\ref{fig:map-bang-lower-cast} shows the output of
+\code{lower\_casts} on the example given in figure~\ref{fig:map-bang}
+that involved casting a tuple of integers to a tuple of \CANYTY{}.
+
+\fi}
+
+{\if\edition\pythonEd
 
 As mentioned in section~\ref{sec:interp-casts}, a cast from one array
 type to another array type is accomplished by creating a proxy that
 intercepts the operations on the underlying array. Here we make the
-creation of the proxy explicit with the
-\racket{\code{vectorof-proxy}}\python{\code{ListProxy}} AST node. It
+creation of the proxy explicit with the \code{ListProxy} AST node. It
 takes fives arguments: the first is an expression for the array, the
 second is a function for casting an element that is being read from
 the array, the third is a function for casting an element that is
@@ -20296,24 +20335,23 @@ being written to the array, the fourth is the type of the underlying
 array, and the fifth is the type of the proxied array.  You can create
 the functions for reading and writing using lambda expressions.
 
-A cast between two tuple types can be handled in a similar manner.
-We create a proxy with the 
-\racket{\code{vector-proxy}}\python{\code{TupleProxy}} AST node.
-\python{Tuples are immutable, so there is no
-  need for a function to cast the value during a write.}
-Because there is a separate element type for each slot in the tuple,
-we need not just one function for casting during a read, but instead a tuple
-of functions.
+A cast between two tuple types can be handled in a similar manner.  We
+create a proxy with the \code{TupleProxy} AST node.  Tuples are
+immutable, so there is no need for a function to cast the value during
+a write.  Because there is a separate element type for each slot in
+the tuple, we need not just one function for casting during a read,
+but instead a tuple of functions.
 %
-Also, as we show in the next section, we need to differentiate
-these tuples from the user-created ones, so we recommend using a new
-AST node named \racket{\code{raw-vector}}\python{\code{RawTuple}}
-instead of \racket{\code{vector}}\python{\code{Tuple}} to create the
+Also, as we show in the next section, we need to differentiate these
+tuples from the user-created ones, so we recommend using a new AST
+node named \code{RawTuple} instead of \code{Tuple} to create the
 tuples of functions.
 %
 Figure~\ref{fig:map-bang-lower-cast} shows the output of
 \code{lower\_casts} on the example given in figure~\ref{fig:map-bang}
 that involved casting an array of integers to an array of \CANYTY{}.
+
+\fi}
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]  
@@ -20330,14 +20368,14 @@ that involved casting an array of integers to an array of \CANYTY{}.
 (let ([v (vector 0 41)])
    (begin 
       (map_inplace inc (vector-proxy v
-                        (raw-vector (lambda: ([x9 : Integer]) : Any
-                                       (inject x9 Integer))
-                                     (lambda: ([x9 : Integer]) : Any
-                                       (inject x9 Integer)))
-                        (raw-vector (lambda: ([x9 : Any]) : Integer
-                                       (project x9 Integer))
-                                    (lambda: ([x9 : Any]) : Integer
-                                       (project x9 Integer)))))
+                           (raw-vector (lambda: ([x9 : Integer]) : Any
+                                          (inject x9 Integer))
+                                        (lambda: ([x9 : Integer]) : Any
+                                          (inject x9 Integer)))
+                           (raw-vector (lambda: ([x9 : Any]) : Integer
+                                          (project x9 Integer))
+                                       (lambda: ([x9 : Any]) : Integer
+                                          (project x9 Integer)))))
       (vector-ref v 1)))
 \end{lstlisting}
 \fi}
@@ -20441,12 +20479,15 @@ meaning, as the type of just tuples, and we introduce a new type,
 \PTUPLETYNAME{}, whose values
 can be either real tuples or tuple
 proxies.
+%
+{\if\edition\pythonEd
 Likewise, we return the
 \ARRAYTYPENAME{} type to its original
 meaning, as the type of arrays, and we introduce a new type,
 \PARRAYTYNAME{}, whose values
 can be either arrays or array proxies.
 These new types come with a suite of new primitive operations.
+\fi}
 
 {\if\edition\racketEd    
 A tuple proxy is represented by a tuple containing three things: (1) the
@@ -20580,12 +20621,15 @@ translated (recursively) to replace \TUPLETYPENAME{} with \PTUPLETYNAME{}.
 Next, we insert uses of \PTUPLETYNAME{} operations in the appropriate
 places. For example, we wrap every tuple creation with an
 \racket{\code{inject-vector}}\python{\code{InjectTuple}}.
-{\if\edition\racketEd    
+%
+{\if\edition\racketEd
+\begin{minipage}{0.96\textwidth}
 \begin{lstlisting}
 (vector |$e_1 \ldots e_n$|)
 |$\Rightarrow$|
 (inject-vector (vector |$e'_1 \ldots e'_n$|))
 \end{lstlisting}
+\end{minipage}
 \fi}
 {\if\edition\pythonEd    
 \begin{lstlisting}
@@ -20594,6 +20638,7 @@ Tuple(|$e_1, \ldots, e_n$|)
 InjectTuple(Tuple(|$e'_1, \ldots, e'_n$|))
 \end{lstlisting}
 \fi}
+
 The \racket{\code{raw-vector}}\python{\code{RawTuple}}
 AST node that we introduced in the previous
 section does not get injected.
@@ -20691,7 +20736,8 @@ Otherwise, the only other changes are adding cases that copy the new AST nodes.
 \label{sec:closure-conversion-gradual}
 
 The auxiliary function that translates type annotations needs to be
-updated to handle the \PTUPLETYNAME{} and \PARRAYTYNAME{} types.
+updated to handle the \PTUPLETYNAME{}
+\racket{type}\python{and \PARRAYTYNAME{} types}.
 %
 Otherwise, the only other changes are adding cases that copy the new
 AST nodes.
@@ -20701,13 +20747,13 @@ AST nodes.
 
 Recall that the \code{select\_instructions} pass is responsible for
 lowering the primitive operations into x86 instructions.  So, we need
-to translate the new operations on \PTUPLETYNAME{} and \PARRAYTYNAME{}
+to translate the new operations on \PTUPLETYNAME{} \python{and \PARRAYTYNAME{}}
 to x86.  To do so, the first question we need to answer is how to
-differentiate between tuple and tuples proxies, and likewise for
-arrays and array proxies.  We need just one bit to accomplish this;
+differentiate between tuple and tuples proxies\python{, and likewise for
+arrays and array proxies}.  We need just one bit to accomplish this;
 we use the bit in position $63$ of the 64-bit tag at the front of
-every tuple (see figure~\ref{fig:tuple-rep}) or array
-(section~\ref{sec:array-rep}). So far, this bit has been set to $0$,
+every tuple (see figure~\ref{fig:tuple-rep})\python{ or array
+(section~\ref{sec:array-rep})}. So far, this bit has been set to $0$,
 so for \racket{\code{inject-vector}}\python{\code{InjectTuple}} we leave
 it that way.
 {\if\edition\racketEd    
@@ -20754,13 +20800,11 @@ movq %r11, |$\itm{lhs'}$|
 \python{\noindent The translation for \code{InjectListProxy} should set bit $63$
   of the tag and also bit $62$, to differentiate between arrays and tuples.}
 
-The \racket{\code{proxy?} operation consumes}
+The \racket{\code{proxy?} operation consumes}%
 \python{\code{is\_tuple\_proxy} and \code{is\_array\_proxy} operations
   consume}
-%
 the information so carefully stashed away by the injections.  It
-isolates bit $63$ to tell whether the value is a tuple/array or a
-proxy.
+isolates bit $63$ to tell whether the value is a proxy.
 %
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -20790,13 +20834,14 @@ The \racket{\code{project-vector} operation is}
 \python{\code{project\_tuple} and \code{project\_array} operations are}
 straightforward to translate, so we leave that to the reader.
 
-Regarding the element access operations for tuples and arrays, the
+Regarding the element access operations for tuples\python{ and arrays}, the
 runtime provides procedures that implement them (they are recursive
 functions!), so here we simply need to translate these tuple
 operations into the appropriate function call. For example, here is
 the translation for
 \racket{\code{proxy-vector-ref}}\python{\code{proxy\_tuple\_load}}.
 {\if\edition\racketEd
+\begin{minipage}{0.96\textwidth}
 \begin{lstlisting}
 (Assign |$\itm{lhs}$| (Prim 'proxy-vector-ref (list |$e_1$| |$e_2$|)))
 |$\Rightarrow$|
@@ -20805,6 +20850,7 @@ movq |$e_2'$|, %rsi
 callq proxy_vector_ref
 movq %rax, |$\itm{lhs'}$|
 \end{lstlisting}
+\end{minipage}
 \fi}
 {\if\edition\pythonEd
 \begin{lstlisting}
@@ -20816,17 +20862,17 @@ callq proxy_vector_ref
 movq %rax, |$\itm{lhs'}$|
 \end{lstlisting}
 \fi}
+
+{\if\edition\pythonEd
+% TODO: revisit the names vecof for python -Jeremy  
 We translate 
-\racket{\code{proxy-vectof-ref}}\python{\code{proxy\_array\_load}}
-to \code{proxy\_vecof\_ref},
-\racket{\code{proxy-vectof-set!}}\python{\code{proxy\_array\_store}}
-to \code{proxy\_vecof\_set}, and
-\racket{\code{proxy-vectof-length}}\python{\code{proxy\_array\_len}}
-to \code{proxy\_vecof\_length}.
+\code{proxy\_array\_load} to \code{proxy\_vecof\_ref},
+\code{proxy\_array\_store} to \code{proxy\_vecof\_set}, and
+\code{proxy\_array\_len} to \code{proxy\_vecof\_length}.
+\fi}
 
 We have another batch of operations to deal with: those for the
-\CANYTY{} type. Recall that overload resolution
-(section~\ref{sec:gradual-resolution}) generates an
+\CANYTY{} type. Recall that we generate an
 \racket{\code{any-vector-ref}}\python{\code{any\_load\_unsafe}} when
 there is a element access on something of type \CANYTY{}, and
 similarly for
@@ -20835,19 +20881,18 @@ similarly for
 section~\ref{sec:select-Lany} we selected instructions for these
 operations on the basis of the idea that the underlying value was a tuple or
 array. But in the current setting, the underlying value is of type
-\PTUPLETYNAME{} or \PARRAYTYNAME{}.  We have added two runtime
-functions to deal with this: \code{proxy\_vec\_ref},
-\code{proxy\_vec\_set}, and
-\code{proxy\_vec\_length}, that inspect bit $62$ of the tag
-to determine whether the value is a tuple or array, and then
-dispatches to the the appropriate function for
-tuples (e.g. \code{proxy\_vector\_ref}) or arrays
-(e.g. \code{proxy\_vecof\_ref}).
+\PTUPLETYNAME{}\python{ or \PARRAYTYNAME{}}.  We have added three runtime
+functions to deal with this:
+\code{proxy\_vector\_ref},
+\code{proxy\_vector\_set}, and
+\code{proxy\_vector\_length}, that inspect bit $62$ of the tag
+to determine whether the value is a proxy, and then
+dispatches to the the appropriate code.
 %
 So \racket{\code{any-vector-ref}}\python{\code{any\_load\_unsafe}}
 can be translated as follows.
 We begin by projecting the underlying value out of the tagged value and
-then call the \code{proxy\_vec\_ref} procedure in the runtime.
+then call the \code{proxy\_vector\_ref} procedure in the runtime.
 {\if\edition\racketEd
 \begin{lstlisting}
 (Assign |$\itm{lhs}$| (Prim 'any-vec-ref (list |$e_1$| |$e_2$|)))
@@ -20855,7 +20900,7 @@ then call the \code{proxy\_vec\_ref} procedure in the runtime.
 movq |$\neg 111$|, %rdi
 andq |$e_1'$|, %rdi
 movq |$e_2'$|, %rsi
-callq proxy_vec_ref
+callq proxy_vector_ref
 movq %rax, |$\itm{lhs'}$|
 \end{lstlisting}
 \fi}
@@ -20866,7 +20911,7 @@ Assign([|$\itm{lhs}$|], Call(Name('any_load_unsafe'), [|$e_1$|, |$e_2$|]))
 movq |$\neg 111$|, %rdi
 andq |$e_1'$|, %rdi
 movq |$e_2'$|, %rsi
-callq proxy_vec_ref
+callq proxy_vector_ref
 movq %rax, |$\itm{lhs'}$|
 \end{lstlisting}
 \fi}
@@ -20874,8 +20919,8 @@ movq %rax, |$\itm{lhs'}$|
 and \racket{\code{any-vector-length}}\python{\code{any\_len}} operators 
 are translated in a similar way. Alternatively, you could generate
 instructions to open-code
-the \code{proxy\_vec\_ref}, \code{proxy\_vec\_set},
-and \code{proxy\_vec\_length} functions.
+the \code{proxy\_vector\_ref}, \code{proxy\_vector\_set},
+and \code{proxy\_vector\_length} functions.
 
 \begin{exercise}\normalfont\normalsize
   Implement a compiler for the gradually typed \LangGrad{} language by
@@ -20902,15 +20947,15 @@ and \code{proxy\_vec\_length} functions.
 {\if\edition\racketEd    
 \begin{tikzpicture}[baseline=(current  bounding  box.center),scale=0.85]
 \node (Lgradual) at (0,4)  {\large \LangGrad{}};
-\node (Lgradual2) at (4,4)  {\large \LangGrad{}};
-\node (Lgradual3) at (8,4)  {\large \LangCast{}};
-\node (Lgradual4) at (12,4)  {\large \LangProxy{}};
+\node (Lgradual2) at (4,4)  {\large \LangCast{}};
+\node (Lgradual3) at (8,4)  {\large \LangProxy{}};
+\node (Lgradual4) at (12,4)  {\large \LangPVec{}};
 \node (Lgradualr) at (12,2)  {\large \LangPVec{}};
 \node (Lgradualp) at (8,2)  {\large \LangPVec{}};
-\node (Llambdapp) at (4,2)  {\large \LangPVec{}};
+\node (Llambdapp) at (4,2)  {\large \LangPVecFunRef{}};
 \node (Llambdaproxy-4) at (0,2)  {\large \LangPVecFunRef{}};
 \node (Llambdaproxy-5) at (0,0)  {\large \LangPVecFunRef{}};
-\node (F1-1) at (4,0)  {\large \LangPVecFunRef{}};
+%\node (F1-1) at (4,0)  {\large \LangPVecFunRef{}};
 \node (F1-2) at (8,0)  {\large \LangPVecFunRef{}};
 \node (F1-3) at (12,0)  {\large \LangPVecFunRef{}};
 \node (F1-4) at (12,-2)  {\large \LangPVecAlloc{}};
@@ -20927,24 +20972,24 @@ and \code{proxy\_vec\_length} functions.
 
 
 \path[->,bend left=15] (Lgradual) edge [above] node
-     {\ttfamily\footnotesize shrink} (Lgradual2);
+     {\ttfamily\footnotesize cast\_insert} (Lgradual2);
 \path[->,bend left=15] (Lgradual2) edge [above] node
-     {\ttfamily\footnotesize uniquify} (Lgradual3);
+     {\ttfamily\footnotesize lower\_casts} (Lgradual3);
 \path[->,bend left=15] (Lgradual3) edge [above] node
-     {\ttfamily\footnotesize reveal\_functions} (Lgradual4);
+     {\ttfamily\footnotesize differentiate\_proxies} (Lgradual4);
 \path[->,bend left=15] (Lgradual4) edge [left] node
-     {\ttfamily\footnotesize resolve} (Lgradualr);
-\path[->,bend left=15] (Lgradualr) edge [below] node
-     {\ttfamily\footnotesize cast\_insert} (Lgradualp);
+     {\ttfamily\footnotesize shrink} (Lgradualr);
+\path[->,bend left=15] (Lgradualr) edge [above] node
+     {\ttfamily\footnotesize uniquify} (Lgradualp);
 \path[->,bend right=15] (Lgradualp) edge [above] node
-     {\ttfamily\footnotesize lower\_casts} (Llambdapp);
+     {\ttfamily\footnotesize reveal\_functions} (Llambdapp);
+%% \path[->,bend left=15] (Llambdaproxy-4) edge [left] node
+%%      {\ttfamily\footnotesize resolve} (Lgradualr);
 \path[->,bend right=15] (Llambdapp) edge [above] node
-     {\ttfamily\footnotesize differentiate\_proxies} (Llambdaproxy-4);
+     {\ttfamily\footnotesize reveal\_casts} (Llambdaproxy-4);
 \path[->,bend right=15] (Llambdaproxy-4) edge [right] node
-     {\ttfamily\footnotesize reveal\_casts} (Llambdaproxy-5);
-\path[->,bend right=15] (Llambdaproxy-5) edge [below] node
-     {\ttfamily\footnotesize convert\_assignments} (F1-1);
-\path[->,bend left=15] (F1-1) edge [above] node
+     {\ttfamily\footnotesize convert\_assignments} (Llambdaproxy-5);
+\path[->,bend right=10] (Llambdaproxy-5) edge [above] node
      {\ttfamily\footnotesize convert\_to\_closures} (F1-2);
 \path[->,bend left=15] (F1-2) edge [above] node
      {\ttfamily\footnotesize limit\_functions} (F1-3);
