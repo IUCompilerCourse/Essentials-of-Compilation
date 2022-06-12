@@ -116,6 +116,8 @@ showstringspaces=false
 
 \halftitlepage
 
+\clearemptydoublepage
+
 \Title{Essentials of Compilation}
 
 \Booksubtitle{An Incremental Approach in \python{Python}\racket{Racket}}
@@ -4073,6 +4075,687 @@ $\itm{residual}$ expressions.  Once the improvements are complete,
 make sure that your compiler still passes all the tests.  After
 all, fast code is useless if it produces incorrect results!
 \end{exercise}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\if\edition\pythonEd
+\chapter{Parsing}
+\label{ch:parsing}
+\setcounter{footnote}{0}
+
+The main ideas covered in this \Part{} are
+\begin{description}
+\item[lexical analysis] the identification of tokens (i.e., words)
+  within sequences of characters.
+\item[parsing] the identification of sentence structure within
+  sequences of tokens.
+\end{description}
+
+In general, the syntax of the source code for a language is called its
+\emph{concrete syntax}. The concrete syntax of $P_0$ specifies which
+programs, expressed as sequences of characters, are $P_0$ programs.
+The process of transforming a program written in the concrete syntax
+(a sequence of characters) into an abstract syntax tree is
+traditionally subdivided into two parts: \emph{lexical analysis}
+(often called scanning) and \emph{parsing}. The lexical analysis phase
+translates the sequence of characters into a sequence of
+\emph{tokens}, where each token consists of several characters. The
+parsing phase organizes the tokens into a \emph{parse tree} as
+directed by the grammar of the language and then translates the parse
+tree into an abstract syntax tree.
+
+It is feasible to implement a compiler without doing lexical analysis,
+instead just parsing.  However, scannerless parsers tend to be slower,
+which mattered back when computers were slow, and sometimes still
+matters for very large files.
+
+
+
+%(If you need a refresher on how a context-free grammar specifies a
+%language, read Section 3.1 of~\cite{Appel:2003fk}.)
+
+
+The Python Lex-Yacc tool, abbreviated PLY~\cite{Beazley:fk}, is an
+easy-to-use Python imitation of the original \texttt{lex} and
+\texttt{yacc} C programs. Lex was written by Eric Schmidt and Mike
+Lesk~\cite{Lesk:1975uq} at Bell Labs, and is the standard lexical
+analyzer generator on many Unix systems. 
+%
+%The input to \texttt{lex} is
+%a specification consisting of a list of the kinds of tokens and a
+%regular expression for each.  The output of \texttt{lex} is a program
+%that analyzes a text file, turning it into a sequence of tokens. 
+%
+YACC stands from Yet Another Compiler Compiler and was originally
+written by Stephen C. Johnson at AT\&T~\cite{Johnson:1979qy}.
+%
+%The input to
+%\texttt{yacc} is a context-free grammar together with an action (a
+%chunk of code) for each production. The output of \texttt{yacc} is a
+%program that parses a text file and fires the appropriate actions when
+%a production is applied. 
+%
+The PLY tool combines the functionality of both \texttt{lex} and
+\texttt{yacc}. In this \Part{} we will use the PLY tool to generate
+a lexer and parser for the $P_0$ subset of Python.
+
+
+
+\section{Lexical analysis}
+\label{sec:lex}
+
+The lexical analyzer turns a sequence of characters (a string) into a
+sequence of tokens. For example, the string
+\begin{lstlisting}
+'print 1 + 3'
+\end{lstlisting}
+\noindent will be converted into the list of tokens
+\begin{lstlisting}
+['print','1','+','3']
+\end{lstlisting}
+Actually, to be more accurate, each token will contain the token
+\texttt{type} and the token's \texttt{value}, which is the string from
+the input that matched the token.
+
+With the PLY tool, the types of the tokens must be specified by
+initializing the \texttt{tokens} variable. For example,
+
+\begin{lstlisting}
+tokens = ('PRINT','INT','PLUS')
+\end{lstlisting}
+
+Next we must specify which sequences of characters will map to each
+type of token. We do this using regular expression. The term
+``regular'' comes from ``regular languages'', which are the
+(particularly simple) set of languages that can be recognized by a
+finite automata. A \emph{regular expression} is a pattern formed of
+the following core elements:
+
+\begin{enumerate}
+\item a character, e.g. \texttt{a}. The only string that matches this
+  regular expression is \texttt{a}.
+\item two regular expressions, one followed by the other
+  (concatenation), e.g. \texttt{bc}.  The only string that matches
+  this regular expression is \texttt{bc}.
+\item one regular expression or another (alternation), e.g.
+  \texttt{a|bc}.  Both the string \texttt{'a'} and \texttt{'bc'} would
+  be matched by this pattern.
+\item a regular expression repeated zero or more times (Kleene
+  closure), e.g. \texttt{(a|bc)*}.  The string \texttt{'bcabcbc'}
+  would match this pattern, but not \texttt{'bccba'}.
+\item the empty sequence (epsilon)
+\end{enumerate}
+
+The Python support for regular expressions goes beyond the core
+elements and include many other convenient short-hands, for example
+\texttt{+} is for repetition one or more times. If you want to refer
+to the actual character \texttt{+}, use a backslash to escape it.
+Section \href{http://docs.python.org/lib/re-syntax.html}{4.2.1 Regular
+  Expression Syntax} of the Python Library Reference gives an in-depth
+description of the extended regular expressions supported by Python.
+
+Normal Python strings give a special interpretation to backslashes,
+which can interfere with their interpretation as regular expressions.
+To avoid this problem, use Python's raw strings instead of normal
+strings by prefixing the string with an \texttt{r}.  For example, the
+following specifies the regular expression for the \texttt{'PLUS'}
+token.
+
+\begin{lstlisting}
+t_PLUS =   r'\+'
+\end{lstlisting}
+
+\noindent The \lstinline{t_} is a naming convention that PLY uses to know when
+you are defining the regular expression for a token. 
+
+Sometimes you need to do some extra processing for certain kinds of
+tokens.  For example, for the \texttt{INT} token it is nice to convert
+the matched input string into a Python integer. With PLY you can do
+this by defining a function for the token. The function must have the
+regular expression as its documentation string and the body of the
+function should overwrite in the \texttt{value} field of the token.  Here's
+how it would look for the \texttt{INT} token. The \lstinline{\d} regular
+expression stands for any decimal numeral (0-9).
+
+\begin{lstlisting}
+def t_INT(t):
+    r'\d+'
+    try:
+      t.value = int(t.value)
+    except ValueError:
+      print "integer value too large", t.value
+      t.value = 0
+    return t
+\end{lstlisting}
+
+In addition to defining regular expressions for each of the tokens,
+you'll often want to perform special handling of newlines and
+whitespace. The following is the code for counting newlines and for
+telling the lexer to ignore whitespace. (Python has complex rules
+for dealing with whitespace that we'll ignore for now.)
+% (We'll need to reconsider this later to handle Python indentation rules.)
+
+\begin{lstlisting}
+def t_newline(t):
+    r'\n+'
+    t.lexer.lineno += len(t.value)
+
+t_ignore  = ' \t'  
+\end{lstlisting}
+
+If a portion of the input string is not matched by any of the tokens,
+then the lexer calls the error function that you provide. The following
+is an example error function.
+
+\begin{lstlisting}
+def t_error(t):
+    print "Illegal character '%s'" % t.value[0]
+    t.lexer.skip(1)  
+\end{lstlisting}
+
+\noindent Last but not least, you'll need to instruct PLY to generate
+the lexer from your specification with the following code.
+
+\begin{lstlisting}
+import ply.lex as lex
+lex.lex()
+\end{lstlisting}
+
+\noindent Figure~\ref{fig:lex} shows the complete code for an example
+lexer.
+
+\begin{figure}[htbp]
+  \centering
+  \begin{tabular}{|cl}
+&
+\begin{lstlisting}
+tokens = ('PRINT','INT','PLUS')
+
+t_PRINT = r'print'
+
+t_PLUS =   r'\+'
+
+def t_INT(t):
+    r'\d+'
+    try:
+      t.value = int(t.value)
+    except ValueError:
+      print "integer value too large", t.value
+      t.value = 0
+    return t
+
+t_ignore  = ' \t'  
+
+def t_newline(t):
+  r'\n+'
+  t.lexer.lineno += t.value.count("\n")
+
+def t_error(t):
+  print "Illegal character '%s'" % t.value[0]
+  t.lexer.skip(1)
+
+import ply.lex as lex
+lex.lex()
+\end{lstlisting}
+\end{tabular}
+  \caption{Example lexer implemented using the PLY lexer generator.}
+  \label{fig:lex}
+\end{figure}
+
+\begin{exercise}
+  Write a PLY lexer specification for $P_0$ and test it on a few input
+  programs, looking at the output list of tokens to see if they make
+  sense.
+\end{exercise}
+
+%\section{Parsing}
+%\label{sec:parsing}
+
+%Explain LR (shift-reduce parsing).
+%Show an example PLY parser.
+%Explain actions and AST construction.
+%Start symbols.
+%Specifying precedence.
+%Looking at the parser.out file.
+%Debugging shift/reduce and reduce/reduce errors.
+
+%We start with some background on context-free grammars
+%(Section~\ref{sec:cfg}), then discuss how to use PLY to do parsing
+%(Section~\ref{sec:ply-parsing}). 
+
+%, so we
+%discuss the algorithm it uses in Sections \ref{sec:lalr} and
+%\ref{sec:table}. This section concludes with a discussion of using
+%precedence levels to resolve parsing conflicts.
+
+
+\section{Background on CFGs and the $P_0$ grammar. }
+\label{sec:cfg}
+
+A \emph{context-free grammar} (CFG) consists of a set of \emph{rules} (also
+called productions) that describes how to categorize strings of
+various forms. There are two kinds of categories, \emph{terminals} and
+\emph{non-terminals}.  The terminals correspond to the tokens from the
+lexical analysis. Non-terminals are used to categorize different parts
+of a language, such as the distinction between statements and
+expressions in Python and C. The term \emph{symbol} refers to both
+terminals and non-terminals.  A grammar rule has two parts, the
+left-hand side is a non-terminal and the right-hand side is a sequence
+of zero or more symbols. The notation \lstinline{::=} is used to
+separate the left-hand side from the right-hand side. The following is
+a rule that could be used to specify the syntax for an addition
+operator.
+%
+\begin{lstlisting}
+$(1)$ expression ::= expression PLUS expression
+\end{lstlisting}
+%
+This rule says that if a string can be divided into three parts, where
+the first part can be categorized as an expression, the second part is
+the \texttt{PLUS} non-terminal (token), and the third part can be
+categorized as an expression, then the entire string can be
+categorized as an expression.  The next example rule has the
+non-terminal \texttt{INT} on the right-hand side and says that a
+string that is categorized as an integer (by the lexer) can also be
+categorized as an expression.  As is apparent here, a string can be
+categorized by more than one non-terminal.
+\begin{lstlisting}
+$(2)$ expression ::= INT
+\end{lstlisting}
+
+To \emph{parse} a string is to determine how the string can be
+categorized according to a given grammar.  Suppose we have the string
+``\lstinline{1 + 3}''.  Both the \texttt{1} and the \texttt{3} can be
+categorized as expressions using rule $2$.  We can then use rule 1 to
+categorize the entire string as an expression.  A \emph{parse tree} is
+a good way to visualize the parsing process. (You will be tempted to
+confuse parse trees and abstract syntax tress, but the excellent
+students will carefully study the difference to avoid this confusion.)
+A parse tree for ``\lstinline{1 + 3}'' is shown in
+Figure~\ref{fig:parse-tree}. The best way to start drawing a parse
+tree is to first list the tokenized string at the bottom of the page.
+These tokens correspond to terminals and will form the leaves of the
+parse tree. You can then start to categorize non-terminals, or
+sequences of non-terminals, using the parsing rules.  For example, we
+can categorize the integer ``\texttt{1}'' as an expression using rule
+$(2)$, so we create a new node above ``\texttt{1}'', label the node
+with the left-hand side terminal, in this case \texttt{expression},
+and draw a line down from the new node down to ``\texttt{1}''. As an
+optional step, we can record which rule we used in parenthesis after
+the name of the terminal.  We then repeat this process until all of
+the leaves have been connected into a single tree, or until no more
+rules apply.
+
+\begin{figure}[htbp]
+  \centering
+\includegraphics[width=2.5in]{simple-parse-tree}  
+  \caption{The parse tree for ``\texttt{1 + 3}''.}
+  \label{fig:parse-tree}
+\end{figure}
+
+
+There can be more than one parse tree for the same string if the
+grammar is ambiguous. For example, the string ``\texttt{1 + 2 + 3}''
+can be parsed two different ways using rules 1 and 2, as shown in
+Figure~\ref{fig:ambig}. In Section~\ref{sec:precedence} we'll discuss
+ways to avoid ambiguity through the use of precedence levels and
+associativity.
+
+\begin{figure}[htbp]
+  \centering
+\includegraphics[width=5in]{ambig-parse-tree}  
+  \caption{Two parse trees for ``\texttt{1 + 2 + 3}''.}
+  \label{fig:ambig}
+\end{figure}
+
+The process describe above for creating a parse-tree was
+``bottom-up''. We started at the leaves of the tree and then worked
+back up to the root. An alternative way to build parse-trees is the
+``top-down'' \emph{derivation} approach. This approach is not a
+practical way to parse a particular string but it is helpful for
+thinking about all possible strings that are in the language described
+by the grammar.  To perform a derivation, start by drawing a single
+node labeled with the starting non-terminal for the grammar. This is
+often the \texttt{program} non-terminal, but in our case we simply
+have \texttt{expression}. We then select at random any grammar rule
+that has \texttt{expression} on the left-hand side and add new edges
+and nodes to the tree according to the right-hand side of the rule.
+The derivation process then repeats by selecting another non-terminal
+that does not yet have children. Figure~\ref{fig:derivation} shows the
+process of building a parse tree by derivation. A \emph{left-most
+  derivation} is one in which the left-most non-terminal is always
+chosen as the next non-terminal to expand. A \texttt{right-most
+  derivation} is one in which the right-most non-terminal is always
+chosen as the next non-terminal to expand. The derivation in
+Figure~\ref{fig:derivation} is a right-most derivation.
+
+\begin{figure}[htbp]
+  \centering
+\includegraphics[width=5in]{derivation}  
+  \caption{Building a parse-tree by derivation.}
+  \label{fig:derivation}
+\end{figure}
+
+
+For each subset of Python in this course, we will specify which
+language features are in a given subset of Python using context-free
+grammars.  The notation we'll use for grammars is
+\href{http://en.wikipedia.org/wiki/Extended_Backus\%E2\%80\%93Naur_form}{Extended
+  Backus-Naur Form (EBNF)}.  The grammar for $P_0$ is shown in
+Figure~\ref{fig:concrete-P0}.  This notation does not correspond
+exactly to the notation for grammars used by PLY, but it should not be
+too difficult for the reader to figure out the PLY grammar given the
+EBNF grammar.
+
+
+\begin{figure}[htbp]
+  \centering
+  \begin{tabular}{|cl}
+&
+\begin{lstlisting}
+program ::= module
+module ::= simple_statement+
+simple_statement ::= "print" expression
+                   | name "=" expression
+                   | expression
+expression ::= name
+             | decimalinteger
+             | "-" expression 
+             | expression "+" expression
+             | "(" expression ")"
+             | "input" "(" ")"
+\end{lstlisting}
+  \end{tabular}
+  \caption{Context-free grammar for the $P_0$ subset of Python.}
+  \label{fig:concrete-P0}
+\end{figure}
+
+
+\section{Generating parser with PLY}
+\label{sec:ply-parsing}
+
+Figure~\ref{fig:parser1} shows an example use of PLY to generate a
+parser. The code specifies a grammar and it specifies actions for each
+rule. For each grammar rule there is a function whose name must begin
+with \lstinline{p_}.  The document string of the function contains the
+specification of the grammar rule.  PLY uses just a colon
+\lstinline{:} instead of the usual \lstinline{::=} to separate the
+left and right-hand sides of a grammar production. The left-hand side
+symbol for the first function (as it appears in the Python file) is
+considered the start symbol.  The body of these functions contains
+code that carries out the action for the production.
+
+Typically, what you want to do in the actions is build an abstract
+syntax tree, as we do here. The parameter \lstinline{t} of the
+function contains the results from the actions that were carried out
+to parse the right-hand side of the production. You can index into
+\lstinline{t} to access these results, starting with \lstinline{t[1]}
+for the first symbol of the right-hand side. To specify the result of
+the current action, assign the result into \lstinline{t[0]}. So, for
+example, in the production \lstinline{expression : INT}, we build a
+\lstinline{Const} node containing an integer that we obtain from
+\lstinline{t[1]}, and we assign the \lstinline{Const} node to
+\lstinline{t[0]}.
+
+
+\begin{figure}[htbp]
+  \centering
+  \centering
+  \begin{tabular}{|cl}
+&
+\begin{lstlisting}
+from compiler.ast import Printnl, Add, Const
+
+def p_print_statement(t):
+  'statement : PRINT expression'
+  t[0] = Printnl([t[2]], None)
+  
+def p_plus_expression(t):
+  'expression : expression PLUS expression'
+  t[0] = Add((t[1], t[3]))
+
+def p_int_expression(t):
+  'expression : INT'
+  t[0] = Const(t[1])
+
+def p_error(t):
+  print "Syntax error at '%s'" % t.value
+
+import ply.yacc as yacc
+yacc.yacc()
+\end{lstlisting}
+\end{tabular}
+  \caption{First attempt at writing a parser using PLY.}
+  \label{fig:parser1}
+\end{figure}
+
+The PLY parser generator takes your grammar and generates a parser
+that uses the LALR(1) shift-reduce algorithm, which is the most common
+parsing algorithm in use today. LALR(1) stands for Look Ahead
+Left-to-right with Rightmost-derivation and 1 token of lookahead.
+Unfortunately, the LALR(1) algorithm cannot handle all context-free
+grammars, so sometimes you will get error messages from PLY. To understand
+these errors and know how to avoid them, you have to know a little bit
+about the parsing algorithm.
+
+\section{The LALR(1) algorithm}
+\label{sec:lalr}
+
+To understand the error messages of PLY, one needs to understand the
+underlying parsing algorithm.
+%
+The LALR(1) algorithm uses a stack and a finite automata.  Each
+element of the stack is a pair: a state number and a symbol. The
+symbol characterizes the input that has been parsed so-far and the
+state number is used to remember how to proceed once the next
+symbol-worth of input has been parsed.  Each state in the finite
+automata represents where the parser stands in the parsing process
+with respect to certain grammar rules.  Figure~\ref{fig:shift-reduce}
+shows an example LALR(1) parse table generated by PLY for the grammar
+specified in Figure~\ref{fig:parser1}. When PLY generates a parse
+table, it also outputs a textual representation of the parse table to
+the file \texttt{parser.out} which is useful for debugging purposes.
+
+Consider state 1 in Figure~\ref{fig:shift-reduce}. The parser has just
+read in a \lstinline{PRINT} token, so the top of the stack is
+\lstinline{(1,PRINT)}. The parser is part of the way through parsing
+the input according to grammar rule 1, which is signified by showing
+rule 1 with a dot after the PRINT token and before the expression
+non-terminal.  A rule with a dot in it is called an \emph{item}. There
+are several rules that could apply next, both rule 2 and 3, so state 1
+also shows those rules with a dot at the beginning of their right-hand
+sides. The edges between states indicate which transitions the
+automata should make depending on the next input token. So, for
+example, if the next input token is INT then the parser will push INT
+and the target state 4 on the stack and transition to state 4.
+Suppose we are now at the end of the input. In state 4 it says we
+should reduce by rule 3, so we pop from the stack the same number of
+items as the number of symbols in the right-hand side of the rule, in
+this case just one.  We then momentarily jump to the state at the top
+of the stack (state 1) and then follow the goto edge that corresponds
+to the left-hand side of the rule we just reduced by, in this case
+\lstinline{expression}, so we arrive at state 3.  (A slightly longer
+example parse is shown in Figure~\ref{fig:shift-reduce}.)
+
+
+\begin{figure}[htbp]
+  \centering
+\includegraphics[width=5.0in]{shift-reduce-conflict}  
+  \caption{An LALR(1) parse table and a trace of an example run.}
+  \label{fig:shift-reduce}
+\end{figure}
+
+In general, the shift-reduce algorithm works as follows. Look at the
+next input token.
+\begin{itemize}
+\item If there there is a shift edge for the input token, push the
+  edge's target state and the input token on the stack and proceed to
+  the edge's target state.
+\item If there is a reduce action for the input token, pop $k$
+  elements from the stack, where $k$ is the number of symbols in the
+  right-hand side of the rule being reduced. Jump to the state at the
+  top of the stack and then follow the goto edge for the non-terminal
+  that matches the left-hand side of the rule we're reducing by. Push
+  the edge's target state and the non-terminal on the stack.
+\end{itemize}
+
+Notice that in state 6 of Figure~\ref{fig:shift-reduce} there is both
+a shift and a reduce action for the token \lstinline{PLUS}, so the
+algorithm does not know which action to take in this case. When a
+state has both a shift and a reduce action for the same token, we say
+there is a \emph{shift/reduce conflict}.  In this case, the conflict
+will arise, for example, when trying to parse the input
+\lstinline{print 1 + 2 + 3}.  After having consumed
+\lstinline{print 1 + 2} the parser will be in state 6, and it will not 
+know whether to reduce to form an expression of \lstinline{1 + 2}, 
+or whether it should proceed by shifting the next \lstinline{+} from 
+the input.
+
+A similar kind of problem, known as a \emph{reduce/reduce} conflict,
+arises when there are two reduce actions in a state for the same
+token. To understand which grammars gives rise to shift/reduce and
+reduce/reduce conflicts, it helps to know how the parse table is
+generated from the grammar, which we discuss next.
+
+\subsection{Parse table generation}
+\label{sec:table}
+
+The parse table is generated one state at a time. State 0 represents
+the start of the parser. We add the production for the start symbol to
+this state with a dot at the beginning of the right-hand side.  If the
+dot appears immediately before another non-terminal, we add all the
+productions with that non-terminal on the left-hand side. Again, we
+place a dot at the beginning of the right-hand side of each the new
+productions. This process called \emph{state closure} is continued
+until there are no more productions to add. We then examine each item
+in the current state $I$. Suppose an item has the form $A ::=
+\alpha.X\beta$, where $A$ and $X$ are symbols and $\alpha$ and $\beta$
+are sequences of symbols. We create a new state, call it $J$.  If $X$
+is a terminal, we create a shift edge from $I$ to $J$, whereas if $X$
+is a non-terminal, we create a goto edge from $I$ to $J$.  We then
+need to add some items to state $J$. We start by adding all items from
+state $I$ that have the form $B ::= \gamma.X\kappa$ (where $B$ is any
+symbol and $\gamma$ and $\kappa$ are arbitrary sequences of symbols),
+but with the dot moved past the $X$. We then perform state closure on
+$J$.  This process repeats until there are no more states or edges to
+add.
+
+We then mark states as accepting states if they have an item that is
+the start production with a dot at the end.  Also, to add in the
+reduce actions, we look for any state containing an item with a dot at
+the end. Let $n$ be the rule number for this item. We then put a
+reduce $n$ action into that state for every token $Y$. For example, in
+Figure~\ref{fig:shift-reduce} state 4 has an item with a dot at the
+end. We therefore put a reduce by rule 3 action into state 4 for every
+token. (Figure~\ref{fig:shift-reduce} does not show a reduce rule for
+INT in state 4 because this grammar does not allow
+two consecutive INT tokens in the input. We will not go into how this
+can be figured out, but in any event it does no harm to have a reduce
+rule for INT in state 4; it just means the input will be rejected at a
+later point in the parsing process.)
+
+\begin{exercise}
+On a piece of paper, walk through the parse table generation 
+process for the grammar in Figure~\ref{fig:parser1} and check
+your results against Figure~\ref{fig:shift-reduce}. 
+\end{exercise}
+
+
+\subsection{Resolving conflicts with precedence declarations}
+\label{sec:precedence}
+
+To solve the shift/reduce conflict in state 6, we can add the
+following precedence rules, which says addition associates to the left
+and takes precedence over printing. This will cause state 6 to choose
+reduce over shift.
+
+\begin{lstlisting}
+precedence = (
+    ('nonassoc','PRINT'),
+    ('left','PLUS')
+    )
+\end{lstlisting}
+
+In general, the precedence variable should be assigned a tuple of
+tuples. The first element of each inner tuple should be an
+associativity (nonassoc, left, or right) and the rest of the elements
+should be tokens.  The tokens that appear in the same inner tuple have
+the same precedence, whereas tokens that appear in later tuples have a
+higher precedence.  Thus, for the typical precedence for arithmetic
+operations, we would specify the following:
+
+\begin{lstlisting}
+precedence = (
+    ('left','PLUS','MINUS'),
+    ('left','TIMES','DIVIDE')
+    )
+\end{lstlisting}
+
+Figure~\ref{fig:parser-resolved} shows the Python code for generating
+a lexer and parser using PLY.
+
+\begin{figure}[htbp]
+  \centering
+\begin{lstlisting}[basicstyle=\footnotesize\ttfamily]
+# Lexer
+tokens = ('PRINT','INT','PLUS')
+t_PRINT = r'print'
+t_PLUS = r'\+'
+def t_INT(t):
+    r'\d+'
+    try:
+        t.value = int(t.value)
+    except ValueError:
+        print "integer value too large", t.value
+        t.value = 0
+    return t
+t_ignore  = ' \t'  
+def t_newline(t):
+    r'\n+'
+    t.lexer.lineno += t.value.count("\n")
+def t_error(t):
+    print "Illegal character '%s'" % t.value[0]
+    t.lexer.skip(1)
+import ply.lex as lex
+lex.lex()
+# Parser
+from compiler.ast import Printnl, Add, Const
+precedence = (
+    ('nonassoc','PRINT'),
+    ('left','PLUS')
+    )
+def p_print_statement(t):
+    'statement : PRINT expression'
+    t[0] = Printnl([t[2]], None)
+def p_plus_expression(t):
+    'expression : expression PLUS expression'
+    t[0] = Add((t[1], t[3]))
+def p_int_expression(t):
+    'expression : INT'
+    t[0] = Const(t[1])
+def p_error(t):
+    print "Syntax error at '%s'" % t.value
+import ply.yacc as yacc
+yacc.yacc()
+\end{lstlisting}
+  \caption{Example parser with precedence declarations to resolve conflicts.}
+  \label{fig:parser-resolved}
+\end{figure}
+
+\begin{exercise}
+  Write a PLY grammar specification for $P_0$ and update your compiler
+  so that it uses the generated lexer and parser instead of using the
+  parser in the \lstinline{compiler} module. In addition to handling
+  the grammar in Figure~\ref{fig:concrete-P0}, you also need to handle
+  Python-style comments, everything following a \texttt{\#} symbol up
+  to the newline should be ignored.  Perform regression testing on
+  your compiler to make sure that it still passes all of the tests
+  that you created for $P_0$.
+\end{exercise}
+
+
+\fi
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Register Allocation}
