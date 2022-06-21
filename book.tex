@@ -497,13 +497,14 @@ perform.\index{subject}{concrete syntax}\index{subject}{abstract
   syntax}\index{subject}{abstract syntax
   tree}\index{subject}{AST}\index{subject}{program}\index{subject}{parse}
 The process of translating from concrete syntax to abstract syntax is
-called \emph{parsing}~\citep{Aho:2006wb}. This book does not cover the
-theory and implementation of parsing.
+called \emph{parsing}~\citep{Aho:2006wb}\python{ and is studied in
+  chapter~\ref{ch:parsing-Lvar}}.
+\racket{This book does not cover the theory and implementation of parsing.}%
 %
 \racket{A parser is provided in the support code for translating from
-  concrete to abstract syntax.}
+  concrete to abstract syntax.}%
 %
-\python{We use Python's \code{ast} module to translate from concrete
+\python{For now we use Python's \code{ast} module to translate from concrete
   to abstract syntax.}
 
 ASTs can be represented inside the compiler in many different ways,
@@ -4073,6 +4074,100 @@ $\itm{residual}$ expressions.  Once the improvements are complete,
 make sure that your compiler still passes all the tests.  After
 all, fast code is useless if it produces incorrect results!
 \end{exercise}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Parsing}
+\label{ch:parsing-Lvar}
+\setcounter{footnote}{0}
+
+\index{subject}{parsing}
+
+
+In this chapter we learn how to use the Lark parser generator to
+translate the concrete syntax of \LangVar{} (a sequence of characters)
+into an abstract syntax tree.  A parser generator takes in a
+specification of the concrete syntax and produces a parser. Even
+though a parser generator does most of the work for us, using one
+properly requires considerable knowledge about parsing algorithms.  In
+particular, we must learn about the specification languages used by
+parser generators and we must learn how to deal with ambiguity in our
+language specifications.
+
+The process of parsing is traditionally subdivided into two phases:
+\emph{lexical analysis} (often called scanning) and
+\emph{parsing}. The lexical analysis phase translates the sequence of
+characters into a sequence of \emph{tokens}, that is, words consisting
+of several characters. The parsing phase organizes the tokens into a
+\emph{parse tree} that captures how the tokens were matched by rules
+in the grammar of the language. The reason for the subdivision into
+two phases is to enable the use of a faster but less powerful
+algorithm for lexical analysis and the use of a slower but more
+powerful algorithm for parsing.
+%
+Likewise, parser generators typical come in pairs, with separate
+generators for the lexical analyzer and for the parser.  A paricularly
+influential pair of generators were \texttt{lex} and
+\texttt{yacc}. The \texttt{lex} generator was written by Eric Schmidt
+and Mike Lesk~\cite{Lesk:1975uq} at Bell Labs. The \texttt{yacc}
+generator was written by Stephen C. Johnson at
+AT\&T~\cite{Johnson:1979qy} and stands for Yet Another Compiler
+Compiler.
+
+The Lark parse generator that we use in this chapter includes both a
+lexical analyzer and a parser. The next section discusses lexical
+analysis and the remainder of the chapter discusses parsing.
+
+
+\section{Lexical analysis}
+\label{sec:lex}
+
+The lexical analyzers produced by Lark turn a sequence of characters
+(a string) into a sequence of token objects. For example, the string
+\begin{lstlisting}
+'print(1 + 3)'
+\end{lstlisting}
+\noindent could be converted into the following sequence of token objects
+\begin{lstlisting}
+Token('PRINT', 'print')
+Token('LPAR', '(')
+Token('INT', '1')
+Token('PLUS', '+')
+Token('INT', '3')
+Token('RPAR', ')')
+Token('NEWLINE', '\n')
+\end{lstlisting}
+where each token includes a field for its \code{type}, such as \code{'INT'},
+and for its \code{value}, such as \code{'1'}.
+
+Following in the tradition of \code{lex}, the Lark generator requires
+a specification of which words should be categorized as which types of
+the tokens using \emph{regular expressions}.  The term ``regular''
+comes from ``regular languages'', which are the (particularly simple)
+set of languages that can be recognized by a finite automata. A
+\emph{regular expression} is a pattern formed of the following core
+elements:\index{subject}{regular expression}
+
+\begin{enumerate}
+\item a single character, e.g. \texttt{a}. The only string that matches this
+  regular expression is \texttt{a}.
+\item two regular expressions, one followed by the other
+  (concatenation), e.g. \texttt{bc}.  The only string that matches
+  this regular expression is \texttt{bc}.
+\item one regular expression or another (alternation), e.g.
+  \texttt{a|bc}.  Both the string \texttt{'a'} and \texttt{'bc'} would
+  be matched by this pattern.
+\item a regular expression repeated zero or more times (Kleene
+  closure), e.g. \texttt{(a|bc)*}.  The string \texttt{'bcabcbc'}
+  would match this pattern, but not \texttt{'bccba'}.
+\item the empty sequence
+\end{enumerate}
+
+
+
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Register Allocation}
