@@ -4144,42 +4144,62 @@ and a field for its \code{value}, such as \code{'1'}.
 
 Following in the tradition of \code{lex}, the specification language
 for Lark's lexical analysis generator is one regular expression for
-each type of the token. The term \emph{regular} comes from \emph{regular
-languages}, which are the languages that can be recognized by a
-finite automata. A \emph{regular expression} is a pattern formed of
-the following core elements:\index{subject}{regular expression}
+each type of the token. The term \emph{regular} comes from
+\emph{regular languages}, which are the languages that can be
+recognized by a finite automata. A \emph{regular expression} is a
+pattern formed of the following core elements:\index{subject}{regular
+  expression}\footnote{Regular expressions traditionally include the
+  empty regular expression that matches any zero-length part of a
+  string, but Lark does not support the empty regular expression.}
 
 \begin{itemize}
-\item A single character, e.g. \code{"a"}. The only string that matches this
-  regular expression is \code{'a'}.
-\item Two regular expressions, one followed by the other
-  (concatenation), e.g. \code{"bc"}.  The only string that matches
-  this regular expression is \code{'bc'}.
-\item One regular expression or another (alternation), e.g.
-  \code{"a|bc"}.  Both the string \code{'a'} and \code{'bc'} would
-  be matched by this pattern.
-\item A regular expression repeated zero or more times (Kleene
-  closure), e.g. \code{"(a|bc)*"}.  The string \code{'bcabcbc'}
-  would match this pattern, but not \code{'bccba'}.
-\item The empty sequence.
+\item A single character $c$ is a regular expression and it only
+  matches itself. For example, the regular expression \code{a} only
+  matches with the string \code{'a'}.
+  
+\item Two regular expressions separated by a vertical bar $R_1 \mid
+  R_2$ form a regular expression that matches any string that matches
+  $R_1$ or $R_2$. For example, the regular expression \code{a|c}
+  matches the string \code{'a'} and the string \code{'c'}.
+
+\item Two regular expressions in sequence $R_1 R_2$ form a regular
+  expression that matches any string that can be formed by
+  concatenating two strings, where the first matches $R_1$
+  and the second matches $R_2$. For example, the regular expression
+  \code{(a|c)b} matches the strings \code{'ab'} and \code{'cb'}.
+  (Parentheses can be used to control the grouping of operators within
+  a regular expression.)
+
+\item A regular expression followed by an asterisks $R*$ (called
+  Kleene closure) is a regular expression that matches any string that
+  can be formed by concatenating zero or more strings that each match
+  the regular expression $R$.  For example, the regular expression
+  \code{"((a|c)b)*"} matches the strings \code{'abcbab'} and
+  \code{''}, but not \code{'abc'}.
 \end{itemize}
-Parentheses can be used to control the grouping within a regular
-expression.
 
 For our convenience, Lark also accepts an extended set of regular
-expressions that are automatically translates into the core regular
+expressions that are automatically translated into the core regular
 expressions.
 
 \begin{itemize}
-\item Match one of a set of characters, for example, \code{[abc]}
-  is equivalent to \code{a|b|c}.
-\item Match one of a range of characters, for example, \code{[a-z]}
-  matches any lowercase letter in the alphabet.
-\item Repetition one or more times, for example, \code{[a-z]+}
-  will match any sequence of one or more lowercase letters,
-  such as \code{'b'} and \code{'bzca'}.
-\item Zero or one matches, for example, \code{a? b}  matches
-  both \code{'ab'} and \code{'b'}.
+\item A set of characters enclosed in square brackets $[c_1 c_2 \ldots
+  c_n]$ is a regular expression that matches any one of the
+  characters. So $[c_1 c_2 \ldots c_n]$  is equivalent to
+  the regular expression $c_1\mid c_2\mid \ldots \mid c_n$.
+\item A range of characters enclosed in square brackets $[c_1-c_2]$ is
+  a regular expression that matches any character between $c_1$ and
+  $c_2$, inclusive. For example, \code{[a-z]} matches any lowercase
+  letter in the alphabet.
+\item A regular expression followed by the plus symbol $R+$
+  is a reglar expression that matches any string that can
+  be formed by concatenating one or more strings that each match $R$.
+  So $R+$ is equivalent to $R(R*)$. For example, \code{[a-z]+}
+  matches \code{'b'} and \code{'bzca'}.
+\item A regular expression followed by a question mark $R?$
+  is a regular expression that matches any string that either
+  matches $R$ or that is the empty string.
+  For example, \code{a?b}  matches both \code{'ab'} and \code{'b'}.
 \item A string, such as \code{"hello"}, which matches itself,
     that is, \code{'hello'}.
 \end{itemize}
@@ -4187,14 +4207,19 @@ expressions.
 In a Lark grammar file, specify a name for each type of token followed
 by a colon and then a regular expression surrounded by \code{/}
 characters. For example, the \code{DIGIT}, \code{INT}, \code{NEWLINE},
-and \code{PRINT} types of tokens are specified in the following way.
-
+\code{PRINT}, and \code{PLUS} types of tokens are specified in the
+following way.
+\begin{center}
+\begin{minipage}{0.5\textwidth}
 \begin{lstlisting}
 DIGIT: /[0-9]/
 INT: DIGIT+
 NEWLINE: (/\r/? /\n/)+
 PRINT: "print"
+PLUS: "+"
 \end{lstlisting}
+\end{minipage}
+\end{center}
 
 \noindent (In Lark, the regular expression operators can be used both
 inside a regular expression, that is, between the \code{/} characters,
@@ -4213,8 +4238,8 @@ against an abstract syntax tree. In particular, each right-hand side
 is a sequence of \emph{symbols}\index{subject}{symbol}, where a symbol
 is either a terminal or nonterminal. A
 \emph{terminal}\index{subject}{terminal} is either a string or the
-name of a type of token. The nonterminals play the same role as
-before, defining categories of syntax.
+name of a type of token such as \code{INT}. The nonterminals play
+the same role as before, defining categories of syntax.
 
 As an example, let us recall the \LangInt{} language, which included
 the following rules for its abstract syntax.
@@ -4224,28 +4249,74 @@ the following rules for its abstract syntax.
 \end{align*}
 The corresponding rules for its concrete syntax are as follows. 
 \begin{align}
-  \Exp &::= \code{INT} \label{eq:parse-int}\\
-  \Exp &::= \Exp\; \code{"+"} \; \Exp \label{eq:parse-plus}
+  \Exp &::= \mathit{INT} \label{eq:parse-int}\\
+  \Exp &::= \Exp\; \mathit{PLUS} \; \Exp \label{eq:parse-plus}
 \end{align}
 The rule \eqref{eq:parse-int} says that any string that matches the
-regular expression for \code{INT} can also be categorized, that is, parsed
-as an expression. The rule \eqref{eq:parse-plus} says that any string that
-parses as an expression, followed by the \code{+} character, followed
-by another expression, can itself be parsed as an expression.
-For example, the string \code{'1+3'} is an \Exp{} because
-\code{'1'} and \code{'3'} are both \Exp{} by rule \eqref{eq:parse-int},
-and then rule \eqref{eq:parse-plus} applies to categorize
-\code{'1+3'} as an \Exp{}. We can visualize the application of grammar
-rules to categorize a string using a
-\emph{parse tree}\index{subject}{parse tree}. Each internal node in the tree
-is an application of a grammar rule and the leaf nodes are substrings of the
-input program.
+regular expression for \textit{INT} can also be categorized as an
+expression. The rule \eqref{eq:parse-plus} says that any string that
+is an expression, followed by the \code{+} character, followed by
+another expression, is itself an expression.  For example, the string
+\code{'1+3'} is an \Exp{} because \code{'1'} and \code{'3'} are both
+\Exp{} by rule \eqref{eq:parse-int}, and then rule
+\eqref{eq:parse-plus} applies to categorize \code{'1+3'} as an
+\Exp{}. We can visualize the application of grammar rules to
+categorize a string using a \emph{parse tree}\index{subject}{parse
+  tree}. Each internal node in the tree is an application of a grammar
+rule. Each leaf node is part of the input program.
 
+\begin{figure}[tbp]
+\begin{tcolorbox}[colback=white]
+\centering
+\includegraphics[width=0.5\textwidth]{figs/simple-parse-tree}
+\end{tcolorbox}
+\caption{The parse tree for \code{'1+3'}.}
+\label{fig:simple-parse-tree}
+\end{figure}
 
+The Lark syntax for grammar rules differs slightly from BNF.  In
+particular, the notation $::=$ is replaced by a single colon and there
+may only be one rule for each non-terminal. Thus, instead of writing
+multiple rules with the same left-hand side, one instead makes use of
+alternation, written \code{|}, to separate the right-hand sides. Thus,
+the rules \eqref{eq:parse-int} and \eqref{eq:parse-plus} are written
+in Lark as follows.
 
+\begin{lstlisting}[escapechar=$]
+exp: INT
+   | exp "+" exp
+\end{lstlisting}
 
+The result of parsing \code{'1+3'} with this Lark grammar is the
+following parse tree which corresponds to the one in
+figure~\ref{fig:simple-parse-tree}.
+\begin{lstlisting}
+  Tree('exp', [Tree('exp', [Token('INT', '1')]),
+                Token('PLUS', '+'),
+                Tree('exp', [Token('INT', '3')])])
+\end{lstlisting}
+The nodes that come from the lexer are \code{Token} objects whereas
+the nodes from the parser are \code{Tree} objects.  Each tree object
+has a \code{data} field containing the name of the nonterminal for the
+grammar rule that was applied, which in this example is \code{'exp'}
+for all three \code{Tree} nodes. Each tree object also has a
+\code{children} field that is a list containing trees and/or tokens.
 
+A grammar is ambiguous when there are strings that can be parsed in
+more than one way. For example, consider the string \code{'1+2+3'}.
+Using the grammar comprised of rules \eqref{eq:parse-int} and
+\eqref{eq:parse-plus}, this string can parsed in two different ways,
+resulting in the two parse trees shown in
+figure~\ref{fig:ambig-parse-tree}.
 
+\begin{figure}[tbp]
+\begin{tcolorbox}[colback=white]
+\centering
+\includegraphics[width=0.95\textwidth]{figs/ambig-parse-tree}
+\end{tcolorbox}
+\caption{The two parse trees for \code{'1+2+3'}.}
+\label{fig:ambig-parse-tree}
+\end{figure}
 
 
 
