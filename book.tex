@@ -4083,14 +4083,12 @@ all, fast code is useless if it produces incorrect results!
 \chapter{Parsing}
 \label{ch:parsing-Lvar}
 \setcounter{footnote}{0}
-
 \index{subject}{parsing}
 
-
 In this chapter we learn how to use the Lark parser generator to
-translate the concrete syntax of \LangVar{} (a sequence of characters)
-into an abstract syntax tree.  A parser generator takes in a
-specification of the concrete syntax and produces a parser. Even
+translate the concrete syntax of \LangInt{} and \LangVar{} (a sequence
+of characters) into an abstract syntax tree.  A parser generator takes
+in a specification of the concrete syntax and produces a parser. Even
 though a parser generator does most of the work for us, using one
 properly requires considerable knowledge about parsing algorithms.  In
 particular, we must learn about the specification languages used by
@@ -4125,11 +4123,14 @@ analysis and the remainder of the chapter discusses parsing.
 \label{sec:lex}
 
 The lexical analyzers produced by Lark turn a sequence of characters
-(a string) into a sequence of token objects. For example, converting the string
+(a string) into a sequence of token objects. For example, a Lark
+generated lexer for \LangInt{} converts the string
 \begin{lstlisting}
 'print(1 + 3)'
 \end{lstlisting}
 \noindent into the following sequence of token objects
+\begin{center}
+\begin{minipage}{0.5\textwidth}
 \begin{lstlisting}
 Token('PRINT', 'print')
 Token('LPAR', '(')
@@ -4139,19 +4140,20 @@ Token('INT', '3')
 Token('RPAR', ')')
 Token('NEWLINE', '\n')
 \end{lstlisting}
+\end{minipage}
+\end{center}
 Each token includes a field for its \code{type}, such as \code{'INT'},
 and a field for its \code{value}, such as \code{'1'}.
 
 Following in the tradition of \code{lex}, the specification language
 for Lark's lexical analysis generator is one regular expression for
-each type of the token. The term \emph{regular} comes from
+each type of token. The term \emph{regular} comes from the term
 \emph{regular languages}, which are the languages that can be
 recognized by a finite automata. A \emph{regular expression} is a
 pattern formed of the following core elements:\index{subject}{regular
   expression}\footnote{Regular expressions traditionally include the
   empty regular expression that matches any zero-length part of a
   string, but Lark does not support the empty regular expression.}
-
 \begin{itemize}
 \item A single character $c$ is a regular expression and it only
   matches itself. For example, the regular expression \code{a} only
@@ -4192,7 +4194,7 @@ expressions.
   $c_2$, inclusive. For example, \code{[a-z]} matches any lowercase
   letter in the alphabet.
 \item A regular expression followed by the plus symbol $R+$
-  is a reglar expression that matches any string that can
+  is a regular expression that matches any string that can
   be formed by concatenating one or more strings that each match $R$.
   So $R+$ is equivalent to $R(R*)$. For example, \code{[a-z]+}
   matches \code{'b'} and \code{'bzca'}.
@@ -4206,17 +4208,14 @@ expressions.
 
 In a Lark grammar file, specify a name for each type of token followed
 by a colon and then a regular expression surrounded by \code{/}
-characters. For example, the \code{DIGIT}, \code{INT}, \code{NEWLINE},
-\code{PRINT}, and \code{PLUS} types of tokens are specified in the
-following way.
+characters. For example, the \code{DIGIT}, \code{INT}, and
+\code{NEWLINE} types of tokens are specified in the following way.
 \begin{center}
 \begin{minipage}{0.5\textwidth}
 \begin{lstlisting}
 DIGIT: /[0-9]/
-INT: DIGIT+
+INT: "-"? DIGIT+
 NEWLINE: (/\r/? /\n/)+
-PRINT: "print"
-PLUS: "+"
 \end{lstlisting}
 \end{minipage}
 \end{center}
@@ -4230,40 +4229,59 @@ and they can be used to combine regular expressions, outside the
 \label{sec:CFG}
 
 In section~\ref{sec:grammar} we learned how to use grammar rules to
-specify the abstract syntax of a language. We now use grammar rules to
-specify the concrete syntax. Recall that each rule has a left-hand
-side and a right-hand side. However, this time each right-hand side
-expresses a pattern to match against a string, instead of matching
-against an abstract syntax tree. In particular, each right-hand side
-is a sequence of \emph{symbols}\index{subject}{symbol}, where a symbol
-is either a terminal or nonterminal. A
-\emph{terminal}\index{subject}{terminal} is either a string or the
-name of a type of token such as \code{INT}. The nonterminals play
-the same role as before, defining categories of syntax.
+specify the abstract syntax of a language. We now take a closer look
+at using grammar rules to specify the concrete syntax. Recall that
+each rule has a left-hand side and a right-hand side. However, this
+time each right-hand side expresses a pattern to match against a
+string, instead of matching against an abstract syntax tree. In
+particular, each right-hand side is a sequence of
+\emph{symbols}\index{subject}{symbol}, where a symbol is either a
+terminal or nonterminal. A \emph{terminal}\index{subject}{terminal} is
+either a string or the name of a type of token such as \Int{}. The
+nonterminals play the same role as in the abstract syntax, defining
+categories of syntax.
 
-As an example, let us recall the \LangInt{} language, which included
-the following rules for its abstract syntax.
-\begin{align*}
-  \Exp &::= \INT{\Int}\\
-  \Exp &::= \ADD{\Exp}{\Exp}
-\end{align*}
-The corresponding rules for its concrete syntax are as follows. 
-\begin{align}
-  \Exp &::= \mathit{INT} \label{eq:parse-int}\\
-  \Exp &::= \Exp\; \mathit{PLUS} \; \Exp \label{eq:parse-plus}
-\end{align}
-The rule \eqref{eq:parse-int} says that any string that matches the
-regular expression for \textit{INT} can also be categorized as an
-expression. The rule \eqref{eq:parse-plus} says that any string that
-is an expression, followed by the \code{+} character, followed by
-another expression, is itself an expression.  For example, the string
-\code{'1+3'} is an \Exp{} because \code{'1'} and \code{'3'} are both
-\Exp{} by rule \eqref{eq:parse-int}, and then rule
-\eqref{eq:parse-plus} applies to categorize \code{'1+3'} as an
-\Exp{}. We can visualize the application of grammar rules to
-categorize a string using a \emph{parse tree}\index{subject}{parse
-  tree}. Each internal node in the tree is an application of a grammar
-rule. Each leaf node is part of the input program.
+As an example, let us take a closer look at the concrete syntax of the
+\LangInt{} language, repeated here.
+\[
+\begin{array}{l}
+  \LintGrammarPython  \\
+  \begin{array}{rcl}
+    \LangInt{} &::=& \Stmt^{*}
+  \end{array}
+\end{array}
+\]
+The Lark syntax for grammar rules differs slightly from the variant of
+BNF that we use in this book. In particular, the notation $::=$ is
+replaced by a single colon and the use of typewriter font for string
+literals is replaced by quotation marks. The following serves as a
+first draft of a Lark grammar for \LangInt{}.
+\begin{lstlisting}[escapechar=$]
+exp: INT | "input_int""("")" | "-"exp | exp"+"exp | exp"-"exp | "(" exp ")"
+stmt: "print""(" exp ")" | exp
+lang_int: (stmt NEWLINE)*
+\end{lstlisting}
+
+Let us begin by discussing the rule \code{exp: INT}.  In
+Section~\ref{sec:grammar} we defined the corresponding \Int{}
+nonterminal with an English sentence. Here we specify \code{INT} more
+formally using a type of token \code{INT} and its regular expression
+\code{"-"? DIGIT+}. Thus, the rule \code{exp: INT} says that
+if the lexer matches a string to \code{INT}, then the parser
+also categorizes the string as an \code{exp}.
+
+The rule \code{exp: exp "+" exp} says that any string that matches
+\code{exp}, followed by the \code{+} character, followed by another
+string that matches \code{exp}, is itself an \code{exp}.  For example,
+the string \code{'1+3'} is an \code{exp} because \code{'1'} and
+\code{'3'} are both \code{exp} by rule \code{exp: INT}, and then the
+rule for addition applies to categorize \code{'1+3'} as an \Exp{}. We
+can visualize the application of grammar rules to categorize a string
+using a \emph{parse tree}\index{subject}{parse tree}. Each internal
+node in the tree is an application of a grammar rule and labeled with
+the nonterminal of its left-hand side. Each leaf node is a terminal
+symbol that is a substring of the input program.  The parse tree for
+\code{'1+3'} is shown in figure~\ref{fig:simple-parse-tree}.
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]
@@ -4274,40 +4292,31 @@ rule. Each leaf node is part of the input program.
 \label{fig:simple-parse-tree}
 \end{figure}
 
-The Lark syntax for grammar rules differs slightly from BNF.  In
-particular, the notation $::=$ is replaced by a single colon and there
-may only be one rule for each non-terminal. Thus, instead of writing
-multiple rules with the same left-hand side, one instead makes use of
-alternation, written \code{|}, to separate the right-hand sides. Thus,
-the rules \eqref{eq:parse-int} and \eqref{eq:parse-plus} are written
-in Lark as follows.
-
-\begin{lstlisting}[escapechar=$]
-exp: INT
-   | exp "+" exp
-\end{lstlisting}
-
 The result of parsing \code{'1+3'} with this Lark grammar is the
-following parse tree which corresponds to the one in
-figure~\ref{fig:simple-parse-tree}.
+following parse tree as represented by \code{Tree} and \code{Token}
+objects.
 \begin{lstlisting}
-  Tree('exp', [Tree('exp', [Token('INT', '1')]),
-                Token('PLUS', '+'),
-                Tree('exp', [Token('INT', '3')])])
+  Tree('lang_int',
+     [Tree('stmt', [Tree('exp', [Tree('exp', [Token('INT', '1')]),
+                                    Tree('exp', [Token('INT', '3')])])]),
+      Token('NEWLINE', '\n')])
 \end{lstlisting}
 The nodes that come from the lexer are \code{Token} objects whereas
-the nodes from the parser are \code{Tree} objects.  Each tree object
-has a \code{data} field containing the name of the nonterminal for the
-grammar rule that was applied, which in this example is \code{'exp'}
-for all three \code{Tree} nodes. Each tree object also has a
-\code{children} field that is a list containing trees and/or tokens.
+the nodes from the parser are \code{Tree} objects.  Each \code{Tree}
+object has a \code{data} field containing the name of the nonterminal
+for the grammar rule that was applied. Each \code{Tree} object also
+has a \code{children} field that is a list containing trees and/or
+tokens. Note that Lark does not produce nodes for the string literals
+in the grammar. For example, the \code{Tree} node for the addition
+expression has two children
+
+
 
 A grammar is \emph{ambiguous}\index{subject}{ambiguous} when there are
 strings that can be parsed in more than one way. For example, consider
-the string \code{'1+2+3'}.  Using the grammar comprised of rules
-\eqref{eq:parse-int} and \eqref{eq:parse-plus}, this string can parsed
-in two different ways, resulting in the two parse trees shown in
-figure~\ref{fig:ambig-parse-tree}.
+the string \code{'1+2+3'}.  This string can parsed in two different
+ways using our draft grammar, resulting in the two parse trees shown
+in figure~\ref{fig:ambig-parse-tree}.
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]
