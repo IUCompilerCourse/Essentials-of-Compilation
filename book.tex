@@ -246,6 +246,11 @@ concepts and algorithms used in compilers.
   Chapters~\ref{ch:trees-recur} and \ref{ch:Lvar}, where we introduce
   the fundamental tools of compiler construction: \emph{abstract
     syntax trees} and \emph{recursive functions}. 
+{\if\edition\pythonEd
+\item In Chapter~\ref{ch:parsing-Lvar} we learn how to use a parser
+  generator to create a parser for the language of integer arithmetic
+  and local variables.
+\fi}  
 \item In Chapter~\ref{ch:register-allocation-Lvar} we apply
   \emph{graph coloring} to assign variables to machine registers.
 \item Chapter~\ref{ch:Lif} adds conditional expressions, which
@@ -930,15 +935,15 @@ combine several right-hand sides into a single rule.
 
 The concrete syntax for \LangInt{} is shown in
 figure~\ref{fig:r0-concrete-syntax} and the abstract syntax for
-\LangInt{} is shown in figure~\ref{fig:r0-syntax}.
-
+\LangInt{} is shown in figure~\ref{fig:r0-syntax}.%
+%
 \racket{The \code{read-program} function provided in
   \code{utilities.rkt} of the support code reads a program from a file
   (the sequence of characters in the concrete syntax of Racket) and
   parses it into an abstract syntax tree. Refer to the description of
   \code{read-program} in appendix~\ref{appendix:utilities} for more
   details.}
-
+%
 \python{The \code{parse} function in Python's \code{ast} module
   converts the concrete syntax (represented as a string) into an
   abstract syntax tree.}
@@ -4080,31 +4085,33 @@ all, fast code is useless if it produces incorrect results!
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{Parsing}
+{\if\edition\pythonEd
+\chapter{Parser Generation}
 \label{ch:parsing-Lvar}
 \setcounter{footnote}{0}
 \index{subject}{parsing}
 
-In this chapter we learn how to use the Lark parser generator to
-translate the concrete syntax of \LangInt{} and \LangVar{} (a sequence
-of characters) into an abstract syntax tree.  A parser generator takes
-in a specification of the concrete syntax and produces a parser. Even
-though a parser generator does most of the work for us, using one
-properly requires considerable knowledge about parsing algorithms.  In
+In this chapter we learn how to use the Lark parser
+generator~\citep{shinan20:_lark_docs} to translate the concrete syntax
+of \LangInt{} (a sequence of characters) into an abstract syntax tree.
+You will then be asked to use Lark to create a parser for \LangVar{}.
+A parser generator takes in a specification of the concrete syntax and
+produces a parser. Even though a parser generator does most of the
+work for us, using one properly requires some knowledge.  In
 particular, we must learn about the specification languages used by
 parser generators and we must learn how to deal with ambiguity in our
 language specifications.
 
 The process of parsing is traditionally subdivided into two phases:
-\emph{lexical analysis} (also called scanning) and
-\emph{parsing}. The lexical analysis phase translates the sequence of
-characters into a sequence of \emph{tokens}, that is, words consisting
-of several characters. The parsing phase organizes the tokens into a
-\emph{parse tree} that captures how the tokens were matched by rules
-in the grammar of the language. The reason for the subdivision into
-two phases is to enable the use of a faster but less powerful
-algorithm for lexical analysis and the use of a slower but more
-powerful algorithm for parsing.
+\emph{lexical analysis} (also called scanning) and \emph{syntax
+  analysis} (also called parsing). The lexical analysis phase
+translates the sequence of characters into a sequence of
+\emph{tokens}, that is, words consisting of several characters. The
+parsing phase organizes the tokens into a \emph{parse tree} that
+captures how the tokens were matched by rules in the grammar of the
+language. The reason for the subdivision into two phases is to enable
+the use of a faster but less powerful algorithm for lexical analysis
+and the use of a slower but more powerful algorithm for parsing.
 %
 Likewise, parser generators typical come in pairs, with separate
 generators for the lexical analyzer (or lexer for short) and for the
@@ -4119,7 +4126,7 @@ lexical analyzer and a parser. The next section discusses lexical
 analysis and the remainder of the chapter discusses parsing.
 
 
-\section{Lexical analysis}
+\section{Lexical Analysis and Regular Expressions}
 \label{sec:lex}
 
 The lexical analyzers produced by Lark turn a sequence of characters
@@ -4220,10 +4227,10 @@ NEWLINE: (/\r/? /\n/)+
 \end{minipage}
 \end{center}
 
-\noindent (In Lark, the regular expression operators can be used both
+\noindent In Lark, the regular expression operators can be used both
 inside a regular expression, that is, between the \code{/} characters,
 and they can be used to combine regular expressions, outside the
-\code{/} characters.)
+\code{/} characters.
 
 \section{Grammars and Parse Trees}
 \label{sec:CFG}
@@ -4231,15 +4238,16 @@ and they can be used to combine regular expressions, outside the
 In section~\ref{sec:grammar} we learned how to use grammar rules to
 specify the abstract syntax of a language. We now take a closer look
 at using grammar rules to specify the concrete syntax. Recall that
-each rule has a left-hand side and a right-hand side. However, this
-time each right-hand side expresses a pattern to match against a
-string, instead of matching against an abstract syntax tree. In
-particular, each right-hand side is a sequence of
+each rule has a left-hand side and a right-hand side. However, for
+concrete syntax, each right-hand side expresses a pattern to match
+against a string, instead of matching against an abstract syntax
+tree. In particular, each right-hand side is a sequence of
 \emph{symbols}\index{subject}{symbol}, where a symbol is either a
 terminal or nonterminal. A \emph{terminal}\index{subject}{terminal} is
-either a string or the name of a type of token such as \Int{}. The
-nonterminals play the same role as in the abstract syntax, defining
-categories of syntax.
+a string. The nonterminals play the same role as in the abstract
+syntax, defining categories of syntax. The nonterminals of a grammar
+include the tokens defined in the lexer and all the nonterminals
+defined in the grammar rules.
 
 As an example, let us take a closer look at the concrete syntax of the
 \LangInt{} language, repeated here.
@@ -4254,8 +4262,8 @@ As an example, let us take a closer look at the concrete syntax of the
 The Lark syntax for grammar rules differs slightly from the variant of
 BNF that we use in this book. In particular, the notation $::=$ is
 replaced by a single colon and the use of typewriter font for string
-literals is replaced by quotation marks. The following serves as a
-first draft of a Lark grammar for \LangInt{}.
+literals is replaced by quotation marks. The following grammar serves
+as a first draft of a Lark grammar for \LangInt{}.
 \begin{center}
 \begin{minipage}{0.95\textwidth}
 \begin{lstlisting}[escapechar=$]
@@ -4278,9 +4286,9 @@ Let us begin by discussing the rule \code{exp: INT}.  In
 Section~\ref{sec:grammar} we defined the corresponding \Int{}
 nonterminal with an English sentence. Here we specify \code{INT} more
 formally using a type of token \code{INT} and its regular expression
-\code{"-"? DIGIT+}. Thus, the rule \code{exp: INT} says that
-if the lexer matches a string to \code{INT}, then the parser
-also categorizes the string as an \code{exp}.
+\code{"-"? DIGIT+}. Thus, the rule \code{exp: INT} says that if the
+lexer matches a string to \code{INT}, then the parser also categorizes
+the string as an \code{exp}.
 
 The rule \code{exp: exp "+" exp} says that any string that matches
 \code{exp}, followed by the \code{+} character, followed by another
@@ -4290,15 +4298,15 @@ the string \code{'1+3'} is an \code{exp} because \code{'1'} and
 rule for addition applies to categorize \code{'1+3'} as an \Exp{}. We
 can visualize the application of grammar rules to categorize a string
 using a \emph{parse tree}\index{subject}{parse tree}. Each internal
-node in the tree is an application of a grammar rule and labeled with
-the nonterminal of its left-hand side. Each leaf node is a terminal
-symbol that is a substring of the input program.  The parse tree for
-\code{'1+3'} is shown in figure~\ref{fig:simple-parse-tree}.
+node in the tree is an application of a grammar rule and is labeled
+with the nonterminal of its left-hand side. Each leaf node is a
+substring of the input program.  The parse tree for \code{'1+3'} is
+shown in figure~\ref{fig:simple-parse-tree}.
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]
 \centering
-\includegraphics[width=2.0in]{figs/simple-parse-tree}
+\includegraphics[width=1.9in]{figs/simple-parse-tree}
 \end{tcolorbox}
 \caption{The parse tree for \code{'1+3'}.}
 \label{fig:simple-parse-tree}
@@ -4354,7 +4362,7 @@ Tree('module',
    Token('NEWLINE', '\n')])
 \end{lstlisting}
 
-\subsection{Ambiguous Grammars}
+\section{Ambiguous Grammars}
 
 A grammar is \emph{ambiguous}\index{subject}{ambiguous} when a string
 can be parsed in more than one way. For example, consider the string
@@ -4373,14 +4381,136 @@ the correct answer is \code{2}.
 \label{fig:ambig-parse-tree}
 \end{figure}
 
-To deal with this problem we can change the grammar to become
-unambiguous by categorizing the syntax in a more fine grained
-fashion. In this case we want to disallow the application of the rule
-\code{exp: exp "-" exp} when the child on the right is an addition.
+To deal with this problem we can change the grammar by categorizing
+the syntax in a more fine grained fashion. In this case we want to
+disallow the application of the rule \code{exp: exp "-" exp} when the
+child on the right is an addition.  To do this we can replace the
+\code{exp} after \code{"-"} with a nonterminal that categorizes all
+the expressions except for addition, as in the following.
+\begin{center}
+\begin{minipage}{0.95\textwidth}
+\begin{lstlisting}[escapechar=$]
+exp: exp "-" exp_no_add     -> sub
+   | exp "+" exp            -> add
+   | exp_no_add
+
+exp_no_add: INT             -> int
+   | "input_int" "(" ")"    -> input_int
+   | "-" exp                -> usub
+   | exp "-" exp_no_add     -> sub
+   | "(" exp ")"            -> paren
+\end{lstlisting}
+\end{minipage}
+\end{center}
+
+However, there remains some ambiguity in the grammar. For example, the
+string \code{'1-2-3'} can still be parsed in two different ways, as
+\code{'(1-2)-3'} (correct) or \code{'1-(2-3)'} (incorrect).  That is
+to say, subtraction is left associative. Likewise, addition in Python
+is left associative. We also need to consider the interaction of unary
+subtraction with both addition and subtraction. How should we parse
+\code{'-1+2'}? Unary subtraction has higher
+\emph{precendence}\index{subject}{precedence} than addition and
+subtraction, so \code{'-1+2'} should parse as \code{'(-1)+2'} and not
+\code{'-(1+2)'}. The grammar in figure~\ref{fig:Lint-lark-grammar}
+handles the associativity of addition and subtraction by using the
+nonterminal \code{exp\_hi} for all the other expressions, and uses
+\code{exp\_hi} for the second child in the rules for addition and
+subtraction. Furthermore, unary subtraction uses \code{exp\_hi} for
+its child.
+
+For languages with more operators with more precedence levels, one
+would need to refine the \code{exp} nonterminal into several
+nonterminals, 
+
+\begin{figure}[tbp]
+\begin{tcolorbox}[colback=white]
+\centering
+\begin{lstlisting}[escapechar=$]
+exp: exp "+" exp_hi         -> add
+   | exp "-" exp_hi         -> sub
+   | exp_hi
+
+exp_hi: INT                 -> int
+      | "input_int" "(" ")" -> input_int
+      | "-" exp_hi          -> usub
+      | "(" exp ")"         -> paren
+
+stmt: "print" "(" exp ")"  -> print
+    | exp                  -> expr
+
+lang_int: (stmt NEWLINE)*  -> module
+\end{lstlisting}
+\end{tcolorbox}
+\caption{An unambiguous Lark grammar for \LangInt{}.}
+\label{fig:Lint-lark-grammar}
+\end{figure}
+
+\section{From Parse Trees to Abstract Syntax Trees}
+
+As we have seen, the output of a Lark parser is a parse tree, that is,
+a tree consisting of \code{Tree} and \code{Token} nodes. So the next
+step is to convert the parse tree to an abstract syntax tree. This can
+be accomplished with a recursive function that inspects the
+\code{data} field of each node and then constructs the corresponding
+AST node, using recursion to handle its children. The following is an
+excerpt of the \code{parse\_tree\_to\_ast} function for \LangInt{}.
+
+\begin{center}
+\begin{minipage}{0.95\textwidth}
+\begin{lstlisting}
+def parse_tree_to_ast(e):
+    if e.data == 'int':
+        return Constant(int(e.children[0].value))
+    elif e.data == 'input_int':
+        return Call(Name('input_int'), [])
+    elif e.data == 'add':
+        e1, e2 = e.children
+        return BinOp(parse_tree_to_ast(e1), Add(), parse_tree_to_ast(e2))
+    ...
+    else:
+        raise Exception('unhandled parse tree', e)
+\end{lstlisting}
+\end{minipage}
+\end{center}
+
+\begin{exercise}
+  \normalfont\normalsize
+
+  Use Lark to create a lexer and parser for \LangVar{}.  We recommend
+  using Lark's default parsing algorithm (Earley) with the
+  \code{ambiguity} option set to \code{'explicit'} so that if your
+  grammar is ambiguous, the output will include multiple parse trees
+  which will indicate to you that there is a problem with your
+  grammar. Your parser should ignore white space so we
+  recommend using Lark's \code{\%ignore} directive as follows.
+\begin{lstlisting}
+WS: /[ \t\f\r\n]/+
+%ignore WS
+\end{lstlisting}
+Change your compiler from chapter~\ref{ch:Lvar} to use your
+Lark-generated parser instead of using the \code{parse} function from
+the \code{ast} module. Test your compiler on all of the \LangVar{}
+programs that you have created and create four additional programs
+that would reveal ambiguities in your grammar.
+
+\end{exercise}
+
+
+\section{The Earley Algorithm}
+
+
+\section{The LALR Algorithm}
+
+
+\section{Further Reading}
+
+UNDER CONSTRUCTION
 
 
 
 
+\fi}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Register Allocation}
