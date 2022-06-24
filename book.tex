@@ -4130,7 +4130,7 @@ generated lexer for \LangInt{} converts the string
 \end{lstlisting}
 \noindent into the following sequence of token objects
 \begin{center}
-\begin{minipage}{0.5\textwidth}
+\begin{minipage}{0.95\textwidth}
 \begin{lstlisting}
 Token('PRINT', 'print')
 Token('LPAR', '(')
@@ -4211,7 +4211,7 @@ by a colon and then a regular expression surrounded by \code{/}
 characters. For example, the \code{DIGIT}, \code{INT}, and
 \code{NEWLINE} types of tokens are specified in the following way.
 \begin{center}
-\begin{minipage}{0.5\textwidth}
+\begin{minipage}{0.95\textwidth}
 \begin{lstlisting}
 DIGIT: /[0-9]/
 INT: "-"? DIGIT+
@@ -4256,11 +4256,23 @@ BNF that we use in this book. In particular, the notation $::=$ is
 replaced by a single colon and the use of typewriter font for string
 literals is replaced by quotation marks. The following serves as a
 first draft of a Lark grammar for \LangInt{}.
+\begin{center}
+\begin{minipage}{0.95\textwidth}
 \begin{lstlisting}[escapechar=$]
-exp: INT | "input_int""("")" | "-"exp | exp"+"exp | exp"-"exp | "(" exp ")"
-stmt: "print""(" exp ")" | exp
+exp: INT
+   | "input_int" "(" ")"
+   | "-" exp
+   | exp "+" exp
+   | exp "-" exp
+   | "(" exp ")"
+
+stmt: "print" "(" exp ")"
+    | exp
+
 lang_int: (stmt NEWLINE)*
 \end{lstlisting}
+\end{minipage}
+\end{center}
 
 Let us begin by discussing the rule \code{exp: INT}.  In
 Section~\ref{sec:grammar} we defined the corresponding \Int{}
@@ -4286,7 +4298,7 @@ symbol that is a substring of the input program.  The parse tree for
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]
 \centering
-\includegraphics[width=0.5\textwidth]{figs/simple-parse-tree}
+\includegraphics[width=2.0in]{figs/simple-parse-tree}
 \end{tcolorbox}
 \caption{The parse tree for \code{'1+3'}.}
 \label{fig:simple-parse-tree}
@@ -4306,15 +4318,47 @@ the nodes from the parser are \code{Tree} objects.  Each \code{Tree}
 object has a \code{data} field containing the name of the nonterminal
 for the grammar rule that was applied. Each \code{Tree} object also
 has a \code{children} field that is a list containing trees and/or
-tokens. Note that Lark does not produce nodes for the string literals
-in the grammar. For example, the \code{Tree} node for the addition
-expression has two children
+tokens. Note that Lark does not produce nodes for string literals in
+the grammar. For example, the \code{Tree} node for the addition
+expression has only two children for the two integers but is missing
+its middle child for the \code{"+"} terminal. This would be
+problematic except that Lark provides a mechanism for customizing the
+\code{data} field of each \code{Tree} node based on which rule was
+applied.  Next to each alternative in a grammar rule, write \code{->}
+followed by a string that you would like to appear in the \code{data}
+field.  The following is a second draft of a Lark grammar for
+\LangInt{}, this time with more specific labels on the \code{Tree}
+nodes.
+\begin{center}
+\begin{minipage}{0.95\textwidth}
+\begin{lstlisting}[escapechar=$]
+exp: INT                    -> int
+   | "input_int" "(" ")"    -> input_int
+   | "-" exp                -> usub
+   | exp "+" exp            -> add
+   | exp "-" exp            -> sub
+   | "(" exp ")"            -> paren
 
+stmt: "print" "(" exp ")"   -> print
+    | exp                   -> expr
 
+lang_int: (stmt NEWLINE)*   -> module
+\end{lstlisting}
+\end{minipage}
+\end{center}
+The resulting parse tree 
+\begin{lstlisting}
+Tree('module',
+  [Tree('expr', [Tree('add', [Tree('int', [Token('INT', '1')]),
+                                 Tree('int', [Token('INT', '3')])])]),
+   Token('NEWLINE', '\n')])
+\end{lstlisting}
+
+\subsection{Ambiguous Grammars}
 
 A grammar is \emph{ambiguous}\index{subject}{ambiguous} when there are
 strings that can be parsed in more than one way. For example, consider
-the string \code{'1+2+3'}.  This string can parsed in two different
+the string \code{'1-2+3'}.  This string can parsed in two different
 ways using our draft grammar, resulting in the two parse trees shown
 in figure~\ref{fig:ambig-parse-tree}.
 
@@ -4323,7 +4367,7 @@ in figure~\ref{fig:ambig-parse-tree}.
 \centering
 \includegraphics[width=0.95\textwidth]{figs/ambig-parse-tree}
 \end{tcolorbox}
-\caption{The two parse trees for \code{'1+2+3'}.}
+\caption{The two parse trees for \code{'1-2+3'}.}
 \label{fig:ambig-parse-tree}
 \end{figure}
 
