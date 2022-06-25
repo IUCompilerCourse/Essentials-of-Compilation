@@ -782,13 +782,14 @@ A programming language can be thought of as a \emph{set} of programs.
 The set is infinite (that is, one can always create larger programs),
 so one cannot simply describe a language by listing all the
 programs in the language. Instead we write down a set of rules, a
-\emph{grammar}, for building programs. Grammars are often used to
+\emph{context-free grammar}, for building programs. Grammars are often used to
 define the concrete syntax of a language, but they can also be used to
 describe the abstract syntax. We write our rules in a variant of
 Backus-Naur form (BNF)~\citep{Backus:1960aa,Knuth:1964aa}.
 \index{subject}{Backus-Naur form}\index{subject}{BNF} As an example,
 we describe a small language, named \LangInt{}, that consists of
-integers and arithmetic operations.  \index{subject}{grammar}
+integers and arithmetic operations.\index{subject}{grammar}
+\index{subject}{context-free grammar}
 
 The first grammar rule for the abstract syntax of \LangInt{} says that an
 instance of the \racket{\code{Int} structure}\python{\code{Constant} class} is an expression:
@@ -4086,7 +4087,7 @@ all, fast code is useless if it produces incorrect results!
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 {\if\edition\pythonEd
-\chapter{Parser Generation}
+\chapter{Parsing}
 \label{ch:parsing-Lvar}
 \setcounter{footnote}{0}
 \index{subject}{parsing}
@@ -4095,6 +4096,9 @@ In this chapter we learn how to use the Lark parser
 generator~\citep{shinan20:_lark_docs} to translate the concrete syntax
 of \LangInt{} (a sequence of characters) into an abstract syntax tree.
 You will then be asked to use Lark to create a parser for \LangVar{}.
+We then learn about the parsing algorithms used inside Lark, studying
+the \citet{Earley:1970ly} and LALR algorithms.
+
 A parser generator takes in a specification of the concrete syntax and
 produces a parser. Even though a parser generator does most of the
 work for us, using one properly requires some knowledge.  In
@@ -4274,10 +4278,10 @@ exp: INT
    | exp "-" exp
    | "(" exp ")"
 
-stmt: "print" "(" exp ")"
-    | exp
+stmt_list:
+    | stmt NEWLINE stmt_list
 
-lang_int: (stmt NEWLINE)*
+lang_int: stmt_list
 \end{lstlisting}
 \end{minipage}
 \end{center}
@@ -4350,7 +4354,10 @@ exp: INT                    -> int
 stmt: "print" "(" exp ")"   -> print
     | exp                   -> expr
 
-lang_int: (stmt NEWLINE)*   -> module
+stmt_list:                   -> empty_stmt
+    | stmt NEWLINE stmt_list -> add_stmt
+
+lang_int: stmt_list          -> module
 \end{lstlisting}
 \end{minipage}
 \end{center}
@@ -4439,7 +4446,10 @@ exp_hi: INT                 -> int
 stmt: "print" "(" exp ")"  -> print
     | exp                  -> expr
 
-lang_int: (stmt NEWLINE)*  -> module
+stmt_list:                   -> empty_stmt
+    | stmt NEWLINE stmt_list -> add_stmt
+
+lang_int: stmt_list          -> module
 \end{lstlisting}
 \end{tcolorbox}
 \caption{An unambiguous Lark grammar for \LangInt{}.}
@@ -4476,14 +4486,14 @@ def parse_tree_to_ast(e):
 
 \begin{exercise}
   \normalfont\normalsize
-
-  Use Lark to create a lexer and parser for \LangVar{}.  We recommend
-  using Lark's default parsing algorithm (Earley) with the
-  \code{ambiguity} option set to \code{'explicit'} so that if your
-  grammar is ambiguous, the output will include multiple parse trees
-  which will indicate to you that there is a problem with your
-  grammar. Your parser should ignore white space so we
-  recommend using Lark's \code{\%ignore} directive as follows.
+%
+  Use Lark to create a lexer and parser for \LangVar{}.  Use Lark's
+  default parsing algorithm (Earley) with the \code{ambiguity} option
+  set to \code{'explicit'} so that if your grammar is ambiguous, the
+  output will include multiple parse trees which will indicate to you
+  that there is a problem with your grammar. Your parser should ignore
+  white space so we recommend using Lark's \code{\%ignore} directive
+  as follows.
 \begin{lstlisting}
 WS: /[ \t\f\r\n]/+
 %ignore WS
@@ -4493,19 +4503,84 @@ Lark-generated parser instead of using the \code{parse} function from
 the \code{ast} module. Test your compiler on all of the \LangVar{}
 programs that you have created and create four additional programs
 that would reveal ambiguities in your grammar.
-
 \end{exercise}
 
 
 \section{The Earley Algorithm}
+\label{sec:earley}
+
+In this section we discuss the parsing algorithm of
+\citet{Earley:1970ly}, which is the default algorithm used by Lark.
+The algorithm is powerful in that it can handle any context-free
+grammar, which makes it easy to use. However, it is not the most
+efficient parsing algorithm: it is $O(n^3)$ for ambiguous grammars and
+$O(n^2)$ for unambiguous grammars~\citep{Hopcroft06:_automata}.  In
+section~\ref{sec:lalr} we learn about the LALR algorithm, which is
+more efficient but can only handle a subset of the context-free
+grammars.
+
+The Earley algorithm uses a data structure called a
+\emph{chart}\index{subject}{chart} to keep track of its progress.  The
+chart is an array with one slot for each position in the input string,
+where position $0$ is before the first character and position $n$ is
+immediately after the last character. So the array has length $n+1$
+for an input string of length $n$. Each slot in the chart contains a
+set of \emph{dotted rules}. A dotted rule is simply a grammar rule
+with a period indicating how much of its right-hand side has already
+been parsed. For example, the dotted rule
+\begin{lstlisting}
+exp: exp "+" . exp_hi
+\end{lstlisting}
+represents a partial parse that has matched an expression followed by
+\code{+}, but has not yet parsed an expression to the right of
+\code{+}.
+
+The algorithm begins by creating dotted rules for all the grammar
+rules whose left-hand side is the start symbol and placing then in
+slot $0$ of the chart.  For example, given the grammar in
+figure~\ref{fig:Lint-lark-grammar}, we would place
+\begin{lstlisting}
+  lang_int: . stmt_list
+\end{lstlisting}
+in slot $0$ of the chart. The algorithm then proceeds to its
+\emph{prediction} phase in which it adds more dotted rules to the
+chart based on which nonterminal come after a period. In the above,
+the nonterminal \code{stmt\_list} appears after a period, so we add all
+the rules for \code{stmt\_list} to slot $0$, with a period at the
+beginning of their right-hand sides, as follows:
+\begin{lstlisting}
+stmt_list:  . 
+stmt_list:  .  stmt  NEWLINE  stmt_list
+\end{lstlisting}
+The prediction phase continues to add dotted rules as more
+opportunities arise. For example, the \code{stmt} nonterminal now
+appears after a period, so we add all the rules for \code{stmt}.
+\begin{lstlisting}
+stmt:  .  "print" "("  exp ")"
+stmt:  .  exp
+\end{lstlisting}
+To finish the preduction phase, we add the grammar rules for
+\code{exp} and \code{exp\_hi}.
+\begin{lstlisting}[escapechar=$]
+exp: . exp "+" exp_hi
+exp: . exp "-" exp_hi
+exp: . exp_hi
+exp_hi: . INT
+exp_hi: . "input_int" "(" ")"
+exp_hi: . "-" exp_hi
+exp_hi: . "(" exp ")"
+\end{lstlisting}
 
 
 \section{The LALR Algorithm}
-
+\label{sec:lalr}
 
 \section{Further Reading}
 
 UNDER CONSTRUCTION
+
+finite automata
+
 
 
 
