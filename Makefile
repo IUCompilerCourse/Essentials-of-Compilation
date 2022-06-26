@@ -4,7 +4,7 @@
 LATEXMK= latexmk -pdf
 
 all:
-	$(LATEXMK) book
+	$(LATEXMK) -f book
 
 cont: continuous
 continuous:
