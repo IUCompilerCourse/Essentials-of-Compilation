@@ -249,7 +249,7 @@ concepts and algorithms used in compilers.
     syntax trees} and \emph{recursive functions}. 
 {\if\edition\pythonEd
 \item In Chapter~\ref{ch:parsing} we learn how to use the Lark
-  parser generator to create a parser for the language of integer
+  parser framework to create a parser for the language of integer
   arithmetic and local variables. We learn about the parsing
   algorithms inside Lark, including Earley and LALR(1).
 %
@@ -309,15 +309,21 @@ mathematics.
 %
 At the beginning of the course, students form groups of two to four
 people.  The groups complete approximately one chapter every two
-weeks, starting with chapter~\ref{ch:Lvar}. The last two weeks of the
-course involve a final project in which students design and implement
-a compiler extension of their choosing.  The last few chapters can be
-used in support of these projects.  Many chapters include a challenge
-problem that we assign to the graduate students. For compiler courses
-at universities on the quarter system (about ten weeks in length), we
-recommend completing the course through chapter~\ref{ch:Lvec} or
-chapter~\ref{ch:Lfun} and providing some scaffolding code to the
-students for each compiler pass.
+weeks, starting with chapter~\ref{ch:Lvar} and including chapters
+according to the students interests while respecting the dependencies
+between chapters shown in
+Figure~\ref{fig:chapter-dependences}. Chapter~\ref{ch:Lfun}
+(functions) depends on chapter~\ref{ch:Lvec} (tuples) only in the
+implementation of efficient tail calls.
+%
+The last two weeks of the course involve a final project in which
+students design and implement a compiler extension of their choosing.
+The last few chapters can be used in support of these projects.  Many
+chapters include a challenge problem that we assign to the graduate
+students. For compiler courses at universities on the quarter system
+(about ten weeks in length), we recommend completing the course
+through chapter~\ref{ch:Lvec} or chapter~\ref{ch:Lfun} and providing
+some scaffolding code to the students for each compiler pass.
 %
 The course can be adapted to emphasize functional languages by
 skipping chapter~\ref{ch:Lwhile} (loops) and including
@@ -326,11 +332,6 @@ dynamically typed languages by including chapter~\ref{ch:Ldyn}.
 %
 %% \python{A course that emphasizes object-oriented languages would
 %%   include Chapter~\ref{ch:Lobject}.}
-%
-Figure~\ref{fig:chapter-dependences} depicts the dependencies between
-chapters. Chapter~\ref{ch:Lfun} (functions) depends on
-chapter~\ref{ch:Lvec} (tuples) only in the implementation of efficient
-tail calls.
 
 This book has been used in compiler courses at California Polytechnic
 State University, Portland State University, Rose–Hulman Institute of
@@ -569,9 +570,9 @@ input_int() + -8
 \begin{equation}
 \begin{tikzpicture}
  \node[draw] (plus)  at (0 ,  0) {\key{+}};
- \node[draw] (read)  at (-1, -1.5) {{\if\edition\racketEd\footnotesize\key{read}\fi\if\edition\pythonEd\key{input\_int()}\fi}};
- \node[draw] (minus) at (1 , -1.5) {$\key{-}$};
- \node[draw] (8)     at (1 , -3) {\key{8}};
+ \node[draw] (read)  at (-1, -1) {{\if\edition\racketEd\footnotesize\key{read}\fi\if\edition\pythonEd\key{input\_int()}\fi}};
+ \node[draw] (minus) at (1 , -1) {$\key{-}$};
+ \node[draw] (8)     at (1 , -2) {\key{8}};
 
  \draw[->] (plus) to (read);
  \draw[->] (plus) to (minus);
@@ -5170,40 +5171,46 @@ to a stack location in the first place. Or better yet, if we can
 arrange for \code{x} to be placed in a callee-saved register, then it
 won't need to be saved and restored during function calls.
 
-The approach that we recommend for call-live variables is either to
-assign them to callee-saved registers or to spill them to the
-stack. On the other hand, for variables that are not call-live, we try
-the following alternatives in order: (1) look for an available
-caller-saved register (to leave room for other variables in the
-callee-saved register), (2) look for a callee-saved register, and (3)
-spill the variable to the stack.
+We recommend an approach that captures these issues in the
+interference graph, without complicating the graph coloring algorithm.
+During liveness analysis we know which variables are call-live because
+we compute which variables are in use at every instruction
+(section~\ref{sec:liveness-analysis-Lvar}). When we build the
+interference graph (section~\ref{sec:build-interference}), we can
+place an edge between each call-live variable and the caller-saved
+registers in the interference graph. This will prevent the graph
+coloring algorithm from assigning call-live variables to caller-saved
+registers.
 
-It is straightforward to implement this approach in a graph coloring
-register allocator. First, we know which variables are call-live
-because we already need to compute which variables are in use at every
-instruction (section~\ref{sec:liveness-analysis-Lvar}). Second, when
-we build the interference graph
-(section~\ref{sec:build-interference}), we can place an edge between
-each of the call-live variables and the caller-saved registers in the
-interference graph. This will prevent the graph coloring algorithm
-from assigning them to caller-saved registers.
+On the other hand, for variables that are not call-live, we prefer
+placing them in caller-saved registers to leave more room for
+call-live variables in the callee-saved registers. This can also be
+implemented without complicating the graph coloring algorithm. We
+recommend that the graph coloring algorithm assign variables to
+natural numbers, choosing the lowest number for which there is no
+interference. After the coloring is complete, we assign the numbers to
+registers and stack locations: placing the caller-saved registers in
+the lowest numbers, followed by the callee-saved registers, then
+placing the largest numbers in stack locations. This ordering gives
+preference to registers over stack locations and to caller-saved
+registers over callee-saved registers.
 
 Returning to the example in
 figure~\ref{fig:example-calling-conventions}, let us analyze the
-generated x86 code on the right-hand side. Notice that variable
-\code{x} is assigned to \code{rbx}, a callee-saved register. Thus, it
-is already in a safe place during the second call to
-\code{read\_int}. Next, notice that variable \code{y} is assigned to
-\code{rcx}, a caller-saved register, because \code{y} is not a
-call-live variable.
+generated x86 code on the right-hand side. Variable \code{x} is
+assigned to \code{rbx}, a callee-saved register. Thus, it is already
+in a safe place during the second call to \code{read\_int}. Next,
+variable \code{y} is assigned to \code{rcx}, a caller-saved register,
+because \code{y} is not a call-live variable.
 
-Next we analyze the example from the callee point of view, focusing on
-the prelude and conclusion of the \code{main} function. As usual, the
-prelude begins with saving the \code{rbp} register to the stack and
-setting the \code{rbp} to the current stack pointer. We now know why
-it is necessary to save the \code{rbp}: it is a callee-saved register.
-The prelude then pushes \code{rbx} to the stack because (1) \code{rbx}
-is a callee-saved register and (2) \code{rbx} is assigned to a variable
+We have completed the analysis from the caller point of view, so now
+we switch to the callee point of view, focusing on the prelude and
+conclusion of the \code{main} function. As usual, the prelude begins
+with saving the \code{rbp} register to the stack and setting the
+\code{rbp} to the current stack pointer. We now know why it is
+necessary to save the \code{rbp}: it is a callee-saved register.  The
+prelude then pushes \code{rbx} to the stack because (1) \code{rbx} is
+a callee-saved register and (2) \code{rbx} is assigned to a variable
 (\code{x}). The other callee-saved registers are not saved in the
 prelude because they are not used. The prelude subtracts 8 bytes from
 the \code{rsp} to make it 16-byte aligned. Shifting attention to the
@@ -22822,7 +22829,7 @@ print(t[1])
 \label{fig:map-resolve}
 \end{figure}
 
-\section{Erase Types}
+\section{Erase Generic Types}
 \label{sec:erase_types}
 
 We use the \CANYTY{} type presented in chapter~\ref{ch:Ldyn} to
