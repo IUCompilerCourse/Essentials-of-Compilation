@@ -4167,60 +4167,59 @@ Each token includes a field for its \code{type}, such as \code{'INT'},
 and a field for its \code{value}, such as \code{'1'}.
 
 Following in the tradition of \code{lex}~\citep{Lesk:1975uq}, the
-specification language for Lark's lexical analysis generator is one
-regular expression for each type of token. The term \emph{regular}
-comes from the term \emph{regular languages}, which are the languages
-that can be recognized by a finite automata. A \emph{regular
-  expression} is a pattern formed of the following core
-elements:\index{subject}{regular expression}\footnote{Regular
-  expressions traditionally include the empty regular expression that
-  matches any zero-length part of a string, but Lark does not support
-  the empty regular expression.}
+specification language for Lark's lexer is one regular expression for
+each type of token. The term \emph{regular} comes from the term
+\emph{regular languages}, which are the languages that can be
+recognized by a finite state machine. A \emph{regular expression} is a
+pattern formed of the following core elements:\index{subject}{regular
+  expression}\footnote{Regular expressions traditionally include the
+  empty regular expression that matches any zero-length part of a
+  string, but Lark does not support the empty regular expression.}
 \begin{itemize}
 \item A single character $c$ is a regular expression and it only
   matches itself. For example, the regular expression \code{a} only
   matches with the string \code{'a'}.
   
-\item Two regular expressions separated by a vertical bar $R_1 \mid
+\item Two regular expressions separated by a vertical bar $R_1 \ttm{|}
   R_2$ form a regular expression that matches any string that matches
   $R_1$ or $R_2$. For example, the regular expression \code{a|c}
   matches the string \code{'a'} and the string \code{'c'}.
 
 \item Two regular expressions in sequence $R_1 R_2$ form a regular
   expression that matches any string that can be formed by
-  concatenating two strings, where the first matches $R_1$
-  and the second matches $R_2$. For example, the regular expression
+  concatenating two strings, where the first string matches $R_1$ and
+  the second string matches $R_2$. For example, the regular expression
   \code{(a|c)b} matches the strings \code{'ab'} and \code{'cb'}.
   (Parentheses can be used to control the grouping of operators within
   a regular expression.)
 
-\item A regular expression followed by an asterisks $R*$ (called
+\item A regular expression followed by an asterisks $R\ttm{*}$ (called
   Kleene closure) is a regular expression that matches any string that
   can be formed by concatenating zero or more strings that each match
   the regular expression $R$.  For example, the regular expression
-  \code{"((a|c)b)*"} matches the strings \code{'abcbab'} and
-  \code{''}, but not \code{'abc'}.
+  \code{"((a|c)b)*"} matches the strings \code{'abcbab'} but not
+  \code{'abc'}.
 \end{itemize}
 
-For our convenience, Lark also accepts an extended set of regular
-expressions that are automatically translated into the core regular
-expressions.
+For our convenience, Lark also accepts the following extended set of
+regular expressions that are automatically translated into the core
+regular expressions.
 
 \begin{itemize}
 \item A set of characters enclosed in square brackets $[c_1 c_2 \ldots
   c_n]$ is a regular expression that matches any one of the
   characters. So $[c_1 c_2 \ldots c_n]$  is equivalent to
   the regular expression $c_1\mid c_2\mid \ldots \mid c_n$.
-\item A range of characters enclosed in square brackets $[c_1-c_2]$ is
+\item A range of characters enclosed in square brackets $[c_1\ttm{-}c_2]$ is
   a regular expression that matches any character between $c_1$ and
   $c_2$, inclusive. For example, \code{[a-z]} matches any lowercase
   letter in the alphabet.
-\item A regular expression followed by the plus symbol $R+$
+\item A regular expression followed by the plus symbol $R\ttm{+}$
   is a regular expression that matches any string that can
   be formed by concatenating one or more strings that each match $R$.
   So $R+$ is equivalent to $R(R*)$. For example, \code{[a-z]+}
   matches \code{'b'} and \code{'bzca'}.
-\item A regular expression followed by a question mark $R?$
+\item A regular expression followed by a question mark $R\ttm{?}$
   is a regular expression that matches any string that either
   matches $R$ or that is the empty string.
   For example, \code{a?b}  matches both \code{'ab'} and \code{'b'}.
@@ -4253,9 +4252,11 @@ and they can be used to combine regular expressions, outside the
 In section~\ref{sec:grammar} we learned how to use grammar rules to
 specify the abstract syntax of a language. We now take a closer look
 at using grammar rules to specify the concrete syntax. Recall that
-each rule has a left-hand side and a right-hand side. However, for
-concrete syntax, each right-hand side expresses a pattern for a
-string, instead of a patter for an abstract syntax tree. In
+each rule has a left-hand side and a right-hand side where the
+left-hand side is a nonterminal and the right-hand side is a pattern
+that defines what can be parsed as that nonterminal.
+For concrete syntax, each right-hand side expresses a pattern for a
+string, instead of a pattern for an abstract syntax tree. In
 particular, each right-hand side is a sequence of
 \emph{symbols}\index{subject}{symbol}, where a symbol is either a
 terminal or nonterminal. A \emph{terminal}\index{subject}{terminal} is
@@ -4297,13 +4298,13 @@ lang_int: stmt_list
 \end{minipage}
 \end{center}
 
-Let us begin by discussing the rule \code{exp: INT}.  In
+Let us begin by discussing the rule \code{exp: INT} which says that if
+the lexer matches a string to \code{INT}, then the parser also
+categorizes the string as an \code{exp}.  Recall that in
 Section~\ref{sec:grammar} we defined the corresponding \Int{}
 nonterminal with an English sentence. Here we specify \code{INT} more
 formally using a type of token \code{INT} and its regular expression
-\code{"-"? DIGIT+}. Thus, the rule \code{exp: INT} says that if the
-lexer matches a string to \code{INT}, then the parser also categorizes
-the string as an \code{exp}.
+\code{"-"? DIGIT+}.
 
 The rule \code{exp: exp "+" exp} says that any string that matches
 \code{exp}, followed by the \code{+} character, followed by another
@@ -4311,8 +4312,8 @@ string that matches \code{exp}, is itself an \code{exp}.  For example,
 the string \code{'1+3'} is an \code{exp} because \code{'1'} and
 \code{'3'} are both \code{exp} by the rule \code{exp: INT}, and then
 the rule for addition applies to categorize \code{'1+3'} as an
-\Exp{}. We can visualize the application of grammar rules to parse a
-string using a \emph{parse tree}\index{subject}{parse tree}. Each
+\code{exp}. We can visualize the application of grammar rules to parse
+a string using a \emph{parse tree}\index{subject}{parse tree}. Each
 internal node in the tree is an application of a grammar rule and is
 labeled with its left-hand side nonterminal. Each leaf node is a
 substring of the input program.  The parse tree for \code{'1+3'} is
@@ -4363,12 +4364,12 @@ exp: INT                    -> int
    | "(" exp ")"            -> paren
 
 stmt: "print" "(" exp ")"   -> print
-    | exp                   -> expr
+    | exp                    -> expr
 
-stmt_list:                   -> empty_stmt
+stmt_list:                      -> empty_stmt
     | stmt NEWLINE stmt_list -> add_stmt
 
-lang_int: stmt_list          -> module
+lang_int: stmt_list             -> module
 \end{lstlisting}
 \end{minipage}
 \end{center}
@@ -4510,10 +4511,10 @@ WS: /[ \t\f\r\n]/+
 %ignore WS
 \end{lstlisting}
 Change your compiler from chapter~\ref{ch:Lvar} to use your
-Lark-generated parser instead of using the \code{parse} function from
+Lark parser instead of using the \code{parse} function from
 the \code{ast} module. Test your compiler on all of the \LangVar{}
 programs that you have created and create four additional programs
-that would reveal ambiguities in your grammar.
+that test for ambiguities in your grammar.
 \end{exercise}
 
 
@@ -4521,14 +4522,14 @@ that would reveal ambiguities in your grammar.
 \label{sec:earley}
 
 In this section we discuss the parsing algorithm of
-\citet{Earley:1970ly}, which is the default algorithm used by Lark.
-The algorithm is powerful in that it can handle any context-free
-grammar, which makes it easy to use. However, it is not the most
-efficient parsing algorithm: it is $O(n^3)$ for ambiguous grammars and
-$O(n^2)$ for unambiguous grammars, where $n$ is the number of tokens
-in the input string~\citep{Hopcroft06:_automata}.  In
-section~\ref{sec:lalr} we learn about the LALR(1) algorithm, which is
-more efficient but cannot handle all context-free grammars.
+\citet{Earley:1970ly}, the default algorithm used by Lark.  The
+algorithm is powerful in that it can handle any context-free grammar,
+which makes it easy to use. However, it is not the most efficient
+parsing algorithm: it is $O(n^3)$ for ambiguous grammars and $O(n^2)$
+for unambiguous grammars, where $n$ is the number of tokens in the
+input string~\citep{Hopcroft06:_automata}.  In section~\ref{sec:lalr}
+we learn about the LALR(1) algorithm, which is more efficient but
+cannot handle all context-free grammars.
 
 The Earley algorithm can be viewed as an interpreter; it treats the
 grammar as the program being interpreted and it treats the concrete
@@ -4564,7 +4565,7 @@ grammar in figure~\ref{fig:Lint-lark-grammar}, we place
 \begin{lstlisting}
   lang_int: . stmt_list         (0)
 \end{lstlisting}
-in slot $0$ of the chart. The algorithm then proceeds to with
+in slot $0$ of the chart. The algorithm then proceeds with
 \emph{prediction} actions in which it adds more dotted rules to the
 chart based on which nonterminals come immediately after a period. In
 the above, the nonterminal \code{stmt\_list} appears after a period,
@@ -4582,7 +4583,7 @@ stmt:  .  "print" "("  exp ")"   (0)
 stmt:  .  exp                    (0)
 \end{lstlisting}
 This reveals yet more opportunities for prediction, so we add the grammar
-rules for \code{exp} and \code{exp\_hi}.
+rules for \code{exp} and \code{exp\_hi} to slot $0$.
 \begin{lstlisting}[escapechar=$]
 exp: . exp "+" exp_hi         (0)
 exp: . exp "-" exp_hi         (0)
@@ -4596,14 +4597,14 @@ exp_hi: . "(" exp ")"         (0)
 We have exhausted the opportunities for prediction, so the algorithm
 proceeds to \emph{scanning}, in which we inspect the next input token
 and look for a dotted rule at the current position that has a matching
-terminal following the period. In our running example, the first input
-token is \code{"print"} so we identify the rule in slot $0$ of
-the chart whose dot comes before \code{"print"}:
+terminal immediately following the period. In our running example, the
+first input token is \code{"print"} so we identify the rule in slot
+$0$ of the chart where \code{"print"} follows the period:
 \begin{lstlisting}
 stmt:  .  "print" "("  exp ")"       (0)
 \end{lstlisting}
-and add the following rule to slot $1$ of the chart, with the period
-moved forward past \code{"print"}.
+We advance the period past \code{"print"} and add the resulting rule
+to slot $1$ of the chart:
 \begin{lstlisting}
 stmt:  "print" . "("  exp ")"        (0)
 \end{lstlisting}
@@ -4629,9 +4630,9 @@ exp_hi: . "input_int" "(" ")" (2)
 exp_hi: . "-" exp_hi          (2)
 exp_hi: . "(" exp ")"         (2)
 \end{lstlisting}
-With that prediction complete, we return to scanning, noting that the
+With this prediction complete, we return to scanning, noting that the
 next input token is \code{"1"} which the lexer parses as an
-\code{INT}. There is a matching rule is slot $2$:
+\code{INT}. There is a matching rule in slot $2$:
 \begin{lstlisting}
 exp_hi: . INT             (2)
 \end{lstlisting}
@@ -4644,7 +4645,7 @@ the end of a dotted rule, we recognize that the substring
 has matched the nonterminal on the left-hand side of the rule, in this case
 \code{exp\_hi}. We therefore need to advance the periods in any dotted
 rules in slot $2$ (the starting position for the finished rule) if
-period is immediately followed by \code{exp\_hi}. So we identify
+the period is immediately followed by \code{exp\_hi}. So we identify
 \begin{lstlisting}
 exp: . exp_hi                 (2)
 \end{lstlisting}
@@ -4738,17 +4739,16 @@ algorithm.
 \item The algorithm repeatedly applies the following three kinds of
   actions for as long as there are opportunities to do so.
   \begin{itemize}
-  \item Prediction: if there is a dotted rule in slot $k$ whose period
-    comes before a nonterminal, add all the rules for that nonterminal
-    into slot $k$, placing a period at the beginning of their
-    right-hand sides, and recording their starting position as
-    $k$.
+  \item Prediction: if there is a rule in slot $k$ whose period comes
+    before a nonterminal, add the rules for that nonterminal into slot
+    $k$, placing a period at the beginning of their right-hand sides
+    and recording their starting position as $k$.
   \item Scanning: If the token at position $k$ of the input string
     matches the symbol after the period in a dotted rule in slot $k$
-    of the chart, advance the prior in the dotted rule, adding
+    of the chart, advance the period in the dotted rule, adding
     the result to slot $k+1$.
   \item Completion: If a dotted rule in slot $k$ has a period at the
-    end, consider the rules in the slot corresponding to the starting
+    end, inspect the rules in the slot corresponding to the starting
     position of the completed rule. If any of those rules have a
     nonterminal following their period that matches the left-hand side
     of the completed rule, then advance their period, placing the new
@@ -4766,23 +4766,28 @@ shared packed parse forest~\citep{Tomita:1985qr}.  The simple idea is
 to attach a partial parse tree to every dotted rule in the chart.
 Initially, the tree node associated with a dotted rule has no
 children. As the period moves to the right, the nodes from the
-subparses are added as children to this tree node.
+subparses are added as children to the tree node.
 
 As mentioned at the beginning of this section, the Earley algorithm is
 $O(n^2)$ for unambiguous grammars, which means that it can parse input
 files that contain thousands of tokens in a reasonable amount of time,
-but not millions. In the next section we discuss the LALR(1) parsing
-algorithm, which has time complexity $O(n)$, making it practical to
-use with even the largest of input files.
+but not millions.
+%
+In the next section we discuss the LALR(1) parsing algorithm, which is
+efficient enough to use with even the largest of input files.
+
 
 \section{The LALR(1) Algorithm}
 \label{sec:lalr}
 
 The LALR(1) algorithm~\citep{DeRemer69,Anderson73} can be viewed as a
 two phase approach in which it first compiles the grammar into a state
-machine and then runs the state machine to parse an input string.
+machine and then runs the state machine to parse an input string.  The
+second phase has time complexity $O(n)$ where $n$ is the number of
+tokens in the input, so LALR(1) is the best one could hope for with
+respect to efficiency.
 %
-A particularly influential implementation of LALR(1) was the
+A particularly influential implementation of LALR(1) is the
 \texttt{yacc} parser generator by \citet{Johnson:1979qy}, which stands
 for Yet Another Compiler Compiler.
 %
@@ -4806,25 +4811,24 @@ stmt: "print" exp
 start: stmt
 \end{lstlisting}
 Consider state 1 in Figure~\ref{fig:shift-reduce}. The parser has just
-read in a \lstinline{PRINT} token, so the top of the stack is
-\lstinline{(1,PRINT)}. The parser is part of the way through parsing
+read in a \lstinline{"print"} token, so the top of the stack is
+\lstinline{(1,"print")}. The parser is part of the way through parsing
 the input according to grammar rule 1, which is signified by showing
-rule 1 with a period after the \code{PRINT} token and before the
-\code{exp} nonterminal.  A rule with a period in it is called an
-\emph{item}. There are several rules that could apply next, both rule
-2 and 3, so state 1 also shows those rules with a period at the
-beginning of their right-hand sides. The edges between states indicate
-which transitions the machine should make depending on the next input
-token. So, for example, if the next input token is \code{INT} then the
-parser will push \code{INT} and the target state 4 on the stack and
-transition to state 4.  Suppose we are now at the end of the input. In
-state 4 it says we should reduce by rule 3, so we pop from the stack
-the same number of items as the number of symbols in the right-hand
-side of the rule, in this case just one.  We then momentarily jump to
-the state at the top of the stack (state 1) and then follow the goto
-edge that corresponds to the left-hand side of the rule we just
-reduced by, in this case \code{exp}, so we arrive at state 3.  (A
-slightly longer example parse is shown in
+rule 1 with a period after the \code{"print"} token and before the
+\code{exp} nonterminal. There are several rules that could apply next,
+both rule 2 and 3, so state 1 also shows those rules with a period at
+the beginning of their right-hand sides. The edges between states
+indicate which transitions the machine should make depending on the
+next input token. So, for example, if the next input token is
+\code{INT} then the parser will push \code{INT} and the target state 4
+on the stack and transition to state 4.  Suppose we are now at the end
+of the input. In state 4 it says we should reduce by rule 3, so we pop
+from the stack the same number of items as the number of symbols in
+the right-hand side of the rule, in this case just one.  We then
+momentarily jump to the state at the top of the stack (state 1) and
+then follow the goto edge that corresponds to the left-hand side of
+the rule we just reduced by, in this case \code{exp}, so we arrive at
+state 3.  (A slightly longer example parse is shown in
 Figure~\ref{fig:shift-reduce}.)
 
 \begin{figure}[htbp]
@@ -4834,18 +4838,19 @@ Figure~\ref{fig:shift-reduce}.)
   \label{fig:shift-reduce}
 \end{figure}
 
-In general, the algorithm works as follows. Look at the next input
-token.
+In general, the algorithm works as follows. Set the current state to
+state $0$. Then repeat the following, looking at the next input token.
 \begin{itemize}
-\item If there there is a shift edge for the input token, push the
-  edge's target state and the input token on the stack and proceed to
-  the edge's target state.
-\item If there is a reduce action for the input token, pop $k$
-  elements from the stack, where $k$ is the number of symbols in the
-  right-hand side of the rule being reduced. Jump to the state at the
-  top of the stack and then follow the goto edge for the nonterminal
-  that matches the left-hand side of the rule that we reducing
-  by. Push the edge's target state and the nonterminal on the stack.
+\item If there there is a shift edge for the input token in the
+  current state, push the edge's target state and the input token on
+  the stack and proceed to the edge's target state.
+\item If there is a reduce action for the input token in the current
+  state, pop $k$ elements from the stack, where $k$ is the number of
+  symbols in the right-hand side of the rule being reduced. Jump to
+  the state at the top of the stack and then follow the goto edge for
+  the nonterminal that matches the left-hand side of the rule that we
+  reducing by. Push the edge's target state and the nonterminal on the
+  stack.
 \end{itemize}
 
 Notice that in state 6 of Figure~\ref{fig:shift-reduce} there is both
@@ -4856,7 +4861,7 @@ there is a \emph{shift/reduce conflict}.  In this case, the conflict
 will arise, for example, when trying to parse the input
 \lstinline{print 1 + 2 + 3}. After having consumed \lstinline{print 1 + 2}
 the parser will be in state 6, and it will not know whether to
-reduce to form an \emph{exp} of \lstinline{1 + 2}, or whether it
+reduce to form an \code{exp} of \lstinline{1 + 2}, or whether it
 should proceed by shifting the next \lstinline{+} from the input.
 
 A similar kind of problem, known as a \emph{reduce/reduce} conflict,
@@ -4872,7 +4877,7 @@ similar to the initialization phase of the Earley parser.  If the
 period appears immediately before another nonterminal, we add all the
 rules with that nonterminal on the left-hand side. Again, we place a
 period at the beginning of the right-hand side of each the new
-rules. This process called \emph{state closure} is continued
+rules. This process, called \emph{state closure}, is continued
 until there are no more rules to add (similar to the prediction
 actions of an Earley parser). We then examine each dotted rule in the
 current state $I$. Suppose a dotted rule has the form $A ::=
@@ -4897,12 +4902,6 @@ $Y$. For example, in Figure~\ref{fig:shift-reduce} state 4 has an
 dotted rule with a period at the end. We therefore put a reduce by
 rule 3 action into state 4 for every
 token.
-%% (Figure~\ref{fig:shift-reduce} does not show a reduce rule for
-%% \code{INT} in state 4 because this grammar does not allow two
-%% consecutive \code{INT} tokens in the input. We will not go into how
-%% this can be figured out, but in any event it does no harm to have a
-%% reduce rule for \code{INT} in state 4; it just means the input will be
-%% rejected at a later point in the parsing process.)
 
 When inserting reduce actions, take care to spot any shift/reduce or
 reduce/reduce conflicts. If there are any, abort the construction of
@@ -5177,8 +5176,8 @@ During liveness analysis we know which variables are call-live because
 we compute which variables are in use at every instruction
 (section~\ref{sec:liveness-analysis-Lvar}). When we build the
 interference graph (section~\ref{sec:build-interference}), we can
-place an edge between each call-live variable and the caller-saved
-registers in the interference graph. This will prevent the graph
+place an edge in the interference graph between each call-live
+variable and the caller-saved registers. This will prevent the graph
 coloring algorithm from assigning call-live variables to caller-saved
 registers.
 
