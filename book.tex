@@ -26,7 +26,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{1}
+\def\edition{0}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd{#1}\fi}}
@@ -5187,12 +5187,12 @@ call-live variables in the callee-saved registers. This can also be
 implemented without complicating the graph coloring algorithm. We
 recommend that the graph coloring algorithm assign variables to
 natural numbers, choosing the lowest number for which there is no
-interference. After the coloring is complete, we assign the numbers to
-registers and stack locations: placing the caller-saved registers in
-the lowest numbers, followed by the callee-saved registers, then
-placing the largest numbers in stack locations. This ordering gives
-preference to registers over stack locations and to caller-saved
-registers over callee-saved registers.
+interference. After the coloring is complete, we map the numbers to
+registers and stack locations: mapping the lowest numbers to
+caller-saved registers, the next lowest to callee-saved registers, and
+the largest numbers to stack locations. This ordering gives preference
+to registers over stack locations and to caller-saved registers over
+callee-saved registers.
 
 Returning to the example in
 figure~\ref{fig:example-calling-conventions}, let us analyze the
@@ -5613,7 +5613,8 @@ same time?  (If so, they cannot be assigned to the same register.)  To
 make this question more efficient to answer, we create an explicit
 data structure, an \emph{interference
   graph}\index{subject}{interference graph}.  An interference graph is
-an undirected graph that has an edge between two locations if they are
+an undirected graph that has a node for every variable and register
+and has an edge between two nodes if they are
 live at the same time, that is, if they interfere with each other.
 %
 \racket{We recommend using the Racket \code{graph} package
@@ -5689,8 +5690,11 @@ instructions.  \racket{The first instruction is \lstinline{movq $1, v},
 %
 Figure~\ref{fig:interference-results} lists the interference results
 for all the instructions, and the resulting interference graph is
-shown in figure~\ref{fig:interfere}.
-
+shown in figure~\ref{fig:interfere}. We elide the register nodes from
+the interference graph in figure~\ref{fig:interfere} because there
+were no interference edges involving registers and we did not wish to
+clutter the graph, but in general one needs to include all the
+registers in the interference graph.
 
 \begin{figure}[tbp]
 \begin{tcolorbox}[colback=white]
@@ -5926,13 +5930,23 @@ we use the most-constrained-first heuristic in the greedy search.
 Figure~\ref{fig:satur-algo} gives the pseudocode for a simple greedy
 algorithm for register allocation based on saturation and the
 most-constrained-first heuristic. It is roughly equivalent to the
-DSATUR graph coloring algorithm~\citep{Brelaz:1979eu}.
-Just as in sudoku, the algorithm represents colors with integers. The
-integers $0$ through $k-1$ correspond to the $k$ registers that we use
-for register allocation. The integers $k$ and larger correspond to
-stack locations. The registers that are not used for register
-allocation, such as \code{rax}, are assigned to negative integers. In
-particular, we assign $-1$ to \code{rax} and $-2$ to \code{rsp}.
+DSATUR graph coloring algorithm~\citep{Brelaz:1979eu}.  Just as in
+sudoku, the algorithm represents colors with integers. The integers
+$0$ through $k-1$ correspond to the $k$ registers that we use for
+register allocation. In particular, we recommend the following
+correspondence, with $k=11$.
+\begin{lstlisting}
+  0: rcx, 1: rdx, 2: rsi, 3: rdi, 4: r8, 5: r9,
+  6: r10, 7: rbx, 8: r12, 9: r13, 10: r14
+\end{lstlisting}
+The integers $k$ and larger correspond to stack locations. The
+registers that are not used for register allocation, such as
+\code{rax}, are assigned to negative integers. In particular, we
+recommend the following correspondence.
+\begin{lstlisting}
+  -1: rax, -2: rsp, -3: rbp, -4: r11, -5: r15
+\end{lstlisting}
+
 
 %% One might wonder why we include registers at all in the liveness
 %% analysis and interference graph. For example, we never allocate a
@@ -5975,12 +5989,15 @@ example and consider how to color the interference graph shown in
 figure~\ref{fig:interfere}.
 %
 We start by assigning each register node to its own color. For
-example, \code{rax} is assigned the color $-1$ and \code{rsp} is
-assigned $-2$.  The variables are not yet colored, so they are
-annotated with a dash. We then update the saturation for vertices that
-are adjacent to a register, obtaining the following annotated
-graph. For example, the saturation for \code{t} is $\{-1,-2\}$ because
-it interferes with both \code{rax} and \code{rsp}.
+example, \code{rax} is assigned the color $-1$, \code{rsp} is assign
+$-2$, \code{rcx} is assigned $0$, and \code{rdx} is assigned $1$.
+(To reduce clutter in the intereference graph, we elide nodes
+that do not have intereference edges, such as \code{rcx}.)
+The variables are not yet colored, so they are annotated with a dash. We
+then update the saturation for vertices that are adjacent to a
+register, obtaining the following annotated graph. For example, the
+saturation for \code{t} is $\{-1,-2\}$ because it interferes with both
+\code{rax} and \code{rsp}.
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
 \node (rax) at (0,0) {$\ttm{rax}:-1,\{-2\}$};
@@ -6213,11 +6230,14 @@ So, we obtain the following coloring:
 With the DSATUR algorithm in hand, let us return to the running
 example and consider how to color the interference graph in
 figure~\ref{fig:interfere}. We annotate each variable node with a dash
-to indicate that it has not yet been assigned a color. The saturation
-sets are also shown for each node; all of them start as the empty set.
-(We do not include the register nodes in the graph below because there
-were no interference edges involving registers in this program, but in
-general there can be.)
+to indicate that it has not yet been assigned a color.  Each register
+node (not shown) should be assigned the number that the register
+corresponds to, for example, color \code{rcx} with the number \code{0}
+and \code{rdx} with \code{1}. The saturation sets are also shown for
+each node; all of them start as the empty set.  We do not show the
+register nodes in the graph below because there were no interference
+edges involving registers in this program, but in general there can
+be.
 %
 \[
 \begin{tikzpicture}[baseline=(current  bounding  box.center)]
