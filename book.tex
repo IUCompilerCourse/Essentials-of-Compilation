@@ -26,7 +26,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{1}
+\def\edition{0}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd{#1}\fi}}
@@ -6776,18 +6776,18 @@ the \code{rsp} is aligned to 16 bytes.
 Moving on to the program proper, we see how the registers were
 allocated.
 %
-\racket{Variables \code{v}, \code{x}, and \code{y} were assigned to
-  \code{rbx}, and variable \code{z} was assigned to \code{rcx}.}
+\racket{Variables \code{v}, \code{x}, and \code{z} were assigned to
+  \code{rbx}, and variables \code{w} and \code{tmp} was assigned to \code{rcx}.}
 %
 \python{Variables \code{v}, \code{x}, \code{y}, and \code{tmp\_0}
   were assigned to \code{rcx} and variables \code{w} and \code{tmp\_1}
   were assigned to \code{rbx}.}
 %
-Variable \racket{\code{w}}\python{\code{z}} was spilled to the stack
+Variable \racket{\code{y}}\python{\code{z}} was spilled to the stack
 location \code{-16(\%rbp)}.  Recall that the prelude saved the
 callee-save register \code{rbx} onto the stack. The spilled variables
 must be placed lower on the stack than the saved callee-save
-registers, so in this case \racket{\code{w}}\python{z} is placed at
+registers, so in this case \racket{\code{y}}\python{z} is placed at
 \code{-16(\%rbp)}.
 
 In the conclusion\index{subject}{conclusion}, we undo the work that was
@@ -6803,23 +6803,34 @@ done in the prelude. We move the stack pointer up by \code{8} bytes
   % var_test_28.rkt
   % (use-minimal-set-of-registers! #t)
   % and only rbx rcx
+%old:
 % tmp 0 rbx
 % z 1  rcx
 % y 0  rbx
 % w 2  16(%rbp)
 % v 0  rbx
 % x 0  rbx
+
+%new: rcx, rbx
+% tmp 0 rcx
+% z 1 rbx
+% w 0 rcx
+% y 2 rbp -16
+% v 1 rbx
+% x 1 rbx
+  
 {\if\edition\racketEd
 \begin{lstlisting}
 start:
 	movq	$1, %rbx
-	movq	$42, -16(%rbp)
+	movq	$42, %rcx
 	addq	$7, %rbx
-	movq	%rbx, %rcx
-	addq	-16(%rbp), %rcx
-	negq	%rbx
-	movq	%rcx, %rax
-	addq	%rbx, %rax
+	movq	%rbx, -16(%rbp)
+	addq	%rcx, %rbx
+	movq	-16(%rbp), %rcx
+	negq	%rcx
+	movq	%rbx, %rax
+	addq	%rcx, %rax
 	jmp conclusion
 
 	.globl main
