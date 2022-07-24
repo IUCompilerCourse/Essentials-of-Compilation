@@ -583,7 +583,7 @@ ItalicFont=SyntaxLTStd-Italic,
   \pagenumbering{arabic}}
 
 \newcommand\backmatter{%
-  \clearpage
+  \clearpage\thispagestyle{plain}
   \@mainmatterfalse}
 
 \def\part{\clearpage\thispagestyle{empty}\global\@topnum\z@
