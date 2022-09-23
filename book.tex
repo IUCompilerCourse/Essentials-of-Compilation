@@ -3689,11 +3689,13 @@ $\Tail$.}
 
 Next consider the cases for the $\Stmt$ nonterminal, starting with
 arithmetic operations. For example, consider the following addition
-operation, on the left side. There is an \key{addq} instruction in
-x86, but it performs an in-place update.  So, we could move $\Arg_1$
-into the left-hand \itm{var} and then add $\Arg_2$ to \itm{var},
-where $\Arg_1$ and $\Arg_2$ are the translations of $\Atm_1$ and
-$\Atm_2$, respectively.
+operation, on the left side.  (Let $\Arg_1$ and $\Arg_2$ be the
+translations of $\Atm_1$ and $\Atm_2$, respectively.)  There is an
+\key{addq} instruction in x86, but it performs an in-place update.
+%
+So, we could move $\Arg_1$ into the \code{rax} register, then add
+$\Arg_2$ to \code{rax}, and then finally move \code{rax} into the
+left-hand \itm{var}. 
 \begin{transformation}
 {\if\edition\racketEd    
 \begin{lstlisting}
@@ -3707,15 +3709,16 @@ $\Atm_2$, respectively.
 \fi}
 \compilesto
 \begin{lstlisting}
-movq |$\Arg_1$|, |$\itm{var}$|
-addq |$\Arg_2$|, |$\itm{var}$|
+movq |$\Arg_1$|, %rax
+addq |$\Arg_2$|, %rax
+movq %rax, |$\itm{var}$|
 \end{lstlisting}
 \end{transformation}
-There are also cases that require special care to avoid generating
-needlessly complicated code. For example, if one of the arguments of
-the addition is the same variable as the left-hand side of the
-assignment, as shown next, then there is no need for the extra move
-instruction.  The assignment statement can be translated into a single
+%
+However, with some care we can generate shorter sequences of
+instructions. Suppose that one or more of the arguments of the
+addition is the same variable as the left-hand side of the assignment.
+Then the assignment statement can be translated into a single
 \key{addq} instruction, as follows.
 \begin{transformation}
 {\if\edition\racketEd
@@ -3731,6 +3734,28 @@ instruction.  The assignment statement can be translated into a single
 \compilesto
 \begin{lstlisting}
 addq |$\Arg_1$|, |$\itm{var}$|
+\end{lstlisting}
+\end{transformation}
+%
+On the other hand, if $\Atm_1$ is not the same variable as the
+left-hand side, then we can move $\Arg_1$ into the left-hand \itm{var}
+and then add $\Arg_2$ to \itm{var}.
+%
+\begin{transformation}
+{\if\edition\racketEd    
+\begin{lstlisting}
+|$\itm{var}$| = (+ |$\Atm_1$| |$\Atm_2$|);
+\end{lstlisting}
+\fi}
+{\if\edition\pythonEd\pythonColor
+\begin{lstlisting}
+|$\itm{var}$| = |$\Atm_1$| + |$\Atm_2$|
+\end{lstlisting}
+\fi}
+\compilesto
+\begin{lstlisting}
+movq |$\Arg_1$|, |$\itm{var}$|
+addq |$\Arg_2$|, |$\itm{var}$|
 \end{lstlisting}
 \end{transformation}
 
