@@ -2160,8 +2160,18 @@ extensible way.
 Having justified the use of classes and methods to implement
 interpreters, we revisit the definitional interpreter for \LangInt{}
 shown in figure~\ref{fig:interp-Lint-class} and then extend it to
-create an interpreter for \LangVar{}, shown in figure~\ref{fig:interp-Lvar}.
-The interpreter for \LangVar{} adds two new \key{match} cases for
+create an interpreter for \LangVar{}, shown in
+figure~\ref{fig:interp-Lvar}.
+%
+\python{We change the \code{interp\_stmt} method in the interpreter
+  for \LangInt{} in anticipation of adding \code{Goto} in
+  Chapter~\ref{ch:Lif}. The \code{interp\_stmt} method takes an extra
+  parameter named \code{cont} for \emph{continuation}, which is the
+  technical name for what comes after a particular point in a
+  program. The \code{cont} parameter is the list of statements that
+  need to be interpreted after the current statement.}
+%
+The interpreter for \LangVar{} adds two new cases for
 variables and \racket{\key{let}}\python{assignment}. For
 \racket{\key{let}}\python{assignment}, we need a way to communicate the
 value bound to a variable to all the uses of the variable. To
@@ -2189,8 +2199,8 @@ variable, it looks up the corresponding value in the dictionary.
   the body of the \key{Let}.}
 %
 \python{When the interpreter encounters an assignment, it evaluates
-  the initializing expression and then associates the resulting value
-  with the variable in the environment.}
+   the initializing expression and then associates the resulting value
+   with the variable in the environment.}
 
 \begin{figure}[tp]
 \begin{tcolorbox}[colback=white]
@@ -2235,16 +2245,23 @@ class InterpLint:
       case Call(Name('input_int'), []):
         return int(input())            
 
-  def interp_stmts(self, ss, env):
-    if len(ss) == 0:
-      return
-    match ss[0]:
+  def interp_stmt(self, s, env, cont):
+    match s:
       case Expr(Call(Name('print'), [arg])):
-        print(self.interp_exp(arg, env), end='')
-        return self.interp_stmts(ss[1:], env)
+        val = self.interp_exp(arg, env)
+        print(val, end='')
+        return self.interp_stmts(cont, env)
       case Expr(value):
         self.interp_exp(value, env)
-        return self.interp_stmts(ss[1:], env)
+        return self.interp_stmts(cont, env)
+      case _:
+        raise Exception('error in interp_stmt, unexpected ' + repr(s))
+    
+  def interp_stmts(self, ss, env):
+    if len(ss) == 0:
+      return None
+    else:
+      return self.interp_stmt(ss[0], env, ss[1:])
 
   def interp(self, p):
     match p:
@@ -2291,15 +2308,13 @@ class InterpLvar(InterpLint):
       case _:
         return super().interp_exp(e, env)
 
-  def interp_stmts(self, ss, env):
-    if len(ss) == 0:
-      return
-    match ss[0]:
+  def interp_stmt(self, s, env, cont):
+    match s:
       case Assign([lhs], value):
         env[lhs.id] = self.interp_exp(value, env)
-        return self.interp_stmts(ss[1:], env)
+        return self.interp_stmts(cont, env)
       case _:
-        return super().interp_stmts(ss, env)
+        return super().interp_stmt(s, env, cont)
 
 def interp_Lvar(p):
   return InterpLvar().interp(p)
@@ -7852,17 +7867,16 @@ class InterpLif(InterpLvar):
       case _:
         return super().interp_exp(e, env)
 
-  def interp_stmts(self, ss, env):
-    if len(ss) == 0:
-      return
-    match ss[0]:
+  def interp_stmt(self, s, env, cont):
+    match s:
       case If(test, body, orelse):
-        if self.interp_exp(test, env):
-          return self.interp_stmts(body + ss[1:], env)
-        else:
-          return self.interp_stmts(orelse + ss[1:], env)
+        match self.interp_exp(test, env):
+          case True:
+            return self.interp_stmts(body + cont, env)
+          case False:
+            return self.interp_stmts(orelse + cont, env)
       case _:
-        return super().interp_stmts(ss, env)
+        return super().interp_stmt(s, env, cont)
   ...      
 \end{lstlisting}
 \fi}
@@ -10971,16 +10985,15 @@ function, where we repeatedly interpret the \code{body} so long as the
 {\if\edition\pythonEd\pythonColor
 \begin{lstlisting}
 class InterpLwhile(InterpLif):
-  def interp_stmts(self, ss, env):
-    if len(ss) == 0:
-      return
-    match ss[0]:
+  def interp_stmt(self, s, env, cont):
+    match s:
       case While(test, body, []):
-        while self.interp_exp(test, env):
-            self.interp_stmts(body, env)
-        return self.interp_stmts(ss[1:], env)
+        if self.interp_exp(test, env):
+            self.interp_stmts(body + [s] + cont, env)
+        else:
+          return self.interp_stmts(cont, env)
       case _:
-        return super().interp_stmts(ss, env)
+        return super().interp_stmt(s, env, cont)
 \end{lstlisting}
 \fi}
 \end{tcolorbox}
@@ -14174,17 +14187,15 @@ class InterpLarray(InterpLtup):
       case _:
         return super().interp_exp(e, env)
 
-  def interp_stmts(self, ss, env):
-    if len(ss) == 0:
-      return
-    match ss[0]:
-      case Assign([Subscript(lst, index)], value):
-        lst = self.interp_exp(lst, env)
+  def interp_stmt(self, s, env, cont):
+    match s:
+      case Assign([Subscript(tup, index)], value):
+        tup = self.interp_exp(tup, env)
         index = self.interp_exp(index, env)
-        lst[index] = self.interp_exp(value, env)
-        return self.interp_stmts(ss[1:], env)
+        tup[index] = self.interp_exp(value, env)
+        return self.interp_stmts(cont, env)
       case _:
-        return super().interp_stmts(ss, env)
+        return super().interp_stmt(s, env, cont)
 \end{lstlisting}
 \fi}
   \end{tcolorbox}
@@ -14822,18 +14833,19 @@ class InterpLfun(InterpLtup):
       case _:
         return super().interp_exp(e, env)
 
-  def interp_stmts(self, ss, env):
-    if len(ss) == 0:
-      return
-    match ss[0]:
+  def interp_stmt(self, s, env, cont):
+    match s:
       case Return(value):
         return self.interp_exp(value, env)
       case FunctionDef(name, params, bod, dl, returns, comment):
-        ps = [x for (x,t) in params]
+        if isinstance(params, ast.arguments):
+            ps = [p.arg for p in params.args]
+        else:
+            ps = [x for (x,t) in params]
         env[name] = Function(name, ps, bod, env)
-        return self.interp_stmts(ss[1:], env)
+        return self.interp_stmts(cont, env)
       case _:
-        return super().interp_stmts(ss, env)
+        return super().interp_stmt(s, env, cont)
     
   def interp(self, p):
     match p:
@@ -16684,15 +16696,15 @@ class InterpLlambda(InterpLfun):
       case _:
         return super().interp_exp(e, env)
     
-  def interp_stmts(self, ss, env):
-    if len(ss) == 0:
-      return
-    match ss[0]:
+  def interp_stmt(self, s, env, cont):
+    match s:
       case AnnAssign(lhs, typ, value, simple):
         env[lhs.id] = self.interp_exp(value, env)
-        return self.interp_stmts(ss[1:], env)
+        return self.interp_stmts(cont, env)
+      case Pass():
+        return self.interp_stmts(cont, env)
       case _:
-        return super().interp_stmts(ss, env)
+        return super().interp_stmt(s, env, cont)
 \end{lstlisting}
 \fi}
   \end{tcolorbox}
@@ -18395,33 +18407,37 @@ class InterpLdyn(InterpLlambda):
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 class InterpLdyn(InterpLlambda):
   
-  def interp_stmts(self, ss, env):
-    if len(ss) == 0:
-      return
-    match ss[0]:
+  def interp_stmt(self, s, env, cont):
+    match s:
       case If(test, body, orelse):
         v = self.interp_exp(test, env)
-        if self.untag(v, 'bool', ss[0]):
-            return self.interp_stmts(body + ss[1:], env)
-        else:
-            return self.interp_stmts(orelse + ss[1:], env)
+        match self.untag(v, 'bool', s):
+          case True:
+            return self.interp_stmts(body + cont, env)
+          case False:
+            return self.interp_stmts(orelse + cont, env)
       case While(test, body, []):
-        while self.untag(self.interp_exp(test, env), 'bool', ss[0]):
-            self.interp_stmts(body, env)
-        return self.interp_stmts(ss[1:], env)
+        v = self.interp_exp(test, env)
+        if self.untag(v, 'bool', test):
+            self.interp_stmts(body + [s] + cont, env)
+        else:
+          return self.interp_stmts(cont, env)
       case Assign([Subscript(tup, index)], value):
         tup = self.interp_exp(tup, env)
         index = self.interp_exp(index, env)
-        tup_v = self.untag(tup, 'tuple', ss[0])
-        index_v = self.untag(index, 'int', ss[0])
+        tup_v = self.untag(tup, 'tuple', s)
+        index_v = self.untag(index, 'int', s)
         tup_v[index_v] = self.interp_exp(value, env)
-        return self.interp_stmts(ss[1:], env)
+        return self.interp_stmts(cont, env)
       case FunctionDef(name, params, bod, dl, returns, comment):
-        ps = [x for (x,t) in params]
+        if isinstance(params, ast.arguments):
+            ps = [p.arg for p in params.args]
+        else:
+            ps = [x for (x,t) in params]
         env[name] = self.tag(Function(name, ps, bod, env))
-        return self.interp_stmts(ss[1:], env)
+        return self.interp_stmts(cont, env)
       case _:
-        return super().interp_stmts(ss, env)
+        return super().interp_stmt(s, env, cont)
 \end{lstlisting}
 \end{tcolorbox}
 
