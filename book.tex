@@ -1591,6 +1591,20 @@ same input $i$ yields the same output $o$.
  \path[->] (p1) edge [left]  node {interp\_$\mathcal{L}_1$($i$)} (o);
 \end{tikzpicture}
 \end{equation}
+
+\python{We establish the convention that if running the definitional
+  interpreter on a program produces an error, then the meaning of that
+  program is \emph{unspecified}\index{subject}{unspecified behavior}
+  unless the exception raised is a \code{TrappedError}. A compiler for
+  the language is under no obligation regarding programs with
+  unspecified behavior; it does not have to produce an executable, and
+  if it does, that executable can do anything.  On the other hand, if
+  the error is a \code{TrappedError}, then the compiler must produce
+  an executable and it is required to report that an error
+  occurred. To signal an error, exit with a return code of \code{255}.
+  The interpreters in chapters \ref{ch:Ldyn} and \ref{ch:Lgrad} and in
+  section \ref{sec:arrays} use \code{TrappedError}.}
+
 In the next section we see our first example of a compiler.
 
 
@@ -14190,15 +14204,25 @@ class InterpLarray(InterpLtup):
       case BinOp(left, Mult(), right):
           l = self.interp_exp(left, env); r = self.interp_exp(right, env)
           return l * r
+      case Subscript(tup, index, Load()):
+        t = self.interp_exp(tup, env)
+        n = self.interp_exp(index, env)
+        if n < len(t):
+          return t[n]
+        else:
+          raise TrappedError('array index out of bounds')
       case _:
         return super().interp_exp(e, env)
 
   def interp_stmt(self, s, env, cont):
     match s:
       case Assign([Subscript(tup, index)], value):
-        tup = self.interp_exp(tup, env)
-        index = self.interp_exp(index, env)
-        tup[index] = self.interp_exp(value, env)
+        t = self.interp_exp(tup, env)
+        n = self.interp_exp(index, env)
+        if n < len(t):
+          t[n] = self.interp_exp(value, env)
+        else:
+          raise TrappedError('array index out of bounds')
         return self.interp_stmts(cont, env)
       case _:
         return super().interp_stmt(s, env, cont)
@@ -18531,8 +18555,8 @@ class InterpLdyn(InterpLlambda):
         case Tagged(val, tag) if tag == expected_tag:
           return val
         case _:
-          raise Exception('expected Tagged value with '
-                          + expected_tag + ', not ' + ' ' + repr(v))
+          raise TrappedError('expected Tagged value with '
+                             + expected_tag + ', not ' + ' ' + repr(v))
 
   def apply_fun(self, fun, args, e):
       f = self.untag(fun, 'function', e)
