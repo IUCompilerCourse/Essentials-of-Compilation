@@ -9187,7 +9187,7 @@ jumps to the new basic block.
 def create_block(stmts, basic_blocks):
     label = label_name(generate_name('block'))
     basic_blocks[label] = stmts
-    return Goto(label)
+    return [Goto(label)]
 \end{lstlisting}
 \end{minipage}
 \end{center}
@@ -9254,7 +9254,7 @@ def explicate_pred(cnd, thn, els, basic_blocks):
         case Compare(left, [op], [right]):
             goto_thn = create_block(thn, basic_blocks)
             goto_els = create_block(els, basic_blocks)
-            return [If(cnd, [goto_thn], [goto_els])]
+            return [If(cnd, goto_thn, goto_els)]
         case Constant(True):
             return thn;
         case Constant(False):
@@ -9267,8 +9267,8 @@ def explicate_pred(cnd, thn, els, basic_blocks):
             ...
         case _:
             return [If(Compare(cnd, [Eq()], [Constant(False)]),
-                       [create_block(els, basic_blocks)],
-                       [create_block(thn, basic_blocks)])]
+                       create_block(els, basic_blocks),
+                       create_block(thn, basic_blocks))]
 
 def explicate_stmt(s, cont, basic_blocks):
     match s:
@@ -10421,14 +10421,16 @@ solitary \code{goto} statement.\\
 \begin{minipage}{\textwidth}
 \begin{lstlisting}
 def create_block(promise, basic_blocks):
-  stmts = force(promise)
-  match stmts:
-    case [Goto(l)]:
-       return Goto(l)
-    case _:
-      label = label_name(generate_name('block'))
-      basic_blocks[label] = stmts
-      return Goto(label)
+  def delay():
+    stmts = force(promise)
+    match stmts:
+      case [Goto(l)]:
+         return [Goto(l)]
+      case _:
+        label = label_name(generate_name('block'))
+        basic_blocks[label] = stmts
+        return [Goto(label)]
+  return delay
 \end{lstlisting}
 \end{minipage}
 
