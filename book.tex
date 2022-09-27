@@ -2178,13 +2178,18 @@ create an interpreter for \LangVar{}, shown in
 figure~\ref{fig:interp-Lvar}.
 %
 \python{We change the \code{interp\_stmt} method in the interpreter
-  for \LangInt{} in anticipation of adding \code{Goto} in
-  Chapter~\ref{ch:Lif}. The \code{interp\_stmt} method takes an extra
-  parameter named \code{cont} for \emph{continuation}, which is the
-  technical name for what comes after a particular point in a
-  program. The \code{cont} parameter is the list of statements that
-  need to be interpreted after the current statement.}
-%
+  for \LangInt{} to take two extra parameters named \code{env}, which
+  we discuss in the next paragraph, and \code{cont} for
+  \emph{continuation}, which is the technical name for what comes
+  after a particular point in a program. The \code{cont} parameter is
+  the list of statements that that follow the current statement.  Note
+  that \code{interp\_stmts} invokes \code{interp\_stmt} on the first
+  statement and passes the rest of the statements as the argument for
+  \code{cont}. This organization enables each statement to decide what
+  if anything should be evaluated after it, for example, allowing a
+  \code{return} statement to exit early from a function (see
+  Chapter~\ref{ch:Lfun}).}
+
 The interpreter for \LangVar{} adds two new cases for
 variables and \racket{\key{let}}\python{assignment}. For
 \racket{\key{let}}\python{assignment}, we need a way to communicate the
@@ -2278,10 +2283,11 @@ class InterpLint:
         raise Exception('error in interp_stmt, unexpected ' + repr(s))
     
   def interp_stmts(self, ss, env):
-    if len(ss) == 0:
-      return None
-    else:
-      return self.interp_stmt(ss[0], env, ss[1:])
+    match ss:
+      case []:
+        return 0
+      case [s, *ss]:
+        return self.interp_stmt(s, env, ss)
 
   def interp(self, p):
     match p:
@@ -8418,8 +8424,8 @@ statement to finish the program with a specified value.
 %
 The \key{CProgram} construct contains a dictionary mapping labels to
 lists of statements that end with a \emph{tail} statement, which is
-either a \code{return} statement, a \code{goto}, or a conditional
-\code{goto}.
+either a \code{return} statement, a \code{goto}, or an
+\code{if} statement.
 %
 A \code{goto} transfers control to the sequence of statements
 associated with its label.
@@ -8526,7 +8532,7 @@ in figure~\ref{fig:c1-syntax}.
 \begin{array}{l}
   \CifASTPython \\ 
 \begin{array}{lcl}
-\LangCIfM{} & ::= & \CPROGRAM{\itm{info}}{\LC\itm{label}\key{:}\,\Stmt^{*}\;\Tail, \ldots \RC}
+\LangCIfM{} & ::= & \CPROGRAM{\itm{info}}{\LC\itm{label}\key{:}\,\LS\Stmt,\ldots,\Tail\RS, \ldots \RC}
 \end{array}
 \end{array}
 \]
