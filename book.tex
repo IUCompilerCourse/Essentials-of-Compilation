@@ -10350,22 +10350,41 @@ promise, \code{force} simply returns the argument.
 \fi}
 %
 {\if\edition\pythonEd\pythonColor
-%
+  %
 While Python does not provide direct support for lazy evaluation, it
 is easy to mimic. We can \emph{delay} the evaluation of a computation
 by wrapping it inside a function with no parameters. We can
-\emph{force} its evaluation by calling the function. However, in some
-cases of \code{explicate\_pred}, etc., we will return a list of
-statements and in other cases we will return a function that computes
-a list of statements. We use the term \emph{promise} to refer to a
-value that may be delayed.  To uniformly deal with
-promises, we define the following \code{force} function that checks
-whether its input is delayed (i.e., whether it is a function) and then
-either 1) calls the function, or 2) returns the input.
+\emph{force} its evaluation by calling the function. However, we might
+need to force multiple times, so we should memoize the result of
+calling the function. The following \code{Promise} class handles
+this memoization.
+%
+\begin{lstlisting}
+@dataclass
+class Promise:
+  fun : types.Any
+  cache : list[Stmt] = None
+
+  def force(self):
+      if self.cache is None:
+          self.cache = self.fun()
+          return self.cache
+      else:
+          return self.cache
+\end{lstlisting}
+%
+However, in some cases of \code{explicate\_pred}, etc., we will return
+a list of statements and in other cases we will return a function that
+computes a list of statements.  To uniformly deal with both regular
+data and promises, we define the following \code{force} function that
+checks whether its input is delayed (i.e., whether it is a
+\code{Promise}) and then either 1) forces the promise , or 2) returns
+the input.
+%
 \begin{lstlisting}
 def force(promise):
-    if isinstance(promise, types.FunctionType):
-        return promise()
+    if isinstance(promise, Promise):
+        return promise.force()
     else:
         return promise
 \end{lstlisting}
@@ -10430,7 +10449,7 @@ def create_block(promise, basic_blocks):
         label = label_name(generate_name('block'))
         basic_blocks[label] = stmts
         return [Goto(label)]
-  return delay
+  return Promise(delay)
 \end{lstlisting}
 \end{minipage}
 
