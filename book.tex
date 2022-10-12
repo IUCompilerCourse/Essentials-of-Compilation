@@ -839,16 +839,19 @@ The name $\Int$ is also a nonterminal, but instead of defining it with
 a grammar rule, we define it with the following explanation.  An
 $\Int$ is a sequence of decimals ($0$ to $9$), possibly starting with
 $-$ (for negative integers), such that the sequence of decimals
-represents an integer in the range $-2^{62}$ to $2^{62}-1$.  This
+%
+\racket{represents an integer in the range $-2^{62}$ to $2^{62}-1$.  This
 enables the representation of integers using 63 bits, which simplifies
 several aspects of compilation.
 %
-\racket{Thus, these integers correspond to the Racket \texttt{fixnum}
-  datatype on a 64-bit machine.}
+Thus, these integers correspond to the Racket \texttt{fixnum}
+datatype on a 64-bit machine.}
 %
-\python{In contrast, integers in Python have unlimited precision, but
-  the techniques needed to handle unlimited precision fall outside the
-  scope of this book.}
+\python{represents an integer in the range $-2^{63}$ to $2^{63}-1$.  This
+enables the representation of integers using 64 bits, which simplifies
+several aspects of compilation. In contrast, integers in Python have
+unlimited precision, but the techniques needed to handle unlimited
+precision fall outside the scope of this book.}
 
 The second grammar rule is the \READOP{} operation, which receives an
 input integer from the user of the program.
@@ -1399,7 +1402,8 @@ figure~\ref{fig:interp_Lint}.
   grammar rule of the \Stmt{} nonterminal and it calls
   \code{interp\_exp} on each subexpression.  The \code{interp\_exp}
   function includes a case for each grammar rule of the \Exp{}
-  nonterminal.}
+  nonterminal. We use several auxiliary functions such as \code{add64}
+  and \code{input\_int} that are defined in the support code for this book.}
 
 \begin{figure}[tp]
 \begin{tcolorbox}[colback=white]
@@ -1435,16 +1439,16 @@ def interp_exp(e):
     match e:
         case BinOp(left, Add(), right):
             l = interp_exp(left); r = interp_exp(right)
-            return l + r
+            return add64(l, r)
         case BinOp(left, Sub(), right):
             l = interp_exp(left); r = interp_exp(right)
-            return l - r
+            return sub64(l, r)
         case UnaryOp(USub(), v):
-            return - interp_exp(v)
+            return neg64(interp_exp(v))
         case Constant(value):
             return value
         case Call(Name('input_int'), []):
-            return int(input())            
+            return input_int()
 
 def interp_stmt(s):
     match s:
