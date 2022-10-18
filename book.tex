@@ -4214,8 +4214,8 @@ though a parser framework does most of the work for us, using one
 properly requires some knowledge.  In particular, we must learn about
 its specification languages and we must learn how to deal with
 ambiguity in our language specifications. Also, some algorithms, such
-as LALR(1) place restrictions on the grammars they can handle, in
-which case it helps to know the algorithm when trying to decipher the
+as LALR(1), place restrictions on the grammars they can handle, in
+which case knowing the algorithm help with trying to decipher the
 error messages.
 
 The process of parsing is traditionally subdivided into two phases:
@@ -4239,7 +4239,7 @@ and the use of a slower but more powerful algorithm for parsing.
 %
 The Lark parser framework that we use in this chapter includes both
 lexical analyzers and parsers. The next section discusses lexical
-analysis and the remainder of the chapter discusses parsing.
+analysis, and the remainder of the chapter discusses parsing.
 
 
 \section{Lexical Analysis and Regular Expressions}
@@ -4251,7 +4251,7 @@ generated lexer for \LangInt{} converts the string
 \begin{lstlisting}
 'print(1 + 3)'
 \end{lstlisting}
-\noindent into the following sequence of token objects
+\noindent into the following sequence of token objects:
 \begin{center}
 \begin{minipage}{0.95\textwidth}
 \begin{lstlisting}
@@ -4265,8 +4265,8 @@ Token('NEWLINE', '\n')
 \end{lstlisting}
 \end{minipage}
 \end{center}
-Each token includes a field for its \code{type}, such as \code{'INT'},
-and a field for its \code{value}, such as \code{'1'}.
+Each token includes a field for its \code{type}, such as \skey{INT},
+and a field for its \code{value}, such as \skey{1}.
 
 Following in the tradition of \code{lex}~\citep{Lesk:1975uq}, the
 specification language for Lark's lexer is one regular expression for
@@ -4278,20 +4278,20 @@ pattern formed of the following core elements:\index{subject}{regular
   empty regular expression that matches any zero-length part of a
   string, but Lark does not support the empty regular expression.}
 \begin{itemize}
-\item A single character $c$ is a regular expression and it only
-  matches itself. For example, the regular expression \code{a} only
-  matches with the string \code{'a'}.
+\item A single character $c$ is a regular expression, and it matches
+  only itself. For example, the regular expression \code{a} matches
+  only the string \skey{a}.
   
 \item Two regular expressions separated by a vertical bar $R_1 \ttm{|}
   R_2$ form a regular expression that matches any string that matches
   $R_1$ or $R_2$. For example, the regular expression \code{a|c}
-  matches the string \code{'a'} and the string \code{'c'}.
+  matches the string \skey{a} and the string \skey{c}.
 
 \item Two regular expressions in sequence $R_1 R_2$ form a regular
   expression that matches any string that can be formed by
   concatenating two strings, where the first string matches $R_1$ and
   the second string matches $R_2$. For example, the regular expression
-  \code{(a|c)b} matches the strings \code{'ab'} and \code{'cb'}.
+  \code{(a|c)b} matches the strings \skey{ab} and \skey{cb}.
   (Parentheses can be used to control the grouping of operators within
   a regular expression.)
 
@@ -4299,8 +4299,8 @@ pattern formed of the following core elements:\index{subject}{regular
   Kleene closure) is a regular expression that matches any string that
   can be formed by concatenating zero or more strings that each match
   the regular expression $R$.  For example, the regular expression
-  \code{"((a|c)b)*"} matches the strings \code{'abcbab'} but not
-  \code{'abc'}.
+  \code{((a|c)b)*} matches the string \skey{abcbab} but not
+  \skey{abc}.
 \end{itemize}
 
 For our convenience, Lark also accepts the following extended set of
@@ -4310,7 +4310,7 @@ regular expressions.
 \begin{itemize}
 \item A set of characters enclosed in square brackets $[c_1 c_2 \ldots
   c_n]$ is a regular expression that matches any one of the
-  characters. So $[c_1 c_2 \ldots c_n]$  is equivalent to
+  characters. So, $[c_1 c_2 \ldots c_n]$  is equivalent to
   the regular expression $c_1\mid c_2\mid \ldots \mid c_n$.
 \item A range of characters enclosed in square brackets $[c_1\ttm{-}c_2]$ is
   a regular expression that matches any character between $c_1$ and
@@ -4320,19 +4320,21 @@ regular expressions.
   is a regular expression that matches any string that can
   be formed by concatenating one or more strings that each match $R$.
   So $R+$ is equivalent to $R(R*)$. For example, \code{[a-z]+}
-  matches \code{'b'} and \code{'bzca'}.
+  matches \skey{b} and \skey{bzca}.
 \item A regular expression followed by a question mark $R\ttm{?}$
   is a regular expression that matches any string that either
-  matches $R$ or that is the empty string.
-  For example, \code{a?b}  matches both \code{'ab'} and \code{'b'}.
-\item A string, such as \code{"hello"}, which matches itself,
-    that is, \code{'hello'}.
+  matches $R$ or is the empty string.
+  For example, \code{a?b}  matches both \skey{ab} and \skey{b}.
 \end{itemize}
 
-In a Lark grammar file, specify a name for each type of token followed
-by a colon and then a regular expression surrounded by \code{/}
-characters. For example, the \code{DIGIT}, \code{INT}, and
-\code{NEWLINE} types of tokens are specified in the following way.
+In a Lark grammar file, each kind of token is specified by a
+\emph{terminal}\index{subject}{terminal} which is defined by a rule
+that consists of the name of the terminal followed by a colon followed
+by a sequence of literals.  The literals include strings such as
+\code{"abc"}, regular expressions surrounded by \code{/} characters,
+terminal names, and literals composed using the regular expression
+operators ($+$, $*$, etc.).  For example, the \code{DIGIT},
+\code{INT}, and \code{NEWLINE} terminals are specified as follows:
 \begin{center}
 \begin{minipage}{0.95\textwidth}
 \begin{lstlisting}
@@ -4343,10 +4345,6 @@ NEWLINE: (/\r/? /\n/)+
 \end{minipage}
 \end{center}
 
-\noindent In Lark, the regular expression operators can be used both
-inside a regular expression, that is, between the \code{/} characters,
-and they can be used to combine regular expressions, outside the
-\code{/} characters.
 
 \section{Grammars and Parse Trees}
 \label{sec:CFG}
@@ -4356,16 +4354,15 @@ specify the abstract syntax of a language. We now take a closer look
 at using grammar rules to specify the concrete syntax. Recall that
 each rule has a left-hand side and a right-hand side where the
 left-hand side is a nonterminal and the right-hand side is a pattern
-that defines what can be parsed as that nonterminal.
-For concrete syntax, each right-hand side expresses a pattern for a
-string, instead of a pattern for an abstract syntax tree. In
-particular, each right-hand side is a sequence of
+that defines what can be parsed as that nonterminal.  For concrete
+syntax, each right-hand side expresses a pattern for a string, instead
+of a pattern for an abstract syntax tree. In particular, each
+right-hand side is a sequence of
 \emph{symbols}\index{subject}{symbol}, where a symbol is either a
-terminal or nonterminal. A \emph{terminal}\index{subject}{terminal} is
-a string. The nonterminals play the same role as in the abstract
-syntax, defining categories of syntax. The nonterminals of a grammar
-include the tokens defined in the lexer and all the nonterminals
-defined by the grammar rules.
+terminal or a nonterminal. The nonterminals play the same role as in
+the abstract syntax, defining categories of syntax. The nonterminals
+of a grammar include the tokens defined in the lexer and all the
+nonterminals defined by the grammar rules.
 
 As an example, let us take a closer look at the concrete syntax of the
 \LangInt{} language, repeated here.
@@ -4379,7 +4376,7 @@ As an example, let us take a closer look at the concrete syntax of the
 \]
 The Lark syntax for grammar rules differs slightly from the variant of
 BNF that we use in this book. In particular, the notation $::=$ is
-replaced by a single colon and the use of typewriter font for string
+replaced by a single colon, and the use of typewriter font for string
 literals is replaced by quotation marks. The following grammar serves
 as a first draft of a Lark grammar for \LangInt{}.
 \begin{center}
@@ -4400,25 +4397,25 @@ lang_int: stmt_list
 \end{minipage}
 \end{center}
 
-Let us begin by discussing the rule \code{exp: INT} which says that if
-the lexer matches a string to \code{INT}, then the parser also
+Let us begin by discussing the rule \code{exp: INT}, which says that
+if the lexer matches a string to \code{INT}, then the parser also
 categorizes the string as an \code{exp}.  Recall that in
-Section~\ref{sec:grammar} we defined the corresponding \Int{}
-nonterminal with an English sentence. Here we specify \code{INT} more
-formally using a type of token \code{INT} and its regular expression
-\code{"-"? DIGIT+}.
+section~\ref{sec:grammar} we defined the corresponding \Int{}
+nonterminal with a sentence in English. Here we specify \code{INT}
+more formally using a type of token \code{INT} and its regular
+expression \code{"-"? DIGIT+}.
 
 The rule \code{exp: exp "+" exp} says that any string that matches
 \code{exp}, followed by the \code{+} character, followed by another
 string that matches \code{exp}, is itself an \code{exp}.  For example,
-the string \code{'1+3'} is an \code{exp} because \code{'1'} and
-\code{'3'} are both \code{exp} by the rule \code{exp: INT}, and then
-the rule for addition applies to categorize \code{'1+3'} as an
+the string \lstinline{'1+3'} is an \code{exp} because \lstinline{'1'} and
+\lstinline{'3'} are both \code{exp} by the rule \code{exp: INT}, and then
+the rule for addition applies to categorize \lstinline{'1+3'} as an
 \code{exp}. We can visualize the application of grammar rules to parse
 a string using a \emph{parse tree}\index{subject}{parse tree}. Each
 internal node in the tree is an application of a grammar rule and is
 labeled with its left-hand side nonterminal. Each leaf node is a
-substring of the input program.  The parse tree for \code{'1+3'} is
+substring of the input program.  The parse tree for \lstinline{'1+3'} is
 shown in figure~\ref{fig:simple-parse-tree}.
 
 \begin{figure}[tbp]
@@ -4426,11 +4423,11 @@ shown in figure~\ref{fig:simple-parse-tree}.
 \centering
 \includegraphics[width=1.9in]{figs/simple-parse-tree}
 \end{tcolorbox}
-\caption{The parse tree for \code{'1+3'}.}
+\caption{The parse tree for \lstinline{'1+3'}.}
 \label{fig:simple-parse-tree}
 \end{figure}
 
-The result of parsing \code{'1+3'} with this Lark grammar is the
+The result of parsing \lstinline{'1+3'} with this Lark grammar is the
 following parse tree as represented by \code{Tree} and \code{Token}
 objects.
 \begin{lstlisting}
@@ -4439,7 +4436,7 @@ objects.
                                     Tree('exp', [Token('INT', '3')])])]),
       Token('NEWLINE', '\n')])
 \end{lstlisting}
-The nodes that come from the lexer are \code{Token} objects whereas
+The nodes that come from the lexer are \code{Token} objects, whereas
 the nodes from the parser are \code{Tree} objects.  Each \code{Tree}
 object has a \code{data} field containing the name of the nonterminal
 for the grammar rule that was applied. Each \code{Tree} object also
@@ -4449,9 +4446,9 @@ the grammar. For example, the \code{Tree} node for the addition
 expression has only two children for the two integers but is missing
 its middle child for the \code{"+"} terminal. This would be
 problematic except that Lark provides a mechanism for customizing the
-\code{data} field of each \code{Tree} node based on which rule was
+\code{data} field of each \code{Tree} node on the basis of which rule was
 applied.  Next to each alternative in a grammar rule, write \code{->}
-followed by a string that you would like to appear in the \code{data}
+followed by a string that you want to appear in the \code{data}
 field.  The following is a second draft of a Lark grammar for
 \LangInt{}, this time with more specific labels on the \code{Tree}
 nodes.
@@ -4487,7 +4484,7 @@ Tree('module',
 
 A grammar is \emph{ambiguous}\index{subject}{ambiguous} when a string
 can be parsed in more than one way. For example, consider the string
-\code{'1-2+3'}.  This string can parsed in two different ways using
+\lstinline{'1-2+3'}.  This string can be parsed in two different ways using
 our draft grammar, resulting in the two parse trees shown in
 figure~\ref{fig:ambig-parse-tree}. This example is problematic because
 interpreting the second parse tree would yield \code{-4} even through
@@ -4498,12 +4495,12 @@ the correct answer is \code{2}.
 \centering
 \includegraphics[width=0.95\textwidth]{figs/ambig-parse-tree}
 \end{tcolorbox}
-\caption{The two parse trees for \code{'1-2+3'}.}
+\caption{The two parse trees for \lstinline{'1-2+3'}.}
 \label{fig:ambig-parse-tree}
 \end{figure}
 
 To deal with this problem we can change the grammar by categorizing
-the syntax in a more fine grained fashion. In this case we want to
+the syntax in a more fine-grained fashion. In this case we want to
 disallow the application of the rule \code{exp: exp "-" exp} when the
 child on the right is an addition.  To do this we can replace the
 \code{exp} after \code{"-"} with a nonterminal that categorizes all
@@ -4525,18 +4522,18 @@ exp_no_add: INT             -> int
 \end{center}
 
 However, there remains some ambiguity in the grammar. For example, the
-string \code{'1-2-3'} can still be parsed in two different ways, as
-\code{'(1-2)-3'} (correct) or \code{'1-(2-3)'} (incorrect).  That is
-to say, subtraction is left associative. Likewise, addition in Python
-is left associative. We also need to consider the interaction of unary
-subtraction with both addition and subtraction. How should we parse
-\code{'-1+2'}? Unary subtraction has higher
-\emph{precendence}\index{subject}{precedence} than addition and
-subtraction, so \code{'-1+2'} should parse the same as \code{'(-1)+2'}
-and not \code{'-(1+2)'}. The grammar in
+string \lstinline{'1-2-3'} can still be parsed in two different ways,
+as \lstinline{'(1-2)-3'} (correct) or \lstinline{'1-(2-3)'}
+(incorrect).  That is, subtraction is left associative. Likewise,
+addition in Python is left associative. We also need to consider the
+interaction of unary subtraction with both addition and
+subtraction. How should we parse \lstinline{'-1+2'}? Unary subtraction
+has higher \emph{precedence}\index{subject}{precedence} than addition
+and subtraction, so \lstinline{'-1+2'} should parse the same as
+\lstinline{'(-1)+2'} and not \lstinline{'-(1+2)'}. The grammar in
 figure~\ref{fig:Lint-lark-grammar} handles the associativity of
 addition and subtraction by using the nonterminal \code{exp\_hi} for
-all the other expressions, and uses \code{exp\_hi} for the second
+all the other expressions, and it uses \code{exp\_hi} for the second
 child in the rules for addition and subtraction. Furthermore, unary
 subtraction uses \code{exp\_hi} for its child.
 
@@ -4573,12 +4570,12 @@ lang_int: stmt_list          -> module
 \section{From Parse Trees to Abstract Syntax Trees}
 
 As we have seen, the output of a Lark parser is a parse tree, that is,
-a tree consisting of \code{Tree} and \code{Token} nodes. So the next
+a tree consisting of \code{Tree} and \code{Token} nodes. So, the next
 step is to convert the parse tree to an abstract syntax tree. This can
 be accomplished with a recursive function that inspects the
 \code{data} field of each node and then constructs the corresponding
 AST node, using recursion to handle its children. The following is an
-excerpt of the \code{parse\_tree\_to\_ast} function for \LangInt{}.
+excerpt from the \code{parse\_tree\_to\_ast} function for \LangInt{}.
 
 \begin{center}
 \begin{minipage}{0.95\textwidth}
@@ -4603,10 +4600,10 @@ def parse_tree_to_ast(e):
 %
   Use Lark to create a lexer and parser for \LangVar{}.  Use Lark's
   default parsing algorithm (Earley) with the \code{ambiguity} option
-  set to \code{'explicit'} so that if your grammar is ambiguous, the
-  output will include multiple parse trees which will indicate to you
+  set to \lstinline{'explicit'} so that if your grammar is ambiguous, the
+  output will include multiple parse trees that will indicate to you
   that there is a problem with your grammar. Your parser should ignore
-  white space so we recommend using Lark's \code{\%ignore} directive
+  white space, so we recommend using Lark's \code{\%ignore} directive
   as follows.
 \begin{lstlisting}
 WS: /[ \t\f\r\n]/+
@@ -4615,7 +4612,7 @@ WS: /[ \t\f\r\n]/+
 Change your compiler from chapter~\ref{ch:Lvar} to use your
 Lark parser instead of using the \code{parse} function from
 the \code{ast} module. Test your compiler on all of the \LangVar{}
-programs that you have created and create four additional programs
+programs that you have created, and create four additional programs
 that test for ambiguities in your grammar.
 \end{exercise}
 
@@ -4626,21 +4623,22 @@ that test for ambiguities in your grammar.
 In this section we discuss the parsing algorithm of
 \citet{Earley:1970ly}, the default algorithm used by Lark.  The
 algorithm is powerful in that it can handle any context-free grammar,
-which makes it easy to use. However, it is not the most efficient
-parsing algorithm: it is $O(n^3)$ for ambiguous grammars and $O(n^2)$
-for unambiguous grammars, where $n$ is the number of tokens in the
-input string~\citep{Hopcroft06:_automata}.  In section~\ref{sec:lalr}
-we learn about the LALR(1) algorithm, which is more efficient but
-cannot handle all context-free grammars.
+which makes it easy to use. However, it is not a particularly
+efficient parsing algorithm. The Earley algorithm is $O(n^3)$ for
+ambiguous grammars and $O(n^2)$ for unambiguous grammars, where $n$ is
+the number of tokens in the input
+string~\citep{Hopcroft06:_automata}. In section~\ref{sec:lalr} we
+learn about the LALR(1) algorithm, which is more efficient but cannot
+handle all context-free grammars.
 
 The Earley algorithm can be viewed as an interpreter; it treats the
 grammar as the program being interpreted and it treats the concrete
 syntax of the program-to-be-parsed as its input.  The Earley algorithm
 uses a data structure called a \emph{chart}\index{subject}{chart} to
-keep track of its progress and to memoize its results. The chart is an
+keep track of its progress and to store its results. The chart is an
 array with one slot for each position in the input string, where
 position $0$ is before the first character and position $n$ is
-immediately after the last character. So the array has length $n+1$
+immediately after the last character. So, the array has length $n+1$
 for an input string of length $n$. Each slot in the chart contains a
 set of \emph{dotted rules}. A dotted rule is simply a grammar rule
 with a period indicating how much of its right-hand side has already
@@ -4669,8 +4667,8 @@ grammar in figure~\ref{fig:Lint-lark-grammar}, we place
 \end{lstlisting}
 in slot $0$ of the chart. The algorithm then proceeds with
 \emph{prediction} actions in which it adds more dotted rules to the
-chart based on which nonterminals come immediately after a period. In
-the above, the nonterminal \code{stmt\_list} appears after a period,
+chart based on the nonterminals that come immediately after a period. In
+the dotted rule above, the nonterminal \code{stmt\_list} appears after a period,
 so we add all the rules for \code{stmt\_list} to slot $0$, with a
 period at the beginning of their right-hand sides, as follows:
 \begin{lstlisting}
@@ -4700,7 +4698,7 @@ We have exhausted the opportunities for prediction, so the algorithm
 proceeds to \emph{scanning}, in which we inspect the next input token
 and look for a dotted rule at the current position that has a matching
 terminal immediately following the period. In our running example, the
-first input token is \code{"print"} so we identify the rule in slot
+first input token is \code{"print"}, so we identify the rule in slot
 $0$ of the chart where \code{"print"} follows the period:
 \begin{lstlisting}
 stmt:  .  "print" "("  exp ")"       (0)
@@ -4711,7 +4709,7 @@ to slot $1$ of the chart:
 stmt:  "print" . "("  exp ")"        (0)
 \end{lstlisting}
 If the new dotted rule had a nonterminal after the period, we would
-need to carry out a prediction action, adding more dotted rules into
+need to carry out a prediction action, adding more dotted rules to
 slot $1$. That is not the case, so we continue scanning. The next
 input token is \code{"("}, so we add the following to slot $2$ of the
 chart.
@@ -4733,12 +4731,12 @@ exp_hi: . "-" exp_hi          (2)
 exp_hi: . "(" exp ")"         (2)
 \end{lstlisting}
 With this prediction complete, we return to scanning, noting that the
-next input token is \code{"1"} which the lexer parses as an
+next input token is \code{"1"}, which the lexer parses as an
 \code{INT}. There is a matching rule in slot $2$:
 \begin{lstlisting}
 exp_hi: . INT             (2)
 \end{lstlisting}
-so we advance the period and put the following rule is slot $3$.
+so we advance the period and put the following rule into slot $3$.
 \begin{lstlisting}
 exp_hi: INT .             (2)
 \end{lstlisting}
@@ -4746,7 +4744,7 @@ This brings us to \emph{completion} actions.  When the period reaches
 the end of a dotted rule, we recognize that the substring
 has matched the nonterminal on the left-hand side of the rule, in this case
 \code{exp\_hi}. We therefore need to advance the periods in any dotted
-rules in slot $2$ (the starting position for the finished rule) if
+rules into slot $2$ (the starting position for the finished rule) if
 the period is immediately followed by \code{exp\_hi}. So we identify
 \begin{lstlisting}
 exp: . exp_hi                 (2)
@@ -4777,14 +4775,14 @@ exp_hi: . "(" exp ")"         (4)
 \end{lstlisting}
 The next input token is \code{"3"} which the lexer categorized as an
 \code{INT}, so we advance the period past \code{INT} for the rules in
-slot $4$, of which there is just one, and put the following in slot $5$.
+slot $4$, of which there is just one, and put the following into slot $5$.
 \begin{lstlisting}[escapechar=$]
 exp_hi: INT .                 (4)
 \end{lstlisting}
 
 The period at the end of the rule triggers a completion action for the
 rules in slot $4$, one of which has a period before \code{exp\_hi}.
-So we advance the period and put the following in slot $5$.
+So we advance the period and put the following into slot $5$.
 \begin{lstlisting}[escapechar=$]
 exp: exp "+" exp_hi .         (2)
 \end{lstlisting}
@@ -4797,7 +4795,7 @@ exp: exp . "-" exp_hi         (2)
 \end{lstlisting}
 
 We scan the next input token \code{")"}, placing the following dotted
-rule in slot $6$.
+rule into slot $6$.
 \begin{lstlisting}[escapechar=$]
 stmt:  "print" "(" exp ")" .  (0)
 \end{lstlisting}
@@ -4806,7 +4804,7 @@ This triggers the completion of \code{stmt} in slot $0$
 stmt_list:  stmt . NEWLINE  stmt_list   (0)
 \end{lstlisting}
 The last input token is a \code{NEWLINE}, so we advance the period
-and place the new dotted rule in slot $7$.
+and place the new dotted rule into slot $7$.
 \begin{lstlisting}
 stmt_list:  stmt NEWLINE .  stmt_list  (0)
 \end{lstlisting}
@@ -4841,7 +4839,7 @@ algorithm.
 \item The algorithm repeatedly applies the following three kinds of
   actions for as long as there are opportunities to do so.
   \begin{itemize}
-  \item Prediction: if there is a rule in slot $k$ whose period comes
+  \item Prediction: If there is a rule in slot $k$ whose period comes
     before a nonterminal, add the rules for that nonterminal into slot
     $k$, placing a period at the beginning of their right-hand sides
     and recording their starting position as $k$.
@@ -4856,7 +4854,7 @@ algorithm.
     of the completed rule, then advance their period, placing the new
     dotted rule in slot $k$.
   \end{itemize}
-  While repeating these three actions, take care to never add
+  While repeating these three actions, take care never to add
   duplicate dotted rules to the chart.
 \end{enumerate}
 
@@ -4883,22 +4881,22 @@ efficient enough to use with even the largest of input files.
 \label{sec:lalr}
 
 The LALR(1) algorithm~\citep{DeRemer69,Anderson73} can be viewed as a
-two phase approach in which it first compiles the grammar into a state
+two-phase approach in which it first compiles the grammar into a state
 machine and then runs the state machine to parse an input string.  The
 second phase has time complexity $O(n)$ where $n$ is the number of
 tokens in the input, so LALR(1) is the best one could hope for with
 respect to efficiency.
 %
 A particularly influential implementation of LALR(1) is the
-\texttt{yacc} parser generator by \citet{Johnson:1979qy}, which stands
-for Yet Another Compiler Compiler.
+\texttt{yacc} parser generator by \citet{Johnson:1979qy};
+\texttt{yacc} stands for ``yet another compiler compiler''.
 %
 The LALR(1) state machine uses a stack to record its progress in
 parsing the input string.  Each element of the stack is a pair: a
-state number and a grammar symbol (a terminal or nonterminal). The
-symbol characterizes the input that has been parsed so-far and the
+state number and a grammar symbol (a terminal or a nonterminal). The
+symbol characterizes the input that has been parsed so far, and the
 state number is used to remember how to proceed once the next
-symbol-worth of input has been parsed.  Each state in the machine
+symbol's worth of input has been parsed.  Each state in the machine
 represents where the parser stands in the parsing process with respect
 to certain grammar rules. In particular, each state is associated with
 a set of dotted rules.
@@ -4912,26 +4910,26 @@ exp: INT
 stmt: "print" exp
 start: stmt
 \end{lstlisting}
-Consider state 1 in Figure~\ref{fig:shift-reduce}. The parser has just
+Consider state 1 in figure~\ref{fig:shift-reduce}. The parser has just
 read in a \lstinline{"print"} token, so the top of the stack is
 \lstinline{(1,"print")}. The parser is part of the way through parsing
 the input according to grammar rule 1, which is signified by showing
 rule 1 with a period after the \code{"print"} token and before the
-\code{exp} nonterminal. There are several rules that could apply next,
-both rule 2 and 3, so state 1 also shows those rules with a period at
+\code{exp} nonterminal. There are two rules that could apply next,
+rules 2 and 3, so state 1 also shows those rules with a period at
 the beginning of their right-hand sides. The edges between states
 indicate which transitions the machine should make depending on the
 next input token. So, for example, if the next input token is
 \code{INT} then the parser will push \code{INT} and the target state 4
-on the stack and transition to state 4.  Suppose we are now at the end
-of the input. In state 4 it says we should reduce by rule 3, so we pop
+on the stack and transition to state 4.  Suppose that we are now at the end
+of the input. State 4 says that we should reduce by rule 3, so we pop
 from the stack the same number of items as the number of symbols in
 the right-hand side of the rule, in this case just one.  We then
 momentarily jump to the state at the top of the stack (state 1) and
 then follow the goto edge that corresponds to the left-hand side of
 the rule we just reduced by, in this case \code{exp}, so we arrive at
 state 3.  (A slightly longer example parse is shown in
-Figure~\ref{fig:shift-reduce}.)
+figure~\ref{fig:shift-reduce}.)
 
 \begin{figure}[htbp]
   \centering
@@ -4940,11 +4938,11 @@ Figure~\ref{fig:shift-reduce}.)
   \label{fig:shift-reduce}
 \end{figure}
 
-In general, the algorithm works as follows. Set the current state to
+In general, the algorithm works as follows. First, set the current state to
 state $0$. Then repeat the following, looking at the next input token.
 \begin{itemize}
 \item If there there is a shift edge for the input token in the
-  current state, push the edge's target state and the input token on
+  current state, push the edge's target state and the input token onto
   the stack and proceed to the edge's target state.
 \item If there is a reduce action for the input token in the current
   state, pop $k$ elements from the stack, where $k$ is the number of
@@ -8843,10 +8841,6 @@ upcoming \code{explicate\_control} pass.
   
 \newcommand{\LifMonadASTPython}{
 \begin{array}{rcl}
-%% \itm{binaryop} &::=& \code{Add()} \MID \code{Sub()} \\
-%% \itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()} \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \\
-%% \itm{unaryop} &::=& \code{USub()} \MID \code{Not()} \\
-%% \itm{bool} &::=& \code{True} \MID \code{False} \\
 \Atm &::=& \BOOL{\itm{bool}}\\
 \Exp &::=& \CMP{\Atm}{\itm{cmp}}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} \\
   &\MID& \BEGIN{\Stmt^{*}}{\Exp}\\
@@ -23609,4 +23603,4 @@ registers.
 % LocalWords:  multilanguage Prelim shinan DeRemer lexer Lesk LPAR cb
 % LocalWords:  RPAR abcbab abc bzca usub paren expr lang WS Tomita qr
 % LocalWords:  subparses LCCN ebook hardcover epub pdf LCSH LCC DDC
-% LocalWords:  LC partialevaluation pythonEd TOC
+% LocalWords:  LC partialevaluation pythonEd TOC TrappedError
