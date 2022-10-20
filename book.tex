@@ -1694,21 +1694,21 @@ operation.
 def pe_neg(r):
   match r:
     case Constant(n):
-      return Constant(-n)
+      return Constant(neg64(n))
     case _:
       return UnaryOp(USub(), r)
   
 def pe_add(r1, r2):
   match (r1, r2):
     case (Constant(n1), Constant(n2)):
-      return Constant(n1 + n2)
+      return Constant(add64(n1, n2))
     case _:
       return BinOp(r1, Add(), r2)
 
 def pe_sub(r1, r2):
   match (r1, r2):
     case (Constant(n1), Constant(n2)):
-      return Constant(n1 - n2)
+      return Constant(sub64(n1, n2))
     case _:
       return BinOp(r1, Sub(), r2)
       
@@ -2117,7 +2117,7 @@ class InterpLint:
   def interp_exp(e):
      match e:
        case UnaryOp(USub(), e1):
-         return -self.interp_exp(e1)
+         return neg64(self.interp_exp(e1))
        ...
   ...
 \end{lstlisting}
@@ -2265,11 +2265,15 @@ class InterpLint:
   def interp_exp(self, e, env):
     match e:
       case BinOp(left, Add(), right):
-        return self.interp_exp(left, env) + self.interp_exp(right, env)
+        l = self.interp_exp(left, env)
+        r = self.interp_exp(right, env)
+        return add64(l, r)
       case BinOp(left, Sub(), right):
-        return self.interp_exp(left, env) - self.interp_exp(right, env)
+        l = self.interp_exp(left, env)
+        r = self.interp_exp(right, env)
+        return sub64(l, r)
       case UnaryOp(USub(), v):
-        return - self.interp_exp(v, env)
+        return neg64(self.interp_exp(v, env))
       case Constant(value):
         return value
       case Call(Name('input_int'), []):
@@ -2766,6 +2770,24 @@ register allocation (chapter~\ref{ch:register-allocation-Lvar}).
 \Block &::= & \BLOCK{\itm{info}}{\LP\Instr\ldots\RP} 
 \end{array}
 }
+\newcommand{\ASTXIntPython}{
+\begin{array}{lcl}
+\Reg &::=& \allregisters{} \\
+\Arg &::=&  \IMM{\Int} \MID \REG{\Reg}
+   \MID \DEREF{\Reg}{\Int} \\
+\Instr &::=& \BININSTR{\skey{addq}}{\Arg}{\Arg} 
+       \MID \BININSTR{\skey{subq}}{\Arg}{\Arg}\\
+       &\MID& \UNIINSTR{\skey{negq}}{\Arg}
+       \MID \BININSTR{\skey{movq}}{\Arg}{\Arg}\\
+       &\MID& \PUSHQ{\Arg}
+       \MID \POPQ{\Arg} \\
+      &\MID& \CALLQ{\itm{label}}{\itm{int}}
+       \MID \RETQ{}
+       \MID \JMP{\itm{label}}  \\
+\Block &::= & \Instr^{+} 
+\end{array}
+}
+
 
 \begin{figure}[tp]
 \begin{tcolorbox}[colback=white]
@@ -7905,7 +7927,6 @@ evaluated if $e_1$ evaluates to \TRUE{}.
 {\if\edition\pythonEd\pythonColor
 \begin{lstlisting}
 class InterpLif(InterpLvar):
-
   def interp_exp(self, e, env):
     match e:
       case IfExp(test, body, orelse):
@@ -8647,6 +8668,22 @@ $\Atm$ to x86:
 \end{array}
 }
 
+\newcommand{\ASTXIfPython}{
+\begin{array}{lcl}
+\itm{bytereg} &::=& \skey{ah} \MID \skey{al} \MID \skey{bh} \MID \skey{bl}
+    \MID \skey{ch} \MID \skey{cl} \MID \skey{dh} \MID \skey{dl} \\
+\Arg &::=&  \gray{\IMM{\Int} \MID \REG{\Reg} \MID \DEREF{\Reg}{\Int}} 
+     \MID \BYTEREG{\itm{bytereg}} \\
+\itm{cc} & ::= & \skey{e} \MID \skey{ne} \MID \skey{l} \MID \skey{le} \MID \skey{g} \MID \skey{ge} \\
+\Instr &::=& \python{\JMP{\itm{label}}}\\
+       &\MID& \BININSTR{\scode{xorq}}{\Arg}{\Arg}
+       \MID \BININSTR{\scode{cmpq}}{\Arg}{\Arg}\\
+       &\MID& \UNIINSTR{\scode{set}\code{+}\itm{cc}}{\Arg} 
+       \MID \BININSTR{\scode{movzbq}}{\Arg}{\Arg}\\
+       &\MID&  \JMPIF{\itm{cc}}{\itm{label}} 
+\end{array}
+}
+
 \begin{figure}[tp]
 \begin{tcolorbox}[colback=white]
 \small    
@@ -8664,26 +8701,12 @@ $\Atm$ to x86:
 %
 {\if\edition\pythonEd\pythonColor
 \[
+\begin{array}{l}
+  \gray{\ASTXIntPython} \\ \hline
+  \ASTXIfPython \\
 \begin{array}{lcl}
-\itm{bytereg} &::=& \skey{ah} \MID \skey{al} \MID \skey{bh} \MID \skey{bl}
-    \MID \skey{ch} \MID \skey{cl} \MID \skey{dh} \MID \skey{dl} \\
-\Arg &::=&  \gray{\IMM{\Int} \MID \REG{\Reg} \MID \DEREF{\Reg}{\Int}} 
-     \MID \BYTEREG{\itm{bytereg}} \\
-\itm{cc} & ::= & \skey{e} \MID \skey{ne} \MID \skey{l} \MID \skey{le} \MID \skey{g} \MID \skey{ge} \\
-\Instr &::=& \gray{ \BININSTR{\scode{addq}}{\Arg}{\Arg} 
-       \MID \BININSTR{\scode{subq}}{\Arg}{\Arg} } \\
-       &\MID& \gray{ \BININSTR{\scode{movq}}{\Arg}{\Arg} 
-       \MID \UNIINSTR{\scode{negq}}{\Arg} } \\
-       &\MID& \gray{ \CALLQ{\itm{label}}{\itm{int}} \MID \RETQ{} 
-       \MID \PUSHQ{\Arg}} \\
-       &\MID& \gray{ \POPQ{\Arg} \MID \racket{\JMP{\itm{label}}} } \python{\JMP{\itm{label}}}\\
-       &\MID& \BININSTR{\scode{xorq}}{\Arg}{\Arg}
-       \MID \BININSTR{\scode{cmpq}}{\Arg}{\Arg}\\
-       &\MID& \UNIINSTR{\scode{set}\code{+}\itm{cc}}{\Arg} 
-       \MID \BININSTR{\scode{movzbq}}{\Arg}{\Arg}\\
-       &\MID&  \JMPIF{\itm{cc}}{\itm{label}} \\
-\Block &::= & \Instr^{+} \\
 \LangXIfM{} &::= & \XPROGRAM{\itm{info}}{\LC\itm{label} \,\key{:}\, \Block \key{,} \ldots \RC }
+\end{array}
 \end{array}
 \]
 \fi}
@@ -12064,15 +12087,15 @@ the definition of the abstract syntax.
   \code{vector-length} for obtaining the number of elements of a
   tuple.}
 %
-\python{The \LangVec{} language adds 1) tuple creation via a
-  comma-separated list of expressions, 2) accessing an element of a
-  tuple with the square bracket notation, i.e., \code{t[n]} returns
-  the element at index \code{n} of tuple \code{t}, 3) the \code{is} comparison
-  operator, and 4) obtaining the number of elements (the length) of a
-  tuple. In this chapter, we restrict access indices to constant
-  integers.}
+\python{The \LangVec{} language adds (1) tuple creation via a
+  comma-separated list of expressions; (2) accessing an element of a
+  tuple with the square bracket notation (i.e., \code{t[n]} returns
+  the element at index \code{n} of tuple \code{t}); (3) the \code{is}
+  comparison operator; and (4) obtaining the number of elements (the
+  length) of a tuple. In this chapter, we restrict access indices to
+  constant integers.}
 %
-The following program shows an example use of tuples. It creates a tuple
+The following program shows an example of the use of tuples. It creates a tuple
 \code{t} containing the elements \code{40},
 \racket{\code{\#t}}\python{\code{True}}, and another tuple that
 contains just \code{2}. The element at index $1$ of \code{t} is
@@ -12285,7 +12308,7 @@ that reads from the vector to which it was bound.
 %
 For example, the following program returns \code{42} even though the
 variable \code{x} goes out of scope when the function returns, prior
-to reading the tuple element at index zero. (We study the compilation
+to reading the tuple element at index $0$. (We study the compilation
 of functions in chapter~\ref{ch:Lfun}.)
 %  
 \begin{center}
@@ -13061,7 +13084,7 @@ should be treated as complex operands.
 %
 The expressions \code{allocate}, \code{global\_value}, \code{begin},
 and tuple access should be treated as complex operands.  The
-sub-expressions of tuple access must be atomic.
+subexpressions of tuple access must be atomic.
 %
 \fi}
 %% A new case for
@@ -13419,6 +13442,7 @@ available for use by the register allocator.
 \begin{figure}[tp]
 \begin{tcolorbox}[colback=white]
     \small
+{\if\edition\racketEd    
 \[
 \begin{array}{l}
   \gray{\ASTXIntRacket} \\ \hline
@@ -13429,6 +13453,19 @@ available for use by the register allocator.
 \end{array}
 \end{array}
 \]
+\fi}
+{\if\edition\pythonEd\pythonColor
+\[
+\begin{array}{l}
+  \gray{\ASTXIntPython} \\ \hline
+  \gray{\ASTXIfPython} \\ \hline
+  \ASTXGlobalRacket \\
+\begin{array}{lcl}
+\LangXGlobalM{} &::= & \XPROGRAM{\itm{info}}{\LC\itm{label} \,\key{:}\, \Block \key{,} \ldots \RC }
+\end{array}
+\end{array}
+\]
+\fi}
 \end{tcolorbox}
 
 \caption{The abstract syntax of \LangXGlobal{} (extends \LangXIf{} shown in figure~\ref{fig:x86-1}).}
@@ -13582,7 +13619,7 @@ already interfere with the caller-saved registers.)
   \code{build\_interference} function to communicate this alist.}
 %
 \python{The type information for variables is generated by the type
-  checker for \LangCVec{}, stored a field named \code{var\_types} in
+  checker for \LangCVec{}, stored in a field named \code{var\_types} in
   the \code{CProgram} AST mode. You'll need to propagate that
   information so that it is available in this pass.}
 
@@ -13874,7 +13911,7 @@ The Racket language does not distinguish between tuples and arrays;
 they are both represented by vectors. However, Typed Racket
 distinguishes between tuples and arrays: the \code{Vector} type is for
 tuples, and the \code{Vectorof} type is for arrays.}%
-\python{Arrays correspond to the \code{list} type in Python language.}
+\python{Arrays correspond to the \code{list} type in the Python language.}
 
 Figure~\ref{fig:Lvecof-concrete-syntax} presents the definition of the
 concrete syntax for \LangArray{}, and figure~\ref{fig:Lvecof-syntax}
@@ -13891,7 +13928,7 @@ for tuples become overloaded for use with arrays.}
 The subscript operator becomes overloaded for use with arrays and tuples
 and now may appear on the left-hand side of an assignment.
 Note that the index of the subscript, when applied to an array, may be an
-arbitrary expression and not just a constant integer.
+arbitrary expression and not exclusively a constant integer.
 The \code{len} function is also applicable to arrays.
 }
 %
@@ -14066,9 +14103,9 @@ multiplication: it takes two integers and returns an integer.  \fi}
 %
 The type checker for \LangArray{} is defined in
 figure~\ref{fig:type-check-Lvecof}. The result type of a list literal
-is \code{list[T]} where \code{T} is the type of the initializing
+is \code{list[T]}, where \code{T} is the type of the initializing
 expressions.  The type checking of the \code{len} function and the
-subscript operator is updated to handle lists. The type checker now
+subscript operator are updated to handle lists. The type checker now
 also handles a subscript on the left-hand side of an assignment.
 Regarding multiplication, it takes two integers and returns an
 integer.
@@ -14171,7 +14208,18 @@ class TypeCheckLarray(TypeCheckLtup):
         return IntType()
       case _:
         return super().type_check_exp(e, env)
+\end{lstlisting}
+\fi}
+  \end{tcolorbox}
 
+  \caption{Type checker for the \LangArray{} language\python{, part 1}.}
+\label{fig:type-check-Lvecof}
+\end{figure}
+
+{\if\edition\pythonEd    
+\begin{figure}[tbp]
+  \begin{tcolorbox}[colback=white]
+    \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
   def type_check_stmts(self, ss, env):
     if len(ss) == 0:
       return VoidType()
@@ -14192,16 +14240,16 @@ class TypeCheckLarray(TypeCheckLtup):
         return self.type_check_stmts(ss[1:], env)
       case _:
         return super().type_check_stmts(ss, env)
-\end{lstlisting}
-\fi}
+    \end{lstlisting}
   \end{tcolorbox}
-
-  \caption{Type checker for the \LangArray{} language.}
-\label{fig:type-check-Lvecof}
+  \caption{Type checker for the \LangArray{} language, part 2.}
+\label{fig:type-check-Lvecof-part2}
 \end{figure}
+\fi}
 
 The definition of the interpreter for \LangArray{} is shown in
-figure~\ref{fig:interp-Lvecof}.
+\racket{figure~\ref{fig:interp-Lvecof}}
+\python{figures~\ref{fig:interp-Lvecof} and \ref{fig:type-check-Lvecof-part2}}.
 \racket{The \code{make-vector} operator is
   interpreted using Racket's \code{make-vector} function,
   and multiplication is interpreted using \code{fx*},
@@ -14213,8 +14261,8 @@ figure~\ref{fig:interp-Lvecof}.
   bounds checks that signal a \code{trapped-error}.
 }
 %
-\python{We implement list creation with a Python list comprehension
-  and multiplication is implemented with Python multiplication.  We
+\python{We implement list creation with a Python list comprehension,
+  and multiplication is implemented with 64-bit multiplication.  We
   add a case to handle a subscript on the left-hand side of
   assignment. Other uses of subscript can be handled by the existing
   code for tuples.}
@@ -14251,14 +14299,14 @@ figure~\ref{fig:interp-Lvecof}.
 {\if\edition\pythonEd\pythonColor
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 class InterpLarray(InterpLtup):
-
   def interp_exp(self, e, env):
     match e:
       case ast.List(es, Load()):
         return [self.interp_exp(e, env) for e in es]
       case BinOp(left, Mult(), right):
-          l = self.interp_exp(left, env); r = self.interp_exp(right, env)
-          return l * r
+        l = self.interp_exp(left, env)
+        r = self.interp_exp(right, env)
+        return mul64(l, r)
       case Subscript(tup, index, Load()):
         t = self.interp_exp(tup, env)
         n = self.interp_exp(index, env)
@@ -14357,7 +14405,7 @@ into \racket{\code{vectorof-length}}\python{\code{array\_len}}.
 When these operators are applied to tuples, leave them as is.
 %
 \python{The type checker for \LangArray{} adds a \code{has\_type}
-  field which can be inspected to determine whether the operator
+  field, which can be inspected to determine whether the operator
   is applied to a tuple or an array.}
 
 
@@ -14898,7 +14946,6 @@ this extended environment.
 {\if\edition\pythonEd\pythonColor
 \begin{lstlisting}
 class InterpLfun(InterpLtup):
-  
   def apply_fun(self, fun, args, e):
       match fun:
         case Function(name, xs, body, env):
@@ -16763,7 +16810,6 @@ function.
 {\if\edition\pythonEd\pythonColor
 \begin{lstlisting}
 class InterpLlambda(InterpLfun):
-
   def arity(self, v):
     match v:
       case Function(name, params, body, env):
@@ -16875,7 +16921,6 @@ information is used later in this chapter.
 {\if\edition\pythonEd\pythonColor 
 \begin{lstlisting}
 class TypeCheckLlambda(TypeCheckLfun):
-
   def type_check_exp(self, e, env):
     match e:
       case Name(id):
@@ -18418,7 +18463,6 @@ length of the vector.
 {\if\edition\pythonEd\pythonColor
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 class InterpLdyn(InterpLlambda):
-  
   def interp_exp(self, e, env):
     match e:
       case Constant(n):
@@ -18491,7 +18535,6 @@ class InterpLdyn(InterpLlambda):
 \begin{tcolorbox}[colback=white]    
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 class InterpLdyn(InterpLlambda):
-  
   def interp_stmt(self, s, env, cont):
     match s:
       case If(test, body, orelse):
@@ -18590,7 +18633,6 @@ class InterpLdyn(InterpLlambda):
 {\if\edition\pythonEd\pythonColor
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 class InterpLdyn(InterpLlambda):
-  
   def tag(self, v):
       if v is True or v is False:
           return Tagged(v, 'bool')
@@ -18977,7 +19019,6 @@ class TypeCheckLany(TypeCheckLlambda):
 {\if\edition\pythonEd\pythonColor
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 class InterpLany(InterpLlambda):
-
   def interp_exp(self, e, env):
     match e:
       case Inject(value, typ):
@@ -19053,7 +19094,6 @@ class InterpLany(InterpLlambda):
 {\if\edition\pythonEd\pythonColor
 \begin{lstlisting}
 class InterpLany(InterpLlambda):
-
   def type_to_tag(self, typ):
       match typ:
         case FunctionType(params, rt):
@@ -21162,7 +21202,6 @@ Next we turn to the individual passes needed for compiling \LangGrad{}.
 {\if\edition\pythonEd\pythonColor
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 class InterpLcast(InterpLany):
-
   def interp_exp(self, e, env):
     match e:
       case Cast(value, src, tgt):
