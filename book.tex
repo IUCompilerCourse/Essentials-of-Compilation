@@ -8580,7 +8580,7 @@ abstract syntax.
 \label{sec:x86-if}
 \index{subject}{x86}
 
-To implement the new logical operations, the
+To implement Booleans, the new logical operations, the
 comparison operations, and the \key{if} expression\python{ and
   statement}, we delve further into the x86
 language. Figures~\ref{fig:x86-1-concrete} and \ref{fig:x86-1} present
@@ -8593,13 +8593,17 @@ comparisons, and \racket{conditional} jumps.
   which we refer to as a \emph{basic block}\index{subject}{basic
     block}.}
 
-One challenge is that x86 does not provide an instruction that
-directly implements logical negation (\code{not} in \LangIf{} and
-\LangCIf{}).  However, the \code{xorq} instruction can be used to
-encode \code{not}.  The \key{xorq} instruction takes two arguments,
-performs a pairwise exclusive-or ($\mathrm{XOR}$) operation on each
-bit of its arguments, and writes the results into its second argument.
-Recall the following truth table for exclusive-or:
+As x86 does not provide direct support for Booleans, we take the usual
+approach of encoding Booleans as integers, with \code{True} as $1$ and
+\code{False} as $0$.
+
+Furthermore, x86 does not provide an instruction that directly
+implements logical negation (\code{not} in \LangIf{} and \LangCIf{}).
+However, the \code{xorq} instruction can be used to encode \code{not}.
+The \key{xorq} instruction takes two arguments, performs a pairwise
+exclusive-or ($\mathrm{XOR}$) operation on each bit of its arguments,
+and writes the results into its second argument.  Recall the following
+truth table for exclusive-or:
 \begin{center}
 \begin{tabular}{l|cc}
    & 0 & 1 \\ \hline
@@ -8763,26 +8767,28 @@ a \key{cmpq} instruction to set the EFLAGS register.
 \section{Shrink the \LangIf{} Language}
 \label{sec:shrink-Lif}
 
-The \LangIf{} language includes several features that are easily
-expressible with other features. For example, \code{and} and \code{or}
-are expressible using \code{if} as follows.
+The \code{shrink} pass translates some of the language features into
+other features, thereby reducing the kinds of expressions in the
+language. For example, the short-circuiting nature of the \code{and}
+and \code{or} logical operators can be expressed using \code{if} as
+follows.
 \begin{align*}
   \CAND{e_1}{e_2} & \quad \Rightarrow \quad \CIF{e_1}{e_2}{\FALSE{}}\\
   \COR{e_1}{e_2} & \quad \Rightarrow \quad \CIF{e_1}{\TRUE{}}{e_2}
 \end{align*}
 By performing these translations in the front end of the compiler,
-subsequent passes of the compiler do not need to deal with these features,
-thus making the passes shorter.
+subsequent passes of the compiler can be shorter.
 
 On the other hand, translations sometimes reduce the efficiency of the
 generated code by increasing the number of instructions. For example,
-expressing subtraction in terms of negation
+expressing subtraction in terms of addition and negation
 \[
 \CBINOP{\key{-}}{e_1}{e_2} \quad \Rightarrow \quad
   \CBINOP{\key{+}}{e_1}{ \CUNIOP{\key{-}}{e_2} }
 \]
 produces code with two x86 instructions (\code{negq} and \code{addq})
-instead of just one (\code{subq}).
+instead of just one (\code{subq}). Thus, we do not recommend
+translating subtraction into addition and negation.
 
 \begin{exercise}\normalfont\normalsize
 %
@@ -8942,11 +8948,9 @@ condition must be a comparison.
 As a motivating example, consider the following program that has an
 \key{if} expression nested in the condition of another \key{if}:%
 \python{\footnote{Programmers rarely write nested \code{if}
-  expressions, but it is not uncommon for the condition of an
-  \code{if} statement to be a call of a function that also contains an
-  \code{if} statement.  When such a function is inlined, the result is
-  a nested \code{if} that requires the techniques discussed in this
-  section.}}
+    expressions, but they do write nested expressions involving
+    logical \code{and}, which, as we have seen, translates to
+    \code{if}.}}
 % cond_test_41.rkt, if_lt_eq.py
 \begin{center}
 \begin{minipage}{0.96\textwidth}
@@ -9266,7 +9270,6 @@ def explicate_effect(e, cont, basic_blocks):
             ...
         case _:
             ...
-
 def explicate_assign(rhs, lhs, cont, basic_blocks):
     match rhs:
         case IfExp(test, body, orelse):
@@ -9275,7 +9278,6 @@ def explicate_assign(rhs, lhs, cont, basic_blocks):
             ...
         case _:
             return [Assign([lhs], rhs)] + cont
-
 def explicate_pred(cnd, thn, els, basic_blocks):
     match cnd:
         case Compare(left, [op], [right]):
@@ -9296,7 +9298,6 @@ def explicate_pred(cnd, thn, els, basic_blocks):
             return [If(Compare(cnd, [Eq()], [Constant(False)]),
                        create_block(els, basic_blocks),
                        create_block(thn, basic_blocks))]
-
 def explicate_stmt(s, cont, basic_blocks):
     match s:
         case Assign([lhs], rhs):
@@ -9305,7 +9306,6 @@ def explicate_stmt(s, cont, basic_blocks):
             return explicate_effect(value, cont, basic_blocks)
         case If(test, body, orelse):
             ...
-
 def explicate_control(p):
     match p:
         case Module(body):
@@ -9757,7 +9757,7 @@ The \code{select\_instructions} pass translates \LangCIf{} to
 \racket{For $\Atm$, we have new cases for the Booleans.}
 %
 \python{We begin with the Boolean constants.}
-We take the usual approach of encoding them as integers.
+As previously discussed, we encode them as integers.
 \[
 \TRUE{} \quad\Rightarrow\quad \key{1}
 \qquad\qquad
@@ -9846,7 +9846,7 @@ but use different condition codes for the conditional jump instruction.
 
 \python{Regarding the \key{return} statement, we recommend treating it
   as an assignment to the \key{rax} register followed by a jump to the
-  conclusion of the \code{main} function.}
+  conclusion of the \code{main} function. (See section~\ref{sec:prelude-conclusion-cond} for more about the conclusion of \code{main}.)}
 
 \begin{exercise}\normalfont\normalsize
 Expand your \code{select\_instructions} pass to handle the new
@@ -9953,11 +9953,9 @@ this instruction is particularly interesting because during
 compilation, we do not know which way a conditional jump will go. Thus
 we do not know whether to use the live-before set for the block
 associated with the $\itm{label}$ or the live-before set for the
-following instruction.  However, there is no harm to the correctness
-of the generated code if we classify more locations as live than the
-ones that are truly live during one particular execution of the
-instruction. Thus, we can take the union of the live-before sets from
-the following instruction and from the mapping for $\itm{label}$ in
+following instruction. So we use both, by taking the union of the
+live-before sets from the following instruction and from the mapping
+for $\itm{label}$ in
 \racket{\code{label->live}}\python{\code{live\_before\_block}}.
 
 The auxiliary functions for computing the variables in an
@@ -10029,8 +10027,9 @@ pass.
 The second argument of the \key{cmpq} instruction must not be an
 immediate value (such as an integer). So, if you are comparing two
 immediates, we recommend inserting a \key{movq} instruction to put the
-second argument in \key{rax}. As usual, \key{cmpq} may have at most
-one memory reference.
+second argument in \key{rax}.
+%
+As usual, \key{cmpq} may have at most one memory reference.
 %
 The second argument of the \key{movzbq} must be a register.
 
