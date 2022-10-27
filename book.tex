@@ -62,7 +62,7 @@ showstringspaces=false
 \lstset{%
 language=Python,
 basicstyle=\ttfamily\small,
-morekeywords={match,case,bool,int,let},
+morekeywords={match,case,bool,int,let,begin,if,else},
 deletekeywords={},
 escapechar=|,
 columns=flexible,
@@ -10390,8 +10390,8 @@ The following \code{Promise} class handles this memoization.
 \begin{lstlisting}
 @dataclass
 class Promise:
-  fun : types.Any
-  cache : list[Stmt] = None
+  fun : typing.Any
+  cache : list[stmt] = None
 
   def force(self):
       if self.cache is None:
@@ -12668,8 +12668,8 @@ newly copied objects.
 \begin{figure}[tbp]
 \centering
 \begin{tcolorbox}[colback=white]
-  \racket{\includegraphics[width=0.9\textwidth]{figs/cheney}}
-\python{\includegraphics[width=0.9\textwidth]{figs/cheney-python}}
+\racket{\includegraphics[width=0.8\textwidth]{figs/cheney}}
+\python{\includegraphics[width=0.8\textwidth]{figs/cheney-python}}
 \end{tcolorbox}
 
 \caption{Depiction of the Cheney algorithm copying the live tuples.}
@@ -12867,9 +12867,12 @@ one. The program accesses the element in the inner tuple.
 (vector-ref (vector-ref (vector (vector 42)) 0) 0)
 \end{lstlisting}
 \fi}
+% tests/tuple/get_get.py
 {\if\edition\pythonEd\pythonColor
 \begin{lstlisting}
-print( ((42,),)[0][0] )
+v1 = (42,)
+v2 = (v1,)
+print( v2[0][0] )
 \end{lstlisting}
 \fi}
 
@@ -13038,31 +13041,23 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
 \fi}
 {\if\edition\pythonEd\pythonColor
 \begin{lstlisting}
-print( |$T_1$|[0][0] )
-\end{lstlisting}
-where $T_1$ is
-\begin{lstlisting}
-    begin:
-          tmp.1 = |$T_2$|
-          if global_value(free_ptr) + 16 < global_value(fromspace_end):
-              0
-          else:
+    v1 = begin:
+            init.514 = 42
+            if (free_ptr + 16) < fromspace_end:
+            else:
               collect(16)
-          tmp.2 = allocate(1, TupleType(TupleType([int])))
-          tmp.2[0] = tmp.1
-          tmp.2
-\end{lstlisting}
-and $T_2$ is
-\begin{lstlisting}
-    begin:
-          tmp.3 = 42
-          if global_value(free_ptr) + 16 < global_value(fromspace_end):
-              0
-          else:
+            alloc.513 = allocate(1,tuple[int])
+            alloc.513[0] = init.514
+            alloc.513
+    v2 = begin:
+            init.516 = v1
+            if (free_ptr + 16) < fromspace_end:
+            else:
               collect(16)
-          tmp.4 = allocate(1, TupleType([int]))
-          tmp.4[0] = tmp.3
-          tmp.4
+            alloc.515 = allocate(1,tuple[tuple[int]])
+            alloc.515[0] = init.516
+            alloc.515
+    print(v2[0][0])
 \end{lstlisting}
 \fi}
   \end{tcolorbox}
@@ -13484,7 +13479,8 @@ Figure~\ref{fig:select-instr-output-gc} shows the output of the
 \begin{figure}[tbp]
 \centering
 \begin{tcolorbox}[colback=white]
-  % tests/s2_17.rkt
+{\if\edition\racketEd    
+% tests/s2_17.rkt
 \begin{tabular}{lll}
 \begin{minipage}{0.5\textwidth}
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
@@ -13585,11 +13581,133 @@ block6:
 \end{lstlisting}
 \end{minipage}
 \end{tabular}
+\fi}
+{\if\edition\pythonEd    
+% tests/tuple/get_get.py
+\begin{tabular}{lll}
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+start:
+    init.514 = 42
+    tmp.517 = free_ptr
+    tmp.518 = (tmp.517 + 16)
+    tmp.519 = fromspace_end
+    if tmp.518 < tmp.519:
+      goto block.529
+    else:
+      goto block.530
+
+block.529:
+    goto block.528
+
+block.530:
+    collect(16)
+    goto block.528
+
+block.528:
+    alloc.513 = allocate(1,tuple[int])
+    alloc.513:tuple[int][0] = init.514
+    v1 = alloc.513
+    init.516 = v1
+    tmp.520 = free_ptr
+    tmp.521 = (tmp.520 + 16)
+    tmp.522 = fromspace_end
+    if tmp.521 < tmp.522:
+      goto block.526
+    else:
+      goto block.527
+    
+block.526:
+    goto block.525
+
+block.527:
+    collect(16)
+    goto block.525
+    
+block.525:
+    alloc.515 = allocate(1,tuple[tuple[int]])
+    alloc.515:tuple[tuple[int]][0] = init.516
+    v2 = alloc.515
+    tmp.523 = v2[0]
+    tmp.524 = tmp.523[0]
+    print(tmp.524)
+    return 0
+\end{lstlisting}
+\end{minipage}
+&$\Rightarrow$&
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+start:
+    movq $42, init.514
+    movq _free_ptr(%rip), tmp.517
+    movq tmp.517, tmp.518
+    addq $16, tmp.518
+    movq _fromspace_end(%rip), tmp.519
+    cmpq tmp.519, tmp.518
+    jl block.529
+    jmp block.530
+
+block.529:
+    jmp block.528
+
+block.530:
+    movq %r15, %rdi
+    movq $16, %rsi
+    callq _collect
+    jmp block.528
+
+block.528:
+    movq _free_ptr(%rip), %r11
+    addq $16, _free_ptr(%rip)
+    movq $3, 0(%r11)
+    movq %r11, alloc.513
+    movq alloc.513, %r11
+    movq init.514, 8(%r11)
+    movq alloc.513, v1
+    movq v1, init.516
+    movq _free_ptr(%rip), tmp.520
+    movq tmp.520, tmp.521
+    addq $16, tmp.521
+    movq _fromspace_end(%rip), tmp.522
+    cmpq tmp.522, tmp.521
+    jl block.526
+    jmp block.527
+
+block.526:
+    jmp block.525
+
+block.527:
+    movq %r15, %rdi
+    movq $16, %rsi
+    callq _collect
+    jmp block.525
+
+block.525:
+    movq _free_ptr(%rip), %r11
+    addq $16, _free_ptr(%rip)
+    movq $131, 0(%r11)
+    movq %r11, alloc.515
+    movq alloc.515, %r11
+    movq init.516, 8(%r11)
+    movq alloc.515, v2
+    movq v2, %r11
+    movq 8(%r11), %r11
+    movq %r11, tmp.523
+    movq tmp.523, %r11
+    movq 8(%r11), %r11
+    movq %r11, tmp.524
+    movq tmp.524, %rdi
+    callq _print_int
+    movq $0, %rax
+    jmp _conclusion
+\end{lstlisting}
+\end{minipage}
+\end{tabular}
+\fi}
 \end{tcolorbox}
 
-\caption{Output of the \code{explicate\_control} (\emph{left}) and
-  \code{select\_instructions} (\emph{right}) passes on the running
-  example.}
+\caption{Output of \code{explicate\_control} (\emph{left}) and
+  \code{select\_instructions} (\emph{right}) on the running example.}
 \label{fig:select-instr-output-gc}
 \end{figure}
 
@@ -13675,9 +13793,9 @@ tuple-typed variables. The garbage collector tests each root to see
 if it is null prior to dereferencing it. 
 
 \begin{figure}[htbp]
-  % TODO: Python Version -Jeremy
   \begin{tcolorbox}[colback=white]
-    \begin{minipage}[t]{0.5\textwidth}
+{\if\edition\racketEd    
+\begin{minipage}[t]{0.5\textwidth}
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 	.globl main
 main:
@@ -13691,6 +13809,7 @@ main:
     movq $0, 0(%r15)
     addq $8, %r15
     jmp start
+    
 conclusion:
     subq $8, %r15
     addq $0, %rsp
@@ -13698,6 +13817,33 @@ conclusion:
     retq
 \end{lstlisting}
 \end{minipage}
+    \fi}
+{\if\edition\pythonEd    
+\begin{minipage}[t]{0.5\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+	.globl _main
+_main:
+    pushq %rbp
+    movq %rsp, %rbp
+    pushq %rbx
+    subq $8, %rsp
+    movq $65536, %rdi
+    movq $16, %rsi
+    callq _initialize
+    movq _rootstack_begin(%rip), %r15
+    movq $0, 0(%r15)
+    addq $8, %r15
+    jmp _start
+
+_conclusion:
+    subq $8, %r15
+    addq $8, %rsp
+    popq %rbx
+    popq %rbp
+    retq 
+\end{lstlisting}
+\end{minipage}
+\fi}
   \end{tcolorbox}
 
   \caption{The prelude and conclusion generated by the \code{prelude\_and\_conclusion} pass for the running example.}
