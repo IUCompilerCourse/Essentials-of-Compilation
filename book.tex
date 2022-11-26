@@ -26,7 +26,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{1}
+\def\edition{0}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd{#1}\fi}}
@@ -996,10 +996,9 @@ figure~\ref{fig:r0-concrete-syntax} and the abstract syntax for
 }
 \newcommand{\LintASTPython}{
   \begin{array}{rcl}
-  \itm{binaryop} &::= & \code{Add()} \MID \code{Sub()} \\
-  \itm{unaryop} &::= & \code{USub()} \\
   \Exp{} &::=& \INT{\Int} \MID \READ{} \\
-        &\MID& \UNIOP{\itm{unaryop}}{\Exp} \MID  \BINOP{\Exp}{\itm{binaryop}}{\Exp}  \\
+         &\MID& \UNIOP{\key{USub()}}{\Exp} \MID \BINOP{\Exp}{\key{Add()}}{\Exp}\\
+         &\MID& \BINOP{\Exp}{\key{Sub()}}{\Exp}\\
   \Stmt{} &::=& \PRINT{\Exp} \MID \EXPR{\Exp} 
 \end{array}
 }
@@ -1236,7 +1235,7 @@ and (2) the pattern in each \racket{clause}\python{case}
 corresponds to the corresponding right-hand side of a grammar
 rule. For the \code{match} in the \code{leaf} function, we refer to
 the grammar for \LangInt{} shown in figure~\ref{fig:r0-syntax}. The $\Exp$
-nonterminal has four alternatives, so the \code{match} has four
+nonterminal has five alternatives, so the \code{match} has five
 \racket{clauses}\python{cases}.  The pattern in each
 \racket{clause}\python{case} corresponds to the right-hand side of a
 grammar rule. For example, the pattern \ADDP{\code{e1}}{\code{e2}}
@@ -3320,7 +3319,8 @@ print(tmp_1)
 \begin{array}{rcl}
 \Atm &::=& \INT{\Int} \MID \VAR{\Var} \\  
 \Exp{} &::=& \Atm \MID \READ{} \\
-       &\MID& \UNIOP{\itm{unaryop}}{\Atm} \MID \BINOP{\Atm}{\itm{binaryop}}{\Atm}  \\ 
+       &\MID& \UNIOP{\key{USub()}}{\Atm} \MID \BINOP{\Atm}{\key{Add()}}{\Atm}  \\
+       &\MID& \BINOP{\Atm}{\key{Sub()}}{\Atm} \\ 
 \Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
         &\MID& \ASSIGN{\VAR{\Var}}{\Exp}
 \end{array}
@@ -8490,9 +8490,10 @@ abstract syntax.
 \begin{array}{lcl}
 \Atm &::=& \Int \MID \Var \MID \itm{bool} \\
 \Exp &::= & \Atm \MID \CREAD{} 
-     \MID \CBINOP{\itm{binaryop}}{\Atm}{\Atm}
-     \MID \CUNIOP{\itm{unaryop}}{\Atm} \\
-     &\MID& \CCMP{\itm{cmp}}{\Atm}{\Atm} \\
+     \MID \CUNIOP{\key{-}}{\Atm} 
+     \MID \CBINOP{\key{+}}{\Atm}{\Atm}
+     \MID \CBINOP{\key{-}}{\Atm}{\Atm}
+     \MID \CCMP{\itm{cmp}}{\Atm}{\Atm} \\
 \Stmt &::=& \CPRINT{\Atm} \MID \Exp \MID \CASSIGN{\Var}{\Exp}  \\
 \Tail &::=& \CRETURN{\Exp} \MID \CGOTO{\itm{label}} \\
     &\MID& \CIFSTMT{\CCMP{\itm{cmp}}{\Atm}{\Atm}}{\CGOTO{\itm{label}}}{\CGOTO{\itm{label}}} 
@@ -8501,9 +8502,10 @@ abstract syntax.
 \newcommand{\CifASTPython}{
 \begin{array}{lcl}
 \Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}} \\
-\Exp &::= & \Atm \MID \READ{} \\
-     &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm}
-     \MID \UNIOP{\itm{unaryop}}{\Atm} \\
+\Exp &::= & \Atm \MID \READ{} 
+     \MID \UNIOP{\key{USub()}}{\Atm} \\
+     &\MID& \BINOP{\Atm}{\key{Sub()}}{\Atm}
+     \MID \BINOP{\Atm}{\key{Add()}}{\Atm} \\
      &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \\
 \Stmt &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
      &\MID& \ASSIGN{\VAR{\Var}}{\Exp}  \\
@@ -11725,17 +11727,6 @@ Figure~\ref{fig:Lwhile-anf-syntax} defines the output language
      \LangLoopANF  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
    \end{array}
 \end{array}
-%% \begin{array}{rcl}
-%% \Atm &::=& \INT{\Int} \MID \VAR{\Var} \MID \BOOL{\itm{bool}}\\
-%% \Exp &::=& \Atm \MID \READ{} \\
-%%   &\MID& \BINOP{\Atm}{\itm{binaryop}}{\Atm} \MID \UNIOP{\itm{unaryop}}{\Atm} \\
-%%   &\MID& \CMP{\Atm}{\itm{cmp}}{\Atm} \MID \IF{\Exp}{\Exp}{\Exp} \\
-%% %  &\MID& \LET{\Var}{\Exp}{\Exp}\\ % Why?
-%% \Stmt{} &::=& \PRINT{\Atm} \MID \EXPR{\Exp} \\
-%%   &\MID& \ASSIGN{\VAR{\Var}}{\Exp} \MID \IFSTMT{\Exp}{\Stmt^{+}}{\Stmt^{+}}\\
-%%   &\MID& \WHILESTMT{\Exp}{\Stmt^{+}} \\
-%% \LangLoopANF  &::=& \PROGRAM{\code{()}}{\Stmt^{*}}
-%% \end{array}
 \]
 \fi}
 \end{tcolorbox}
@@ -18461,18 +18452,17 @@ be a tuple, not a Boolean.
 {\if\edition\pythonEd\pythonColor
 \[
 \begin{array}{rcl}
-\itm{binaryop} &::= & \code{Add()} \MID \code{Sub()} \\
-\itm{unaryop} &::= & \code{USub()} \MID \code{Not()} \\
 \itm{boolop} &::=& \code{And()} \MID \code{Or()} \\
 \itm{cmp} &::= & \code{Eq()} \MID \code{NotEq()} \MID \code{Lt()}
-   \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} \\
-   &\MID & \code{Is()} \\
+   \MID \code{LtE()} \MID \code{Gt()} \MID \code{GtE()} 
+   \MID \code{Is()} \\
 \itm{bool} &::=& \code{True} \MID \code{False} \\
 \Exp{} &::=& \INT{\Int} \MID \READ{} \\
-  &\MID& \UNIOP{\itm{unaryop}}{\Exp}
-    \MID  \BINOP{\Exp}{\itm{binaryop}}{\Exp}  
-    \MID \VAR{\Var{}} \\
-  &\MID& \BOOL{\itm{bool}} 
+  &\MID& \UNIOP{\key{USub()}}{\Exp}\\
+  &\MID&  \BINOP{\Exp}{\key{Add()}}{\Exp}  
+    \MID  \BINOP{\Exp}{\key{Sub()}}{\Exp} \\
+    &\MID& \VAR{\Var{}} 
+  \MID \BOOL{\itm{bool}} 
      \MID \BOOLOP{\itm{boolop}}{\Exp}{\Exp}\\
   &\MID& \CMP{\Exp}{\itm{cmp}}{\Exp}  \MID \IF{\Exp}{\Exp}{\Exp} \\
   &\MID& \TUPLE{\Exp^{+}} \MID \GET{\Exp}{\Exp} \\
@@ -23740,7 +23730,7 @@ registers.
 % LocalWords:  Brelaz eu Gebremedhin Omari deletekeywords min JGS wb
 % LocalWords:  morekeywords fullflexible goto allocator tuples Wailes
 % LocalWords:  Kernighan runtime Freiburg Thiemann Bloomington unary
-% LocalWords:  eq prog rcl binaryop unaryop definitional Evaluator os
+% LocalWords:  eq prog rcl definitional Evaluator os
 % LocalWords:  subexpression evaluator InterpLint lcl quadwords concl
 % LocalWords:  nanopass subexpressions decompositions Lawall Hatcliff
 % LocalWords:  subdirectory monadic Moggi mon utils macosx unix repr
