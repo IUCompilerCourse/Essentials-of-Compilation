@@ -525,7 +525,7 @@ Bloomington, Indiana
 \label{ch:trees-recur}
 \setcounter{footnote}{0}
 
-In this chapter we review the basic tools needed to implement a
+In this chapter we introduce the basic tools needed to implement a
 compiler. Programs are typically input by a programmer as text, that
 is, a sequence of characters. The program-as-text representation is
 called \emph{concrete syntax}. We use concrete syntax to concisely
@@ -545,8 +545,8 @@ called \emph{parsing}\index{subject}{parsing}\python{\ and is studied in
 \racket{A parser is provided in the support code for translating from
   concrete to abstract syntax.}%
 %
-\python{For now we use Python's \code{ast} module to translate from concrete
-  to abstract syntax.}
+\python{For now we use the \code{parse} function in Python's
+  \code{ast} module to translate from concrete to abstract syntax.}
 
 ASTs can be represented inside the compiler in many different ways,
 depending on the programming language used to write the compiler.
@@ -984,9 +984,9 @@ figure~\ref{fig:r0-concrete-syntax} and the abstract syntax for
   \code{read-program} in appendix~\ref{appendix:utilities} for more
   details.}
 %
-\python{The \code{parse} function in Python's \code{ast} module
-  converts the concrete syntax (represented as a string) into an
-  abstract syntax tree.}
+\python{We recommend using the \code{parse} function in Python's
+  \code{ast} module to convert the concrete syntax into an abstract
+  syntax tree.}
 
 \newcommand{\LintGrammarRacket}{
   \begin{array}{rcl}
@@ -1277,7 +1277,7 @@ that correspond to a grammar and the body of each
 node.\footnote{This principle of structuring code according to the
   data definition is advocated in the book \emph{How to Design
     Programs} by \citet{Felleisen:2001aa}.}  \python{We define a
-  second function, named \code{stmt}, that recognizes whether a value
+  second function, named \code{is\_stmt}, that recognizes whether a value
   is a \LangInt{} statement.}  \python{Finally, }
 figure~\ref{fig:exp-predicate} \racket{also} contains the definition of
 \code{is\_Lint}, which determines whether an AST is a program in \LangInt{}.
@@ -1329,7 +1329,7 @@ def is_exp(e):
     case _:
       return False
 
-def stmt(s):
+def is_stmt(s):
   match s:
     case Expr(Call(Name('print'), [e])):
       return is_exp(e)
@@ -1341,7 +1341,7 @@ def stmt(s):
 def is_Lint(p):
   match p:
     case Module(body):
-      return all([stmt(s) for s in body])
+      return all([is_stmt(s) for s in body])
     case _:
       return False
 
@@ -1511,7 +1511,8 @@ abstract syntax is
 \fi}
 {\if\edition\pythonEd\pythonColor
 \begin{lstlisting}
-   Module([Expr(Call(Name('print'), [BinOp(Constant(10), Add(), Constant(32))]))])    
+    Module([Expr(Call(Name('print'),
+                        [BinOp(Constant(10), Add(), Constant(32))]))])        
 \end{lstlisting}
 \fi}
 The following program demonstrates that expressions may be nested within
@@ -2066,8 +2067,8 @@ in the following program.
 \noindent If we invoke \code{interp\_Lvar} on this program, it
 dispatches to \code{interp\_Lint} to handle the \code{-} operator, but
 then it recursively calls \code{interp\_Lint} again on its argument.
-Because there is no case for \code{Var} in \code{interp\_Lint}, we get
-an error!
+Because there is no case for \racket{\code{Var}}\python{\code{Name}} in
+\code{interp\_Lint}, we get an error!
 
 To make our interpreters extensible we need something called
 \emph{open recursion}\index{subject}{open recursion}, in which the
@@ -2080,7 +2081,7 @@ method overriding to interpret \LangInt{} and \LangVar{} using
   \href{https://docs.racket-lang.org/guide/classes.html}{\code{class}}
   \index{subject}{class} feature of Racket.}%
 %
-\python{a Python \code{class} definition.}
+\python{Python \code{class} definitions.}
 %
 We define one class for each language and define a method for
 interpreting expressions inside each class. The class for \LangVar{}
@@ -2182,9 +2183,9 @@ InterpLvar().interp_exp(e0)
 \code{interp\_exp} in \LangVar{} dispatches to the \code{interp\_exp}
 method in \LangInt{}. But then for the recursive method call, it
 dispatches to \code{interp\_exp} in \LangVar{}, where the
-\code{Var} node is handled correctly. Thus, method overriding gives us
-the open recursion that we need to implement our interpreters in an
-extensible way.
+\racket{\code{Var}}\python{\code{Name}} node is handled correctly.
+Thus, method overriding gives us the open recursion that we need to
+implement our interpreters in an extensible way.
 
 
 \subsection{Definitional Interpreter for \LangVar{}}
@@ -2201,7 +2202,7 @@ figure~\ref{fig:interp-Lvar}.
   we discuss in the next paragraph, and \code{cont} for
   \emph{continuation}, which is the technical name for what comes
   after a particular point in a program. The \code{cont} parameter is
-  the list of statements that that follow the current statement.  Note
+  the list of statements that follow the current statement.  Note
   that \code{interp\_stmts} invokes \code{interp\_stmt} on the first
   statement and passes the rest of the statements as the argument for
   \code{cont}. This organization enables each statement to decide what
@@ -2359,8 +2360,8 @@ class InterpLvar(InterpLint):
 
   def interp_stmt(self, s, env, cont):
     match s:
-      case Assign([lhs], value):
-        env[lhs.id] = self.interp_exp(value, env)
+      case Assign([Name(id)], value):
+        env[id] = self.interp_exp(value, env)
         return self.interp_stmts(cont, env)
       case _:
         return super().interp_stmt(s, env, cont)
@@ -2514,7 +2515,7 @@ each of which is an integer constant (called an \emph{immediate
 A register is a special kind of variable that holds a 64-bit
 value. There are 16 general-purpose registers in the computer; their
 names are given in figure~\ref{fig:x86-int-concrete}.  A register is
-written with a percent sign, \key{\%}, followed by the register name,
+written with a percent sign, \key{\%}, followed by its name,
 for example \key{\%rax}.
 
 An immediate value is written using the notation \key{\$}$n$ where $n$
@@ -3385,8 +3386,8 @@ in the name \LangVarANF{}. An important invariant of the
 \code{remove\_complex\_operands} pass is that the relative ordering
 among complex expressions is not changed, but the relative ordering
 between atomic expressions and complex expressions can change and
-often does. The reason that these changes are behavior preserving is
-that the atomic expressions are pure.
+often does. These changes are behavior preserving because
+atomic expressions are pure.
 
 {\if\edition\racketEd
   Another well-known form for intermediate languages is the
@@ -3567,24 +3568,10 @@ programs, place \lstinline{(debug-level 1)} before the call to
 
 Create five \LangVar{} programs that exercise the most interesting
 parts of the \code{remove\_complex\_operands} pass.  The five programs
-should be placed in the subdirectory named \key{tests}, and the file
-names should start with \code{var\_test\_} followed by a unique
-integer and end with the file extension \key{.py}.
-%% The \key{run-tests.rkt} script in the support code checks whether the
-%% output programs produce the same result as the input programs.  The
-%% script uses the \key{interp-tests} function
-%% (Appendix~\ref{appendix:utilities}) from \key{utilities.rkt} to test
-%% your \key{uniquify} pass on the example programs.  The \code{passes}
-%% parameter of \key{interp-tests} is a list that should have one entry
-%% for each pass in your compiler.  For now, define \code{passes} to
-%% contain just one entry for \code{uniquify} as shown below.
-%% \begin{lstlisting}
-%% (define passes 
-%%   (list (list "uniquify" uniquify interp_Lvar type-check-Lvar)))
-%% \end{lstlisting}
-Run the \key{run-tests.py} script in the support code to check
-whether the output programs produce the same result as the input
-programs.
+should be placed in the subdirectory \key{tests/var}, and the file
+names should end with the file extension \key{.py}.  Run the
+\key{run-tests.py} script in the support code to check whether the
+output programs produce the same result as the input programs.
 \end{exercise}
 
 \fi}
@@ -3742,8 +3729,7 @@ translations of $\Atm_1$ and $\Atm_2$, respectively.)  There is an
 \key{addq} instruction in x86, but it performs an in-place update.
 %
 So, we could move $\Arg_1$ into the \code{rax} register, then add
-$\Arg_2$ to \code{rax}, and then finally move \code{rax} into the
-left-hand \itm{var}. 
+$\Arg_2$ to \code{rax}, and then finally move \code{rax} into \itm{var}. 
 \begin{transformation}
 {\if\edition\racketEd    
 \begin{lstlisting}
@@ -3818,8 +3804,8 @@ generated x86 assembly code, you need to compile \code{runtime.c} to
 \code{-c}) and link it into the executable. For our purposes of code
 generation, all you need to do is translate an assignment of
 \READOP{} into a call to the \code{read\_int} function followed by a
-move from \code{rax} to the left-hand side variable.  (Recall that the
-return value of a function goes into \code{rax}.)  
+move from \code{rax} to the left-hand side variable.  (The
+return value of a function is placed in \code{rax}.)  
 \begin{transformation}
 {\if\edition\racketEd  
 \begin{lstlisting}
@@ -3869,7 +3855,7 @@ recursively and then append the resulting instructions.
 \fi}
 
 {\if\edition\pythonEd\pythonColor
-We recommend that you use the function \code{utils.label\_name()} to
+We recommend that you use the function \code{utils.label\_name} to
 transform strings into labels, for example, in
 the target of the \code{callq} instruction. This practice makes your
 compiler portable across Linux and Mac OS X, which requires an underscore
@@ -4098,8 +4084,8 @@ all labels (for example, changing \key{main} to \key{\_main}).
   determining which operating system the compiler is running on. It
   returns \code{'macosx}, \code{'unix}, or \code{'windows}.}
 %
-\python{The Python \code{platform} library includes a \code{system()}
-  function that returns \code{\textquotesingle Linux\textquotesingle},
+\python{The Python \code{platform.system} 
+  function returns \code{\textquotesingle Linux\textquotesingle},
   \code{\textquotesingle Windows\textquotesingle}, or
   \code{\textquotesingle Darwin\textquotesingle} (for Mac).}
 
@@ -4162,7 +4148,7 @@ the \code{pe\_exp}
 \python{and \code{pe\_stmt} functions.}
 %
 Once complete, add the partial evaluation pass to the front of your
-compiler, and make sure that your compiler still passes all the
+compiler, and check that your compiler still passes all the
 tests.
 \end{exercise}
 
@@ -6801,7 +6787,7 @@ Run the script to test the \code{patch\_instructions} pass.
 \end{exercise}
 
 
-\section{Prelude and Conclusion}
+\section{Generate Prelude and Conclusion}
 \label{sec:print-x86-reg-alloc}
 \index{subject}{calling conventions}
 \index{subject}{prelude}\index{subject}{conclusion}
@@ -10072,7 +10058,7 @@ Add the following entry to the list of \code{passes} in
 
 {\if\edition\pythonEd\pythonColor
   
-\section{Prelude and Conclusion}
+\section{Generate Prelude and Conclusion}
 \label{sec:prelude-conclusion-cond}
 
 The generation of the \code{main} function with its prelude and
@@ -13792,7 +13778,7 @@ changes to also record the number of spills to the root stack.
 %\section{Patch Instructions}
 %[mention that global variables are memory references]
 
-\section{Prelude and Conclusion}
+\section{Generate Prelude and Conclusion}
 \label{sec:print-x86-gc}
 \label{sec:prelude-conclusion-x86-gc}
 \index{subject}{prelude}\index{subject}{conclusion}
@@ -16264,7 +16250,7 @@ register. Additionally, you should ensure that the argument of
 trample many other registers before the tail call, as explained in the
 next section.
 
-\section{Prelude and Conclusion}
+\section{Generate Prelude and Conclusion}
 
 Now that register allocation is complete, we can translate the
 \code{TailJmp} into a sequence of instructions. A naive translation of
@@ -17758,7 +17744,7 @@ The top-level function definitions need to be updated to take an extra
 closure parameter, but that parameter is ignored in the body of those
 functions.
 
-\section{An Example Translation}
+\subsection{An Example Translation}
 \label{sec:example-lambda}
 
 Figure~\ref{fig:lexical-functions-example} shows the result of
@@ -20434,7 +20420,7 @@ next two sections.
 
 %\clearpage
 
-\section{Type Checking \LangGrad{} \vspace{-2pt}}
+\section{Type Checking \LangGrad{}}
 \label{sec:gradual-type-check}
 
 We begin by discussing the type checking of a partially typed variant
@@ -21035,7 +21021,7 @@ def check_consistent(self, t1, t2, e):
 
 
 
-\section{Interpreting \LangCast{} \vspace{-2pt}}
+\section{Interpreting \LangCast{} }
 \label{sec:interp-casts}
 
 The runtime behavior of casts involving simple types such as
@@ -21430,7 +21416,7 @@ class InterpLcast(InterpLany):
 \fi}
 
 {\if\edition\pythonEd\pythonColor
-\section{Overload Resolution \vspace{-2pt}}
+\section{Overload Resolution }
 \label{sec:gradual-resolution}
 
 Recall that when we added support for arrays in
@@ -21449,7 +21435,7 @@ access and length operations to the primitives \code{any\_load},
 
 \fi}
 
-\section{Cast Insertion \vspace{-2pt}}
+\section{Cast Insertion }
 \label{sec:gradual-insert-casts}
 
 In our discussion of type checking of \LangGrad{}, we mentioned how
@@ -21507,7 +21493,7 @@ tuples of type \CANYTY{}: \code{any-vector-length},
 \fi}
 
 
-\section{Lower Casts \vspace{-2pt}}
+\section{Lower Casts }
 \label{sec:lower_casts}
 
 The next step in the journey toward x86 is the \code{lower\_casts}
@@ -21683,7 +21669,7 @@ def main() -> int:
 
 %\pagebreak
 
-\section{Differentiate Proxies \vspace{-2pt}}
+\section{Differentiate Proxies }
 \label{sec:differentiate-proxies}
 
 So far, the responsibility of differentiating tuples and tuple proxies
@@ -21925,7 +21911,7 @@ from the tuple.
 The translation of array operations is similar to the ones for tuples.
 
 
-\section{Reveal Casts \vspace{-2pt}}
+\section{Reveal Casts }
 \label{sec:reveal-casts-gradual}
 
 {\if\edition\racketEd    
@@ -21961,7 +21947,7 @@ Otherwise, the only other changes are adding cases that copy the new AST nodes.
 
 \pagebreak
 
-\section{Closure Conversion \vspace{-2pt}}
+\section{Closure Conversion }
 \label{sec:closure-conversion-gradual}
 
 The auxiliary function that translates type annotations needs to be
@@ -21971,7 +21957,7 @@ updated to handle the \PTUPLETYNAME{}
 Otherwise, the only other changes are adding cases that copy the new
 AST nodes.
 
-\section{Select Instructions \vspace{-2pt}}
+\section{Select Instructions }
 \label{sec:select-instructions-gradual}
 \index{subject}{select instructions}
 
