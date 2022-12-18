@@ -6054,20 +6054,6 @@ recommend the following correspondence.
 \end{lstlisting}
 
 
-%% One might wonder why we include registers at all in the liveness
-%% analysis and interference graph. For example, we never allocate a
-%% variable to \code{rax} and \code{rsp}, so it would be harmless to
-%% leave them out.  As we see in chapter~\ref{ch:Lvec}, when we begin
-%% to use register for passing arguments to functions, it will be
-%% necessary for those registers to appear in the interference graph
-%% because those registers will also be assigned to variables, and we
-%% don't want those two uses to encroach on each other. Regarding
-%% registers such as \code{rax} and \code{rsp} that are not used for
-%% variables, we could omit them from the interference graph but that
-%% would require adding special cases to our algorithm, which would
-%% complicate the logic for little gain.
-
-
 \begin{figure}[btp]
 \begin{tcolorbox}[colback=white]
   \centering
@@ -7626,12 +7612,12 @@ language includes several operations that involve Booleans
 \racket{\key{eq?}\index{subject}{equal@\EQNAME{}}}\python{==},
 \key{<}\index{subject}{lessthan@\texttt{<}}, etc.) and the
 \key{if}\index{subject}{IfExp@\IFNAME{}}
-conditional expression\index{subject}{conditional expression}
+conditional expression\index{subject}{conditional expression}%
 \python{ and statement\index{subject}{IfStmt@\IFSTMTNAME{}}}.
 With the addition of \key{if}, programs can have
 nontrivial control flow\index{subject}{control flow}, which
 %
-\racket{impacts \code{explicate\_control} and liveness analysis.}
+\racket{impacts \code{explicate\_control} and liveness analysis.}%
 %
 \python{impacts liveness analysis and motivates a new pass named
   \code{explicate\_control}.}
@@ -7864,13 +7850,14 @@ operators to include
 
 Figure~\ref{fig:interp-Lif} shows the definition of the interpreter
 for \LangIf{}, which inherits from the interpreter for \LangVar{}
-(figure~\ref{fig:interp-Lvar}). The literals \TRUE{} and \FALSE{}
-evaluate to the corresponding Boolean values. The conditional
-expression $\CIF{e_1}{e_2}{\itm{e_3}}$ evaluates expression $e_1$ and
-then either evaluates $e_2$ or $e_3$, depending on whether $e_1$
-produced \TRUE{} or \FALSE{}. The logical operations \code{and},
-\code{or}, and \code{not} behave according to propositional logic. In
-addition, the \code{and} and \code{or} operations perform
+(figure~\ref{fig:interp-Lvar}). The constants \TRUE{} and \FALSE{}
+evaluate to the corresponding Boolean values, which is
+inherited from the interpreter for \LangInt{} (figure~\ref{fig:interp-Lint-class}).
+The conditional expression $\CIF{e_1}{e_2}{\itm{e_3}}$ evaluates
+expression $e_1$ and then either evaluates $e_2$ or $e_3$, depending
+on whether $e_1$ produced \TRUE{} or \FALSE{}. The logical operations
+\code{and}, \code{or}, and \code{not} behave according to propositional
+logic. In addition, the \code{and} and \code{or} operations perform
 \emph{short-circuit evaluation}.
 %
 That is, given the expression $\CAND{e_1}{e_2}$, the expression $e_2$
@@ -8104,7 +8091,7 @@ of the support code.
 %
 Each type checker is a structurally recursive function over the AST.
 Given an input expression \code{e}, the type checker either signals an
-error or returns \racket{an expression and} its type.
+error or returns \racket{an expression and its type.}\python{its type.}
 %
 \racket{It returns an expression because there are situations in which
   we want to change or update the expression.}
@@ -8123,10 +8110,10 @@ environment \code{env} to map variables to types.
 %
 \python{Consider the case for assignment. We type check the
   initializing expression to obtain its type \key{t}.  If the variable
-  \code{lhs.id} is already in the environment because there was a
+  \code{id} is already in the environment because there was a
   prior assignment, we check that this initializer has the same type
   as the prior one. If this is the first assignment to the variable,
-  we associate type \code{t} with the variable \code{lhs.id} in the
+  we associate type \code{t} with the variable \code{id} in the
   environment. Thus, when the type checker encounters a use of
   variable \code{x}, it can find its type in the environment.}
 %
@@ -8237,12 +8224,12 @@ class TypeCheckLvar:
     if len(ss) == 0:
       return
     match ss[0]:
-      case Assign([lhs], value):
+      case Assign([Name(id)], value):
         t = self.type_check_exp(value, env)
-        if lhs.id in env:
-          check_type_equal(env[lhs.id], t, value)
+        if id in env:
+          check_type_equal(env[id], t, value)
         else:
-          env[lhs.id] = t
+          env[id] = t
         return self.type_check_stmts(ss[1:], env)
       case Expr(Call(Name('print'), [arg])):
         t = self.type_check_exp(arg, env)
@@ -8386,15 +8373,14 @@ be of \BOOLTY{} type, and the two branches must have the same type.
 
 \begin{exercise}\normalfont\normalsize
 Create ten new test programs in \LangIf{}. Half the programs should
-have a type error. For those programs, create an empty file with the
+have a type error.
+\racket{For those programs, create an empty file with the
 same base name and with file extension \code{.tyerr}. For example, if
-the test
-\racket{\code{cond\_test\_14.rkt}}\python{\code{cond\_test\_14.py}}
+the test \code{cond\_test\_14.rkt}
 is expected to error, then create
 an empty file named \code{cond\_test\_14.tyerr}.
-%
-\racket{This indicates to \code{interp-tests} and
-  \code{compiler-tests} that a type error is expected. }
+This indicates to \code{interp-tests} and
+\code{compiler-tests} that a type error is expected.}
 %
 The other half of the test programs should not have type errors.
 % 
@@ -8440,7 +8426,7 @@ The output of \key{explicate\_control} is a language similar to the
 $C$ language~\citep{Kernighan:1988nx} in that it has labels and
 \code{goto} statements, so we name it \LangCIf{}.  
 %
-The \LangCIf{} language supports the same operators as \LangIf{}, but
+The \LangCIf{} language supports most of the operators in \LangIf{}, but
 the arguments of operators are restricted to atomic expressions. The
 \LangCIf{} language does not include \code{if} expressions, but it does
 include a restricted form of \code{if} statement. The condition must be
@@ -8848,8 +8834,8 @@ the \code{not} operator and comparison operators must be atomic.
   variables and their initializing expressions. However, these
   expressions may contain side effects and should be executed only
   when the condition of the \code{if} is true (for the ``then''
-  branch) or false (for the ``else'' branch). The \code{Begin} provides
-  a way to initialize the temporary variables within the two branches
+  branch) or false (for the ``else'' branch). The \code{Begin} expression
+  provides a way to initialize the temporary variables within the two branches
   of the \code{if} expression.  In general, the $\BEGIN{ss}{e}$
   form executes the statements $ss$ and then returns the result of
   expression $e$.}
@@ -9117,7 +9103,7 @@ block_3:
 {\if\edition\pythonEd\pythonColor
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
-% cond_test_41.rkt
+% tests/if/if_lt_eq.py
 \begin{lstlisting}
 x = input_int()
 y = input_int()
@@ -9129,44 +9115,36 @@ print(y + 2             \
 \end{lstlisting}
 \end{minipage}
 &
-$\Rightarrow$
+$\Rightarrow\qquad$
 &
 \begin{minipage}{0.55\textwidth}
 \begin{lstlisting}
 start:
-  x = input_int()
-  y = input_int()
-  if x < 1:
-    goto block_8
-  else:
-    goto block_9
-block_8:
-  if x == 0:
-    goto block_4
-  else:
-    goto block_5
-block_9:
-  if x == 2:
-    goto block_6
-  else:
-    goto block_7
-block_4:
-  goto block_2
-block_5:
-  goto block_3
+    x = input_int()
+    y = input_int()
+    if x < 1:
+      goto block_6
+    else:
+      goto block_7
 block_6:
-  goto block_2
+    if x == 0:
+      goto block_4
+    else:
+      goto block_5
 block_7:
-  goto block_3
-block_2:
-  tmp_0 = y + 2
-  goto block_1
+    if x == 2:
+      goto block_4
+    else:
+      goto block_5
+block_4:
+    tmp.82 = (y + 2)
+    goto block_3
+block_5:
+    tmp.82 = (y + 10)
+    goto block_3
 block_3:
-  tmp_0 = y + 10
-  goto block_1
-block_1:
-  print(tmp_0)
-  return 0
+    print(tmp.82)
+    return 0
 \end{lstlisting}
 \end{minipage}
 \end{tabular} 
@@ -9212,16 +9190,22 @@ following four auxiliary functions.
 \item[\code{explicate\_stmt}] generates code for statements.
 \end{description}
 These four functions should build the dictionary of basic blocks. The
-following auxiliary function can be used to create a new basic block
-from a list of statements. It returns a \code{goto} statement that
-jumps to the new basic block.
+following auxiliary function \code{create\_block} is used to create a
+new basic block from a list of statements. If the list just contains a
+\code{goto}, then \code{create\_block} returns the list.  Otherwise
+\code{create\_block} creates a new basic block and returns a
+\code{goto} to its label.
 \begin{center}
 \begin{minipage}{\textwidth}
 \begin{lstlisting}
    def create_block(stmts, basic_blocks):
-     label = label_name(generate_name('block'))
-     basic_blocks[label] = stmts
-     return [Goto(label)]
+     match stmts:
+       case [Goto(l)]:
+         return stmts
+       case _:
+         label = label_name(generate_name('block'))
+         basic_blocks[label] = stmts
+         return [Goto(label)]
 \end{lstlisting}
 \end{minipage}
 \end{center}
@@ -9450,22 +9434,21 @@ branch.  The \code{explicate\_pred} function should match on
 {\if\edition\pythonEd\pythonColor
 
 The \code{explicate\_pred} function has four parameters: (1) the
-condition expression, (2) the generated statements for the ``then''
-branch, (3) the generated statements for the ``else'' branch, and (4)
-the dictionary of basic blocks. The \code{explicate\_pred} function
-returns a list of \LangCIf{} statements, and it may add to the
-dictionary of basic blocks.
+condition expression, (2) the generated statements for the \emph{then}
+branch, (3) the generated statements for the \emph{else} branch, and
+(4) the dictionary of basic blocks. The \code{explicate\_pred}
+function returns a list of statements, and it adds to the dictionary
+of basic blocks.
 
 \fi}
 
 Consider the case for comparison operators. We translate the
 comparison to an \code{if} statement whose branches are \code{goto}
-statements created by applying \code{create\_block} to the code
-generated for the \code{thn} and \code{els} branches. Let us
-illustrate this translation by returning to the program with an
-\code{if} expression in tail position, shown next. We invoke
-\code{explicate\_pred} on its condition
-\racket{\code{(eq? x 0)}}\python{\code{x == 0}}.
+statements created by applying \code{create\_block} to the \code{thn}
+and \code{els} parameters. Let us illustrate this translation by
+returning to the program with an \code{if} expression in tail
+position, shown next. We invoke \code{explicate\_pred} on its
+condition \racket{\code{(eq? x 0)}}\python{\code{x == 0}}.
 %
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -9527,7 +9510,7 @@ to the following \code{if} statement:
 \fi}
 Next consider the case for Boolean constants. We perform a kind of
 partial evaluation\index{subject}{partialevaluation@partial evaluation} and output
-either the \code{thn} or \code{els} branch, depending on whether the
+either the \code{thn} or \code{els} parameter, depending on whether the
 constant is \TRUE{} or \FALSE{}. Let us illustrate this with the
 following program:
 {\if\edition\racketEd
@@ -9663,24 +9646,27 @@ and then the comparison \racket{\code{(< x 1)}}\python{\code{x < 1}}
 in the predicate of the inner \key{if}.  In the output of
 \code{explicate\_control}, in the
 block labeled \code{start}, two assignment statements are followed by an
-\code{if} statement that branches to \code{block\_4} or
-\code{block\_5}. The blocks associated with those labels contain the
+\code{if} statement that branches to \racket{\code{block\_4}}\python{\code{block\_6}}
+or \racket{\code{block\_5}}\python{\code{block\_7}}.
+The blocks associated with those labels contain the
 translations of the code
 \racket{\code{(eq? x 0)}}\python{\code{x == 0}}
 and
 \racket{\code{(eq? x 2)}}\python{\code{x == 2}},
-respectively.  In particular, we start \code{block\_4} with the
-comparison
+respectively.  In particular, we start
+\racket{\code{block\_4}}\python{\code{block\_6}}
+with the comparison
 \racket{\code{(eq? x 0)}}\python{\code{x == 0}}
-and then branch to \code{block\_2} or \code{block\_3},
+and then branch to \racket{\code{block\_2}}\python{\code{block\_4}}
+or \racket{\code{block\_3}}\python{\code{block\_5}},
 which correspond to the two branches of the outer \key{if}, that is,
 \racket{\code{(+ y 2)}}\python{\code{y + 2}} and
 \racket{\code{(+ y 10)}}\python{\code{y + 10}}.
 %
-The story for \code{block\_5} is similar to that of \code{block\_4}.
+The story for \racket{\code{block\_5}}\python{\code{block\_7}}
+is similar to that of \racket{\code{block\_4}}\python{\code{block\_6}}.
 %
-\python{The \code{block\_1} corresponds to the \code{print} statement
-  at the end of the program.}
+\python{The \code{block\_3} is the translation of the \code{print} statement.}
 
 
 {\if\edition\racketEd
@@ -10155,9 +10141,11 @@ conclusion:
 % cond_test_20.rkt, eq_input.py
 \begin{lstlisting}
 print(42 if input_int() == 1 else 0)
+  
 \end{lstlisting}
 $\Downarrow$
 \begin{lstlisting}
+  
 start:
 	tmp_0 = input_int()
 	if tmp_0 == 1:
@@ -10173,9 +10161,12 @@ block_4:
 block_2:
 	print(tmp_1)
 	return 0
+
 \end{lstlisting}
 $\Downarrow$
 \begin{lstlisting}
+
+
 start:
 	callq read_int
 	movq %rax, tmp_0
@@ -10192,7 +10183,7 @@ block_2:
 	movq tmp_1, %rdi
 	callq print_int
 	movq 0, %rax
-	jmp conclusion
+	jmp conclusion        
 \end{lstlisting}
 \end{minipage}
 &
@@ -10238,8 +10229,10 @@ conclusion:
 \label{fig:if-example-x86}
 \end{figure}
 
+Figure~\ref{fig:Lif-passes} lists all the passes needed for the
+compilation of \LangIf{}.
 
-\begin{figure}[tbp]
+\begin{figure}[htbp]
 \begin{tcolorbox}[colback=white]  
 {\if\edition\racketEd
 \begin{tikzpicture}[baseline=(current  bounding  box.center),scale=0.90]
@@ -10295,8 +10288,6 @@ conclusion:
  \label{fig:Lif-passes}
 \end{figure}
 
-Figure~\ref{fig:Lif-passes} lists all the passes needed for the
-compilation of \LangIf{}.
 
 
 \section{Challenge: Optimize Blocks and Remove Jumps}
@@ -10336,7 +10327,7 @@ case, and it creates two unused blocks.
 &
 $\Rightarrow$
 &
-\begin{minipage}{0.55\textwidth}
+\begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
 start:
     y = (read);
@@ -10353,6 +10344,35 @@ block_7:
 \end{lstlisting}
 \end{minipage}
 \end{tabular} 
+\end{center}
+\fi}
+{\if\edition\pythonEd
+The following example program falls into this
+case, and it creates the unused \code{block\_9}.       
+\begin{center}
+\begin{minipage}{0.4\textwidth}
+% if/if_true.py
+\begin{lstlisting}
+if True:
+  print(0)
+else:
+  x = 1 if False else 2
+  print(x)
+\end{lstlisting}
+\end{minipage}
+$\Rightarrow\qquad\qquad$
+\begin{minipage}{0.4\textwidth}
+\begin{lstlisting}
+start:
+    print(0)
+    goto block_8
+block_9:
+    print(x)
+    goto block_8
+block_8:
+    return 0
+\end{lstlisting}
+\end{minipage}
 \end{center}
 \fi}
 
@@ -10389,7 +10409,8 @@ its evaluation by calling the function. However, we might need to
 force multiple times, so we store the result of calling the
 function instead of recomputing it each time.  The following
 \code{Promise} class handles this memoization process.
-%
+
+\begin{minipage}{0.8\textwidth}
 \begin{lstlisting}
    @dataclass
    class Promise:
@@ -10401,9 +10422,10 @@ function instead of recomputing it each time.  The following
        else:
          return self.cache
 \end{lstlisting}
-%
-However, in some cases of \code{explicate\_pred}, we return a list
-of statements, and in other cases we return a function that
+\end{minipage}
+
+\noindent However, in some cases of \code{explicate\_pred}, we return
+a list of statements, and in other cases we return a function that
 computes a list of statements.  To uniformly deal with both regular
 data and promises, we define the following \code{force} function that
 checks whether its input is delayed (i.e., whether it is a
@@ -10464,8 +10486,7 @@ return a \code{Goto} to the new label.
 {\if\edition\pythonEd\pythonColor
 %
 Here is the new version of the \code{create\_block} auxiliary function
-that works on promises and that checks whether the block consists of a
-solitary \code{goto} statement.\\
+that delays the creation of the new basic block.\\
 \begin{minipage}{\textwidth}
 \begin{lstlisting}
    def create_block(promise, basic_blocks):
@@ -10485,15 +10506,17 @@ solitary \code{goto} statement.\\
 \fi}
 
 Figure~\ref{fig:explicate-control-challenge} shows the output of
-improved \code{explicate\_control} on this example.  As you can
-see, the number of basic blocks has been reduced from four blocks (see
-figure~\ref{fig:explicate-control-s1-38}) to two blocks.
+improved \code{explicate\_control} on this example.
+\racket{As you can see, the number of basic blocks has been reduced
+  from four blocks to two blocks.}%
+\python{As you can see, the number of basic blocks has been reduced
+  from three blocks to two blocks.}
 
 \begin{figure}[tbp]
   \begin{tcolorbox}[colback=white]
     {\if\edition\racketEd        
 \begin{tabular}{lll}
-\begin{minipage}{0.4\textwidth}
+\begin{minipage}{0.45\textwidth}
 % cond_test_82.rkt
 \begin{lstlisting}
 (let ([y (if #t
@@ -10506,9 +10529,9 @@ figure~\ref{fig:explicate-control-s1-38}) to two blocks.
 \end{lstlisting}
 \end{minipage}
 &
-$\Rightarrow$
+$\quad\Rightarrow\quad$
 &
-\begin{minipage}{0.55\textwidth}
+\begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
 start:
     y = (read);
@@ -10522,15 +10545,13 @@ block_5:
 {\if\edition\pythonEd\pythonColor
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
-  % cond_test_41.rkt
+  % if/if_true.py
 \begin{lstlisting}
-x = input_int()
-y = input_int()
-print(y + 2             \
-      if (x == 0        \
-          if x < 1      \
-          else x == 2) \
-      else y + 10)
+if True:
+  print(0)
+else:
+  x = 1 if False else 2
+  print(x)
 \end{lstlisting}
 \end{minipage}
 &
@@ -10539,30 +10560,10 @@ $\Rightarrow$
 \begin{minipage}{0.55\textwidth}
 \begin{lstlisting}
 start:
-    x = input_int()
-    y = input_int()
-    if x < 1:
-        goto block_4
-    else:
-        goto block_5
+    print(0)
+    goto block_4
+    
 block_4:
-    if x == 0:
-        goto block_2
-    else:
-        goto block_3
-block_5:
-    if x == 2:
-        goto block_2
-    else:
-        goto block_3
-block_2:
-    tmp_0 = y + 2
-    goto block_1
-block_3:
-    tmp_0 = y + 10
-    goto block_1
-block_1:
-    print(tmp_0)
     return 0
 \end{lstlisting}
 \end{minipage}
@@ -10695,9 +10696,11 @@ block_1:
 
 There is an opportunity for removing jumps that is apparent in the
 example of figure~\ref{fig:if-example-x86}. The \code{start} block
-ends with a jump to \code{block\_5}, and there are no other jumps to
-\code{block\_5} in the rest of the program. In this situation we can
-avoid the runtime overhead of this jump by merging \code{block\_5}
+ends with a jump to \racket{\code{block\_5}}\python{\code{block\_4}},
+and there are no other jumps to
+\racket{\code{block\_5}}\python{\code{block\_4}} in the rest of the program.
+In this situation we can avoid the runtime overhead of this jump by merging
+\racket{\code{block\_5}}\python{\code{block\_4}}
 into the preceding block, which in this case is the \code{start} block.
 Figure~\ref{fig:remove-jumps} shows the output of
 \code{allocate\_registers} on the left and the result of this
