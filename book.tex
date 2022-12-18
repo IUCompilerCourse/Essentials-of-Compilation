@@ -12416,7 +12416,7 @@ The type of accessing the ith element of a tuple is the ith element
 type of the tuple's type, if there is one. If not, an error is
 signaled. Note that the index \code{i} is required to be a constant
 integer (and not, for example, a call to
-\racket{\code{read}}\python{input\_int}) so that the type checker
+\racket{\code{read}}\python{\code{input\_int}}) so that the type checker
 can determine the element's type given the tuple type. 
 %
 \racket{
@@ -12685,7 +12685,7 @@ pointer catches up with the free pointer.
 The garbage collector places some requirements on the data
 representations used by our compiler. First, the garbage collector
 needs to distinguish between pointers and other kinds of data such as
-integers. The following are several ways to accomplish this:
+integers. The following are three ways to accomplish this:
 \begin{enumerate}
 \item Attach a tag to each object that identifies what type of
   object it is~\citep{McCarthy:1960dz}.
@@ -13287,7 +13287,7 @@ are obtained by translating from \LangCVec{} to x86.
 The move of $\itm{tup}'$ to
 register \code{r11} ensures that the offset expression
 \code{$8(n+1)$(\%r11)} contains a register operand.  This requires
-removing \code{r11} from consideration by the register allocating.
+removing \code{r11} from consideration by the register allocator.
 
 Why not use \code{rax} instead of \code{r11}? Suppose that we instead used
 \code{rax}. Then the generated code for tuple assignment would be
@@ -14063,8 +14063,8 @@ In this chapter we have studied tuples, that is, heterogeneous
 sequences of elements whose length is determined at compile time. This
 challenge is also about sequences, but this time the length is
 determined at runtime and all the elements have the same type (they
-are homogeneous). We use the term \emph{array} for this latter kind of
-sequence.
+are homogeneous). We use the traditional term \emph{array} for this
+latter kind of sequence.
 %
 \racket{
 The Racket language does not distinguish between tuples and arrays;
@@ -14258,11 +14258,14 @@ updated to handle the situation in which the vector has type
 \code{vectorof} form so that later passes can easily distinguish
 between operations on tuples versus arrays. We override the
 \code{operator-types} method to provide the type signature for
-multiplication: it takes two integers and returns an integer.  \fi}
+multiplication: it takes two integers and returns an integer.
+\fi}
+%
 {\if\edition\pythonEd\pythonColor
 %
 The type checker for \LangArray{} is defined in
-figure~\ref{fig:type-check-Lvecof}. The result type of a list literal
+figure~\ref{fig:type-check-Lvecof} and
+\ref{fig:type-check-Lvecof-part2}. The result type of a list literal
 is \code{list[T]}, where \code{T} is the type of the initializing
 expressions.  The type checking of the \code{len} function and the
 subscript operator are updated to handle lists. The type checker now
@@ -14409,7 +14412,7 @@ class TypeCheckLarray(TypeCheckLtup):
 
 The definition of the interpreter for \LangArray{} is shown in
 \racket{figure~\ref{fig:interp-Lvecof}}
-\python{figures~\ref{fig:interp-Lvecof} and \ref{fig:type-check-Lvecof-part2}}.
+\python{figure~\ref{fig:interp-Lvecof}}.
 \racket{The \code{make-vector} operator is
   interpreted using Racket's \code{make-vector} function,
   and multiplication is interpreted using \code{fx*},
@@ -14421,7 +14424,7 @@ The definition of the interpreter for \LangArray{} is shown in
   bounds checks that signal a \code{trapped-error}.
 }
 %
-\python{We implement list creation with a Python list comprehension,
+\python{We implement array creation with a Python list comprehension,
   and multiplication is implemented with 64-bit multiplication.  We
   add a case to handle a subscript on the left-hand side of
   assignment. Other uses of subscript can be handled by the existing
@@ -14520,8 +14523,8 @@ an array:
   that it is not.
   
 \item The next bit to the left is the pointer mask. A $0$ indicates
-  that none of the elements are pointers to the heap, and a $1$
-  indicates that all the elements are pointers.
+  that none of the elements are pointers, and a $1$ indicates that all
+  the elements are pointers.
 
 \item The next $60$ bits store the length of the array.
 
@@ -14555,8 +14558,7 @@ compilers perform \emph{overload resolution}\index{subject}{overload
 operator into different operators for the different types.
 
 Implement a new pass named \code{resolve}. 
-Translate the reading of an array element
-into a call to
+Translate the reading of an array element to
 \racket{\code{vectorof-ref}}\python{\code{array\_load}}
 and the writing of an array element to
 \racket{\code{vectorof-set!}}\python{\code{array\_store}}
@@ -14572,7 +14574,8 @@ When these operators are applied to tuples, leave them as is.
 \subsection{Bounds Checking}
 
 Recall that the interpreter for \LangArray{} signals a
-\code{trapped-error} when there is an array access that is out of
+\racket{\code{trapped-error}}\python{\code{TrappedError}}
+when there is an array access that is out of
 bounds. Therefore your compiler is obliged to also catch these errors
 during execution and halt, signaling an error. We recommend inserting
 a new pass named \code{check\_bounds} that inserts code around each
