@@ -18674,6 +18674,19 @@ class InterpLdyn(InterpLlambda):
             return self.tag(True)
         else:
             return self.interp_exp(right, env)
+\end{lstlisting}
+\fi}
+  \end{tcolorbox}
+
+  \caption{Interpreter for the \LangDyn{} language\python{, part 1}.}
+\label{fig:interp-Ldyn}
+\end{figure}
+
+{\if\edition\pythonEd\pythonColor
+  \begin{figure}[tbp]
+\begin{tcolorbox}[colback=white]    
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+  # interp_exp continued    
       case Compare(left, [cmp], [right]):
         l = self.interp_exp(left, env)
         r = self.interp_exp(right, env)
@@ -18691,19 +18704,7 @@ class InterpLdyn(InterpLlambda):
         return self.tag(len(self.untag(t, 'tuple', e)))
       case _:
         return self.tag(super().interp_exp(e, env))
-\end{lstlisting}
-\fi}
-  \end{tcolorbox}
 
-  \caption{Interpreter for the \LangDyn{} language\python{, part 1}.}
-\label{fig:interp-Ldyn}
-\end{figure}
-
-{\if\edition\pythonEd\pythonColor
-  \begin{figure}[tbp]
-\begin{tcolorbox}[colback=white]    
-\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
-class InterpLdyn(InterpLlambda):
   def interp_stmt(self, s, env, cont):
     match s:
       case If(test, body, orelse):
@@ -18800,7 +18801,7 @@ class InterpLdyn(InterpLlambda):
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd\pythonColor
-\begin{lstlisting}
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 class InterpLdyn(InterpLlambda):
   def tag(self, v):
     if v is True or v is False:
@@ -18835,7 +18836,7 @@ class InterpLdyn(InterpLlambda):
 \label{fig:interp-Ldyn-aux}
 \end{figure}
 
-\clearpage
+%\clearpage
 
 \section{Representation of Tagged Values}
 
@@ -18878,7 +18879,7 @@ the rightmost 3 bits with the tag, and we can simply zero out the tag
 to recover the original address.
 
 To make tagged values into first-class entities, we can give them a
-type called \racket{\code{Any}}\python{\code{AnyType()}} and define
+type called \racket{\code{Any}}\python{\code{AnyType}} and define
 operations such as \code{Inject} and \code{Project} for creating and
 using them, yielding the statically typed \LangAny{} intermediate
 language. We describe how to compile \LangDyn{} to \LangAny{} in
@@ -19138,7 +19139,7 @@ class TypeCheckLany(TypeCheckLlambda):
 \end{figure}
 \fi}
 
-\begin{figure}[btp]
+\begin{figure}[tbp]
   \begin{tcolorbox}[colback=white]
 {\if\edition\racketEd
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
@@ -19185,39 +19186,32 @@ class TypeCheckLany(TypeCheckLlambda):
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd\pythonColor
-\begin{lstlisting}
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 class InterpLany(InterpLlambda):
   def interp_exp(self, e, env):
     match e:
       case Inject(value, typ):
-        v = self.interp_exp(value, env)
-        return Tagged(v, self.type_to_tag(typ))
+        return Tagged(self.interp_exp(value, env), self.type_to_tag(typ))
       case Project(value, typ):
-        v = self.interp_exp(value, env)
-        match v:
+        match self.interp_exp(value, env):
           case Tagged(val, tag) if self.type_to_tag(typ) == tag:
             return val
           case _:
-            raise Exception('interp project to ' + repr(typ)
-                            + '  unexpected ' + repr(v))
+            raise Exception('failed project to ' + self.type_to_tag(typ))
       case Call(Name('any_tuple_load'), [tup, index]):
-        tv = self.interp_exp(tup, env)
-        n = self.interp_exp(index, env)
-        match tv:
+        match self.interp_exp(tup, env):
           case Tagged(v, tag):
-            return v[n]
+            return v[self.interp_exp(index, env)]
           case _:
-            raise Exception('in any_tuple_load unexpected ' + repr(tv))
+            raise Exception('in any_tuple_load untagged value')
       case Call(Name('any_len'), [value]):
-        v = self.interp_exp(value, env)
-        match v:
+        match self.interp_exp(value, env):
           case Tagged(value, tag):
             return len(value)
           case _:
-            raise Exception('interp any_len unexpected ' + repr(v))
+            raise Exception('interp any_len untagged value')
       case Call(Name('arity'), [fun]):
-        f = self.interp_exp(fun, env)
-        return self.arity(f)
+        return self.arity(self.interp_exp(fun, env))
       case _:
         return super().interp_exp(e, env)
 \end{lstlisting}
@@ -19227,7 +19221,7 @@ class InterpLany(InterpLlambda):
 \label{fig:interp-Lany}
 \end{figure}
 
-\begin{figure}[tbp]
+\begin{figure}[btp]
   \begin{tcolorbox}[colback=white]  
 {\if\edition\racketEd
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
@@ -19260,7 +19254,7 @@ class InterpLany(InterpLlambda):
 \end{lstlisting}
 \fi}
 {\if\edition\pythonEd\pythonColor
-\begin{lstlisting}
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 class InterpLany(InterpLlambda):
   def type_to_tag(self, typ):
     match typ:
@@ -19268,23 +19262,16 @@ class InterpLany(InterpLlambda):
         return 'function'
       case TupleType(fields):
         return 'tuple'
-      case t if t == int:
-        return 'int'
-      case t if t == bool:
-        return 'bool'
       case IntType():
         return 'int'
       case BoolType():
-        return 'int'
+        return 'bool'
       case _:
         raise Exception('type_to_tag unexpected ' + repr(typ))
-
   def arity(self, v):
     match v:
       case Function(name, params, body, env):
         return len(params)
-      case ClosureTuple(args, arity):
-        return arity
       case _:
         raise Exception('Lany arity unexpected ' + repr(v))
 \end{lstlisting}
@@ -20118,7 +20105,7 @@ nevertheless they should be valid \LangDyn{} programs that run to
 completion without error.
 \end{exercise}
 
-Figure~\ref{fig:Ldyn-passes} provides an overview of the passes needed
+Figure~\ref{fig:Ldyn-passes} gives an overview of the passes needed
 for the compilation of \LangDyn{}.
 
 \begin{figure}[bthp]
