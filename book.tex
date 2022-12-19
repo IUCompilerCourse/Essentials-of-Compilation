@@ -17403,8 +17403,8 @@ print(g(20))
 side of assignments.  The variables \code{x} and \code{z} occur free
 inside the \code{lambda}. Thus, variable \code{x} needs to be boxed
 but not \code{y} or \code{z}.  The boxing of \code{x} consists of
-three transformations: initialize \code{x} with a tuple whose elements
-are uninitialized, replace reads from \code{x} with tuple reads, and
+three transformations: initialize \code{x} with a tuple whose element
+is uninitialized, replace reads from \code{x} with tuple reads, and
 replace each assignment to \code{x} with a tuple write. The output of
 \code{convert\_assignments} for this example is as follows:
 %
@@ -17545,7 +17545,7 @@ def g(x : int) -> int:
 %
 \noindent We box parameter \code{x} by creating a local variable named
 \code{x} that is initialized to a tuple whose contents is the value of
-the parameter, which has been renamed to \code{x\_0}.
+the parameter, which is renamed to \code{x\_0}.
 %
 {\if\edition\racketEd
 \begin{lstlisting}
@@ -17588,9 +17588,9 @@ the free variables of the \key{lambda}.
 However, we use the \code{Closure} AST node instead of using a tuple
 so that we can record the arity.
 %
-In the generated code that follows, \itm{fvs} is the free variables of
-the lambda and \itm{name} is a unique symbol generated to identify the
-lambda.
+In the generated code that follows, \itm{fvs} is the list of free
+variables of the lambda and \itm{name} is a unique symbol generated to
+identify the lambda.
 %
 \racket{The \itm{arity} is the number of parameters (the length of
   \itm{ps}).}
@@ -17607,7 +17607,7 @@ lambda.
 \begin{lstlisting}
 Lambda([|$x_1,\ldots,x_n$|], |\itm{body}|)
 |$\Rightarrow$|
-Closure(|$n$|, [FunRef(|\itm{name}|, |$n$|), |\itm{fvs}, \ldots|])
+Closure(|$n$|, [FunRef(|\itm{name}|, |$n$|), |$\itm{fvs}_1$, \ldots, $\itm{fvs}_m$|])
 \end{lstlisting}
 \fi}
 %
@@ -17626,26 +17626,31 @@ tuple, we create a top-level function definition for each
 \fi}
 {\if\edition\pythonEd\pythonColor
 \begin{lstlisting}
-def |\itm{name}|(clos : |\itm{closTy}|, |\itm{ps'}, \ldots|) -> |\itm{rt'}|:
+def |\itm{name}|(clos : |\itm{closTy}|, |$\itm{x}_1 : T'_1$, \ldots, $\itm{x}_n : T'_n$|) -> |\itm{rt'}|:
    |$\itm{fvs}_1$| = clos[1]
    |$\ldots$|
-   |$\itm{fvs}_n$| = clos[|$n$|]
+   |$\itm{fvs}_m$| = clos[|$m$|]
    |\itm{body'}|
 \end{lstlisting}
 \fi}
 \end{minipage}\\
-The \code{clos} parameter refers to the closure.  Translate the type
-annotations in \itm{ps} and the return type \itm{rt}, as discussed in
-the next paragraph, to obtain \itm{ps'} and \itm{rt'}.  The type
+%
+The \code{clos} parameter refers to the closure.  The type
 \itm{closTy} is a tuple type for which the first element type is
-\python{\code{Bottom()}}\racket{\code{\_} (the dummy type)} and the rest of
-the element types are the types of the free variables in the
+\python{\code{Bottom()}}\racket{\code{\_} (the dummy type)} and the
+rest of the element types are the types of the free variables in the
 lambda. We use \python{\code{Bottom()}}\racket{\code{\_}} because it
-is nontrivial to give a type to the function in the closure's type.%
+is nontrivial to give a type to the function in the closure's
+type.\footnote{To give an accurate type to a closure, we would need to
+  add existential types to the type checker~\citep{Minamide:1996ys}.}
 %
-\footnote{To give an accurate type to a closure, we would need to add
-  existential types to the type checker~\citep{Minamide:1996ys}.}
-%
+\racket{Translate the type
+  annotations in \itm{ps} and the return type \itm{rt}, as discussed in
+  the next paragraph, to obtain \itm{ps'} and \itm{rt'}.}%
+\python{The \code{has\_type} field of the \code{Lambda} AST node
+  is of the form \code{FunctionType([$x_1:T_1,\ldots, x_n:T_n$], $rt$)}.
+  Translate the parameter types $T_1,\ldots,T_n$ and return type $\itm{rt}$
+  to obtain $T'_1,\ldots, T'_n$ and $\itm{rt'}$.}
 %% The dummy type is considered to be equal to any other type during type
 %% checking.
 The free variables become local variables that are initialized with
