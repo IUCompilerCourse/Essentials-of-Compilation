@@ -15172,11 +15172,21 @@ Similarly to the interpreter, the case for the
 \racket{\code{ProgramDefsExp}}\python{\code{Module}}
 %
 AST is responsible for setting up the mutual recursion between the
-top-level function definitions. We begin by create a mapping
+top-level function definitions. We begin by creating a mapping
 \code{env} from every function name to its type. We then type check
 the program using this mapping.
 %
-In the case for function \racket{application}\python{call}, we match
+\python{To check a function definition, we copy and extend the
+  \code{env} with the parameters of the function. We then type check
+  the body of the function and obtain the actual return type
+  \code{rt}, which is either the type of the expression in a
+  \code{return} statement, or the \code{VoidType} if control reaches
+  the end of the function without a \code{return} statement.  (If
+  there are multiple \code{return} statements, the types of their
+  expressions must agree.) Finally we check that the actual return
+  type \code{rt} is equal to the declared return type \code{returns}.}
+%
+To check a function \racket{application}\python{call}, we match
 the type of the function expression to a function type and check that
 the types of the argument expressions are equal to the function's
 parameter types. The type of the \racket{application}\python{call} as
@@ -15265,7 +15275,7 @@ class TypeCheckLfun(TypeCheckLtup):
 
   def type_check_stmts(self, ss, env):
     if len(ss) == 0:
-      return
+      return VoidType()
     match ss[0]:
       case FunctionDef(name, params, body, dl, returns, comment):
         new_env = env.copy().update(params)
