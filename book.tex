@@ -12890,8 +12890,11 @@ The pass \code{expose\_allocation} lowers tuple creation into making a
 conditional call to the collector followed by allocating the
 appropriate amount of memory and initializing it.  We choose to place
 the \code{expose\_allocation} pass before
-\code{remove\_complex\_operands} because it generates
-code that contains complex operands.
+\code{remove\_complex\_operands} because it generates code that
+contains complex operands. However, with some care it can also be
+placed before \code{remove\_complex\_operands} which would simplify
+tuple creation by removing the need to assign the initializing
+expressions to temporary variables (see below).
 
 The output of \code{expose\_allocation} is a language \LangAlloc{}
 that replaces tuple creation with new lower-level forms that we use in the
@@ -12909,8 +12912,7 @@ translation of tuple creation.
 {\if\edition\pythonEd\pythonColor
 \[
 \begin{array}{lcl}
-  \Exp &::=& \cdots\\
-      &\MID& \key{collect}(\itm{int})
+  \Exp &::=& \key{collect}(\itm{int})
       \MID \key{allocate}(\itm{int},\itm{type})
       \MID \key{global\_value}(\itm{name}) \\
    \Stmt &::= & \CASSIGN{\CPUT{\Exp}{\itm{int}}}{\Exp}
@@ -12918,11 +12920,11 @@ translation of tuple creation.
 \]
 \fi}
 %
-The \CCOLLECT{$n$} form runs the garbage collector, requesting that it
-make sure that there are $n$ bytes ready to be allocated. During
-instruction selection\index{subject}{instruction selection},
-the \CCOLLECT{$n$} form will become a call to
-the \code{collect} function in \code{runtime.c}.
+The \CCOLLECT{$n$} form runs the garbage collector, requesting that
+there be $n$ bytes ready to be allocated. During instruction
+selection\index{subject}{instruction selection}, the \CCOLLECT{$n$}
+form will become a call to the \code{collect} function in
+\code{runtime.c}.
 %
 The \CALLOCATE{$n$}{$\itm{type}$} form obtains memory for $n$ elements (and
 space at the front for the 64-bit tag), but the elements are not
@@ -13070,9 +13072,10 @@ should be treated as complex operands.
 %
 {\if\edition\pythonEd\pythonColor
 %
-The expressions \code{allocate}, \code{global\_value}, \code{begin},
+The expressions \code{allocate}, \code{begin},
 and tuple access should be treated as complex operands.  The
 subexpressions of tuple access must be atomic.
+The \code{global\_value} AST node is atomic.
 %
 \fi}
 %% A new case for
@@ -13093,10 +13096,10 @@ pass, which is \LangAlloc{} in monadic normal form.
 
 \newcommand{\LtupMonadASTPython}{
 \begin{array}{rcl}
-\Exp &::=& \GET{\Atm}{\Atm} \\
-     &\MID& \LEN{\Atm}\\
-   &\MID& \ALLOCATE{\Int}{\Type}
-    \MID \GLOBALVALUE{\Var} \\
+\Atm &::=& \GLOBALVALUE{\Var} \\
+\Exp &::=& \GET{\Atm}{\Atm} 
+     \MID \LEN{\Atm}\\
+   &\MID& \ALLOCATE{\Int}{\Type}\\
 \Stmt{} &::=& \ASSIGN{\PUT{\Atm}{\Atm}}{\Atm} \\
    &\MID& \COLLECT{\Int}
 \end{array}
@@ -13157,10 +13160,11 @@ pass, which is \LangAlloc{} in monadic normal form.
   
 \newcommand{\CtupASTPython}{
 \begin{array}{lcl}
-\Exp &::= & \GET{\Atm}{\Atm} \MID \ALLOCATE{\Int}{\Type} \\
-      &\MID& \GLOBALVALUE{\Var} \MID \LEN{\Atm} \\
-\Stmt &::=& \COLLECT{\Int} \\
-     &\MID& \ASSIGN{\PUT{\Atm}{\Atm}}{\Atm} 
+\Atm &::=& \GLOBALVALUE{\Var} \\  
+\Exp &::=& \GET{\Atm}{\Atm} \MID \ALLOCATE{\Int}{\Type} \\
+      &\MID& \LEN{\Atm} \\
+\Stmt &::=& \COLLECT{\Int} 
+     \MID \ASSIGN{\PUT{\Atm}{\Atm}}{\Atm} 
 \end{array}
 }
 
