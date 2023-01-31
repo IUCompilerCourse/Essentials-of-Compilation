@@ -113,6 +113,7 @@ week late with a penalty of 10%.
 **Schedule**
 
 	Day     | Lecture Topic                                        | Assignment Due
+	--------|------------------------------------------------------|--------------------------
 	Aug. 22 | Introduction                                         |
 	Aug. 25 | Compiling from LVar to x86                           | 
 	Aug. 30 | Uniquify, Remove Complex Operands, Explicate Control | 
@@ -134,7 +135,7 @@ week late with a penalty of 10%.
 	Oct. 13 | Arrays, Structs, Generational GC                     |
 	Oct. 17 |                                                      | Loops
 	Oct. 18 | Review for Midterm                                   |
-	Oct. 20 | **Midterm Exam**, Practice Exams and Solutions       |
+	Oct. 20 | **Midterm Exam**                                     |
 	Oct. 25 | Compiling Functions to x86                           |
 	Oct. 27 | Compiling Functions, cont'd                          |
 	Oct. 31 |                                                      | Tuples and GC
