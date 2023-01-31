@@ -1,4 +1,4 @@
-## Syllabus Example for Compiler Course
+## Syllabus Example for a Compiler Course based on Essentials of Compilation (Racket)
 
 High-level programming languages like Racket make it easier to program
 compared to low-level languages such as x86 assembly code. But how do
@@ -37,8 +37,8 @@ github:
 
 **Office hours**
 
-* Instruction 1: Times and location.
-* Instruction 2: Times and location.
+* Instructor 1: Times and location.
+* Instructor 2: Times and location.
 
 **Topics:**
 
@@ -112,45 +112,45 @@ week late with a penalty of 10%.
 
 **Schedule**
 
-Day     | Lecture Topic                                       | Assignment Due
-Aug. 22 | Introduction |                               
-Aug. 25 | Compiling from LVar to x86 | 
-Aug. 30 | Uniquify, Remove Complex Operands, Explicate Control | 
-Sep. 1  | Select Instructions through Prelude & Conclusion |  
-Sep. 5  |      | Integers and Variables
-Sep. 6 | Register Allocation: liveness, interference |  
-Sep. 8 | Code Review: Integers and Variables   |
-Sep. 13 | Register Allocation: graph coloring  |  
-Sep. 15 | L_If language, type checking, and x86_If  |    
-Sep. 19 |                  |  Register Allocation
-Sep. 20 | Conditionals and Explicate Control |
-Sep. 22 | Code Review: Register Allocation |
-Sep. 27 | Conditionals: Select Instr., Reg. Alloc., Opt. Jumps |
-Sep. 29 | Loops and Dataflow Analysis |
-Oct. 3  |                       | Booleans and Conditionals
-Oct. 4 | Loops: RCO, Explicate, Challenge | 
-Oct. 6 | Tuples and Garbage Collection
-Oct. 11 | Tuples and GC, cont'd
-Oct. 13 | Arrays, Structs, Generational GC
-Oct. 17 | | Loops
-Oct. 18 | Review for Midterm
-Oct. 20 | **Midterm Exam**, Practice Exams and Solutions
-Oct. 25 | Compiling Functions to x86 |
-Oct. 27 | Compiling Functions, cont'd |
-Oct. 31 |  | Tuples and GC
-Nov. 1 | Lexically Scoped Functions
-Nov. 3 | Lexically Scoped Functions, cont'd |
-Nov. 8 | Optimize Closures | 
-Nov. 10 | Dynamic Typing
-Nov. 14 | | Functions
-Nov. 15 | Code Review |
-Nov. 17 | Gradual Typing
-Nov. 18 |            | Due: Proposal for Final Project 
-Dec. 1  | Generics
-Dec. 6  | No Class
-Dec. 8  | Review for Final Exam
-Dec. 9  | | Due: Final Project
-Dec. 13 | **Final Exam**
+	Day     | Lecture Topic                                        | Assignment Due
+	Aug. 22 | Introduction                                         |
+	Aug. 25 | Compiling from LVar to x86                           | 
+	Aug. 30 | Uniquify, Remove Complex Operands, Explicate Control | 
+	Sep. 1  | Select Instructions through Prelude & Conclusion     |
+	Sep. 5  |                                                      | Integers and Variables
+	Sep. 6  | Register Allocation: liveness, interference          |
+	Sep. 8  | Code Review: Integers and Variables                  |
+	Sep. 13 | Register Allocation: graph coloring                  |
+	Sep. 15 | L_If language, type checking, and x86_If             |
+	Sep. 19 |                                                      | Register Allocation
+	Sep. 20 | Conditionals and Explicate Control                   |
+	Sep. 22 | Code Review: Register Allocation                     |
+	Sep. 27 | Conditionals: Select Instr., Reg. Alloc., Opt. Jumps |
+	Sep. 29 | Loops and Dataflow Analysis                          |
+	Oct. 3  |                                                      | Booleans and Conditionals
+	Oct. 4  | Loops: RCO, Explicate, Challenge                     | 
+	Oct. 6  | Tuples and Garbage Collection                        |
+	Oct. 11 | Tuples and GC, cont'd                                |
+	Oct. 13 | Arrays, Structs, Generational GC                     |
+	Oct. 17 |                                                      | Loops
+	Oct. 18 | Review for Midterm                                   |
+	Oct. 20 | **Midterm Exam**, Practice Exams and Solutions       |
+	Oct. 25 | Compiling Functions to x86                           |
+	Oct. 27 | Compiling Functions, cont'd                          |
+	Oct. 31 |                                                      | Tuples and GC
+	Nov. 1  | Lexically Scoped Functions                           |
+	Nov. 3  | Lexically Scoped Functions, cont'd                   |
+	Nov. 8  | Optimize Closures                                    | 
+	Nov. 10 | Dynamic Typing                                       |
+	Nov. 14 |                                                      | Functions
+	Nov. 15 | Code Review                                          |
+	Nov. 17 | Gradual Typing                                       |
+	Nov. 18 |                                                      | Proposal for Final Project 
+	Dec. 1  | Generics                                             |
+	Dec. 6  | No Class                                             |
+	Dec. 8  | Review for Final Exam                                |
+	Dec. 9  |                                                      | Final Project
+	Dec. 13 | **Final Exam**                                       |
 
 **Resources:**
 
