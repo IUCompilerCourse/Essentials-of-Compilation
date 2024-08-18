@@ -21,15 +21,17 @@ implementation of the compiler and the full test suite.
 * [Instructor Solution (Racket Version)](https://github.com/IUCompilerCourse/course-compiler)
 * [Instructor Solution (Python Version)](https://github.com/IUCompilerCourse/python-compiler)
 
-**Universities Using this Book**
+**Universities that have used this book**
 
 * California Institute of Technology
 * California Polytechnic State University, San Luis Obispo
 * IIIT Hyderabad
 * Portland State University
+* Rose Hulman Institute of Technology
 * University of Basel
 * University of Colorado Boulder (older version of the book)
 * University of Freiburg
+* University of Massachusetts Lowell
 * University of Vermont
 
 
