@@ -33,6 +33,7 @@ implementation of the compiler and the full test suite.
 * University of Freiburg
 * University of Massachusetts Lowell
 * University of Vermont
+* Wisconsin Lutheran College
 
 
 Instructors, please let me know if you plan to use this book in your course!
