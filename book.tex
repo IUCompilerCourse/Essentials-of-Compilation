@@ -2489,6 +2489,7 @@ each of which is an integer constant (called an \emph{immediate
               \MID \key{r14} \MID \key{r15}}
 
 \newcommand{\GrammarXInt}{
+\if\edition\racketEd
 \begin{array}{rcl}
 \Reg &::=& \allregisters{} \\
 \Arg &::=&  \key{\$}\Int \MID \key{\%}\Reg \MID \Int\key{(}\key{\%}\Reg\key{)}\\
@@ -2501,6 +2502,19 @@ each of which is an integer constant (called an \emph{immediate
       \key{jmp}\,\itm{label} \MID \\
   && \itm{label}\key{:}\; \Instr 
 \end{array}
+\fi
+\if\edition\pythonEd\pythonColor
+% no jmp and label in the python version
+\begin{array}{rcl}
+\Reg &::=& \allregisters{} \\
+\Arg &::=&  \key{\$}\Int \MID \key{\%}\Reg \MID \Int\key{(}\key{\%}\Reg\key{)}\\
+\Instr &::=& \key{addq} \; \Arg\key{,} \Arg \MID
+      \key{subq} \; \Arg\key{,} \Arg \MID
+      \key{negq} \; \Arg \MID \key{movq} \; \Arg\key{,} \Arg \MID \\
+  &&  \key{pushq}\;\Arg \MID \key{popq}\;\Arg \MID 
+      \key{callq} \; \mathit{label} \MID \key{retq} 
+\end{array}
+\fi
 }
 
 \begin{figure}[tp]
@@ -2822,8 +2836,7 @@ register allocation (chapter~\ref{ch:register-allocation-Lvar}).
        &\MID& \PUSHQ{\Arg}
        \MID \POPQ{\Arg} \\
       &\MID& \CALLQ{\itm{label}}{\itm{int}}
-       \MID \RETQ{}
-       \MID \JMP{\itm{label}}  \\
+       \MID \RETQ{}  \\
 \Block &::= & \Instr^{+} 
 \end{array}
 }
@@ -2844,17 +2857,11 @@ register allocation (chapter~\ref{ch:register-allocation-Lvar}).
 \fi}
 {\if\edition\pythonEd\pythonColor
 \[
+\begin{array}{l}
+ \ASTXIntPython \\
 \begin{array}{lcl}
-\Reg &::=& \allastregisters{} \\
-\Arg &::=&  \IMM{\Int} \MID \REG{\Reg}
-   \MID \DEREF{\Reg}{\Int} \\
-\Instr &::=& \BININSTR{\scode{addq}}{\Arg}{\Arg} 
-       \MID \BININSTR{\scode{subq}}{\Arg}{\Arg} \\
-       &\MID& \BININSTR{\scode{movq}}{\Arg}{\Arg}
-       \MID \UNIINSTR{\scode{negq}}{\Arg}\\
-       &\MID&  \PUSHQ{\Arg} \MID \POPQ{\Arg} \\
-       &\MID& \CALLQ{\itm{label}}{\itm{int}} \MID \RETQ{}  \MID \JMP{\itm{label}} \\
-\LangXIntM{} &::= & \XPROGRAM{}{\Instr^{*}}{}
+\LangXIntM{} &::= & \XPROGRAM{}{\Block}{}
+\end{array}
 \end{array}
 \]
 \fi}
@@ -8661,6 +8668,7 @@ $\Atm$ to x86:
 \]
 
 \newcommand{\GrammarXIf}{
+\if\edition\racketEd
 \begin{array}{lcl}
   \itm{bytereg} &::=& \key{ah} \MID \key{al} \MID \key{bh} \MID \key{bl}
     \MID \key{ch} \MID \key{cl} \MID \key{dh} \MID \key{dl} \\
@@ -8672,6 +8680,21 @@ $\Atm$ to x86:
     \MID \key{movzbq}~\Arg\key{,}~\Arg \\
     &\MID& \key{j}cc~\itm{label} \\
 \end{array}
+\fi
+\if\edition\pythonEd\pythonColor
+\begin{array}{lcl}
+  \itm{bytereg} &::=& \key{ah} \MID \key{al} \MID \key{bh} \MID \key{bl}
+    \MID \key{ch} \MID \key{cl} \MID \key{dh} \MID \key{dl} \\
+\Arg &::=& \key{\%}\itm{bytereg}\\
+\itm{cc} & ::= & \key{e} \MID \key{ne} \MID \key{l} \MID \key{le} \MID \key{g} \MID \key{ge} \\
+\Instr &::=& \key{xorq}~\Arg\key{,}~\Arg
+   \MID \key{cmpq}~\Arg\key{,}~\Arg
+    \MID  \key{set}cc~\Arg 
+    \MID \key{movzbq}~\Arg\key{,}~\Arg \\
+    &\MID& \key{jmp}\,\itm{label} \MID \key{j}cc~\itm{label} 
+           \MID \itm{label}\key{:}\; \Instr 
+\end{array}
+\fi
 }
 
 
@@ -8714,12 +8737,11 @@ $\Atm$ to x86:
 \Arg &::=&  \gray{\IMM{\Int} \MID \REG{\Reg} \MID \DEREF{\Reg}{\Int}} 
      \MID \BYTEREG{\itm{bytereg}} \\
 \itm{cc} & ::= & \skey{e} \MID \skey{ne} \MID \skey{l} \MID \skey{le} \MID \skey{g} \MID \skey{ge} \\
-\Instr &::=& \python{\JMP{\itm{label}}}\\
-       &\MID& \BININSTR{\scode{xorq}}{\Arg}{\Arg}
+\Instr &::=& \BININSTR{\scode{xorq}}{\Arg}{\Arg}
        \MID \BININSTR{\scode{cmpq}}{\Arg}{\Arg}\\
        &\MID& \UNIINSTR{\scode{set}\code{+}\itm{cc}}{\Arg} 
        \MID \BININSTR{\scode{movzbq}}{\Arg}{\Arg}\\
-       &\MID&  \JMPIF{\itm{cc}}{\itm{label}} 
+       &\MID&  \python{\JMP{\itm{label}}} \MID \JMPIF{\itm{cc}}{\itm{label}} 
 \end{array}
 }
 
