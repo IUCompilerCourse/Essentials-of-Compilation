@@ -23,17 +23,17 @@ implementation of the compiler and the full test suite.
 
 **Universities that have used this book**
 
-* California Institute of Technology
-* California Polytechnic State University, San Luis Obispo
-* IIIT Hyderabad
-* Portland State University
-* Rose Hulman Institute of Technology
-* University of Basel
-* University of Colorado Boulder (older version of the book)
-* University of Freiburg
-* University of Massachusetts Lowell
-* University of Vermont
-* Wisconsin Lutheran College
+1. California Institute of Technology
+2. California Polytechnic State University, San Luis Obispo
+3. IIIT Hyderabad
+4. Portland State University
+5. Rose Hulman Institute of Technology
+6. University of Basel
+7. University of Colorado Boulder (older version of the book)
+8. University of Freiburg
+9. University of Massachusetts Lowell
+10. University of Vermont
+11. Wisconsin Lutheran College
 
 
 Instructors, please let me know if you plan to use this book in your course!
