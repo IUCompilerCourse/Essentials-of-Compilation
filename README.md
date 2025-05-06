@@ -34,6 +34,7 @@ implementation of the compiler and the full test suite.
 9. University of Massachusetts Lowell
 10. University of Vermont
 11. Wisconsin Lutheran College
+12. University of Tuebingen
 
 
 Instructors, please let me know if you plan to use this book in your course!
