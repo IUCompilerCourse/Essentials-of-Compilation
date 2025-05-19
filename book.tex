@@ -13002,7 +13002,7 @@ tuple creation by removing the need to assign the initializing
 expressions to temporary variables (see below).
 
 The output of \code{expose\_allocation} is a language \LangAlloc{}
-that replaces tuple creation with new lower-level forms that we use in the
+that replaces tuple creation with new forms that we use in the
 translation of tuple creation\index{subject}{Lalloc@\LangAlloc{}}.
 %
 {\if\edition\racketEd
@@ -13016,22 +13016,27 @@ translation of tuple creation\index{subject}{Lalloc@\LangAlloc{}}.
 \fi}
 {\if\edition\pythonEd\pythonColor
 \[
-\begin{array}{lcl}
-  \Exp &::=& \key{collect}(\itm{int})
-      \MID \key{allocate}(\itm{int},\itm{type})
-      \MID \key{global\_value}(\itm{name}) \\
-   \Stmt &::= & \CASSIGN{\CPUT{\Exp}{\itm{int}}}{\Exp}
+%% \begin{array}{lcl}
+%%   \Exp &::=& \key{collect}(\itm{int})
+%%       \MID \key{allocate}(\itm{int},\itm{type})
+%%       \MID \key{global\_value}(\itm{name}) \\
+%%    \Stmt &::= & \CASSIGN{\CPUT{\Exp}{\itm{int}}}{\Exp}
+%% \end{array}
+\begin{array}{rcl}
+\Exp &::=& \COLLECT{\Int} \MID \ALLOCATE{\Int}{\Type} \\
+     &\MID& \GLOBALVALUE{\Var} \MID \BEGIN{\Stmt^{*}}{\Exp}\\
+\Stmt{} &::=& \ASSIGN{\PUT{\Exp}{\itm{int}}}{\Exp} 
 \end{array}
 \]
 \fi}
 %
-The \CCOLLECT{$n$} form runs the garbage collector, requesting that
+The \COLLECT{$n$} form runs the garbage collector, requesting that
 there be $n$ bytes ready to be allocated. During instruction
-selection\index{subject}{instruction selection}, the \CCOLLECT{$n$}
+selection\index{subject}{instruction selection}, the \COLLECT{$n$}
 form will become a call to the \code{collect} function in
 \code{runtime.c}.
 %
-The \CALLOCATE{$n$}{$\itm{type}$} form obtains memory for $n$ elements (and
+The \ALLOCATE{$n$}{$\itm{type}$} form obtains memory for $n$ elements (and
 space at the front for the 64-bit tag), but the elements are not
 initialized.  \index{subject}{allocate} The $\itm{type}$ parameter is the type
 of the tuple:
@@ -13040,11 +13045,14 @@ of the tuple:
 %
 where $\Type_i$ is the type of the $i$th element.
 %
-The \CGLOBALVALUE{\itm{name}} form reads the value of a global
+The \GLOBALVALUE{\itm{name}} form reads the value of a global
 variable, such as \code{free\_ptr}.
+%
+\python{We have already seen the \BEGIN{\itm{stmt}$^{*}$}{\itm{exp}} form
+    in section~\ref{sec:remove-complex-opera-Lif}.}
 
 \racket{
-  The type information that you need for \CALLOCATE{$n$}{$\itm{type}$}
+  The type information that you need for \ALLOCATE{$n$}{$\itm{type}$}
   can be obtained by running the
   \code{type-check-Lvec-has-type} type checker immediately before the
   \code{expose\_allocation} pass. This version of the type checker
