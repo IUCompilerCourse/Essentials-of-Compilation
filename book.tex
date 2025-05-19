@@ -23,7 +23,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{0}
+\def\edition{1}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd{#1}\fi}}
@@ -13144,23 +13144,40 @@ Figure~\ref{fig:expose-alloc-output} shows the output of the
 {\if\edition\pythonEd\pythonColor
 \begin{lstlisting}
     v1 = begin:
-            init.514 = 42
+            init.1 = 42
             if (free_ptr + 16) < fromspace_end:
             else:
               collect(16)
-            alloc.513 = allocate(1,tuple[int])
-            alloc.513[0] = init.514
-            alloc.513
+            alloc.0 = allocate(1,tuple[int])
+            alloc.0[0] = init.1
+            alloc.0
     v2 = begin:
-            init.516 = v1
+            init.3 = v1
             if (free_ptr + 16) < fromspace_end:
             else:
               collect(16)
-            alloc.515 = allocate(1,tuple[tuple[int]])
-            alloc.515[0] = init.516
-            alloc.515
+            alloc.2 = allocate(1,tuple[tuple[int]])
+            alloc.2[0] = init.3
+            alloc.2
     print(v2[0][0])
 \end{lstlisting}
+    %% v1 = begin:
+    %%         init.514 = 42
+    %%         if (free_ptr + 16) < fromspace_end:
+    %%         else:
+    %%           collect(16)
+    %%         alloc.513 = allocate(1,tuple[int])
+    %%         alloc.513[0] = init.514
+    %%         alloc.513
+    %% v2 = begin:
+    %%         init.516 = v1
+    %%         if (free_ptr + 16) < fromspace_end:
+    %%         else:
+    %%           collect(16)
+    %%         alloc.515 = allocate(1,tuple[tuple[int]])
+    %%         alloc.515[0] = init.516
+    %%         alloc.515
+    %% print(v2[0][0])
 \fi}
   \end{tcolorbox}
 \caption{Output of the \code{expose\_allocation} pass.}
@@ -13732,119 +13749,207 @@ block6:
 \begin{minipage}{0.5\textwidth}
 \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
 start:
-    init.514 = 42
-    tmp.517 = free_ptr
-    tmp.518 = (tmp.517 + 16)
-    tmp.519 = fromspace_end
-    if tmp.518 < tmp.519:
-      goto block.529
+    init.1 = 42
+    tmp.4 = (free_ptr + 16)
+    if tmp.4 < fromspace_end:
+      goto block.10
     else:
-      goto block.530
+      goto block.11
 
-block.529:
-    goto block.528
-
-block.530:
-    collect(16)
-    goto block.528
-
-block.528:
-    alloc.513 = allocate(1,tuple[int])
-    alloc.513:tuple[int][0] = init.514
-    v1 = alloc.513
-    init.516 = v1
-    tmp.520 = free_ptr
-    tmp.521 = (tmp.520 + 16)
-    tmp.522 = fromspace_end
-    if tmp.521 < tmp.522:
-      goto block.526
+block.10:
+    alloc.0 = allocate(1,tuple[int])
+    alloc.0:tuple[int][0] = init.1
+    v1 = alloc.0
+    init.3 = v1
+    tmp.5 = (free_ptr + 16)
+    if tmp.5 < fromspace_end:
+      goto block.8
     else:
-      goto block.527
-    
-block.526:
-    goto block.525
+      goto block.9
 
-block.527:
-    collect(16)
-    goto block.525
-    
-block.525:
-    alloc.515 = allocate(1,tuple[tuple[int]])
-    alloc.515:tuple[tuple[int]][0] = init.516
-    v2 = alloc.515
-    tmp.523 = v2[0]
-    tmp.524 = tmp.523[0]
-    print(tmp.524)
+block.8:
+    alloc.2 = allocate(1,tuple[tuple[int]])
+    alloc.2:tuple[tuple[int]][0] = init.3
+    v2 = alloc.2
+    tmp.6 = v2[0]
+    tmp.7 = tmp.6[0]
+    print(tmp.7)
     return 0
+
+block.9:
+    collect(16)
+    goto block.8
+
+block.11:
+    collect(16)
+    goto block.10
 \end{lstlisting}
+%% start:
+%%     init.514 = 42
+%%     tmp.517 = free_ptr
+%%     tmp.518 = (tmp.517 + 16)
+%%     tmp.519 = fromspace_end
+%%     if tmp.518 < tmp.519:
+%%       goto block.529
+%%     else:
+%%       goto block.530
+
+%% block.529:
+%%     goto block.528
+
+%% block.530:
+%%     collect(16)
+%%     goto block.528
+
+%% block.528:
+%%     alloc.513 = allocate(1,tuple[int])
+%%     alloc.513:tuple[int][0] = init.514
+%%     v1 = alloc.513
+%%     init.516 = v1
+%%     tmp.520 = free_ptr
+%%     tmp.521 = (tmp.520 + 16)
+%%     tmp.522 = fromspace_end
+%%     if tmp.521 < tmp.522:
+%%       goto block.526
+%%     else:
+%%       goto block.527
+    
+%% block.526:
+%%     goto block.525
+
+%% block.527:
+%%     collect(16)
+%%     goto block.525
+    
+%% block.525:
+%%     alloc.515 = allocate(1,tuple[tuple[int]])
+%%     alloc.515:tuple[tuple[int]][0] = init.516
+%%     v2 = alloc.515
+%%     tmp.523 = v2[0]
+%%     tmp.524 = tmp.523[0]
+%%     print(tmp.524)
+%%     return 0
 \end{minipage}
 &$\Rightarrow$&
 \begin{minipage}{0.4\textwidth}
-\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+  \begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
 start:
-    movq $42, init.514
-    movq free_ptr(%rip), tmp.517
-    movq tmp.517, tmp.518
-    addq $16, tmp.518
-    movq fromspace_end(%rip), tmp.519
-    cmpq tmp.519, tmp.518
-    jl block.529
-    jmp block.530
+    movq $42, init.1
+    movq free_ptr(%rip), tmp.4
+    addq $16, tmp.4
+    cmpq fromspace_end(%rip), tmp.4
+    jl block.10
+    jmp block.11
 
-block.529:
-    jmp block.528
-
-block.530:
-    movq %r15, %rdi
-    movq $16, %rsi
-    callq collect
-    jmp block.528
-
-block.528:
+block.10:
     movq free_ptr(%rip), %r11
     addq $16, free_ptr(%rip)
     movq $3, 0(%r11)
-    movq %r11, alloc.513
-    movq alloc.513, %r11
-    movq init.514, 8(%r11)
-    movq alloc.513, v1
-    movq v1, init.516
-    movq free_ptr(%rip), tmp.520
-    movq tmp.520, tmp.521
-    addq $16, tmp.521
-    movq fromspace_end(%rip), tmp.522
-    cmpq tmp.522, tmp.521
-    jl block.526
-    jmp block.527
+    movq %r11, alloc.0
+    movq alloc.0, %r11
+    movq init.1, 8(%r11)
+    movq alloc.0, v1
+    movq v1, init.3
+    movq free_ptr(%rip), tmp.5
+    addq $16, tmp.5
+    cmpq fromspace_end(%rip), tmp.5
+    jl block.8
+    jmp block.9
 
-block.526:
-    jmp block.525
-
-block.527:
-    movq %r15, %rdi
-    movq $16, %rsi
-    callq collect
-    jmp block.525
-
-block.525:
+block.8:
     movq free_ptr(%rip), %r11
     addq $16, free_ptr(%rip)
     movq $131, 0(%r11)
-    movq %r11, alloc.515
-    movq alloc.515, %r11
-    movq init.516, 8(%r11)
-    movq alloc.515, v2
+    movq %r11, alloc.2
+    movq alloc.2, %r11
+    movq init.3, 8(%r11)
+    movq alloc.2, v2
     movq v2, %r11
-    movq 8(%r11), %r11
-    movq %r11, tmp.523
-    movq tmp.523, %r11
-    movq 8(%r11), %r11
-    movq %r11, tmp.524
-    movq tmp.524, %rdi
+    movq 8(%r11), tmp.6
+    movq tmp.6, %r11
+    movq 8(%r11), tmp.7
+    movq tmp.7, %rdi
     callq print_int
     movq $0, %rax
     jmp conclusion
+
+block.9:
+    movq %r15, %rdi
+    movq $16, %rsi
+    callq collect
+    jmp block.8
+
+block.11:
+    movq %r15, %rdi
+    movq $16, %rsi
+    callq collect
+    jmp block.10
 \end{lstlisting}
+
+%% start:
+%%     movq $42, init.514
+%%     movq free_ptr(%rip), tmp.517
+%%     movq tmp.517, tmp.518
+%%     addq $16, tmp.518
+%%     movq fromspace_end(%rip), tmp.519
+%%     cmpq tmp.519, tmp.518
+%%     jl block.529
+%%     jmp block.530
+
+%% block.529:
+%%     jmp block.528
+
+%% block.530:
+%%     movq %r15, %rdi
+%%     movq $16, %rsi
+%%     callq collect
+%%     jmp block.528
+
+%% block.528:
+%%     movq free_ptr(%rip), %r11
+%%     addq $16, free_ptr(%rip)
+%%     movq $3, 0(%r11)
+%%     movq %r11, alloc.513
+%%     movq alloc.513, %r11
+%%     movq init.514, 8(%r11)
+%%     movq alloc.513, v1
+%%     movq v1, init.516
+%%     movq free_ptr(%rip), tmp.520
+%%     movq tmp.520, tmp.521
+%%     addq $16, tmp.521
+%%     movq fromspace_end(%rip), tmp.522
+%%     cmpq tmp.522, tmp.521
+%%     jl block.526
+%%     jmp block.527
+
+%% block.526:
+%%     jmp block.525
+
+%% block.527:
+%%     movq %r15, %rdi
+%%     movq $16, %rsi
+%%     callq collect
+%%     jmp block.525
+
+%% block.525:
+%%     movq free_ptr(%rip), %r11
+%%     addq $16, free_ptr(%rip)
+%%     movq $131, 0(%r11)
+%%     movq %r11, alloc.515
+%%     movq alloc.515, %r11
+%%     movq init.516, 8(%r11)
+%%     movq alloc.515, v2
+%%     movq v2, %r11
+%%     movq 8(%r11), %r11
+%%     movq %r11, tmp.523
+%%     movq tmp.523, %r11
+%%     movq 8(%r11), %r11
+%%     movq %r11, tmp.524
+%%     movq tmp.524, %rdi
+%%     callq print_int
+%%     movq $0, %rax
+%%     jmp conclusion
+  
 \end{minipage}
 \end{tabular}
 \fi}
