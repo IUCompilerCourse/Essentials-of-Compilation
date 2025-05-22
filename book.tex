@@ -23,7 +23,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{0}
+\def\edition{1}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd{#1}\fi}}
@@ -13997,6 +13997,257 @@ after graph coloring, in choosing how to assign the colors
 \racket{\code{Program}}\python{\code{CProgram}} output of this pass
 changes to also record the number of spills to the root stack.
 
+\begin{figure}[tbp]
+\centering
+\begin{tcolorbox}[colback=white]
+{\if\edition\racketEd    
+% tests/vectors_test_17.rkt
+\begin{tabular}{lll}
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+start:
+    movq free_ptr(%rip), %rcx
+    movq %rcx, %rdx
+    addq $16, %rdx
+    movq fromspace_end(%rip), %rcx
+    cmpq %rcx, %rdx
+    jl block0
+    jmp block1
+    
+block0:
+    movq $0, %rcx
+    jmp block9
+    
+block1:
+    movq %r15, %rdi
+    movq $16, %rsi
+    callq collect
+    jmp block9
+    
+block9:
+    movq free_ptr(%rip), %r11
+    addq $16, free_ptr(%rip)
+    movq $3, 0(%r11)
+    movq %r11, %rcx
+    movq %rcx, %r11
+    movq $42, 8(%r11)
+    movq $0, %rdx
+    movq %rcx, -8(%r15)
+    movq free_ptr(%rip), %rcx
+    movq %rcx, %rcx
+    addq $16, %rcx
+    movq fromspace_end(%rip), %rdx
+    cmpq %rdx, %rcx
+    jl block7
+    jmp block8
+\end{lstlisting}
+\end{minipage}
+&
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+block7:
+    movq $0, %rcx
+    jmp block6
+    
+block8:
+    movq %r15, %rdi
+    movq $16, %rsi
+    callq collect
+    jmp block6
+    
+block6:
+    movq free_ptr(%rip), %r11
+    addq $16, free_ptr(%rip)
+    movq $131, 0(%r11)
+    movq %r11, %rcx
+    movq %rcx, %r11
+    movq -8(%r15), 8(%r11)
+    movq $0, %rdx
+    movq %rcx, %r11
+    movq 8(%r11), %rcx
+    movq %rcx, %r11
+    movq 8(%r11), %rax
+    jmp conclusion    
+\end{lstlisting}
+\end{minipage}
+\end{tabular}
+
+\fi}
+{\if\edition\pythonEd    
+% tests/tuple/get_get.py
+\begin{tabular}{lll}
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+start:
+    movq $42, %rbx
+    movq free_ptr(%rip), %rcx
+    addq $16, %rcx
+    cmpq fromspace_end(%rip), %rcx
+    jl block.10
+    jmp block.11
+
+block.10:
+    movq free_ptr(%rip), %r11
+    addq $16, free_ptr(%rip)
+    movq $3, 0(%r11)
+    movq %r11, %rcx
+    movq %rcx, %r11
+    movq %rbx, 8(%r11)
+    movq %rcx, %rcx
+    movq %rcx, -8(%r15)
+    movq free_ptr(%rip), %rcx
+    addq $16, %rcx
+    cmpq fromspace_end(%rip), %rcx
+    jl block.8
+    jmp block.9
+
+block.11:
+    movq %r15, %rdi
+    movq $16, %rsi
+    callq collect
+    jmp block.10
+\end{lstlisting}
+\end{minipage}
+&
+\begin{minipage}{0.5\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+block.8:
+    movq free_ptr(%rip), %r11
+    addq $16, free_ptr(%rip)
+    movq $131, 0(%r11)
+    movq %r11, %rcx
+    movq %rcx, %r11
+    movq -8(%r15), 8(%r11)
+    movq %rcx, %rcx
+    movq %rcx, %r11
+    movq 8(%r11), %rcx
+    movq %rcx, %r11
+    movq 8(%r11), %rcx
+    movq %rcx, %rdi
+    callq print_int
+    movq $0, %rax
+    jmp conclusion
+
+block.9:
+    movq %r15, %rdi
+    movq $16, %rsi
+    callq collect
+    jmp block.8
+\end{lstlisting}
+\end{minipage}
+\end{tabular}
+\fi}
+\end{tcolorbox}
+
+\caption{Output of register allocation for the running example.}
+\label{fig:reg-alloc-output}
+\end{figure}
+
+\python{
+Figure~\ref{fig:reg-alloc-output} shows the output of register
+allocation on the running example. The register allocator chose the
+below assignment of variables to locations. Most of the variables were
+assigned to register \key{\%rcx}. Variable \key{init.1} was instead
+assigned to \key{\%rbx} because \key{init.1} conflicts with variables
+\key{tmp.4} and \key{alloc.0} which were assigned to \key{\%rcx}.
+Variable \key{init.3} was spilled to the root stack because its type
+is \key{tuple[int]} and it is live during a call to \key{collect}.
+
+\begin{center}\small
+\begin{tabular}{ll}
+  \begin{minipage}{0.45\textwidth}
+    \[
+\begin{array}{l}
+  \key{alloc.0} \mapsto \key{\%rcx} \\
+  \key{alloc.2} \mapsto \key{\%rcx} \\
+  \key{init.1} \mapsto \key{\%rbx} \\
+  \key{init.3} \mapsto \key{-8(\%r15)} 
+\end{array}
+\]
+  \end{minipage}
+  &
+  \begin{minipage}{0.45\textwidth}
+    \[
+\begin{array}{l}
+  \key{tmp.4} \mapsto \key{\%rcx} \\
+  \key{tmp.5} \mapsto \key{\%rcx} \\
+  \key{tmp.6} \mapsto \key{\%rcx} \\
+  \key{tmp.7} \mapsto \key{\%rcx} \\
+  \key{v1} \mapsto \key{\%rcx} \\
+  \key{v2} \mapsto \key{\%rcx}
+\end{array}
+\]
+\end{minipage}
+\end{tabular}
+\end{center}
+}
+
+%% home:
+%% {Variable(id='tmp.6'): Reg(id='rcx'), Variable(id='tmp.4'): Reg(id='rcx'), Variable(id='init.1'): Reg(id='rbx'), Variable(id='tmp.7'): Reg(id='rcx'), Variable(id='tmp.5'): Reg(id='rcx'), Variable(id='alloc.2'): Reg(id='rcx'), Variable(id='v2'): Reg(id='rcx'), Variable(id='v1'): Reg(id='rcx'), Variable(id='init.3'): Deref(reg='r15', offset=-8), Variable(id='alloc.0'): Reg(id='rcx')}
+
+
+\racket{
+Figure~\ref{fig:reg-alloc-output} shows the output of register
+allocation on the running example. The register allocator chose the
+below assignment of variables to locations. Many of the variables were
+assigned to register \key{\%rcx}. Variables \key{\_3}, \key{\_7}, \key{tmp0},
+and \key{tmp4} were instead
+assigned to \key{\%rdx} because they conflict with variables
+that were assigned to \key{\%rcx}.
+Variable \key{vecinit6} was spilled to the root stack because its
+type is \key{(Vector Integer)} and it is live during a call to \key{collect}.
+
+\begin{center}\small
+\begin{tabular}{ll}
+  \begin{minipage}{0.45\textwidth}
+    \[
+\begin{array}{l}
+  \key{alloc2} \mapsto \key{\%rcx} \\
+  \key{alloc5} \mapsto \key{\%rcx} \\
+  \key{\_3} \mapsto \key{\%rdx} \\
+  \key{\_4} \mapsto \key{\%rcx} \\
+  \key{\_7} \mapsto \key{\%rdx} \\
+  \key{\_8} \mapsto \key{\%rcx} \\
+  \key{vecinit6} \mapsto \key{-8(\%r15)} 
+\end{array}
+\]
+  \end{minipage}
+  &
+  \begin{minipage}{0.45\textwidth}
+    \[
+\begin{array}{l}
+  \key{tmp0} \mapsto \key{\%rdx} \\
+  \key{tmp1} \mapsto \key{\%rcx} \\
+  \key{tmp2} \mapsto \key{\%rcx} \\
+  \key{tmp3} \mapsto \key{\%rcx} \\
+  \key{tmp4} \mapsto \key{\%rdx} \\
+  \key{tmp5} \mapsto \key{\%rcx} \\
+  \key{tmp9} \mapsto \key{\%rcx}
+\end{array}
+\]
+\end{minipage}
+\end{tabular}
+\end{center}
+}
+
+%% homes:
+%%  alloc2 %rcx
+%%  alloc5 %rcx
+%%  _3 %rdx
+%%  _4 %rcx
+%%  _7 %rdx
+%%  _8 %rcx
+%%  vecinit6 -8(%r15)
+
+%%  tmp0 %rdx
+%%  tmp1 %rcx
+%%  tmp2 %rcx
+%%  tmp3 %rcx
+%%  tmp4 %rdx
+%%  tmp5 %rcx
+%%  tmp9 %rcx
+
+
 % build-interference
 %
 % callq
@@ -14044,7 +14295,8 @@ if it is null prior to dereferencing it.
 \begin{figure}[htbp]
   \begin{tcolorbox}[colback=white]
 {\if\edition\racketEd    
-\begin{minipage}[t]{0.5\textwidth}
+\begin{tabular}{ll}
+\begin{minipage}[t]{0.45\textwidth}
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 	.globl main
 main:
@@ -14058,7 +14310,11 @@ main:
     movq $0, 0(%r15)
     addq $8, %r15
     jmp start
-    
+\end{lstlisting}
+\end{minipage}
+&
+\begin{minipage}[t]{0.45\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 conclusion:
     subq $8, %r15
     addq $0, %rsp
@@ -14066,7 +14322,8 @@ conclusion:
     retq
 \end{lstlisting}
 \end{minipage}
-    \fi}
+\end{tabular}
+\fi}
 {\if\edition\pythonEd    
 \begin{minipage}[t]{0.5\textwidth}
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
