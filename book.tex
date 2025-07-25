@@ -23,7 +23,7 @@
 
 \def\racketEd{0}
 \def\pythonEd{1}
-\def\edition{1}
+\def\edition{0}
 
 % material that is specific to the Racket edition of the book
 \newcommand{\racket}[1]{{\if\edition\racketEd{#1}\fi}}
@@ -2472,11 +2472,12 @@ each of which is an integer constant (called an \emph{immediate
 \newcommand{\GrammarXIntRacket}{
 \begin{array}{rcl}
 \Reg &::=& \allregisters{} \\
-\Arg &::=&  \key{\$}\Int \MID \key{\%}\Reg \MID \Int\key{(}\key{\%}\Reg\key{)}\\
-\Instr &::=& \key{addq} \; \Arg\key{,} \Arg \MID
-      \key{subq} \; \Arg\key{,} \Arg \MID
-      \key{negq} \; \Arg \MID \key{movq} \; \Arg\key{,} \Arg \MID \\
-  &&  \key{pushq}\;\Arg \MID \key{popq}\;\Arg \MID 
+\Dst &::=&  \key{\%}\Reg \MID \Int\key{(}\key{\%}\Reg\key{)}\\
+\Src &::=&  \key{\$}\Int \MID \Dst \\
+\Instr &::=& \key{addq} \; \Src\key{,} \Dst \MID
+      \key{subq} \; \Src\key{,} \Dst \MID
+      \key{negq} \; \Dst \MID \key{movq} \; \Src\key{,} \Dst \MID \\
+  &&  \key{pushq}\;\Dst \MID \key{popq}\;\Dst \MID 
       \key{callq} \; \mathit{label} \MID
       \key{retq} \MID
       \key{jmp}\,\itm{label} \MID \\
@@ -2488,11 +2489,12 @@ each of which is an integer constant (called an \emph{immediate
 % no jmp and label in the python version
 \begin{array}{rcl}
 \Reg &::=& \allregisters{} \\
-\Arg &::=&  \key{\$}\Int \MID \key{\%}\Reg \MID \Int\key{(}\key{\%}\Reg\key{)}\\
-\Instr &::=& \key{addq} \; \Arg\key{,} \Arg \MID
-      \key{subq} \; \Arg\key{,} \Arg \MID
-      \key{negq} \; \Arg \MID \key{movq} \; \Arg\key{,} \Arg \MID \\
-  &&  \key{pushq}\;\Arg \MID \key{popq}\;\Arg \MID 
+\Dst &::=&  \key{\%}\Reg \MID \Int\key{(}\key{\%}\Reg\key{)}\\
+\Src &::=&  \key{\$}\Int \MID \Dst \\
+\Instr &::=& \key{addq} \; \Src\key{,} \Dst \MID
+      \key{subq} \; \Src\key{,} \Dst \MID
+      \key{negq} \; \Dst \MID \key{movq} \; \Src\key{,} \Dst \MID \\
+  &&  \key{pushq}\;\Dst \MID \key{popq}\;\Dst \MID 
       \key{callq} \; \mathit{label} \MID \key{retq} 
 \end{array}
 }
@@ -2512,16 +2514,12 @@ each of which is an integer constant (called an \emph{immediate
 \fi}
 {\if\edition\pythonEd\pythonColor
 \[
+\begin{array}{l}
+  \GrammarXIntPython \\
 \begin{array}{lcl}
-\Reg &::=& \allregisters{} \\
-\Arg &::=&  \key{\$}\Int \MID \key{\%}\Reg \MID \Int\key{(}\key{\%}\Reg\key{)}\\
-\Instr &::=& \key{addq} \; \Arg\key{,} \Arg \MID
-      \key{subq} \; \Arg\key{,} \Arg \MID
-      \key{negq} \; \Arg \MID \key{movq} \; \Arg\key{,} \Arg \MID \\
-  &&  \key{callq} \; \mathit{label} \MID
-      \key{pushq}\;\Arg \MID \key{popq}\;\Arg \MID \key{retq} \\
 \LangXIntM{} &::= & \key{.globl main}\\
       &    & \key{main:} \; \Instr^{*}
+\end{array}
 \end{array}
 \]
 \fi}
@@ -2790,14 +2788,14 @@ register allocation (chapter~\ref{ch:register-allocation-Lvar}).
 \newcommand{\ASTXIntRacket}{
 \begin{array}{lcl}
 \Reg &::=& \allregisters{} \\
-\Arg &::=&  \IMM{\Int} \MID \REG{\Reg}
-   \MID \DEREF{\Reg}{\Int} \\
-\Instr &::=& \BININSTR{\code{addq}}{\Arg}{\Arg} 
-       \MID \BININSTR{\code{subq}}{\Arg}{\Arg}\\
-       &\MID& \UNIINSTR{\code{negq}}{\Arg}
-       \MID \BININSTR{\code{movq}}{\Arg}{\Arg}\\
-       &\MID& \PUSHQ{\Arg}
-       \MID \POPQ{\Arg} \\
+\Dst &::=&  \REG{\Reg} \MID \DEREF{\Reg}{\Int} \\
+\Src &::=&  \IMM{\Int} \MID \Dst \\
+\Instr &::=& \BININSTR{\code{addq}}{\Src}{\Dst} 
+       \MID \BININSTR{\code{subq}}{\Src}{\Dst}\\
+       &\MID& \UNIINSTR{\code{negq}}{\Dst}
+       \MID \BININSTR{\code{movq}}{\Src}{\Dst}\\
+       &\MID& \PUSHQ{\Dst}
+       \MID \POPQ{\Dst} \\
       &\MID& \CALLQ{\itm{label}}{\itm{int}}
        \MID \RETQ{}
        \MID \JMP{\itm{label}}  \\
@@ -2807,14 +2805,14 @@ register allocation (chapter~\ref{ch:register-allocation-Lvar}).
 \newcommand{\ASTXIntPython}{
 \begin{array}{lcl}
 \Reg &::=& \allregisters{} \\
-\Arg &::=&  \IMM{\Int} \MID \REG{\Reg}
-   \MID \DEREF{\Reg}{\Int} \\
-\Instr &::=& \BININSTR{\skey{addq}}{\Arg}{\Arg} 
-       \MID \BININSTR{\skey{subq}}{\Arg}{\Arg}\\
-       &\MID& \UNIINSTR{\skey{negq}}{\Arg}
-       \MID \BININSTR{\skey{movq}}{\Arg}{\Arg}\\
-       &\MID& \PUSHQ{\Arg}
-       \MID \POPQ{\Arg} \\
+\Dst &::=&  \REG{\Reg} \MID \DEREF{\Reg}{\Int} \\
+\Src &::=&  \IMM{\Int} \MID \Dst \\
+\Instr &::=& \BININSTR{\skey{addq}}{\Src}{\Dst} 
+       \MID \BININSTR{\skey{subq}}{\Src}{\Dst}\\
+       &\MID& \UNIINSTR{\skey{negq}}{\Dst}
+       \MID \BININSTR{\skey{movq}}{\Src}{\Dst}\\
+       &\MID& \PUSHQ{\Dst}
+       \MID \POPQ{\Dst} \\
       &\MID& \CALLQ{\itm{label}}{\itm{int}}
        \MID \RETQ{}  \\
 \Block &::= & \Instr^{+} 
@@ -3725,7 +3723,7 @@ In the \code{select\_instructions} pass we begin the work of
 translating \racket{from \LangCVar{}} to \LangXVar{}. The target
 language of this pass, \LangXVar{}, is a variant of x86 that still
 uses variables, so we add an AST node of the form $\XVAR{\itm{var}}$
-to the \Arg{} nonterminal of the \LangXInt{} abstract syntax
+to the \Dst{} nonterminal of the \LangXInt{} abstract syntax
 (figure~\ref{fig:x86-int-ast})\index{subject}{x86var@\LangXVar{}}.
 \racket{We recommend implementing the \code{select\_instructions} with
   three auxiliary functions, one for each of the nonterminals of
@@ -3739,12 +3737,12 @@ to the \Arg{} nonterminal of the \LangXInt{} abstract syntax
 
 Next consider the cases for the $\Stmt$ nonterminal, starting with
 arithmetic operations. For example, consider the following addition
-operation, on the left side.  (Let $\Arg_1$ and $\Arg_2$ be the
+operation, on the left side.  (Let $\Src_1$ and $\Src_2$ be the
 translations of $\Atm_1$ and $\Atm_2$, respectively.)  There is an
 \key{addq} instruction in x86, but it performs an in-place update.
 %
-So, we could move $\Arg_1$ into the \code{rax} register, then add
-$\Arg_2$ to \code{rax}, and then finally move \code{rax} into \itm{var}. 
+So, we could move $\Src_1$ into the \code{rax} register, then add
+$\Src_2$ to \code{rax}, and then finally move \code{rax} into \itm{var}. 
 \begin{transformation}
 {\if\edition\racketEd    
 \begin{lstlisting}
@@ -3758,8 +3756,8 @@ $\Arg_2$ to \code{rax}, and then finally move \code{rax} into \itm{var}.
 \fi}
 \compilesto
 \begin{lstlisting}
-movq |$\Arg_1$|, %rax
-addq |$\Arg_2$|, %rax
+movq |$\Src_1$|, %rax
+addq |$\Src_2$|, %rax
 movq %rax, |$\itm{var}$|
 \end{lstlisting}
 \end{transformation}
@@ -3782,13 +3780,13 @@ Then the assignment statement can be translated into a single
 \fi}    
 \compilesto
 \begin{lstlisting}
-addq |$\Arg_1$|, |$\itm{var}$|
+addq |$\Src_1$|, |$\itm{var}$|
 \end{lstlisting}
 \end{transformation}
 %
 On the other hand, if $\Atm_2$ is not the same variable as the
-left-hand side, then we can move $\Arg_1$ into the left-hand \itm{var}
-and then add $\Arg_2$ to \itm{var}.
+left-hand side, then we can move $\Src_1$ into the left-hand \itm{var}
+and then add $\Src_2$ to \itm{var}.
 %
 \begin{transformation}
 {\if\edition\racketEd    
@@ -3803,8 +3801,8 @@ and then add $\Arg_2$ to \itm{var}.
 \fi}
 \compilesto
 \begin{lstlisting}
-movq |$\Arg_1$|, |$\itm{var}$|
-addq |$\Arg_2$|, |$\itm{var}$|
+movq |$\Src_1$|, |$\itm{var}$|
+addq |$\Src_2$|, |$\itm{var}$|
 \end{lstlisting}
 \end{transformation}
 
@@ -3845,7 +3843,7 @@ Similarly, we translate the \code{print} operation, shown below, into
 a call to the \code{print\_int} function defined in \code{runtime.c}.
 In x86, the first six arguments to functions are passed in registers,
 with the first argument passed in register \code{rdi}. So we move the
-$\Arg$ into \code{rdi} and then call \code{print\_int} using the
+$\Src$ into \code{rdi} and then call \code{print\_int} using the
 \code{callq} instruction.
 \begin{transformation}
 \begin{lstlisting}
@@ -3853,7 +3851,7 @@ print(|$\Atm$|)
 \end{lstlisting}
 \compilesto
 \begin{lstlisting}
-movq |$\Arg$|, %rdi
+movq |$\Src$|, %rdi
 callq print_int  
 \end{lstlisting}
 \end{transformation}
@@ -5730,7 +5728,7 @@ L_{\mathsf{after}}(5)=  \emptyset
   returns the list of live-after sets.}
 %
 We recommend creating auxiliary functions to (1) compute the set
-of locations that appear in an \Arg{}, (2) compute the locations read
+of locations that appear in a \Src{} and \Dst, (2) compute the locations read
 by an instruction (the $R$ function), and (3) the locations written by
 an instruction (the $W$ function). The \code{callq} instruction should
 include all the caller-saved registers in its write set $W$ because
@@ -8458,7 +8456,7 @@ expected.
 %
 The \LangCIf{} language builds on \LangCVar{} by adding logical and
 comparison operators to the \Exp{} nonterminal and the literals
-\TRUE{} and \FALSE{} to the \Arg{} nonterminal.  Regarding control
+\TRUE{} and \FALSE{} to the \Atm{} nonterminal.  Regarding control
 flow, \LangCIf{} adds \key{goto} and \code{if} statements to the
 \Tail{} nonterminal. The condition of an \code{if} statement is a
 comparison operation and the branches are \code{goto} statements,
@@ -8657,13 +8655,13 @@ For example, applying $\mathrm{XOR}$ to each bit of the binary numbers
 $0011$ and $0101$ yields $0110$. Notice that in the row of the table
 for the bit $1$, the result is the opposite of the second bit.  Thus,
 the \code{not} operation can be implemented by \code{xorq} with $1$ as
-the first argument, as follows, where $\Arg$ is the translation of
+the first argument, as follows, where $\Src$ is the translation of
 $\Atm$ to x86:
 \[
 \CASSIGN{\Var}{\CUNIOP{\key{not}}{\Atm}}
 \qquad\Rightarrow\qquad
 \begin{array}{l}
-\key{movq}~ \Arg\key{,} \Var\\
+\key{movq}~ \Src\key{,} \Var\\
 \key{xorq}~ \key{\$1,} \Var
 \end{array}
 \]
@@ -8672,12 +8670,12 @@ $\Atm$ to x86:
 \begin{array}{lcl}
   \itm{bytereg} &::=& \key{ah} \MID \key{al} \MID \key{bh} \MID \key{bl}
     \MID \key{ch} \MID \key{cl} \MID \key{dh} \MID \key{dl} \\
-\Arg &::=& \key{\%}\itm{bytereg}\\
+\Dst &::=& \key{\%}\itm{bytereg}\\
 \itm{cc} & ::= & \key{e} \MID \key{ne} \MID \key{l} \MID \key{le} \MID \key{g} \MID \key{ge} \\
-\Instr &::=& \key{xorq}~\Arg\key{,}~\Arg
-   \MID \key{cmpq}~\Arg\key{,}~\Arg
-    \MID  \key{set}cc~\Arg 
-    \MID \key{movzbq}~\Arg\key{,}~\Arg \\
+\Instr &::=& \key{xorq}~\Src\key{,}~\Dst
+   \MID \key{cmpq}~\Src\key{,}~\Src
+    \MID  \key{set}cc~\Dst 
+    \MID \key{movzbq}~\Src\key{,}~\Dst \\
     &\MID& \key{j}cc~\itm{label} \\
 \end{array}
 }
@@ -8686,12 +8684,12 @@ $\Atm$ to x86:
 \begin{array}{lcl}
   \itm{bytereg} &::=& \key{ah} \MID \key{al} \MID \key{bh} \MID \key{bl}
     \MID \key{ch} \MID \key{cl} \MID \key{dh} \MID \key{dl} \\
-\Arg &::=& \key{\%}\itm{bytereg}\\
+\Dst &::=& \key{\%}\itm{bytereg}\\
 \itm{cc} & ::= & \key{e} \MID \key{ne} \MID \key{l} \MID \key{le} \MID \key{g} \MID \key{ge} \\
-\Instr &::=& \key{xorq}~\Arg\key{,}~\Arg
-   \MID \key{cmpq}~\Arg\key{,}~\Arg
-    \MID  \key{set}cc~\Arg 
-    \MID \key{movzbq}~\Arg\key{,}~\Arg \\
+\Instr &::=& \key{xorq}~\Src\key{,}~\Dst
+   \MID \key{cmpq}~\Src\key{,}~\Src
+    \MID  \key{set}cc~\Dst 
+    \MID \key{movzbq}~\Src\key{,}~\Dst \\
     &\MID& \key{jmp}\,\itm{label} \MID \key{j}cc~\itm{label} 
            \MID \itm{label}\key{:}\; \Instr 
 \end{array}
@@ -8734,12 +8732,12 @@ $\Atm$ to x86:
 \begin{array}{lcl}
 \itm{bytereg} &::=& \key{ah} \MID \key{al} \MID \key{bh} \MID \key{bl}
     \MID \key{ch} \MID \key{cl} \MID \key{dh} \MID \key{dl} \\
-\Arg &::=&  \BYTEREG{\itm{bytereg}} \\
+\Dst &::=&  \BYTEREG{\itm{bytereg}} \\
 \itm{cc} & ::= & \key{e} \MID \key{l} \MID \key{le} \MID \key{g} \MID \key{ge} \\
-\Instr &::=& \BININSTR{\code{xorq}}{\Arg}{\Arg}
-       \MID \BININSTR{\code{cmpq}}{\Arg}{\Arg}\\
-       &\MID& \BININSTR{\code{set}}{\itm{cc}}{\Arg} 
-       \MID \BININSTR{\code{movzbq}}{\Arg}{\Arg}\\
+\Instr &::=& \BININSTR{\code{xorq}}{\Src}{\Dst}
+       \MID \BININSTR{\code{cmpq}}{\Src}{\Src}\\
+       &\MID& \BININSTR{\code{set}}{\itm{cc}}{\Dst} 
+       \MID \BININSTR{\code{movzbq}}{\Src}{\Dst}\\
        &\MID&  \JMPIF{\itm{cc}}{\itm{label}} 
 \end{array}
 }
@@ -8748,14 +8746,15 @@ $\Atm$ to x86:
 \begin{array}{lcl}
 \itm{bytereg} &::=& \skey{ah} \MID \skey{al} \MID \skey{bh} \MID \skey{bl}
     \MID \skey{ch} \MID \skey{cl} \MID \skey{dh} \MID \skey{dl} \\
-\Arg &::=&  \gray{\IMM{\Int} \MID \REG{\Reg} \MID \DEREF{\Reg}{\Int}} 
+\Dst &::=&  \gray{\REG{\Reg} \MID \DEREF{\Reg}{\Int}} 
      \MID \BYTEREG{\itm{bytereg}} \\
+\Src &::=&  \gray{\IMM{\Int} \MID \Dst} \\
 \itm{cc} & ::= & \skey{e} \MID \skey{ne} \MID \skey{l} \MID \skey{le} \MID \skey{g} \MID \skey{ge} \\
-\Instr &::=& \BININSTR{\scode{xorq}}{\Arg}{\Arg}
-       \MID \BININSTR{\scode{cmpq}}{\Arg}{\Arg}\\
-       &\MID& \UNIINSTR{\scode{set}\code{+}\itm{cc}}{\Arg} 
-       \MID \BININSTR{\scode{movzbq}}{\Arg}{\Arg}\\
-       &\MID&  \python{\JMP{\itm{label}}} \MID \JMPIF{\itm{cc}}{\itm{label}} 
+\Instr &::=& \BININSTR{\scode{xorq}}{\Src}{\Dst}
+       \MID \BININSTR{\scode{cmpq}}{\Src}{\Src}\\
+       &\MID& \UNIINSTR{\scode{set}\code{+}\itm{cc}}{\Dst} 
+       \MID \BININSTR{\scode{movzbq}}{\Src}{\Dst}\\
+       &\MID& \python{\JMP{\itm{label}}} \MID \JMPIF{\itm{cc}}{\itm{label}} 
 \end{array}
 }
 
@@ -9862,13 +9861,13 @@ then just the \code{xorq} instruction suffices.
 \key{xorq}~\key{\$}1\key{,}~\Var
 \]
 Otherwise, a \key{movq} is needed to adapt to the update-in-place
-semantics of x86. In the following translation, let $\Arg$ be the
+semantics of x86. In the following translation, let $\Src$ be the
 result of translating $\Atm$ to x86.
 \[
 \CASSIGN{\Var}{ \CUNIOP{\key{not}}{\Atm} }
 \quad\Rightarrow\quad
 \begin{array}{l}
-\key{movq}~\Arg\key{,}~\Var\\
+\key{movq}~\Src\key{,}~\Var\\
 \key{xorq}~\key{\$}1\key{,}~\Var
 \end{array}
 \]
@@ -9877,8 +9876,8 @@ Next consider the cases for equality comparisons.  Translating this
 operation to x86 is slightly involved due to the unusual nature of the
 \key{cmpq} instruction that we discussed in section~\ref{sec:x86-if}.
 We recommend translating an assignment with an equality on the
-right-hand side into a sequence of three instructions. Let $\Arg_1$
-be the translation of $\Atm_1$ to x86 and likewise for $\Arg_2$.\\
+right-hand side into a sequence of three instructions. Let $\Src_1$
+be the translation of $\Atm_1$ to x86 and likewise for $\Src_2$.\\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
 $\CASSIGN{\Var}{ \CEQ{\Atm_1}{\Atm_2} }$ 
@@ -9888,7 +9887,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-cmpq |$\Arg_2$|, |$\Arg_1$|
+cmpq |$\Src_2$|, |$\Src_1$|
 sete %al
 movzbq %al, |$\Var$|
 \end{lstlisting}
@@ -9908,7 +9907,7 @@ A \key{goto} statement becomes a jump instruction.
 %
 An \key{if} statement becomes a compare instruction followed by a
 conditional jump (for the \emph{then} branch), and the fall-through is to
-a regular jump (for the \emph{else} branch). Again, $\Arg_1$ and $\Arg_2$
+a regular jump (for the \emph{else} branch). Again, $\Src_1$ and $\Src_2$
 are the translations of $\Atm_1$ and $\Atm_2$, respectively.\\
 \begin{tabular}{lll}
 \begin{minipage}{0.4\textwidth}
@@ -9924,7 +9923,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-cmpq |$\Arg_2$|, |$\Arg_1$|
+cmpq |$\Src_2$|, |$\Src_1$|
 je |$\ell_1$|
 jmp |$\ell_2$|
 \end{lstlisting}
@@ -13536,7 +13535,7 @@ $\Rightarrow$
 &
 \begin{minipage}{0.4\textwidth}
 \begin{lstlisting}
-cmpq |$\Arg_2$|, |$\Arg_1$|
+cmpq |$\Src_2$|, |$\Src_1$|
 sete %al
 movzbq %al, |$\Var$|
 \end{lstlisting}
@@ -13547,17 +13546,17 @@ movzbq %al, |$\Var$|
 
 \newcommand{\GrammarXGlobal}{
 \begin{array}{lcl}
-  \Instr &::=& \key{andq}~\Arg\key{,}~\Arg
-          \MID \key{sarq}~\Arg\key{,}~\Arg \\
-  \Arg &::=& \itm{label} \key{(\%rip)} 
+  \Instr &::=& \key{andq}~\Src\key{,}~\Dst
+          \MID \key{sarq}~\Src\key{,}~\Dst \\
+  \Src &::=& \itm{label} \key{(\%rip)} 
 \end{array}
 }
 
 \newcommand{\ASTXGlobalRacket}{
 \begin{array}{lcl}
-  \Instr &::=& \BININSTR{\scode{andq}}{\Arg}{\Arg} \MID
-               \BININSTR{\scode{sarq}}{\Arg}{\Arg} \\
-  \Arg &::=&  \GLOBAL{\itm{label}} 
+  \Instr &::=& \BININSTR{\scode{andq}}{\Src}{\Dst} \MID
+               \BININSTR{\scode{sarq}}{\Src}{\Dst} \\
+  \Src &::=&  \GLOBAL{\itm{label}} 
 \end{array}
 }
 
@@ -16477,8 +16476,8 @@ this section.  \index{subject}{x86}
 
 \newcommand{\GrammarXIndCall}{
 \begin{array}{lcl}
-\Instr &::=&  \key{callq}\;\key{*}\Arg \MID \key{tailjmp}\;\Arg 
-     \MID \key{leaq}\;\Arg\key{,}\;\key{\%}\Reg \\
+\Instr &::=&  \key{callq}\;\key{*}\Src \MID \key{tailjmp}\;\Src 
+     \MID \key{leaq}\;\Src\key{,}\;\key{\%}\Reg \\
 \Block &::= & \Instr^{+} \\
 \Def &::= & \code{.globl}\,\code{.align 8}\,\itm{label}\; (\itm{label}\key{:}\, \Block)^{*} 
 \end{array}
@@ -16486,9 +16485,9 @@ this section.  \index{subject}{x86}
 
 \newcommand{\ASTXIndCallRacket}{
 \begin{array}{lcl}
-  \Instr &::=& \INDCALLQ{\Arg}{\itm{int}}
-    \MID \TAILJMP{\Arg}{\itm{int}}\\
-    &\MID& \BININSTR{\code{'leaq}}{\Arg}{\REG{\Reg}}\\
+  \Instr &::=& \INDCALLQ{\Src}{\itm{int}}
+    \MID \TAILJMP{\Src}{\itm{int}}\\
+    &\MID& \BININSTR{\code{'leaq}}{\Src}{\REG{\Reg}}\\
   \Block &::= & \BLOCK{\itm{info}}{\LP\Instr\ldots\RP}\\
   \Def &::= & \DEF{\itm{label}}{\code{'()}}{\Type}{\itm{info}}{\LP\LP\itm{label}\,\key{.}\,\Block\RP\ldots\RP} 
 \end{array}
@@ -16548,12 +16547,13 @@ this section.  \index{subject}{x86}
 {\if\edition\pythonEd\pythonColor
 \[
 \begin{array}{lcl}
-  \Arg &::=&  \gray{  \INT{\Int} \MID \REG{\Reg} \MID \DEREF{\Reg}{\Int}
+  \Dst &::=&  \gray{  \REG{\Reg} \MID \DEREF{\Reg}{\Int}
      \MID \BYTEREG{\Reg} } \\
+  \Src &::=&  \gray{  \INT{\Int} \MID \Dst } \\
      &\MID& \gray{ \GLOBAL{\itm{label}} } \MID \FUNREF{\itm{label}}{\Int} \\
-  \Instr &::=& \ldots \MID \INDCALLQ{\Arg}{\itm{int}}
-    \MID \TAILJMP{\Arg}{\itm{int}}\\
-    &\MID& \BININSTR{\scode{leaq}}{\Arg}{\REG{\Reg}}\\
+  \Instr &::=& \ldots \MID \INDCALLQ{\Src}{\itm{int}}
+    \MID \TAILJMP{\Src}{\itm{int}}\\
+    &\MID& \BININSTR{\scode{leaq}}{\Src}{\REG{\Reg}}\\
   \Block &::=&\itm{label}\key{:}\,\Instr^{*} \\
   \Def &::= & \DEF{\itm{label}}{\LS\RS}{\LC\Block\code{,}\ldots\RC}{\_}{\Type}{\_} \\
 \LangXIndCallM{} &::= & \XPROGRAMDEFS{\LS\Def\code{,}\ldots\RS}
@@ -16568,7 +16568,7 @@ this section.  \index{subject}{x86}
 
 An assignment of a function reference to a variable becomes a
 load-effective-address instruction as follows, where $\itm{lhs}'$ is
-the translation of $\itm{lhs}$ from \Atm{} in \LangCFun{} to \Arg{} in
+the translation of $\itm{lhs}$ from \Atm{} in \LangCFun{} to \Src{} in
 \LangXIndCallVar{}. The \code{FunRef} becomes a \code{Global} AST
 node, whose concrete syntax is instruction-pointer-relative
 addressing.
@@ -16651,7 +16651,7 @@ $\Rightarrow$
 Recall that we use the label \code{start} for the initial block of a
 program, and in section~\ref{sec:select-Lvar} we recommend labeling
 the conclusion of the program with \code{conclusion}, so that
-$\RETURN{Arg}$ can be compiled to an assignment to \code{rax} followed
+$\RETURN{\Atm}$ can be compiled to an assignment to \code{rax} followed
 by a jump to \code{conclusion}. With the addition of function
 definitions, there is a start block and conclusion for each function,
 but their labels need to be unique. We recommend prepending the
