@@ -11519,18 +11519,20 @@ in the program will eventually produce the least fixed point solution.
 Next let us consider dataflow analysis in general and discuss the
 generic work list algorithm (figure~\ref{fig:generic-dataflow}). 
 %
-The algorithm has four parameters: the control-flow graph \code{G}, a
+The algorithm has six parameters: the control-flow graph \code{G}, a
 function \code{transfer} that applies the analysis to one block, and the
-\code{bottom} and \code{join} operators for the lattice of abstract
-states. The \code{analyze\_dataflow} function is formulated as a
-\emph{forward} dataflow analysis; that is, the inputs to the transfer
-function come from the predecessor nodes in the control-flow
-graph. However, liveness analysis is a \emph{backward} dataflow
-analysis, so in that case one must supply the \code{analyze\_dataflow}
-function with the transpose of the control-flow graph.
+\code{bottom}, \code{join} operators for the lattice of abstract
+states, a set \code{extremals} containing all nodes in the graph that
+are extremal points, and the \code{iota} parameter which maps extremal
+points, the entry and exit nodes for the program, to their initial values. 
+The \code{analyze\_dataflow} function is formulated as a \emph{forward} 
+dataflow analysis; that is, the inputs  to the transfer function come from 
+the predecessor nodes in the control-flow graph. However, liveness analysis is a 
+\emph{backward} dataflow analysis, so in that case one must supply the 
+\code{analyze\_dataflow} function with the transpose of the control-flow graph.
 
-The algorithm begins by creating the bottom mapping, represented by a
-hash table.  It then pushes all the nodes in the control-flow graph
+The algorithm begins by creating the bottom and iota mappings, represented by
+a hash table.  It then pushes all the nodes in the control-flow graph
 onto the work list (a queue). The algorithm repeats the \code{while}
 loop as long as there are items in the work list. In each iteration, a
 node is popped from the work list and processed. The \code{input} for
@@ -11544,10 +11546,12 @@ updated and its successor nodes are pushed onto the work list.
 \begin{tcolorbox}[colback=white]  
 {\if\edition\racketEd    
 \begin{lstlisting}
-(define (analyze_dataflow G transfer bottom join)
+(define (analyze_dataflow G transfer bottom join extremals iota)
   (define mapping (make-hash))
   (for ([v (in-vertices G)])
-    (dict-set! mapping v bottom))
+    (if (set-member? extremals v)
+      (dict-set! mapping v iota)
+      (dict-set! mapping v bottom)))
   (define worklist (make-queue))
   (for ([v (in-vertices G)])
     (enqueue! worklist v))
@@ -11567,9 +11571,9 @@ updated and its successor nodes are pushed onto the work list.
 \fi}
 {\if\edition\pythonEd\pythonColor
 \begin{lstlisting}
-def analyze_dataflow(G, transfer, bottom, join):
+def analyze_dataflow(G, transfer, bottom, join, iota, extremal):
   trans_G  = transpose(G)
-  mapping  = dict((v, bottom) for v in G.vertices())
+  mapping  = dict((v, iota) for v in G.vertices() if v in extremal else (v, bottom))
   worklist = deque(G.vertices)
   while worklist:
     node = worklist.pop()
@@ -12009,6 +12013,13 @@ The \code{analyze\_dataflow} function has the following four parameters.
   parameters: the label for the block to analyze and the live-after
   set for that block.  The transfer function should return the
   live-before set for the block.
+\item The fifth parameter \code{extremals} should be passed a set containing
+  all extremal relavent nodes in a graph. For liveness analysis, this should only
+  be the conclusion block, as a block will never jump to the prelude.
+\item The sixth parameters \code{iota} should be passed a set for the initial
+  values of extremal points. For liveness analysis this should be a set 
+  containing the registers \key{rax} and \key{rsp}, which coressponds to the
+  live before set of the conclusion.
   %
   \racket{Also, as a side effect, it should update the block's
     $\itm{info}$ with the liveness information for each instruction.}
