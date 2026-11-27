@@ -15669,6 +15669,43 @@ the type of the function expression to a function type and check that
 the types of the argument expressions are equal to the function's
 parameter types. The type of the \racket{application}\python{call} as
 a whole is the return type from the function type.
+%
+Comparing functions with \racket{\code{eq?}}\python{\code{==} or
+\code{!=}} is a type error. For example, the comparison
+\racket{\code{(eq? h j)} in
+\code{(let ([h f]) (let ([j f]) (eq? h j)))}}\python{\code{h == j}
+  after \code{h = f} and \code{j = f}} is rejected. (In
+chapter~\ref{ch:Llambda}, each reference to a function produces a new
+closure, so such a comparison would be false.)
+So in addition to the cases shown in figure~\ref{fig:type-check-Lfun},
+the type checker for \LangFun{} includes the following case for
+\racket{\code{eq?}. It checks that the first operand is not a function
+  and then defers to the case for \code{eq?} in the super class, which
+  checks that the two operands have the same type.}%
+\python{\code{==} and \code{!=}. It checks that the left operand is
+  not a function and that the two operands have the same type.}
+{\if\edition\racketEd
+\begin{lstlisting}
+[(Prim 'eq? (list e1 e2))
+ (define-values (e1^ T1) ((type-check-exp env) e1))
+ (match T1
+   [`(,ts ... -> ,rt)
+    (error 'type-check "cannot compare functions in ~v" e)]
+   [else ((super type-check-exp env) e)])]
+\end{lstlisting}
+\fi}
+{\if\edition\pythonEd\pythonColor
+\begin{lstlisting}
+case Compare(left, [cmp], [right]) if isinstance(cmp, Eq) \
+                                      or isinstance(cmp, NotEq):
+  l = self.type_check_exp(left, env)
+  r = self.type_check_exp(right, env)
+  if isinstance(l, FunctionType):
+    raise Exception('type_check_exp: cannot compare functions')
+  check_type_equal(l, r, e)
+  return bool
+\end{lstlisting}
+\fi}
 
 
 \begin{figure}[tp]
